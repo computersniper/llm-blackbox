@@ -16,13 +16,23 @@ const MONTAGE = [
   { R: 52, n: 70e9, sub: '一个 700 亿参数的模型（如 Llama 3 70B）' },
 ];
 
+// 返回 HTML：极大/极小的数用 ×10 的上标写法
 const fmtVal = (v) => {
   if (Number.isNaN(v)) return 'NaN';
   if (!Number.isFinite(v)) return v > 0 ? '+∞' : '−∞';
   if (v === 0) return '0';
   const a = Math.abs(v);
-  const s = a >= 1e5 || a < 1e-4 ? a.toExponential(4).replace('e', ' × 10^') : a.toPrecision(7);
+  let s;
+  if (a >= 1e5 || a < 1e-4) {
+    const [m, e] = a.toExponential(4).split('e');
+    s = `${m} × 10<sup>${Number(e) < 0 ? '−' : ''}${Math.abs(Number(e))}</sup>`;
+  } else s = a.toPrecision(7);
   return (v < 0 ? '−' : '') + s;
+};
+const fmtRatio = (r) => {
+  if (r < 1e5) return fmtNum(r);
+  const k = Math.round(Math.log2(r));
+  return `2<sup>${k}</sup>（≈ 10<sup>${Math.round(k * Math.LOG10E * Math.LN2)}</sup>）`;
 };
 const fmtBytes = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(b >= 1e10 ? 0 : 1)} GB` : `${(b / 1e6).toFixed(0)} MB`);
 
@@ -95,14 +105,14 @@ export default {
       const v = dec.value;
       $('.bt-fname', el).textContent = `${fmt} · ${F.name} · ${F.note}`;
       const valEl = $('.bt-value', el);
-      valEl.textContent = fmtVal(v);
+      valEl.innerHTML = fmtVal(v);
       const changed = flips > 0;
       valEl.classList.toggle('changed', changed);
       let diff = '';
       if (!Number.isFinite(v)) diff = '指数位全是 1：它不再是一个正常的数。模型里只要混进一个这样的值，结果就会全部崩坏。';
       else if (changed) {
         const ratio = Math.abs(v / original);
-        diff = ratio > 8 || ratio < 1 / 8 ? `和原值相差 <b>${ratio >= 1 ? fmtNum(ratio) : `1/${fmtNum(1 / ratio)}`} 倍</b>，只因为翻转了一个比特。` : `原值 ${fmtVal(original)}，现在 ${fmtVal(v)}。`;
+        diff = ratio > 8 ? `变成了原来的 <b>${fmtRatio(ratio)} 倍</b>，只因为翻转了一个比特。` : ratio < 1 / 8 ? `缩小到原来的 <b>1 / ${fmtRatio(1 / ratio)}</b>，只因为翻转了一个比特。` : `原值 ${fmtVal(original)}，现在 ${fmtVal(v)}。`;
       } else {
         const err = Math.abs(v - original) / Math.abs(original || 1);
         diff = `原值 ${fmtVal(original)} · 用 ${fmt} 存储后的误差 <b>${(err * 100).toFixed(err < 0.001 ? 4 : 2)}%</b>`;
@@ -124,7 +134,7 @@ export default {
       } else if (dec.e === 0) {
         formula = `(−1)<sup>${dec.s}</sup> × 2<sup>1 − ${dec.bias}</sup> × (${dec.m} / 2<sup>${dec.man}</sup>) = <b class="acc">${fmtVal(v)}</b> <span class="dimmed">（指数为 0：非规格化数）</span>`;
       } else {
-        formula = `(−1)<sup class="s">${dec.s}</sup> × 2<sup class="e">${dec.e} − ${dec.bias}</sup> × (1 + <span class="m">${dec.m}</span> / 2<sup>${dec.man}</sup>) = ${dec.s ? '−' : ''}${Math.pow(2, dec.e - dec.bias)} × ${(1 + dec.m / Math.pow(2, dec.man)).toFixed(5)} = <b class="acc">${fmtVal(v)}</b>`;
+        formula = `(−1)<sup class="s">${dec.s}</sup> × 2<sup class="e">${dec.e} − ${dec.bias}</sup> × (1 + <span class="m">${dec.m}</span> / 2<sup>${dec.man}</sup>) = ${dec.s ? '−' : ''}${fmtVal(Math.pow(2, dec.e - dec.bias))} × ${(1 + dec.m / Math.pow(2, dec.man)).toFixed(5)} = <b class="acc">${fmtVal(v)}</b>`;
       }
       $('.bt-formula', el).innerHTML = formula;
 

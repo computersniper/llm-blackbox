@@ -417,6 +417,7 @@
 .bt-main { padding: 22px 24px; margin-bottom: 18px; }
 .bt-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
 .bt-value { font-size: clamp(34px, 5vw, 60px); font-weight: 700; line-height: 1.1; color: var(--ink); letter-spacing: -.01em; transition: color .3s, text-shadow .3s; margin: 6px 0 4px; word-break: break-all; }
+.bt-value sup { font-size: .45em; vertical-align: super; margin-left: 2px; }
 .bt-value.changed { color: var(--amber); text-shadow: 0 0 30px rgba(255, 182, 92, .35); }
 .bt-diff b { color: var(--ink); }
 .bt-bits { display: flex; gap: 6px; perspective: 600px; }
