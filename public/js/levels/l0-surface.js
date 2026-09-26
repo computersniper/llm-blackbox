@@ -64,6 +64,7 @@ export default {
     const tilt = $('.sf-tilt', el);
     input.value = app.state.prompt;
     let launching = false;
+    let alive = true;
     const timers = [];
 
     // 统计数字滚动
@@ -151,15 +152,19 @@ export default {
       timers.push(drain);
       await sleep(reducedMotion ? 0 : Math.min(1500, chars.length * 28 + 650));
       clearInterval(drain);
+      if (!alive) return;
       zone.classList.add('charged');
       el.classList.add('launch');
       app.discover('enter');
       await sleep(reducedMotion ? 0 : 520);
-      app.go(1, cube);
+      if (alive) app.go(1, cube);
     });
+
+    app.setNext('下潜 <b>↓</b>', () => form.requestSubmit());
 
     return {
       destroy() {
+        alive = false;
         removeEventListener('pointermove', onMove);
         timers.forEach((t) => { clearTimeout(t); clearInterval(t); });
         $$('.sf-fly').forEach((s) => s.remove());

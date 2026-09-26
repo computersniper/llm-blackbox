@@ -110,6 +110,7 @@ export default {
       valEl.classList.toggle('changed', changed);
       let diff = '';
       if (!Number.isFinite(v)) diff = '指数位全是 1：它不再是一个正常的数。模型里只要混进一个这样的值，结果就会全部崩坏。';
+      else if (changed && (v === 0 || original === 0)) diff = `原值 ${fmtVal(original)}，现在 ${fmtVal(v)}。`;
       else if (changed) {
         const ratio = Math.abs(v / original);
         diff = ratio > 8 ? `变成了原来的 <b>${fmtRatio(ratio)} 倍</b>，只因为翻转了一个比特。` : ratio < 1 / 8 ? `缩小到原来的 <b>1 / ${fmtRatio(1 / ratio)}</b>，只因为翻转了一个比特。` : `原值 ${fmtVal(original)}，现在 ${fmtVal(v)}。`;

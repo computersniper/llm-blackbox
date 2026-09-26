@@ -26,6 +26,7 @@ export default {
     let rot = 0;
     let spinning = false;
     let auto = false;
+    let autoRun = 0;
     let alive = true;
     let tempTouched = false;
 
@@ -154,13 +155,14 @@ export default {
 
     const spin = async () => {
       if (spinning || !alive) return;
-      if (Array.from(app.state.prompt).length >= 78) {
+      if (Array.from(app.state.prompt).length >= 68) {
         app.say('句子已经够长了。点“重置句子”重新开始，或者带着这句话<b>再潜一次</b>。');
         auto = false;
         return;
       }
       spinning = true;
       el.classList.add('spinning');
+      range.disabled = true;
       const d = withTemperature(app.model.dist, st.temp);
       const pick = sampleFrom(d);
       let seg = segs.find((s) => s.k === pick.k) || segs.find((s) => s.other) || segs[0];
@@ -207,16 +209,18 @@ export default {
       st.generated++;
       renderLine(n);
       if (st.generated >= 3) app.discover('autoregress');
-      if (pick.k === -1) app.say(`掷到了长尾里的「${esc(tokPlain(pick.text))}」！五万个低概率词元加起来也不少，<b>温度越高，越容易掷到这种怪词</b>。`);
+      if (pick.k === -1 || seg.other) app.say(`掷到了长尾里的「${esc(tokPlain(pick.text))}」！五万个低概率词元加起来也不少，<b>温度越高，越容易掷到这种怪词</b>。`);
       else if (!auto) app.say(`掷出了「${esc(tokPlain(pick.text))}」，接到句子末尾。然后整个模型<b>从分词开始，再完整跑一遍</b>，只为了下一个词元。再掷一次试试？`);
       await runPipe();
       renderDist();
       $$('.op-seg', el).forEach((p) => p.classList.remove('hit'));
       el.classList.remove('spinning');
+      range.disabled = false;
       spinning = false;
     };
 
     range.addEventListener('input', () => {
+      if (spinning) { range.value = st.temp; return; } // 转盘转动时不改分布
       st.temp = Number(range.value);
       setFill();
       renderDist();
@@ -237,14 +241,18 @@ export default {
 
     $('.op-spin', el).addEventListener('click', () => { app.sfx.click(); spin(); });
     $('.op-auto', el).addEventListener('click', async (e) => {
-      if (auto) { auto = false; return; }
-      auto = true;
       const btn = e.currentTarget;
+      if (auto) { auto = false; btn.textContent = '自动生成 × 6'; return; }
+      auto = true;
+      const run = ++autoRun;
       btn.textContent = '停止';
-      for (let i = 0; i < 6 && auto && alive; i++) {
+      for (let i = 0; i < 6 && auto && alive && run === autoRun; i++) {
+        while (spinning && alive && run === autoRun) await sleep(80); // 等上一次转完
+        if (!auto || run !== autoRun) break;
         await spin();
         await sleep(reducedMotion ? 0 : 150);
       }
+      if (run !== autoRun) return;
       auto = false;
       if (alive) btn.textContent = '自动生成 × 6';
       if (alive) app.say(`这就是大模型“说话”的方式：<b>一次一个词元，每次都把整句话从头算一遍</b>。你刚刚看着它生成了 ${st.generated} 个。`);

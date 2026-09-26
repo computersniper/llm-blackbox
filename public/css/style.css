@@ -374,7 +374,7 @@ body.at-surface .narrator { transform: translateY(140%); opacity: 0; pointer-eve
 /* ---------------- 窄屏 ---------------- */
 
 @media (max-width: 900px) {
-  :root { --gauge-w: 0px; --hud-h: 54px; --nar-h: 128px; }
+  :root { --gauge-w: 0px; --hud-h: 54px; --nar-h: 164px; }
   .gauge { display: none; }
   .hud-prompt { display: none; }
   .hud-top { gap: 10px; padding: 0 12px; justify-content: space-between; }
@@ -382,7 +382,7 @@ body.at-surface .narrator { transform: translateY(140%); opacity: 0; pointer-eve
   .brand-zh { display: none; }
   .narrator { left: 10px; right: 10px; bottom: 10px; flex-wrap: wrap; align-content: center; gap: 8px 12px; padding: 10px 12px; height: calc(var(--nar-h) - 18px); }
   .nar-avatar { width: 28px; height: 28px; }
-  .nar-text { font-size: 13.5px; flex-basis: calc(100% - 44px); max-height: 3.2em; }
+  .nar-text { font-size: 13.5px; line-height: 1.5; flex-basis: calc(100% - 44px); max-height: 6.1em; overflow-y: auto; overscroll-behavior: contain; }
   .nar-actions { width: 100%; justify-content: flex-end; }
   .nar-actions .btn { height: 34px; padding: 0 14px; }
   .scene { padding: 16px 16px 24px; }

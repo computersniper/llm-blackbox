@@ -188,9 +188,16 @@ export default {
       canvas.style.cursor = 'zoom-in';
     });
     canvas.addEventListener('pointerleave', () => { hover = -1; draw(); app.tip.hide(); });
+    const cellAt = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const { cs, ox, oy } = geom;
+      const c = Math.floor((e.clientX - r.left - ox) / cs), rr = Math.floor((e.clientY - r.top - oy) / cs);
+      return c < 0 || rr < 0 || c >= COLS || rr >= ROWS ? -1 : rr * COLS + c;
+    };
     canvas.addEventListener('click', (e) => {
-      if (hover < 0) return;
-      st.neuron = hover;
+      const j = cellAt(e); // 触屏上没有 pointermove，直接按点击位置算
+      if (j < 0) return;
+      st.neuron = j;
       app.sfx.click();
       app.go(6, e);
     });
@@ -201,11 +208,11 @@ export default {
       acts = actsOf(st.focus);
       reveal = 1;
       tween(acts);
-      renderSide();
+      ({ top } = renderSide());
       app.sfx.click();
     }));
 
-    const { strong, top } = renderSide();
+    let { strong, top } = renderSide();
     const off = onResize($('.mp-canvas-wrap', el), draw);
     const timer = setTimeout(() => app.discover('sparse'), 2400);
 

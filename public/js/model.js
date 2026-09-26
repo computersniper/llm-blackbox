@@ -51,6 +51,8 @@ export function gaussian(r) {
 }
 
 export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+// 用户输入会被当作键去查表，必须避开 Object.prototype 上的 valueOf、constructor 等
+const own = (obj, k) => (Object.hasOwn(obj, k) ? obj[k] : undefined);
 
 /* ------------------------------------------------------------------ */
 /* 词汇与语义类别                                                      */
@@ -117,7 +119,7 @@ export const MAP_WORDS = [
 const RELATED = { 'nature|poetry': 0.8, 'nature|time': 0.35, 'place|people': 0.3, 'tech|people': 0.2, 'poetry|place': 0.35, 'emotion|people': 0.3, 'color|nature': 0.45 };
 export function catSim(a, b) {
   if (a === b) return a === 'func' || a === 'punct' || a === 'misc' ? 0.35 : 1;
-  return RELATED[`${a}|${b}`] ?? RELATED[`${b}|${a}`] ?? 0;
+  return own(RELATED, `${a}|${b}`) ?? own(RELATED, `${b}|${a}`) ?? 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,7 +186,7 @@ function catOf(text, kind) {
 }
 
 function makeTok(text, kind, extra = {}) {
-  const id = extra.id ?? KNOWN_IDS[text] ?? (300 + (hashStr(text, 7) % 49900));
+  const id = extra.id ?? own(KNOWN_IDS, text) ?? (300 + (hashStr(text, 7) % 49900));
   return { text, kind, id, cat: catOf(text, kind), ...extra };
 }
 
@@ -285,7 +287,7 @@ export function posEnc(pos, i, d = CFG.dModel) {
 
 export function mapPos(t) {
   const key = t.text.trim();
-  if (FIXED_POS[key]) return FIXED_POS[key];
+  if (own(FIXED_POS, key)) return FIXED_POS[key];
   const cat = CATS[t.cat] ?? CATS.misc;
   const r = rngFor('map', key);
   if (t.cat === 'misc') return [-0.1 + (r() - 0.5) * 1.6, -0.2 + (r() - 0.5) * 1.2];
@@ -461,7 +463,7 @@ const NEXT = {
 };
 const ZH_DEFAULT = ['的', '，', '是', '了', '。', '在', '和', '我'];
 const EN_DEFAULT = [' the', ',', ' and', ' to', '.', ' of', ' a', ' is'];
-export const FILLER = ['泉', ' quantum', 'ing', '<0xE5>', '@', '…', ' banana', '彼', 'の', ' 然后', 'Ω', ' Tokyo', '器', ' seventeen', '#', '逻辑', ' pixel', '氢', '::', ' und', '阿', ' Mozart', '鲸', '{', ' tomato', '辑', ' sql', '凹'];
+export const FILLER = ['泉', ' quantum', 'ing', '垚', '@', '…', ' banana', '彼', 'の', ' 然后', 'Ω', ' Tokyo', '器', ' seventeen', '#', '逻辑', ' pixel', '氢', '::', ' und', '阿', ' Mozart', '鲸', '{', ' tomato', '辑', ' sql', '凹'];
 
 function isEnglishish(tokens) {
   const tail = tokens.slice(-4);
@@ -472,10 +474,10 @@ function heuristicCands(tokens) {
   const last = tokens[tokens.length - 1];
   if (!last) return ZH_DEFAULT.slice(0, 6);
   const key = last.text.trim().toLowerCase();
-  let cands = NEXT[last.text] || NEXT[key];
+  let cands = own(NEXT, last.text) || own(NEXT, key);
   if (!cands && last.kind === 'zh') {
     const ch = Array.from(last.text).pop();
-    cands = NEXT[ch];
+    cands = own(NEXT, ch);
   }
   if (!cands && last.kind === 'num') {
     const d = Number(key);
@@ -484,13 +486,13 @@ function heuristicCands(tokens) {
   if (!cands) cands = isEnglishish(tokens) ? EN_DEFAULT : ZH_DEFAULT;
   // 归纳头的行为：如果当前词元之前出现过，下一个词很可能重复上次跟在后面的那个
   for (let p = tokens.length - 2; p >= 0; p--) {
-    if (tokens[p].text.trim() === last.text.trim() && !isPunctTok(last) && p + 1 < tokens.length - 1) {
+    if (tokens[p].text.trim() === last.text.trim() && !isPunctTok(last) && p + 1 < tokens.length - 1 && tokens[p + 1].kind !== 'byte') {
       const nxt = tokens[p + 1].text;
       cands = [nxt, ...cands.filter((c) => c !== nxt)];
       break;
     }
   }
-  return cands.slice(0, 6);
+  return [...new Set(cands)].slice(0, 6);
 }
 
 function distFrom(list, tail, seedKey, topBoost = null) {

@@ -153,9 +153,10 @@ function originPoint(origin) {
 }
 
 async function go(target, origin) {
-  if (busy || target === state.depth) return;
+  if (busy || target === state.depth || !LEVELS[target]) return;
   if (target > state.max && target !== OUT && target > state.depth + 1) return;
   busy = true;
+  nextAction = null; // 转场期间旧场景的"继续"不再生效
   app.tip.hide();
   const from = state.depth;
   const dir = target === OUT ? -1 : from === OUT ? 1 : Math.sign(target - from) || 1;
@@ -350,14 +351,16 @@ function setHash(d) {
   setTimeout(() => { hashLock = false; }, 0);
 }
 function readHash() {
-  const m = location.hash.match(/^#\/(\d)$/);
+  const m = location.hash.match(/^#\/([0-8])$/);
   return m ? Number(m[1]) : 0;
 }
-addEventListener('popstate', () => {
-  if (hashLock) return;
+function followHash() {
   const d = readHash();
-  if (d !== state.depth) go(d);
-});
+  if (d === state.depth) return;
+  if (busy) setTimeout(followHash, 300); // 转场中按了后退/前进：等转场结束再跟上
+  else go(d);
+}
+addEventListener('popstate', () => { if (!hashLock) followHash(); });
 
 /* ---------------- 事件 ---------------- */
 
@@ -367,7 +370,7 @@ function fillRange(r) {
 }
 document.addEventListener('input', (e) => { if (e.target.matches?.('input[type="range"]')) fillRange(e.target); });
 
-btnNext.addEventListener('click', (e) => { sfx.click(); nextAction?.(e); });
+btnNext.addEventListener('click', (e) => { if (busy) return; sfx.click(); nextAction?.(e); });
 btnUp.addEventListener('click', (e) => { sfx.click(); app.up(e); });
 $('#btnCodex').addEventListener('click', () => { sfx.click(); openCodex(); });
 $('.cx-close', codex).addEventListener('click', closeCodex);
