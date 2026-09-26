@@ -119,6 +119,7 @@ async function enterInspect(msg) {
     $('#loading').hidden = false;
     try { await ensureEngine(); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
     engine.active = true;
+    if (matchMedia('(max-width: 900px)').matches && !$('#dbg').classList.contains('folded')) { $('#dbg').classList.add('folded'); $('#btnDbgFold').textContent = '+'; }
     updateInsets();
     sfx.dive();
   }

@@ -1,26 +1,48 @@
-# 潜入黑箱 · Black Box
+# 揭开黑箱 · Black Box
 
-一个可交互的大模型内部探索网站：从你写下的一句话出发，一层层下潜到组成模型的最小单位——一个比特，再上浮回来，看它说出下一个词。
+和真实的开源大模型 **Qwen3-0.6B** 聊天，然后像调试程序一样，一层层揭开它，看它是怎么想出每一个字的。
 
 线上地址：<https://caijiechao.com/blackbox/>
 
-## 九个深度
+## 玩法
 
-| 深度 | 场景 | 可以做什么 |
+1. **聊天**：用点选式输入法（候选就是问题的真实分词，Qwen3 的词元和编号）拼出问题，发送。模型像平常的 AI 一样流式回答。
+2. **＋ 揭开**：点消息旁的 ＋，右侧出现一台 3D 机器。每按一次 ＋ 往里钻一层（单步进入），− 退回（跳出）：
+
+| 深度 | 看到什么 | 每一步是什么 |
 | --- | --- | --- |
-| 00 地表 | 3D 黑箱 + 输入框 | 输入一句话，字符飞进黑箱，镜头冲进去 |
-| 01 分词 | 激光切句、词元编号 | 分词实验室：数字、emoji、长单词 |
-| 02 嵌入 | 768 维条形码、语义地图 | 向量算术（国王 − 男人 + 女人）、位置编码 |
-| 03 层塔 | 12 层等轴测塔、残差流 | 逻辑透镜：逐层看模型的“猜测”怎样成形 |
-| 04 注意力 | 弧线、注意力矩阵、12 个头 | 前一词头 / 汇聚头 / 归纳头 / 因果遮罩 |
-| 05 前馈网络 | 3072 个神经元阵列 | 稀疏激活、多义神经元 |
-| 06 神经元内部 | 逐项乘加、激活函数 | 拖动权重，切换 GELU / ReLU / SiLU |
-| 07 比特 | bf16 的 16 个比特 | 翻转比特、FP32/BF16/FP16/INT8/INT4 量化、规模蒙太奇 |
-| ↑ 输出 | 概率分布 + 转盘 | 温度、贪心解码、自回归生成 |
+| D1 黑箱 | 合着的机箱，想完一个词就吐出一块 | 每个词元一步 |
+| D2 结构 | 机箱揭开：词元托盘、28 层玻璃层板、残差流光柱、lm_head、采样轨道、自回归回路 | 读入 / 嵌入 / 28 层 / 输出头 / 采样 |
+| D3 层塔 | 每层旁边有逻辑透镜读数，层板上有 KV 缓存和注意力光束 | 逐层 |
+| D4 一层之内 | 拆开的一层：RMSNorm → 注意力 → ⊕ → RMSNorm → SwiGLU → ⊕ | 逐个算子 |
+| D5 算子 | 注意力：Q·K·V / 打分 / softmax / 加权求和，16 个查询头可切换；前馈：3072 个神经元阵列 | 算子内部 |
+| D6 一次乘加 | 一个 SwiGLU 神经元的真实乘加（gate、up 两个水箱，SiLU 斜坡，乘法阀门）；一次 Q·K 打分 | 乘 / 加 / 激活 |
+| D7 比特 | 一个 bf16 权重的 16 个比特键帽，可以翻转，看神经元输出怎么变 | — |
 
-一路上藏着 22 个“知识碎片”，靠互动解锁，右上角的图鉴可以查看。
+3. **调试器**：播放 / 暂停 / 上一步 / 下一步，0.25×–8× 倍速；右侧伪代码高亮当前行，并监视真实变量。键盘：空格、← →、＋ −、1–6 切换倍速。
 
-模型结构取自 GPT-2 Small（12 层 · 12 头 · 768 维 · 3072 个 MLP 神经元）。画面中的数值由 `public/js/model.js` 里的确定性规则生成，用来直观展示真实模型中会发生的现象，并非真实模型的推理结果。
+一路上藏着 19 个“知识碎片”，右上角的图鉴可以查看。
+
+## 数据是怎么来的
+
+`tools/export_qwen.py` 在本地用 GPU 跑真实的 Qwen3-0.6B（非思考模式，T=0.7 / top_k=20 / top_p=0.8，固定种子），为每个预设问题导出：
+
+- 聊天模板后的真实分词、生成的回答、每一步的前 12 名概率、各温度下的概率、top-k/top-p 候选池和采样用的随机数；
+- 逻辑透镜（每层输出接最终 RMSNorm + 输出矩阵）的前 3 名；
+- 每层每头的注意力（每行前 4 名）和 logsumexp（用来还原真实打分）；
+- 每层 SwiGLU 激活的前 16 名、第 14 层完整的 3072 维；
+- 焦点层（3 / 14 / 25）单个神经元与单次 Q·K 打分的真实乘加、真实的 bf16 权重；
+- 每层每个位置的残差范数。
+
+脚本会自己复现一遍注意力（RMSNorm → RoPE → GQA），并和模型输出对比（平均误差约 3×10⁻⁴）。导出结果在 `public/data/`，数据文件额外存一份 `.gz`，网页用 `DecompressionStream` 解压（服务器只对 HTML 做 gzip）。
+
+重新导出：
+
+```bash
+python tools/export_qwen.py --model /path/to/Qwen3-0.6B
+```
+
+需要 torch、transformers（5.x 已测试）、safetensors；模型可从 ModelScope 或 Hugging Face 下载。
 
 ## 本地运行
 
@@ -28,42 +50,34 @@
 
 ```bash
 cd public && python3 -m http.server 8765
-# 打开 http://127.0.0.1:8765/
 ```
 
 ## 目录
 
 ```
-public/            网站本体（部署的就是这个目录）
-  js/main.js       外壳：路由、缩放转场、深度仪表、旁白、图鉴
-  js/model.js      示意模型：分词器、嵌入、注意力、神经元、预测、浮点编码
-  js/levels/       九个深度，每个导出 { key, name, en, scale, mount(el, app) }
-  fonts/           自托管字体（思源宋体子集 + JetBrains Mono）
-deploy/            服务器端：post-receive 钩子与一次性初始化脚本
-tools/             截图测试、字体子集、版本号、发布脚本
+public/
+  js/main.js        聊天模式 / 揭开模式的切换，时间线、舞台、聊天气泡的联动
+  js/chat.js        聊天面板和点选输入法（前缀树）
+  js/timeline.js    调试器核心：按深度展开的步骤树、单步进入 / 跳出、播放
+  js/explain.js     伪代码、每一步的讲解、变量监视（全部用真实数值）
+  js/controls.js    调试器界面
+  js/data.js        读取导出的数据
+  js/stage/         Three.js 舞台：engine（渲染 / 相机 / 拾取）、machine（机器本体）、detail（神经元 / 打分 / 比特）
+  js/vendor/three/  自托管的 Three.js r186
+  data/             导出的真实模型数据
+tools/              导出脚本、截图测试、字体子集、版本号、发布
+deploy/             服务器端 post-receive 钩子与初始化脚本
 ```
 
-改了页面上的中文标题后，重新生成字体子集（否则新字会回退到系统字体）：
-
-```bash
-pip install fonttools brotli
-python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf
-```
+改了页面上的中文标题后，重新生成字体子集：`python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf`。
 
 ## 部署
 
-服务器上有一个 bare 仓库 `/srv/blackbox/repo.git`。推送 `main` 后，`post-receive` 钩子会导出 `public/`、给 CSS/JS 加上 `?v=<commit>`、放进 `/srv/blackbox/releases/<时间>-<commit>/`，再原子地切换 `/srv/blackbox/current`。博客根目录下的 `blackbox` 是指向它的软链接，nginx 不需要改动。保留最近 5 个版本。
+服务器上有 bare 仓库 `/srv/blackbox/repo.git`。推送 `main` 后，钩子导出 `public/`、给 CSS/JS 加 `?v=<commit>`、放进 `/srv/blackbox/releases/<时间>-<commit>/` 并原子切换 `/srv/blackbox/current`；博客根目录下的 `blackbox` 软链接指向它，nginx 不需要改动。保留最近 5 个版本。
 
 ```bash
 git remote add deploy root@182.61.48.178:/srv/blackbox/repo.git   # 只需一次
 git push deploy main                                               # 发布
 ```
 
-回滚：在服务器上把 `/srv/blackbox/current` 指回 `releases/` 里的旧目录即可。
-
-首次初始化服务器：
-
-```bash
-scp deploy/post-receive root@182.61.48.178:/tmp/blackbox-post-receive
-ssh root@182.61.48.178 'sh -s' < deploy/setup-server.sh
-```
+上一个版本（九个深度的分页式下潜）保存在 git 标签 `v1`。

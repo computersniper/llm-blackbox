@@ -165,7 +165,7 @@ body.mode-inspect .chat-head, body.mode-inspect .chat-log, body.mode-inspect .co
 .cmp-send { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 0; background: var(--acc); color: #04121a; font-size: 19px; font-weight: 900; cursor: pointer; transition: opacity .2s, transform .2s var(--ease), box-shadow .2s; box-shadow: 0 0 20px rgba(94, 240, 212, .35); }
 .cmp-send:disabled { opacity: .2; box-shadow: none; cursor: default; }
 .cmp-send:not(:disabled):hover { transform: translateY(-1px); }
-.cmp-cands { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 2px 0; min-height: 46px; }
+.cmp-cands { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 2px 0; min-height: 46px; max-height: min(38vh, 320px); overflow-y: auto; scrollbar-width: thin; }
 .cmp-cands .lab { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--faint); margin-right: 4px; }
 .cand { display: inline-flex; align-items: baseline; gap: 5px; height: 32px; padding: 0 11px; border-radius: 10px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .03); color: var(--ink); font-size: 14.5px; cursor: pointer; transition: background .2s, border-color .2s, transform .2s var(--ease); animation: candin .35s var(--ease) backwards; }
 .cand:hover { background: rgba(94, 240, 212, .1); border-color: rgba(94, 240, 212, .5); transform: translateY(-2px); }

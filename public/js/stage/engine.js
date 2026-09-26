@@ -30,7 +30,7 @@ export class Engine {
 
     const scene = (this.scene = new THREE.Scene());
     scene.background = new THREE.Color(BG);
-    scene.fog = new THREE.Fog(BG, 40, 120);
+    scene.fog = new THREE.Fog(BG, 70, 240);
     this.camera = new THREE.PerspectiveCamera(34, 1, 0.004, 400);
 
     const pmrem = new THREE.PMREMGenerator(r);
