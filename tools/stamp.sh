@@ -5,4 +5,4 @@ set -eu
 dir=$1
 v=$2
 sed -i "s#\(href=\"css/[^\"?]*\.css\)\"#\1?v=$v\"#g; s#\(src=\"js/main\.js\)\"#\1?v=$v\"#" "$dir/index.html"
-find "$dir/js" -name '*.js' -exec sed -i "s#\(from '[^'?]*\.js\)'#\1?v=$v'#g" {} +
+find "$dir/js" -name '*.js' -exec sed -i "s#\(from '[^'?]*\.js\)'#\1?v=$v'#g; s#\(import('[^'?]*\.js\)')#\1?v=$v')#g" {} +

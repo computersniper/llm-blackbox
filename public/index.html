@@ -3,57 +3,92 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>潜入黑箱 · 大模型内部探索</title>
-  <meta name="description" content="一场从一句话下潜到一个比特的旅程：可交互地探索大语言模型内部的分词、嵌入、注意力、神经元与浮点数。">
+  <title>揭开黑箱 · 看大模型如何想出每一个字</title>
+  <meta name="description" content="和真实的开源大模型 Qwen3-0.6B 聊天，然后像调试程序一样，一层层揭开它：词元、嵌入、28 层 Transformer、注意力、SwiGLU 神经元，直到权重的比特。所有数据都来自真实模型。">
   <meta name="theme-color" content="#060d1a">
-  <meta property="og:title" content="潜入黑箱 · 大模型内部探索">
-  <meta property="og:description" content="从一句话下潜到一个比特，亲手拆开大模型的“黑箱”。">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/levels.css">
+  <link rel="stylesheet" href="css/app.css">
 </head>
-<body class="at-surface" data-depth="0">
+<body class="mode-chat">
   <canvas id="bg" aria-hidden="true"></canvas>
   <div class="grain" aria-hidden="true"></div>
-  <div class="vignette" aria-hidden="true"></div>
 
-  <header class="hud-top">
-    <a class="brand" href="#/" aria-label="回到地表">
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="揭开黑箱">
       <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="brand-en">BLACK&nbsp;BOX</span>
-      <span class="brand-zh">潜入黑箱</span>
+      <span class="brand-zh">揭开黑箱</span>
     </a>
-    <div class="hud-prompt" id="hudPrompt"></div>
-    <div class="hud-actions">
-      <span class="hud-depth" id="hudDepth"></span>
-      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴">
-        <span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0/22</span>
-      </button>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
+    <div class="top-actions">
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
       <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
     </div>
   </header>
 
-  <nav class="gauge" id="gauge" aria-label="深度导航"></nav>
+  <div class="app">
+    <section class="chat" id="chat" aria-label="聊天">
+      <div class="chat-head">
+        <span class="avatar" aria-hidden="true"><i></i></span>
+        <div class="chat-title">
+          <b>Qwen3-0.6B</b>
+          <span>阿里开源的 6 亿参数模型 · 真实输出，离线录制</span>
+        </div>
+        <button class="chat-close" id="btnChatToggle" type="button" title="收起聊天">‹</button>
+      </div>
+      <div class="chat-log" id="chatLog" aria-live="polite"></div>
+      <div class="composer" id="composer">
+        <div class="cmp-row">
+          <button class="cmp-plus" id="btnPlus" type="button" title="揭开：看下一层（单步进入）" disabled>＋</button>
+          <div class="cmp-input" id="cmpInput" role="textbox" aria-label="用词元拼出的问题" aria-readonly="true"></div>
+          <button class="cmp-icon" id="btnBack" type="button" title="删掉最后一个词元">⌫</button>
+          <button class="cmp-send" id="btnSend" type="button" title="发送" disabled>↑</button>
+        </div>
+        <div class="cmp-cands" id="cands" aria-label="候选词元"></div>
+      </div>
+    </section>
 
-  <main id="stage"></main>
+    <section class="stage" id="stage" aria-label="模型内部">
+      <div class="gl" id="gl"></div>
+      <div class="stage-top">
+        <div class="stage-strip" id="strip"></div>
+      </div>
+      <div class="heads" id="heads" hidden></div>
+      <div class="stage-loading" id="loading" hidden><span class="spin"></span><span>正在载入这条回复的真实内部数据…</span></div>
 
-  <footer class="narrator" id="narrator">
-    <div class="nar-avatar" aria-hidden="true"><i></i><i></i></div>
-    <p class="nar-text" aria-live="polite"></p>
-    <div class="nar-actions">
-      <button class="btn ghost" id="btnUp" type="button" title="返回上一层（↑）">↑ 上浮</button>
-      <button class="btn primary" id="btnNext" type="button">继续下潜 <b>↓</b></button>
-    </div>
-  </footer>
+      <aside class="dbg" id="dbg" aria-label="调试器">
+        <header class="dbg-h">
+          <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono">forward()</span>
+          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
+        </header>
+        <div class="dbg-body">
+          <pre class="code" id="code"></pre>
+          <div class="dbg-explain" id="explain"></div>
+          <div class="dbg-watch" id="watch"></div>
+        </div>
+      </aside>
 
-  <div id="titlecard" aria-hidden="true">
-    <div class="tc-depth"></div>
-    <div class="tc-name"></div>
-    <div class="tc-en"></div>
-    <div class="tc-scale"></div>
+      <div class="ctl" id="ctl">
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-bar">
+          <div class="ctl-depth">
+            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+            <span class="ctl-dname" id="dname"></span>
+            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
+          </div>
+          <div class="ctl-play">
+            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
+          </div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+          <div class="ctl-pos mono" id="pos"></div>
+        </div>
+      </div>
+    </section>
   </div>
 
   <div id="toasts" aria-live="polite"></div>
@@ -66,12 +101,12 @@
           <div class="eyebrow">CODEX · 知识碎片图鉴</div>
           <h2>你在黑箱里的发现</h2>
         </div>
-        <div class="cx-progress"><b>0 / 22</b><span class="cx-bar"><i></i></span></div>
+        <div class="cx-progress"><b>0</b><span class="cx-bar"><i></i></span></div>
         <button class="cx-close" type="button" aria-label="关闭">✕</button>
       </header>
       <div class="cx-grid"></div>
       <footer class="cx-foot">
-        <p>模型结构取自 GPT-2 Small（12 层 · 12 头 · 768 维）。页面中的数值由确定性规则生成，用来直观展示真实模型中会发生的现象，并非真实模型的推理结果。</p>
+        <p>模型：Qwen3-0.6B（28 层 · 隐藏维度 1024 · 16 个查询头 / 8 个键值头 · SwiGLU 3072 · 词表 151936）。回答、分词、概率、注意力、激活和权重都来自真实模型的一次离线运行；为控制体积，注意力每行只保留前 4 名，神经元只保留最亮的一部分。</p>
         <button class="linkish" id="btnReset" type="button">重置进度</button>
       </footer>
     </div>

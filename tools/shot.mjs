@@ -8,7 +8,7 @@ const { chromium } = require(pwPath);
 
 const args = Object.fromEntries(process.argv.slice(3).map((a) => { const m = a.match(/^--([^=]+)=(.*)$/s); return m ? [m[1], m[2]] : [a, true]; }));
 const url = process.argv[2];
-const steps = JSON.parse(args.steps || '[]');
+const steps = JSON.parse(args.stepsfile ? (await import('node:fs')).readFileSync(args.stepsfile, 'utf8') : (args.steps || '[]'));
 const proxy = !/^https?:\/\/(127\.0\.0\.1|localhost)/.test(url) && (process.env.HTTPS_PROXY || process.env.https_proxy);
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'], ...(proxy ? { proxy: { server: proxy } } : {}) });
 const page = await browser.newPage({ viewport: { width: Number(args.w || 1440), height: Number(args.h || 900) }, deviceScaleFactor: Number(args.dpr || 1) });
