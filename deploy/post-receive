@@ -1,0 +1,23 @@
+#!/bin/sh
+# 推送到 main 时自动发布：导出 public/ → 加版本号 → 新 release 目录 → 原子切换软链接。
+# 安装位置：/srv/blackbox/repo.git/hooks/post-receive（由 deploy/setup-server.sh 安装）
+set -eu
+ROOT=/srv/blackbox
+KEEP=5
+
+while read -r old new ref; do
+  [ "$ref" = "refs/heads/main" ] || continue
+  sha=$(git rev-parse --short "$new")
+  rel="$ROOT/releases/$(date +%Y%m%d-%H%M%S)-$sha"
+  tmp=$(mktemp -d)
+  git archive "$new" public tools/stamp.sh | tar -x -C "$tmp"
+  mkdir -p "$rel"
+  cp -a "$tmp/public/." "$rel/"
+  sh "$tmp/tools/stamp.sh" "$rel" "$sha"
+  rm -rf "$tmp"
+  chmod -R a+rX "$rel"
+  ln -sfn "$rel" "$ROOT/current.new"
+  mv -Tf "$ROOT/current.new" "$ROOT/current"
+  ls -1dt "$ROOT"/releases/*/ | tail -n +$((KEEP + 1)) | xargs -r rm -rf
+  echo "已发布 $sha → https://caijiechao.com/blackbox/"
+done

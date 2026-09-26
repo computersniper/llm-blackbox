@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>潜入黑箱 · 大模型内部探索</title>
+  <meta name="description" content="一场从一句话下潜到一个比特的旅程：可交互地探索大语言模型内部的分词、嵌入、注意力、神经元与浮点数。">
+  <meta name="theme-color" content="#060d1a">
+  <meta property="og:title" content="潜入黑箱 · 大模型内部探索">
+  <meta property="og:description" content="从一句话下潜到一个比特，亲手拆开大模型的“黑箱”。">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/levels.css">
+</head>
+<body class="at-surface" data-depth="0">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <header class="hud-top">
+    <a class="brand" href="#/" aria-label="回到地表">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">BLACK&nbsp;BOX</span>
+      <span class="brand-zh">潜入黑箱</span>
+    </a>
+    <div class="hud-prompt" id="hudPrompt"></div>
+    <div class="hud-actions">
+      <span class="hud-depth" id="hudDepth"></span>
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴">
+        <span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0/22</span>
+      </button>
+      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="gauge" id="gauge" aria-label="深度导航"></nav>
+
+  <main id="stage"></main>
+
+  <footer class="narrator" id="narrator">
+    <div class="nar-avatar" aria-hidden="true"><i></i><i></i></div>
+    <p class="nar-text" aria-live="polite"></p>
+    <div class="nar-actions">
+      <button class="btn ghost" id="btnUp" type="button" title="返回上一层（↑）">↑ 上浮</button>
+      <button class="btn primary" id="btnNext" type="button">继续下潜 <b>↓</b></button>
+    </div>
+  </footer>
+
+  <div id="titlecard" aria-hidden="true">
+    <div class="tc-depth"></div>
+    <div class="tc-name"></div>
+    <div class="tc-en"></div>
+    <div class="tc-scale"></div>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tooltip" role="tooltip"></div>
+
+  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴">
+    <div class="cx-panel">
+      <header class="cx-head">
+        <div>
+          <div class="eyebrow">CODEX · 知识碎片图鉴</div>
+          <h2>你在黑箱里的发现</h2>
+        </div>
+        <div class="cx-progress"><b>0 / 22</b><span class="cx-bar"><i></i></span></div>
+        <button class="cx-close" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="cx-grid"></div>
+      <footer class="cx-foot">
+        <p>模型结构取自 GPT-2 Small（12 层 · 12 头 · 768 维）。页面中的数值由确定性规则生成，用来直观展示真实模型中会发生的现象，并非真实模型的推理结果。</p>
+        <button class="linkish" id="btnReset" type="button">重置进度</button>
+      </footer>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

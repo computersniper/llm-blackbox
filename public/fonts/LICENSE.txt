@@ -1,0 +1,8 @@
+本目录中的字体均以 SIL Open Font License 1.1 授权：
+
+- Noto Serif SC（思源宋体），© Google / Adobe。noto-serif-sc-subset-*.woff2 是只包含本站所用字符的子集。
+  https://github.com/notofonts/noto-cjk
+- JetBrains Mono，© JetBrains。
+  https://github.com/JetBrains/JetBrainsMono
+
+许可全文：https://openfontlicense.org
