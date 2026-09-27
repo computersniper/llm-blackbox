@@ -140,7 +140,7 @@ export class Detail {
     const hp = this.bulbPos(st, this.topN).sub(pp);
     this.hot.position.set(hp.x, hp.y, 0.01);
     this.hot.material.opacity = lit > 0.9 ? 0.6 + 0.4 * Math.sin(t * 5) : 0;
-    if (fan > 0.01) {
+    if (fan > 0.01 && false) { // 投影已经由 W_gate / W_up 面板表示，扇形光不再画
       const src = v3(this.M.xFocus(st), this.base() + 1.78 * this.M.e + 0.11, 0);
       const w = (COLS * CELL) / 2, h = (ROWS * CELL) / 2;
       const mk = (mesh, yOff) => {
@@ -468,7 +468,14 @@ export class Detail {
 
   camera(st) {
     switch (st.view) {
-      case 'mlp': { const look = this.panelPos(st).add(v3(0, -0.15, 0)); return { pos: look.clone().add(v3(0.7, 0.45, 3.9)), look }; }
+      case 'mlp': {
+        // 神经元阵列在焦点列后面，W_gate / W_up / W_down 在右边：两者都框进来
+        const pp = this.panelPos(st);
+        const x0 = pp.x - 1.7, x1 = this.M.mats.extentX(st);
+        const d = Math.max(4.2, this.E.fitDistance(x1 - x0, 2.9, 1.05));
+        const look = v3((x0 + x1) / 2, pp.y - 0.3, -0.2);
+        return { pos: look.clone().add(v3(0.4, 0.5, d)), look };
+      }
       case 'neuron': { const look = (this.rigCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(2.05, 1.45, 1.12); return { pos: look.clone().add(v3(0.1, 0.12, d)), look }; }
       case 'dot': { const look = (this.dotCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(1.9, 1.35, 1.12); return { pos: look.clone().add(v3(0.08, 0.12, d)), look }; }
       case 'bits': { const look = (this.bitsCenter || this.panelPos(st)).clone().add(v3(0, 0.02, 0)); const d = this.E.fitDistance(0.5, 0.25, 1.1); return { pos: look.clone().add(v3(0, d * 0.3, d)), look }; }

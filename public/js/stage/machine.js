@@ -5,6 +5,7 @@ import { THREE, textTexture, label, easeOut, easeInOut, seg } from './engine.js'
 import { RoundedBoxGeometry } from '../vendor/three/addons/geometries/RoundedBoxGeometry.js';
 import { tokPlain, shortSpecial, fmtPct, hueOf, esc } from '../ui.js';
 import { Detail } from './detail.js';
+import { Mats } from './mats.js';
 
 export const ROLE = { system: 0x8fa6d6, user: 0x5ee4f0, assistant: 0xffb65c, tpl: 0xb39dff };
 const S = 0.42;        // 词元间距
@@ -43,6 +44,7 @@ export class Machine {
     this.E = E;
     this.scene = E.scene;
     this.detail = new Detail(E);
+    this.mats = new Mats(E, this);
     this.buildStatic();
     this.root = null;
   }
@@ -185,6 +187,7 @@ export class Machine {
     this.buildHead();
     this.buildCasing();
     this.detail.load(Q, this);
+    this.mats.load(Q);
   }
 
   /* ------------------------------------------------------------ 拆开的一层 */
@@ -503,6 +506,7 @@ export class Machine {
 
     // 细节（神经元阵列、单个神经元、比特……）
     this.detail.update(st, dt, t);
+    this.mats.update(st, dt, t);
 
     this.dust.rotation.y += dt * 0.01;
   }
@@ -745,8 +749,21 @@ export class Machine {
         const look = v3(xf - 2.4, Math.max(2.2, this.yL(f) + 0.3), 0);
         return { pos: look.clone().add(v3(2.2, 2.4, 10.5)), look };
       }
-      case 'layer': { const look = v3(xf - 1.1, Y0 + this.explodeL * GAP + 1.25, 0); return { pos: look.clone().add(v3(2.2, 1.2, 6.8)), look }; }
+      case 'layer': {
+        const op = st.step.op, withMats = op === 'attn' || op === 'mlp';
+        const x1 = withMats ? this.mats.extentX(st) : xf + 0.8;
+        const x0 = xf - 3.2;
+        const d = Math.max(6, E.fitDistance(x1 - x0, 3.4, 1.05));
+        const look = v3((x0 + x1) / 2, Y0 + this.explodeL * GAP + 1.3, 0.2);
+        return { pos: look.clone().add(v3(0.8, d * 0.2, d)), look };
+      }
       case 'attn': {
+        if (st.step.sub === 'qkv' || st.step.sub === 'mix') {
+          const f = this.mats.attnFrame(st);
+          const d = Math.max(3.2, E.fitDistance(f.x1 - f.x0 + 0.6, f.h, 1.05));
+          const look = v3((f.x0 + f.x1) / 2, f.y, 0.62);
+          return { pos: look.clone().add(v3(0.2, d * 0.18, d)), look };
+        }
         const list = st.head == null ? this.Q.attMean(this.explodeL, focus, 5) : this.Q.att(this.explodeL, st.head, focus);
         // “看开头”的那一束会伸到最左边，取景时不算它，免得整体缩得太小
         const xs = list.filter((a) => a.j !== 0 || list.length === 1).map((a) => this.x(a.j)).concat([xf]);

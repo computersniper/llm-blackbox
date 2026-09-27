@@ -235,6 +235,10 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .code .nu { color: #f78c6c; }
 .dbg-explain { padding: 12px 14px; font-size: 13.5px; line-height: 1.75; color: var(--ink2); border-bottom: 1px solid var(--line); }
 .dbg-explain b { color: var(--ink); }
+.dbg-explain .shape { margin: 4px 0 8px; padding: 7px 9px; border-radius: 8px; background: rgba(94, 240, 212, .06); border: 1px solid rgba(94, 240, 212, .2); font-family: var(--mono); font-size: 11px; line-height: 1.75; color: var(--ink2); }
+.dbg-explain .shape b { color: var(--cyan); font-weight: 400; }
+.dbg-explain .dimmed { color: var(--dim); }
+.lbl small { font-family: var(--mono); color: var(--dim); font-size: 10px; margin-left: 4px; }
 .dbg-explain em { font-style: normal; color: var(--amber); }
 .dbg-explain .tok { font-size: 12.5px; padding: 0 5px; }
 .dbg-watch { padding: 10px 14px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: var(--mono); font-size: 11.5px; }

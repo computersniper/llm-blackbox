@@ -147,6 +147,45 @@ function layerExplain(s, Q, ctx, i, cur) {
   return `SiLU(g) × u = <b>${(n.silu * n.uz).toFixed(3)}</b>：这就是神经元 #${n.n} 的输出。`;
 }
 
+// 这一步的矩阵形状（预填充时 n = 提示长度，之后每步 n = 1）
+const D = (s) => `<b>${s}</b>`;
+export function shapeOf(s, Q) {
+  const M = Q.M, n = s.g === 0 ? Q.P : 1, L = Q.P + s.g;
+  const H = M.hidden, qd = M.heads * M.headDim, kd = M.kvHeads * M.headDim, F = M.ffn, V = M.vocab;
+  const x = `[${n}×${H}]`;
+  switch (s.ph) {
+    case 'read': return s.g === 0 ? `ids ${D(`[${Q.P}]`)}：${Q.P} 个词元编号` : `ids ${D(`[${L}]`)}：末尾接上 1 个`;
+    case 'embed': return `one-hot ${D(`[${n}×${V}]`)} @ E ${D(`[${V}×${H}]`)} → x ${D(x)}<br><span class="dimmed">实际实现是按编号直接取出 E 的第 id 行</span>`;
+    case 'layers': case 'pass': return `x ${D(x)} → 28 × Transformer 块 → ${D(x)}`;
+    case 'head':
+      if (s.sub === 'norm') return `x[-1] ${D(`[1×${H}]`)} ÷ RMS × γ ${D(`[${H}]`)}`;
+      if (s.sub === 'softmax') return `softmax(logits ${D(`[1×${V}]`)}) → p ${D(`[1×${V}]`)}，和为 1`;
+      return `x[-1] ${D(`[1×${H}]`)} @ Eᵀ ${D(`[${H}×${V}]`)} → logits ${D(`[1×${V}]`)}`;
+    case 'sample': return `p ${D(`[${V}]`)} → ÷0.7 → 前 20 → 累计 80% → 候选 ${D(`[${Q.steps[s.g].pool.length}]`)} → 1 个词元`;
+    case 'layer': {
+      if (!s.op) return `x ${D(x)} → 注意力 → 前馈 → ${D(x)}`;
+      if (s.op === 'ln1' || s.op === 'ln2') return `h = x ${D(x)} ÷ RMS(x) × γ ${D(`[${H}]`)} → ${D(x)}`;
+      if (s.op === 'add1' || s.op === 'add2') return `x ${D(x)} + Δx ${D(x)} → ${D(x)}`;
+      if (s.op === 'attn') {
+        if (!s.sub || s.sub === 'qkv') return `h ${D(x)} @ W<sub>q</sub> ${D(`[${H}×${qd}]`)} → q ${D(`[${n}×${qd}]`)} = ${M.heads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>k</sub> ${D(`[${H}×${kd}]`)} → k = ${M.kvHeads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>v</sub> ${D(`[${H}×${kd}]`)} → v = ${M.kvHeads} 头 × ${M.headDim}`;
+        if (s.sub === 'score') {
+          if (s.mi) return `q<sub>头</sub> ${D(`[${M.headDim}]`)} · k ${D(`[${M.headDim}]`)} → 标量，÷ √${M.headDim}`;
+          return `q ${D(`[${M.heads}×${n}×${M.headDim}]`)} @ Kᵀ ${D(`[${M.heads}×${M.headDim}×${L}]`)} → s ${D(`[${M.heads}×${n}×${L}]`)}<br><span class="dimmed">K 只有 ${M.kvHeads} 头，每个复用给 2 个 Q 头</span>`;
+        }
+        if (s.sub === 'softmax') return `softmax(s ${D(`[${M.heads}×${n}×${L}]`)} + 遮罩) → a，每行和为 1`;
+        return `a ${D(`[${M.heads}×${n}×${L}]`)} @ V ${D(`[${M.heads}×${L}×${M.headDim}]`)} → ${D(`[${M.heads}×${n}×${M.headDim}]`)}<br>拼接 ${D(`[${n}×${qd}]`)} @ W<sub>o</sub> ${D(`[${qd}×${H}]`)} → Δx ${D(x)}`;
+      }
+      if (s.op === 'mlp') {
+        if (s.mi) return `x ${D(`[${H}]`)} · w<sub>gate</sub> ${D(`[${H}]`)} → g（标量）；x · w<sub>up</sub> → u；输出 silu(g)·u`;
+        if (!s.sub || s.sub === 'up') return `h ${D(x)} @ W<sub>gate</sub> ${D(`[${H}×${F}]`)} → g ${D(`[${n}×${F}]`)}<br>h ${D(x)} @ W<sub>up</sub> ${D(`[${H}×${F}]`)} → u ${D(`[${n}×${F}]`)}`;
+        if (s.sub === 'act') return `silu(g) ⊙ u：${D(`[${n}×${F}]`)} 逐个相乘`;
+        return `${D(`[${n}×${F}]`)} @ W<sub>down</sub> ${D(`[${F}×${H}]`)} → Δx ${D(x)}`;
+      }
+    }
+  }
+  return '';
+}
+
 export function watch(s, Q, ctx = {}) {
   const g = s.g, i = Q.row(g), st = Q.steps[g];
   const rows = [

@@ -1,7 +1,7 @@
 // 调试器界面：面包屑、深度、播放控制、倍速、步骤轨道、代码高亮、讲解、变量监视、注意力头选择。
 import { $, $$, esc } from './ui.js';
 import { DEPTH_NAMES, MAX_DEPTH } from './timeline.js';
-import { renderCode, linesFor, explain, watch, renderWatch, stepLabel, crumbs, interestingHead } from './explain.js';
+import { renderCode, linesFor, explain, watch, renderWatch, stepLabel, crumbs, interestingHead, shapeOf } from './explain.js';
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 
@@ -58,7 +58,8 @@ export class Controls {
       const top = first.offsetTop - box.clientHeight * 0.25;
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top, behavior: 'smooth' });
     }
-    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s))}</div>${explain(s, Q, ctx)}`;
+    const shape = shapeOf(s, Q);
+    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s))}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, Q, ctx)}`;
     renderWatch($('#watch'), watch(s, Q, ctx));
     // 步骤轨道（当前深度、当前词元的所有步骤）
     const n = tl.list.length;
