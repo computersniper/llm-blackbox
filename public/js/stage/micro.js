@@ -51,9 +51,9 @@ export class Micro {
     if (s.sub === 'up') {
       const n = Q.neuronAt(s.L, st.g);
       if (!n) return null;
-      const e = { j: n.n, dims: n.dims, x: n.x, w: n.wg, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
-      const e2 = { j: n.n, dims: n.dims, x: n.x, w: n.wu, total: n.uz, shown: n.x.reduce((a, x, k) => a + x * n.wu[k], 0) };
-      return { kind: 'gate', inDim: 1024, e, e2, panel: mats.mlp.g, panel2: mats.mlp.u, outVec: mats.mlp.go, outVec2: mats.mlp.uo, outSeg: Math.floor(n.n / 256), inX: -0.14, name: 'W<sub>gate</sub>', out: `g[${n.n}]`, outName: `神经元 #${n.n} 的 g`, col: `第 ${n.n} 列 = 神经元 #${n.n}` };
+      const e = { j: n.j, dims: n.dims, x: n.x, w: n.wg, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
+      const e2 = { j: n.j, dims: n.dims, x: n.x, w: n.wu, total: n.uz, shown: n.x.reduce((a, x, k) => a + x * n.wu[k], 0) };
+      return { kind: 'gate', inDim: 1024, e, e2, panel: mats.mlp.g, panel2: mats.mlp.u, outVec: mats.mlp.go, outVec2: mats.mlp.uo, outSeg: Math.floor(n.j / 256), inX: -0.14, name: 'W<sub>gate</sub>', out: `g[${n.j}]`, outName: `神经元 #${n.j} 的 g`, col: `第 ${n.j} 列 = 神经元 #${n.j}` };
     }
     return null;
   }
@@ -216,7 +216,7 @@ export class Micro {
       this.ropeLbl.visible = rp > 0;
       if (rp > 0) {
         this.ropeLbl.el.innerHTML = `<b style="color:var(--ink)">q_norm</b>：${f(e.total)} ÷ RMS ${e.rms.toFixed(3)} × γ ${e.qnW.toFixed(4)} = <b style="color:var(--cyan)">${f(e.qn, 4)}</b><br>
-          <b style="color:var(--ink)">RoPE</b>：第 ${e.dim} 维和第 ${e.partner} 维配成一对，按位置 ${e.pos} 旋转 θ = ${e.pos} / 10⁶<sup>${(2 * e.freq / 128).toFixed(3)}</sup> = ${e.angle.toFixed(3)} 弧度
+          <b style="color:var(--ink)">RoPE</b>：第 ${e.dim} 维和第 ${e.partner} 维配成一对，按位置 ${e.row} 旋转 θ = ${e.row} / 10⁶<sup>${(2 * e.freq / 128).toFixed(3)}</sup> = ${e.angle.toFixed(3)} 弧度
           ${dial(e)}
           旋转后 q[${e.j}] = <b style="color:var(--cyan)">${f(e.qr, 4)}</b>（这就是拿去和 K 做点积的数）`;
       }

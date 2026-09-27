@@ -5,14 +5,14 @@
 //   d3 层塔    28 层逐层
 //   d4 一层内  RMSNorm / 注意力 / 残差 / RMSNorm / 前馈 / 残差
 //   d5 算子    注意力：QKV / 打分 / softmax / 加权求和；前馈：升维 / 门控激活 / 降维
-//   d6 乘加    单次打分 Q·K、单个 SwiGLU 神经元（只在导出了细节的焦点层）
+//   d6 乘加    单次打分 Q·K、单个 SwiGLU 神经元、矩阵乘法的一个输出元素（28 层都有，数据按层懒加载）
 //   d7 比特    权重本身的 bf16 比特
 //
 // “＋”= 单步进入（step into），“−”= 跳出（step out），上一步 / 下一步 = 在当前深度逐步执行。
 
 export const OPS = ['ln1', 'attn', 'add1', 'ln2', 'mlp', 'add2'];
 const SUBS = { attn: ['qkv', 'score', 'softmax', 'mix'], mlp: ['up', 'act', 'down'] };
-// 微观步骤：一个输出元素是怎么乘加出来的（只在导出了细节的焦点层）
+// 微观步骤：一个输出元素是怎么乘加出来的（每一层都有）
 const MICROS = { qkv: ['pick', 'mul', 'sum', 'rope'], score: ['mul', 'sum', 'scale'], mix: ['pick', 'mul', 'sum'], up: ['pick', 'mul', 'sum'], act: ['silu', 'gate'], down: ['pick', 'mul', 'sum'] };
 const HEAD_MICRO = ['pick', 'mul', 'sum'];
 export const MAX_DEPTH = 7;
@@ -27,7 +27,7 @@ const DUR = {
   norm: 0.9, unembed: 1.5, softmaxH: 1.5, temp: 1.3, topk: 1.3, topp: 1.5, draw: 2.4,
 };
 
-export function buildSteps(depth, g, NL, focus) {
+export function buildSteps(depth, g, NL) {
   if (depth <= 1) return [{ g, ph: 'pass' }];
   const s = [{ g, ph: 'read' }, { g, ph: 'embed' }];
   if (depth === 2) s.push({ g, ph: 'layers' });
@@ -37,7 +37,7 @@ export function buildSteps(depth, g, NL, focus) {
       for (const op of OPS) {
         if (depth === 4 || !SUBS[op]) { s.push({ g, ph: 'layer', L, op }); continue; }
         for (const sub of SUBS[op]) {
-          const micros = depth >= 6 && focus.includes(L) ? MICROS[sub] : null;
+          const micros = depth >= 6 ? MICROS[sub] : null;
           if (micros) for (const mi of micros) s.push({ g, ph: 'layer', L, op, sub, mi });
           else s.push({ g, ph: 'layer', L, op, sub });
         }
@@ -71,6 +71,13 @@ export function isPrefix(a, b) {
 
 export const sameStep = (a, b) => a && b && isPrefix(a, b) && isPrefix(b, a);
 
+// 这一步要用到第几层的乘加数据（按层分块，data/qNN/Lxx.json）；不需要时返回 -1。
+// 输出头的那次乘加（headMM）在主文件里，不用等
+export const microLayer = (s) => (s && s.ph === 'layer' && s.mi ? s.L : -1);
+
+// 数据还没到时，舞台先按上一级（去掉微观步骤）来画
+export const withoutMicro = (s) => { const { mi, ...rest } = s; return rest; };
+
 // 相机与场景使用的“视图”
 export function viewOf(depth, s) {
   if (depth <= 1) return 'box';
@@ -97,11 +104,12 @@ function durOf(s) {
 }
 
 export class Timeline {
-  constructor(Q, focus) {
+  constructor(Q) {
     this.Q = Q;
     this.NL = Q.NL;
     this.G = Q.G;
-    this.focus = focus;
+    // 这一步的数据到了没有；没到时播放停在这一步原地等（由 main.js 按分块加载情况设置）
+    this.ready = () => true;
     this.depth = 1;
     this.g = 0;
     this.i = 0;
@@ -113,7 +121,7 @@ export class Timeline {
     this.done = false;
   }
 
-  build(depth, g) { return buildSteps(depth, g, this.NL, this.focus); }
+  build(depth, g) { return buildSteps(depth, g, this.NL); }
   get step() { return this.list[this.i]; }
   get view() { return viewOf(this.depth, this.step); }
   get dur() { return durOf(this.step); }
@@ -202,12 +210,13 @@ export class Timeline {
   toggle() { this.playing ? this.pause() : this.play(); }
 
   tick(dt) {
-    if (!this.playing) return;
+    if (!this.playing || !this.ready(this.step)) return; // 数据没到：原地等，不前进
     this.p += (dt * this.speed) / this.dur;
     let guard = 0;
     while (this.p >= 1 && guard++ < 50) {
       const carry = this.p - 1;
       if (!this.advance()) { this.playing = false; this.emit('play'); break; }
+      if (!this.ready(this.step)) { this.p = 0; break; } // 刚走进一步但数据还没到：从头开始等
       this.p = Math.min(carry, 0.99);
     }
   }
