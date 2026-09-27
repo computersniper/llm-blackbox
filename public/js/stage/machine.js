@@ -59,8 +59,9 @@ export class Machine {
       c.width = c.height = 512;
       const g = c.getContext('2d');
       const gr = g.createRadialGradient(256, 256, 0, 256, 256, 256);
-      gr.addColorStop(0, 'rgba(34,78,105,0.42)');
-      gr.addColorStop(0.35, 'rgba(14,30,52,0.35)');
+      // 地面只留一层很淡的深蓝，不要像有盏灯照在机器脚下
+      gr.addColorStop(0, 'rgba(18,40,60,0.16)');
+      gr.addColorStop(0.35, 'rgba(10,22,40,0.12)');
       gr.addColorStop(1, 'rgba(5,11,23,0)');
       g.fillStyle = gr;
       g.fillRect(0, 0, 512, 512);
@@ -145,12 +146,14 @@ export class Machine {
       this.columns.push(c);
     });
 
-    // 28 层玻璃层板
+    // 28 层玻璃层板：面很淡、颜色很深，靠边线勾出结构。
+    // 面太亮的话，28 层叠在一起会连成一整片发光的蓝雾，看起来像机器背后有个光源
     this.slabs = [];
+    const slabEnv = this.scene.environment;
     const slabGeo = new THREE.BoxGeometry(this.W - 0.3, 0.03, DEPTH);
     const edgeGeo = new THREE.EdgesGeometry(slabGeo);
     for (let L = 0; L < NL; L++) {
-      const mat = new THREE.MeshStandardMaterial({ color: 0x6d8cff, emissive: 0x5ef0d4, emissiveIntensity: 0, transparent: true, opacity: 0.1, roughness: 0.15, metalness: 0.2, depthWrite: false });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x22346a, emissive: 0x5ef0d4, emissiveIntensity: 0, transparent: true, opacity: 0.05, roughness: 0.4, metalness: 0.1, depthWrite: false, envMap: slabEnv, envMapIntensity: 0.12 });
       const s = new THREE.Mesh(slabGeo, mat);
       const e = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.22 }));
       s.add(e);
@@ -463,7 +466,7 @@ export class Machine {
       const on = L === cur || (s.ph === 'layers' && Math.floor(flow) === L);
       const glow = on ? 0.26 : passed ? 0.05 : 0;
       sl.material.emissiveIntensity += (glow - sl.material.emissiveIntensity) * Math.min(1, dt * 8);
-      sl.material.opacity = ((0.08 + (on ? 0.12 : 0)) * inside + (L === this.explodeL ? -0.05 * this.e : 0)) * (1 - fade * 0.85);
+      sl.material.opacity = Math.max(0, (0.045 + (on ? 0.1 : 0)) * inside + (L === this.explodeL ? -0.04 * this.e : 0)) * (1 - fade * 0.85);
       sl.edge.material.opacity = (on ? 0.9 : passed ? 0.35 : 0.2) * inside * (1 - fade * 0.8);
       // 层号 / 逻辑透镜读数
       const showLbl = da >= 2.6 && (view === 'tower' || (view === 'layer' && L === cur));

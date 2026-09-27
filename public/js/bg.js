@@ -1,8 +1,8 @@
 // 背景：缓慢上浮的"海雪"粒子。下潜时粒子沿径向拉成光线（跃迁），上浮时反向收拢。
 
 const TINTS = [
-  [7, 17, 32], [6, 15, 29], [7, 13, 27], [8, 12, 25], [9, 11, 24],
-  [11, 10, 23], [12, 9, 21], [13, 8, 18], [6, 17, 26],
+  [6, 13, 26], [6, 13, 25], [6, 12, 24], [7, 11, 23], [8, 11, 22],
+  [9, 10, 21], [10, 9, 20], [11, 8, 17], [6, 14, 23],
 ];
 const DOTS = [
   [120, 230, 220], [120, 220, 235], [130, 200, 255], [140, 180, 255], [160, 170, 255],
@@ -74,9 +74,11 @@ export class Background {
       this.dot[i] += (dd[i] - this.dot[i]) * Math.min(1, dt * 1.5);
     }
     const [r, gg, b] = this.tint.map(Math.round);
-    const grad = g.createRadialGradient(this.w * 0.5, this.h * 0.35, 0, this.w * 0.5, this.h * 0.5, Math.max(this.w, this.h) * 0.8);
-    grad.addColorStop(0, `rgb(${r + 8},${gg + 10},${b + 16})`);
-    grad.addColorStop(1, `rgb(${Math.max(0, r - 4)},${Math.max(0, gg - 5)},${Math.max(0, b - 8)})`);
+    // 均匀的深色空间：中间不提亮（提亮会像背后有一盏灯），只在最边缘略微压暗
+    const grad = g.createRadialGradient(this.w * 0.5, this.h * 0.5, 0, this.w * 0.5, this.h * 0.5, Math.max(this.w, this.h) * 0.75);
+    grad.addColorStop(0, `rgb(${r},${gg},${b})`);
+    grad.addColorStop(0.6, `rgb(${r},${gg},${b})`);
+    grad.addColorStop(1, `rgb(${Math.max(0, r - 2)},${Math.max(0, gg - 4)},${Math.max(0, b - 7)})`);
     g.fillStyle = grad;
     g.fillRect(0, 0, this.w, this.h);
 
