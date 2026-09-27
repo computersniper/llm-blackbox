@@ -44,7 +44,7 @@ async function boot() {
     toggle: () => toggle(),
     speed: (s) => { store.speed = s; save(); if (tl) { tl.speed = s; controls.updatePlay(tl); } },
     seek: (i) => { if (!tl) return; tl.pause(); tl.seekIndex(i); },
-    depth: (d) => { if (!tl) return; if (d === 0) exitInspect(); else { d > tl.depth ? sfx.dive() : sfx.rise(); tl.setDepth(d); } },
+    depth: (d) => { if (!tl) return; if (d === 0) exitInspect(); else { d > tl.depth ? sfx.dive() : sfx.rise(); engine?.exitFree(); tl.setDepth(d); } },
     fold: () => updateInsets(),
     head: (h) => { ctx.head = h; if (tl) { controls.update(tl, ctx); checkSink(); } },
   });
@@ -107,7 +107,7 @@ async function ensureEngine() {
   const eng = await import('./stage/engine.js');
   const mach = await import('./stage/machine.js');
   THREE = eng.THREE;
-  engine = new eng.Engine($('#gl'), { onFrame, onWheelDepth: (d) => (d > 0 ? into() : out()), onHover, onPick });
+  engine = new eng.Engine($('#gl'), { onFrame, onHover, onPick, onFreeChange: (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); } });
   machine = new mach.Machine(engine);
 }
 
@@ -119,6 +119,7 @@ async function enterInspect(msg) {
     $('#loading').hidden = false;
     try { await ensureEngine(); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
     engine.active = true;
+    if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
     if (matchMedia('(max-width: 900px)').matches && !$('#dbg').classList.contains('folded')) { $('#dbg').classList.add('folded'); $('#btnDbgFold').textContent = '+'; }
     updateInsets();
     sfx.dive();
@@ -152,6 +153,7 @@ async function attach(msg, from = null) {
       if (Q.steps[Q.G - 1].chosenS === '<|im_end|>') discover('imend');
     }
   });
+  engine.exitFree();
   if (fresh) {
     machine.load(Q);
     const far = machine.camera({ view: 'box', step: tl.step, g: tl.g });
@@ -188,6 +190,7 @@ function into() {
   if (!tl) return;
   if (!tl.canInto()) { flashBtn('#btnIn'); return; }
   sfx.dive();
+  engine?.exitFree();
   tl.into();
 }
 
@@ -195,7 +198,17 @@ function out() {
   if (!tl) return;
   if (tl.depth <= 1) return exitInspect();
   sfx.rise();
+  engine?.exitFree();
   tl.out();
+}
+
+// 操作说明：第一次揭开时出现几秒；点“操作说明”可以再看
+let hintTimer = 0;
+function showHint(on = true) {
+  const h = $('#stageHint');
+  clearTimeout(hintTimer);
+  h.classList.toggle('on', on);
+  if (on) hintTimer = setTimeout(() => h.classList.remove('on'), 9000);
 }
 
 function toggle() {
@@ -235,7 +248,7 @@ function onFrame(dt, t) {
   machine.update(st, dt, t);
   const cam = machine.camera(st);
   const same = view === lastView && tl.depth === lastDepth;
-  engine.setView(cam.pos, cam.look, { keepOrbit: same, speed: same ? 2.4 : 2.0 });
+  engine.setView(cam.pos, cam.look, { speed: same ? 2.4 : 2.0 });
   if (!same) { lastView = view; lastDepth = tl.depth; }
 }
 
@@ -377,6 +390,8 @@ function bindChrome() {
   renderSound();
   $('#btnChatToggle').addEventListener('click', () => document.body.classList.remove('chat-open'));
   $('#strip').addEventListener('click', () => document.body.classList.add('chat-open'));
+  $('#btnFollow').addEventListener('click', () => { engine?.exitFree(); sfx.click(); });
+  $('#btnHint').addEventListener('click', () => showHint(!$('#stageHint').classList.contains('on')));
 }
 
 function bindKeys() {
@@ -389,6 +404,8 @@ function bindKeys() {
     else if (e.key === 'ArrowLeft') { e.preventDefault(); tl?.pause(); tl?.back(); }
     else if (e.key === '+' || e.key === '=' || e.key === 'ArrowDown') { e.preventDefault(); into(); }
     else if (e.key === '-' || e.key === '_' || e.key === 'ArrowUp' || e.key === 'Escape') { e.preventDefault(); out(); }
+    else if (e.key === 'f' || e.key === 'F') { engine?.exitFree(); }
+    else if (e.key === 'h' || e.key === 'H' || e.key === '?') { showHint(!$('#stageHint').classList.contains('on')); }
     else if (e.key >= '1' && e.key <= '6') { const s = SPEEDS[Number(e.key) - 1]; store.speed = s; if (tl) { tl.speed = s; controls.updatePlay(tl); } }
   });
 }

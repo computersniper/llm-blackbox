@@ -48,7 +48,7 @@ export class Detail {
     back.position.z = -0.03;
     panel.add(back);
     panel.add(new THREE.LineSegments(new THREE.EdgesGeometry(back.geometry), new THREE.LineBasicMaterial({ color: 0xffb65c, transparent: true, opacity: 0.5 })));
-    this.bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.017, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), COLS * ROWS);
+    this.bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.016, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), COLS * ROWS);
     for (let n = 0; n < COLS * ROWS; n++) {
       tmpM.makeTranslation((n % COLS - (COLS - 1) / 2) * CELL, ((ROWS - 1) / 2 - Math.floor(n / COLS)) * CELL, 0);
       this.bulbs.setMatrixAt(n, tmpM);
@@ -132,7 +132,7 @@ export class Detail {
       for (let n = 0; n < this.acts.length; n++) {
         const a = this.acts[n], m = Math.abs(a) / this.maxAct;
         if (this.order[n] > lit || m < 0.02) { this.bulbs.setColorAt(n, DIM); continue; }
-        tmpC.copy(a >= 0 ? AMBER : BLUE).lerp(new THREE.Color(0xffffff), Math.max(0, m - 0.6)).multiplyScalar((0.15 + Math.pow(m, 0.6) * 2.4) * this.dimK);
+        tmpC.copy(a >= 0 ? AMBER : BLUE).lerp(new THREE.Color(0xffffff), Math.max(0, m - 0.6)).multiplyScalar((0.12 + Math.pow(m, 0.7) * 1.45) * this.dimK);
         this.bulbs.setColorAt(n, tmpC);
       }
       this.bulbs.instanceColor.needsUpdate = true;

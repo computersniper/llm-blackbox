@@ -55,7 +55,7 @@ export class Machine {
       c.width = c.height = 512;
       const g = c.getContext('2d');
       const gr = g.createRadialGradient(256, 256, 0, 256, 256, 256);
-      gr.addColorStop(0, 'rgba(40,90,120,0.55)');
+      gr.addColorStop(0, 'rgba(34,78,105,0.42)');
       gr.addColorStop(0.35, 'rgba(14,30,52,0.35)');
       gr.addColorStop(1, 'rgba(5,11,23,0)');
       g.fillStyle = gr;
@@ -78,7 +78,7 @@ export class Machine {
     for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 70; pos[i * 3 + 1] = Math.random() * 26 - 2; pos[i * 3 + 2] = (Math.random() - 0.5) * 50; }
     const pg = new THREE.BufferGeometry();
     pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x7fd8e8, size: 0.05, transparent: true, opacity: 0.45, depthWrite: false }));
+    this.dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x7fd8e8, size: 0.05, transparent: true, opacity: 0.32, depthWrite: false }));
     this.scene.add(this.dust);
   }
 
@@ -133,7 +133,7 @@ export class Machine {
       this.E.pickables.push(m);
       root.add(g);
       this.tiles.push(g);
-      const cm = new THREE.MeshBasicMaterial({ color: col(ROLE[t.role] || ROLE.tpl), transparent: true, opacity: 0.5, depthWrite: false });
+      const cm = new THREE.MeshBasicMaterial({ color: col(ROLE[t.role] || ROLE.tpl).multiplyScalar(0.72), transparent: true, opacity: 0.5, depthWrite: false });
       const c = new THREE.Mesh(GEO.column, cm);
       c.position.set(this.x(i), 0.25, 0);
       c.scale.y = 0.001;
@@ -240,7 +240,7 @@ export class Machine {
     this.normRing.rotation.x = Math.PI / 2;
     this.normRing.scale.setScalar(1.8);
     g.add(this.normRing);
-    this.lm = new THREE.Mesh(new THREE.BoxGeometry(this.W - 0.3, 0.05, DEPTH), new THREE.MeshStandardMaterial({ color: 0xb39dff, emissive: 0xb39dff, emissiveIntensity: 0.06, transparent: true, opacity: 0.16, depthWrite: false }));
+    this.lm = new THREE.Mesh(new THREE.BoxGeometry(this.W - 0.3, 0.05, DEPTH), new THREE.MeshStandardMaterial({ color: 0xb39dff, emissive: 0xb39dff, emissiveIntensity: 0.04, transparent: true, opacity: 0.1, depthWrite: false }));
     this.lm.add(new THREE.LineSegments(new THREE.EdgesGeometry(this.lm.geometry), new THREE.LineBasicMaterial({ color: 0xb39dff, transparent: true, opacity: 0.5 })));
     g.add(this.lm);
     this.lmLabel = label('lm_head<small>1024 × 151936 · 与嵌入表共享</small>', 'lbl part');
@@ -384,8 +384,8 @@ export class Machine {
     const FADE = { layer: 0.35, attn: 0.8, dot: 0.9, mlp: 0.85, neuron: 0.95, bits: 0.97 };
     this.fade += ((FADE[view] || 0) - (this.fade || 0)) * Math.min(1, dt * 3);
     const fade = this.fade;
-    const BLOOM = { box: 0.62, machine: 0.6, tray: 0.55, tower: 0.5, layer: 0.45, attn: 0.5, head: 0.5, mlp: 0.38, neuron: 0.2, dot: 0.15, bits: 0.18 };
-    this.E.bloom.strength += ((BLOOM[view] ?? 0.5) - this.E.bloom.strength) * Math.min(1, dt * 3);
+    const BLOOM = { box: 0.46, machine: 0.42, tray: 0.38, tower: 0.34, layer: 0.32, attn: 0.36, head: 0.34, mlp: 0.28, neuron: 0.16, dot: 0.12, bits: 0.14 };
+    this.E.bloom.strength += ((BLOOM[view] ?? 0.36) * (this.brightness ?? 1) - this.E.bloom.strength) * Math.min(1, dt * 3);
 
     // 拆开的层
     const wantEx = view === 'layer' || view === 'attn' || view === 'mlp' || view === 'neuron' || view === 'dot' || view === 'bits';
@@ -427,9 +427,9 @@ export class Machine {
       }
       c.scale.y = h;
       const nL = Math.min(NL - 1, Math.max(0, Math.floor(flow)));
-      const bright = isA ? 0.85 : 0.16 + 0.14 * Math.min(1, Q.norm(nL, i) / 60);
+      const bright = isA ? 0.68 : 0.14 + 0.12 * Math.min(1, Q.norm(nL, i) / 60);
       c.material.opacity = bright * inside * (i === focus ? 1 - fade * 0.4 : 1 - fade * 0.92);
-      c.scale.x = c.scale.z = i === focus ? 1.6 : isA ? 1.2 : 1;
+      c.scale.x = c.scale.z = i === focus ? 1.35 : isA ? 1.1 : 1;
     });
 
     // 光环
@@ -445,7 +445,7 @@ export class Machine {
     }
     this.pulses.count = pc;
     this.pulses.instanceMatrix.needsUpdate = true;
-    this.pulses.material.opacity = 0.6 + 0.35 * Math.sin(t * 10);
+    this.pulses.material.opacity = 0.45 + 0.2 * Math.sin(t * 10);
 
     // 层板
     const cur = s.ph === 'layer' ? s.L : s.ph === 'layers' ? Math.floor(flow) : -1;
@@ -453,7 +453,7 @@ export class Machine {
       sl.position.y = this.yL(L);
       const passed = flow >= L + 1 || s.ph === 'head' || s.ph === 'sample';
       const on = L === cur || (s.ph === 'layers' && Math.floor(flow) === L);
-      const glow = on ? 0.55 : passed ? 0.08 : 0;
+      const glow = on ? 0.26 : passed ? 0.05 : 0;
       sl.material.emissiveIntensity += (glow - sl.material.emissiveIntensity) * Math.min(1, dt * 8);
       sl.material.opacity = ((0.08 + (on ? 0.12 : 0)) * inside + (L === this.explodeL ? -0.05 * this.e : 0)) * (1 - fade * 0.85);
       sl.edge.material.opacity = (on ? 0.9 : passed ? 0.35 : 0.2) * inside * (1 - fade * 0.8);
@@ -535,7 +535,7 @@ export class Machine {
             : new THREE.Vector3((xq + xk) / 2, y0 + Math.min(1.5, 0.2 + dx * 0.16), 0);
           const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(xq, y0, 0), ctrl, new THREE.Vector3(xk, y0, j === focus ? 0.25 : 0));
           const geo = new THREE.TubeGeometry(curve, 48, mode === 'arch' ? 0.012 + w * 0.05 : 0.006 + w * 0.03, 8, false);
-          const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.25 + 0.75 * w, blending: THREE.AdditiveBlending, depthWrite: false }));
+          const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x4fd8c0, transparent: true, opacity: 0.18 + 0.6 * w, blending: THREE.AdditiveBlending, depthWrite: false }));
           m.userData.pick = { type: 'beam', L, j, w, head };
           this.beams.add(m);
           if (mode === 'arch' && w >= 0.06) {
@@ -575,17 +575,17 @@ export class Machine {
     this.exUnit.position.set(xf, at('mlp') + 0.11, 0);
     const opOn = (k) => (s.op === k ? 1 : 0);
     const flash = (k) => opOn(k) * (0.5 + 0.5 * Math.sin(st.p * Math.PI));
-    this.exRing1.material.opacity = (0.35 + 0.65 * flash('ln1')) * e;
-    this.exRing2.material.opacity = (0.35 + 0.65 * flash('ln2')) * e;
+    this.exRing1.material.opacity = (0.3 + 0.5 * flash('ln1')) * e;
+    this.exRing2.material.opacity = (0.3 + 0.5 * flash('ln2')) * e;
     this.exRing1.scale.setScalar(1.6 + flash('ln1') * 0.6);
     this.exRing2.scale.setScalar(1.6 + flash('ln2') * 0.6);
-    this.exAdd1.mat.opacity = (0.4 + 0.6 * flash('add1')) * e;
-    this.exAdd2.mat.opacity = (0.4 + 0.6 * flash('add2')) * e;
+    this.exAdd1.mat.opacity = (0.35 + 0.45 * flash('add1')) * e;
+    this.exAdd2.mat.opacity = (0.35 + 0.45 * flash('add2')) * e;
     this.exAdd1.scale.setScalar(1 + flash('add1') * 0.5);
     this.exAdd2.scale.setScalar(1 + flash('add2') * 0.5);
-    this.exAttn.material.emissiveIntensity = 0.05 + opOn('attn') * 0.35;
-    this.exMlp.material.emissiveIntensity = 0.05 + opOn('mlp') * 0.3;
-    this.exUnit.material.emissiveIntensity = 0.2 + flash('mlp') * 2.2;
+    this.exAttn.material.emissiveIntensity = 0.04 + opOn('attn') * 0.16;
+    this.exMlp.material.emissiveIntensity = 0.04 + opOn('mlp') * 0.14;
+    this.exUnit.material.emissiveIntensity = 0.15 + flash('mlp') * 0.9;
     const show = st.view === 'layer';
     for (const [k, lb] of Object.entries(this.exLabels)) {
       lb.position.set(xf + 0.32, at(k) + (k === 'mlp' ? 0.1 : 0), 0.25);
@@ -609,7 +609,7 @@ export class Machine {
     this.lmLabel.visible = st.view === 'head' || st.view === 'machine';
     const inHead = s.ph === 'head' || s.ph === 'sample';
     this.normRing.material.opacity = inHead && (!s.sub || s.sub === 'norm') ? 0.9 : 0.25;
-    this.lm.material.emissiveIntensity = inHead && (!s.sub || s.sub === 'unembed') ? 0.45 : 0.06;
+    this.lm.material.emissiveIntensity = inHead && (!s.sub || s.sub === 'unembed') ? 0.16 : 0.04;
 
     // 概率柱：输出头阶段按 T=1 升起；采样阶段按温度 0.7 变形，再被 top-k / top-p 截断
     const barsY = yTop + 1.2;
@@ -636,7 +636,7 @@ export class Machine {
       const hue = it.id < 0 ? 0.62 : hueOf(it.str) / 360;
       const won = s.ph === 'sample' && (!s.sub || s.sub === 'draw') && p > 0.8 && it.id === stp.chosen;
       bar.material.emissive.setHSL(hue, it.id < 0 ? 0.1 : 0.75, won ? 0.7 : 0.45);
-      bar.material.emissiveIntensity = (0.25 + (won ? 1.2 : 0)) * alive;
+      bar.material.emissiveIntensity = (0.16 + (won ? 0.55 : 0)) * alive;
       bar.material.opacity = 0.25 + 0.7 * alive;
       bar.lbl.position.set(bar.position.x, barsY - 0.06, 0.05);
       bar.lbl.visible = rise > 0.2 && (st.view === 'head' || st.view === 'machine') && (k < 8 || it.id < 0);
@@ -677,7 +677,7 @@ export class Machine {
       this.ball.position.set(x0 + stp.u * L * k, stripY + 0.1 + bounce, 0.75);
       this.uLabel.el.textContent = `u = ${(stp.u * k).toFixed(3)}`;
     }
-    this.strip.children.forEach((m) => { m.material.emissiveIntensity = m.chosen && drawP >= 1 ? 1.6 : 0.35; });
+    this.strip.children.forEach((m) => { m.material.emissiveIntensity = m.chosen && drawP >= 1 ? 0.8 : 0.25; });
 
     // 回路轨道：输出 → 机器右侧 → 落回托盘末端
     const nextSlot = Math.min(this.T - 1, Q.P + g);

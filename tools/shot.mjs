@@ -22,6 +22,10 @@ for (const s of steps) {
   if (s.hover) await page.hover(s.hover, { timeout: 5000 }).catch((e) => errors.push(`[step] hover ${s.hover}: ${e.message.split('\n')[0]}`));
   if (s.mouse) await page.mouse.move(s.mouse[0], s.mouse[1], { steps: 4 });
   if (s.key) await page.keyboard.press(s.key);
+  if (s.drag) { const [x1, y1, x2, y2, button = 'left'] = s.drag; await page.mouse.move(x1, y1); await page.mouse.down({ button }); await page.mouse.move(x2, y2, { steps: 12 }); await page.mouse.up({ button }); }
+  if (s.wheel) { await page.mouse.move(s.wheel[0], s.wheel[1]); for (let i = 0; i < (s.wheel[3] || 1); i++) { await page.mouse.wheel(0, s.wheel[2]); await page.waitForTimeout(30); } }
+  if (s.hold) { await page.keyboard.down(s.hold[0]); await page.waitForTimeout(s.hold[1]); await page.keyboard.up(s.hold[0]); }
+  if (s.dblclick) await page.mouse.dblclick(s.dblclick[0], s.dblclick[1]);
   if (s.type) { await page.fill(s.type[0], ''); await page.type(s.type[0], s.type[1], { delay: 20 }); }
   if (s.wait) await page.waitForTimeout(s.wait);
   if (s.eval) { const r = await page.evaluate(s.eval).catch((e) => `ERR ${e.message}`); if (r !== undefined) console.log('eval:', typeof r === 'string' ? r : JSON.stringify(r)); }
