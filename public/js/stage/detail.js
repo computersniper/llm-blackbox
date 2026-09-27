@@ -89,8 +89,8 @@ export class Detail {
     const v = st.view, s = st.step;
     const inMlp = s.ph === 'layer' && s.op === 'mlp' && (v === 'mlp' || v === 'neuron' || v === 'bits');
     this.updatePanel(st, inMlp, t);
-    this.updateRig(st, v === 'neuron' || (v === 'bits' && s.op === 'mlp'), t);
-    this.updateDot(st, v === 'dot' || (v === 'bits' && s.op === 'attn'), t);
+    this.updateRig(st, v === 'neuron', t);
+    this.updateDot(st, v === 'dot' || (v === 'bits' && s.sub === 'score'), t);
     this.updateBits(st, v === 'bits', t);
   }
 
@@ -408,14 +408,12 @@ export class Detail {
   // 当前要看的那个数：神经元里某个输入的 gate 权重，或者打分里 Q 的某一维
   bitsTarget(st) {
     const s = st.step;
-    if (s.op === 'mlp') {
-      const n = this.Q.neuronAt(s.L, st.g);
-      if (!n) return null;
-      const k = Math.min(this.bitsIndex, n.wg.length - 1);
-      return { kind: 'w', v: n.wg[k], k, n, anchor: this.pins?.[k] };
+    if (s.sub === 'score') {
+      const d = this.Q.dotAt(s.L, st.g);
+      return d ? { kind: 'q', v: d.q[0], k: 0, d, anchor: this.dotBars?.[0]?.pb } : null;
     }
-    const d = this.Q.dotAt(s.L, st.g);
-    return d ? { kind: 'q', v: d.q[0], k: 0, d, anchor: this.dotBars?.[0]?.pb } : null;
+    const b = this.M.micro.bitsSource(st);
+    return b ? { kind: 'mm', ...b } : null;
   }
 
   flip(i) {
@@ -432,7 +430,7 @@ export class Detail {
     if (!show) return;
     const tg = this.bitsTarget(st);
     if (!tg) { this.bits.visible = false; return; }
-    const key = `${st.g}|${st.step.L}|${tg.kind}|${tg.k}`;
+    const key = `${st.g}|${st.step.L}|${st.step.sub}|${tg.kind}|${tg.k}|${tg.label || ''}`;
     if (key !== this.bitsKey) {
       this.bitsKey = key;
       if (!this.keys) this.buildBits();
@@ -448,15 +446,17 @@ export class Detail {
       if (m.face.material.map !== tex) { m.face.material.map = tex; m.face.material.needsUpdate = true; }
     });
     const E = val.e - 127, frac = 1 + val.m / 128;
-    const what = tg.kind === 'w' ? `w<sub>gate</sub>[${tg.n.dims[tg.k]}]` : 'q[0]';
+    const what = tg.kind === 'mm' ? tg.label : 'q[0]';
     this.bitsVal.el.innerHTML = `${what} = ${fmtSci(val.value)}<br><small style="font-size:11px;color:var(--dim)">(−1)<sup>${val.s}</sup> × 2<sup>${val.e}−127</sup> × (1 + ${val.m}/128) = ${val.s ? '−' : ''}2<sup>${E}</sup> × ${frac.toFixed(4)}</small>`;
-    if (tg.kind === 'w') {
-      const n = tg.n;
-      const gz2 = n.gz + n.x[tg.k] * (val.value - tg.v);
-      const a2 = (gz2 / (1 + Math.exp(-gz2))) * n.uz;
-      this.bitsFx.el.innerHTML = this.flips.has(key)
-        ? `翻转之后：g ${n.gz.toFixed(3)} → <b>${Number.isFinite(gz2) ? gz2.toFixed(3) : fmtSci(gz2)}</b>，神经元输出 ${(n.silu * n.uz).toFixed(3)} → <b>${Number.isFinite(a2) ? a2.toFixed(3) : fmtSci(a2)}</b>`
-        : '点击任意一个键帽，翻转这个比特';
+    if (tg.kind === 'mm') {
+      const t2 = tg.total + tg.x * (val.value - tg.v);
+      const fmt = (v) => (Number.isFinite(v) ? v.toFixed(3) : fmtSci(v));
+      let extra = '';
+      if (tg.kind2 === 'gate' || tg.e2) {
+        const u = tg.e2.total;
+        extra = `，神经元输出 silu(g)·u ${fmt((tg.total / (1 + Math.exp(-tg.total))) * u)} → <b>${fmt((t2 / (1 + Math.exp(-t2))) * u)}</b>`;
+      }
+      this.bitsFx.el.innerHTML = this.flips.has(key) ? `翻转之后：${tg.out} ${fmt(tg.total)} → <b>${fmt(t2)}</b>${extra}` : `${tg.out} = … + x × 这个权重 + …（x = ${tg.x.toFixed(3)}）· 点击任意一个键帽翻转`;
     } else this.bitsFx.el.innerHTML = this.flips.has(key) ? '激活值也是 bf16：翻转指数位，数值会成倍地变' : '点击任意一个键帽，翻转这个比特';
     const anchor = tg.anchor ? tg.anchor.getWorldPosition(v3(0, 0, 0)) : (this.rigCenter || this.dotCenter || v3(0, 0, 0));
     this.bits.position.copy(anchor).add(v3(0.02, 0.09, 0.2));

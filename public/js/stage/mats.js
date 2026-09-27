@@ -46,7 +46,7 @@ function panel(name, inDim, outDim, color, seed) {
   const scan = new THREE.Mesh(new THREE.PlaneGeometry(0.012, h), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
   scan.position.set(0, h / 2, 0.002);
   g.add(scan);
-  const lb = label(`${name}<small>${inDim} × ${outDim}</small>`, 'lbl part');
+  const lb = label(`${name}<small>${inDim} × ${outDim} · 真实权重分布</small>`, 'lbl part');
   lb.position.set(0, h + 0.02, 0);
   lb.center.set(0, 1.15);
   g.add(lb);
@@ -75,6 +75,7 @@ export class Mats {
   constructor(E, M) {
     this.E = E;
     this.M = M;
+    this.texCache = new Map();
     this.root = new THREE.Group();
     E.scene.add(this.root);
   }
@@ -180,13 +181,16 @@ export class Mats {
     P.add(P.x, P.x2, P.g, P.u, P.go, P.uo, P.d, P.din, P.dout);
     this.root.add(P);
     this.root.visible = true;
+    this.thumbL = -1;
   }
 
   update(st, dt, t) {
     const M = this.M, s = st.step, v = st.view, p = st.p;
     const A = this.attn, P = this.mlp;
     if (!A) return;
-    const inLayer = s.ph === 'layer' && M.e > 0.6 && (v === 'layer' || v === 'attn' || v === 'mlp');
+    const micro = v === 'mm' || (v === 'bits' && s.sub !== 'score');
+    const inLayer = s.ph === 'layer' && M.e > 0.6 && (v === 'layer' || v === 'attn' || v === 'mlp' || micro);
+    if (inLayer) this.applyThumbs(M.explodeL);
     const xf = M.xFocus(st);
     const base = 0.95 + M.explodeL * 0.26;
     const e = M.e;
@@ -206,6 +210,11 @@ export class Mats {
         pn.mat.opacity = qkv ? 0.9 : 0.35;
         out.setFill(easeOut(kP), qkv ? 0.55 : 0.25);
       }
+      if (micro) {
+        // 微观视图：只突出正在放大的那块矩阵
+        for (const pn of [A.q, A.k, A.v]) { pn.scan.material.opacity = 0; pn.mat.opacity = pn === A.q && qkv ? (v === 'bits' ? 0.3 : 0.95) : 0.18; }
+        for (const out of [A.qo, A.ko, A.vo]) out.setFill(1, out === A.qo ? 0.35 : 0.12);
+      }
       A.x.visible = sub !== 'mix';
       A.x.setFill(1, qkv ? 0.6 : 0.2);
       A.gqa.material.opacity = sub === 'qkv' ? 0.55 * seg(kP, 0.7, 1) : sub === 'score' ? 0.5 : 0.15;
@@ -221,6 +230,7 @@ export class Mats {
         A.o.scan.material.opacity = mP < 1 ? 0.85 : 0;
         A.o.scan.position.x = A.o.w * easeOut(mP);
         A.oo.setFill(easeOut(mP), 0.55);
+        if (micro) { A.o.scan.material.opacity = 0; A.oo.setFill(1, 0.3); A.o.mat.opacity = v === 'bits' ? 0.3 : 0.95; }
       }
     }
     // 前馈这一组
@@ -246,8 +256,55 @@ export class Mats {
       P.d.scan.position.x = P.d.w * easeOut(dP);
       P.din.setFill(sub === 'up' ? 0 : 1, sub === 'act' ? 0.7 : 0.4);
       P.dout.setFill(easeOut(dP), 0.55);
+      if (micro) {
+        for (const pn of [P.g, P.u, P.d]) pn.scan.material.opacity = 0;
+        const hi = v === 'bits' ? 0.3 : 0.95;
+        P.g.mat.opacity = P.u.mat.opacity = up ? hi : 0.18;
+        P.d.mat.opacity = down ? hi : 0.18;
+        P.go.setFill(1, 0.3); P.uo.setFill(1, 0.3); P.dout.setFill(down ? 1 : 0, 0.3);
+      }
     }
   }
+
+  // 换成这一层真实的权重分布（每格 = 32×32 个权重的均方根，越亮越大）
+  applyThumbs(L) {
+    if (!this.thumbs || L < 0 || this.thumbL === L) return;
+    this.thumbL = L;
+    const idx = this.thumbIndex;
+    const set = (pn, name) => {
+      const spec = idx[`${L}:${name}`];
+      if (!spec) return;
+      const key = `${L}:${name}`;
+      let tex = this.texCache.get(key);
+      if (!tex) {
+        const { w, h, offset } = spec;
+        const c = new THREE.Color(pn.color);
+        const data = new Uint8Array(w * h * 4);
+        for (let r = 0; r < h; r++) {
+          for (let x = 0; x < w; x++) {
+            const v = this.thumbs[offset + (h - 1 - r) * w + x] / 255; // 导出时第 0 行是最后一维，这里翻回来
+            const o = (r * w + x) * 4;
+            const k = Math.pow(v, 0.7);
+            data[o] = Math.round(40 + c.r * 215 * k); data[o + 1] = Math.round(40 + c.g * 215 * k); data[o + 2] = Math.round(50 + c.b * 205 * k);
+            data[o + 3] = Math.round(40 + 215 * k);
+          }
+        }
+        tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.LinearFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.needsUpdate = true;
+        this.texCache.set(key, tex);
+      }
+      pn.mat.map = tex;
+      pn.mat.needsUpdate = true;
+      pn.real = true;
+    };
+    set(this.attn.q, 'q'); set(this.attn.k, 'k'); set(this.attn.v, 'v'); set(this.attn.o, 'o');
+    set(this.mlp.g, 'gate'); set(this.mlp.u, 'up'); set(this.mlp.d, 'down');
+  }
+
+  setThumbs(bytes, index) { this.thumbs = bytes; this.thumbIndex = index; this.thumbL = -1; }
 
   // 让相机把矩阵也框进去：返回这一组在世界坐标里的右边界
   extentX(st) {

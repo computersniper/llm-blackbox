@@ -48,6 +48,13 @@ async function fetchData(url) {
   return r.arrayBuffer();
 }
 
+// 每层每个矩阵的真实权重分布缩略图（每格 = 32×32 个权重的均方根）
+let thumbs = null;
+export async function loadThumbs() {
+  if (!thumbs) thumbs = fetchData('data/weights.bin').then((b) => new Uint8Array(b));
+  return thumbs;
+}
+
 export async function loadQuestion(id, manifest) {
   if (cache.has(id)) return cache.get(id);
   const [jbuf, buf] = await Promise.all([fetchData(`data/${id}.json`), fetchData(`data/${id}.bin`)]);
@@ -98,6 +105,8 @@ export async function loadQuestion(id, manifest) {
     norm: (L, i) => meta.norms[L][i],
     lensAt: (g, L) => meta.lens[g][L],
     neuronAt: (L, g) => meta.neuron[String(L)]?.[g] ?? null,
+    mmAt: (L, g) => meta.mm?.[String(L)]?.[g] ?? null,
+    headMMAt: (g) => meta.headMM?.[g] ?? null,
     dotAt: (L, g) => meta.dot[String(L)]?.[g] ?? null,
   };
   cache.set(id, Q);

@@ -12,7 +12,9 @@
 
 export const OPS = ['ln1', 'attn', 'add1', 'ln2', 'mlp', 'add2'];
 const SUBS = { attn: ['qkv', 'score', 'softmax', 'mix'], mlp: ['up', 'act', 'down'] };
-const MICROS = { score: ['mul', 'sum', 'scale'], act: ['mul', 'sum', 'silu', 'gate'] };
+// 微观步骤：一个输出元素是怎么乘加出来的（只在导出了细节的焦点层）
+const MICROS = { qkv: ['pick', 'mul', 'sum', 'rope'], score: ['mul', 'sum', 'scale'], mix: ['pick', 'mul', 'sum'], up: ['pick', 'mul', 'sum'], act: ['silu', 'gate'], down: ['pick', 'mul', 'sum'] };
+const HEAD_MICRO = ['pick', 'mul', 'sum'];
 export const MAX_DEPTH = 7;
 
 export const DEPTH_NAMES = ['对话', '黑箱', '结构', '层塔', '一层之内', '算子', '一次乘加', '比特'];
@@ -21,7 +23,7 @@ const DUR = {
   pass: 1.6, read0: 2.4, read: 1.1, embed: 1.3, layers: 2.6, layer: 0.62, head: 1.5, sample: 2.4,
   ln1: 0.8, attn: 1.8, add1: 0.8, ln2: 0.8, mlp: 1.8, add2: 0.8,
   qkv: 1.6, score: 1.6, softmax: 1.5, mix: 1.7, up: 1.5, act: 1.9, down: 1.5,
-  mul: 2.2, sum: 1.7, scale: 1.3, silu: 1.9, gate: 1.7,
+  mul: 2.6, sum: 1.8, scale: 1.3, silu: 1.9, gate: 1.7, pick: 1.4, rope: 2.4,
   norm: 0.9, unembed: 1.5, softmaxH: 1.5, temp: 1.3, topk: 1.3, topp: 1.5, draw: 2.4,
 };
 
@@ -44,7 +46,10 @@ export function buildSteps(depth, g, NL, focus) {
   }
   if (depth <= 3) s.push({ g, ph: 'head' }, { g, ph: 'sample' });
   else {
-    for (const sub of ['norm', 'unembed', 'softmax']) s.push({ g, ph: 'head', sub });
+    for (const sub of ['norm', 'unembed', 'softmax']) {
+      if (sub === 'unembed' && depth >= 5) for (const mi of HEAD_MICRO) s.push({ g, ph: 'head', sub, mi });
+      else s.push({ g, ph: 'head', sub });
+    }
     for (const sub of ['temp', 'topk', 'topp', 'draw']) s.push({ g, ph: 'sample', sub });
   }
   return s;
@@ -57,6 +62,7 @@ export function isPrefix(a, b) {
   if (a.ph === 'layers') return b.ph === 'layer' || b.ph === 'layers';
   if (a.ph !== b.ph) return false;
   for (const k of ['L', 'op', 'sub', 'mi']) {
+    if (a.ph !== 'layer' && (k === 'L' || k === 'op')) continue;
     if (a[k] === undefined) return true;
     if (a[k] !== b[k]) return false;
   }
@@ -70,18 +76,22 @@ export function viewOf(depth, s) {
   if (depth <= 1) return 'box';
   if (depth === 2) return 'machine';
   if (s.ph === 'read' || s.ph === 'embed') return 'tray';
-  if (s.ph === 'head' || s.ph === 'sample') return 'head';
+  if (s.ph === 'head' || s.ph === 'sample') {
+    if (s.mi) return depth >= 6 && s.mi === 'mul' ? 'bits' : 'mm';
+    return 'head';
+  }
   if (depth === 3) return 'tower';
   if (depth === 4 || !s.sub) return 'layer';
   if (depth === 5 || !s.mi) return s.op === 'attn' ? 'attn' : 'mlp';
-  if (depth === 6 || s.mi !== 'mul') return s.op === 'attn' ? 'dot' : 'neuron';
-  return 'bits';
+  if (s.sub === 'act') return 'neuron';
+  if (depth >= 7 && s.mi === 'mul') return 'bits';
+  return s.sub === 'score' ? 'dot' : 'mm';
 }
 
 function durOf(s) {
   if (s.ph === 'read') return s.g === 0 ? DUR.read0 : DUR.read;
   if (s.ph === 'layer') return DUR[s.mi || s.sub || s.op || 'layer'];
-  if (s.ph === 'head') return s.sub ? DUR[s.sub === 'softmax' ? 'softmaxH' : s.sub] : DUR.head;
+  if (s.ph === 'head') return s.mi ? DUR[s.mi] : s.sub ? DUR[s.sub === 'softmax' ? 'softmaxH' : s.sub] : DUR.head;
   if (s.ph === 'sample') return s.sub ? DUR[s.sub] : DUR.sample;
   return DUR[s.ph];
 }

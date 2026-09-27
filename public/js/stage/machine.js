@@ -6,6 +6,7 @@ import { RoundedBoxGeometry } from '../vendor/three/addons/geometries/RoundedBox
 import { tokPlain, shortSpecial, fmtPct, hueOf, esc } from '../ui.js';
 import { Detail } from './detail.js';
 import { Mats } from './mats.js';
+import { Micro } from './micro.js';
 
 export const ROLE = { system: 0x8fa6d6, user: 0x5ee4f0, assistant: 0xffb65c, tpl: 0xb39dff };
 const S = 0.42;        // 词元间距
@@ -45,6 +46,7 @@ export class Machine {
     this.scene = E.scene;
     this.detail = new Detail(E);
     this.mats = new Mats(E, this);
+    this.micro = new Micro(E, this);
     this.buildStatic();
     this.root = null;
   }
@@ -188,6 +190,9 @@ export class Machine {
     this.buildCasing();
     this.detail.load(Q, this);
     this.mats.load(Q);
+    this.micro.head = null;
+    this.micro.key = '';
+    this.micro.selD = null;
   }
 
   /* ------------------------------------------------------------ 拆开的一层 */
@@ -384,14 +389,14 @@ export class Machine {
     const inside = Math.max(0.15, o);
 
     // 聚焦：越深，越把无关的层板、光柱、KV 缓存淡出
-    const FADE = { layer: 0.35, attn: 0.8, dot: 0.9, mlp: 0.85, neuron: 0.95, bits: 0.97 };
+    const FADE = { layer: 0.35, attn: 0.8, dot: 0.9, mlp: 0.85, neuron: 0.95, bits: 0.97, mm: 0.93 };
     this.fade += ((FADE[view] || 0) - (this.fade || 0)) * Math.min(1, dt * 3);
     const fade = this.fade;
-    const BLOOM = { box: 0.46, machine: 0.42, tray: 0.38, tower: 0.34, layer: 0.32, attn: 0.36, head: 0.34, mlp: 0.28, neuron: 0.16, dot: 0.12, bits: 0.14 };
+    const BLOOM = { box: 0.46, machine: 0.42, tray: 0.38, tower: 0.34, layer: 0.32, attn: 0.36, head: 0.34, mlp: 0.28, neuron: 0.16, dot: 0.12, bits: 0.14, mm: 0.14 };
     this.E.bloom.strength += ((BLOOM[view] ?? 0.36) * (this.brightness ?? 1) - this.E.bloom.strength) * Math.min(1, dt * 3);
 
     // 拆开的层
-    const wantEx = view === 'layer' || view === 'attn' || view === 'mlp' || view === 'neuron' || view === 'dot' || view === 'bits';
+    const wantEx = s.ph === 'layer' && (view === 'layer' || view === 'attn' || view === 'mlp' || view === 'neuron' || view === 'dot' || view === 'bits' || view === 'mm');
     const exL = s.ph === 'layer' ? s.L : -1;
     if (wantEx && exL !== this.explodeL && this.e < 0.02) this.explodeL = exL;
     const eT = wantEx && exL === this.explodeL ? 1 : 0;
@@ -507,6 +512,7 @@ export class Machine {
     // 细节（神经元阵列、单个神经元、比特……）
     this.detail.update(st, dt, t);
     this.mats.update(st, dt, t);
+    this.micro.update(st, dt, t);
 
     this.dust.rotation.y += dt * 0.01;
   }
@@ -552,7 +558,7 @@ export class Machine {
         });
       } else this.beamList = [];
     }
-    const hideBeams = ['mlp', 'neuron', 'bits'].includes(view);
+    const hideBeams = ['mlp', 'neuron', 'bits', 'mm'].includes(view);
     this.beams.visible = !hideBeams;
     for (const b of this.beamList || []) {
       b.geo.setDrawRange(0, Math.floor(b.geo.index.count * grow / 6) * 6);
@@ -773,6 +779,8 @@ export class Machine {
         return { pos: look.clone().add(v3(0.6, d * 0.32, d)), look };
       }
       case 'head': { const look = v3(this.headX(st), yTop + 1.9, 0); return { pos: look.clone().add(v3(1.6, 1.0, 8.2)), look }; }
+      case 'mm': return this.micro.camera(st) || this.detail.camera(st);
+      case 'bits': if (st.step.sub !== 'score') { const c = this.detail.camera(st); return c; } return this.detail.camera(st);
       default: return this.detail.camera(st);
     }
   }

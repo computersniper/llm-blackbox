@@ -163,12 +163,13 @@ def internals(model, seq, cfg):
     T = len(seq)
     H, KVH, D = cfg.num_attention_heads, cfg.num_key_value_heads, cfg.head_dim
     eps = cfg.rms_norm_eps
-    cap = {"ln1": {}, "ln2": {}, "act": {}, "out": {}}
+    cap = {"ln1": {}, "ln2": {}, "act": {}, "out": {}, "oin": {}}
     hooks = []
     for li, layer in enumerate(m.layers):
         hooks.append(layer.input_layernorm.register_forward_hook(lambda mod, i, o, li=li: cap["ln1"].__setitem__(li, o[0].float())))
         hooks.append(layer.post_attention_layernorm.register_forward_hook(lambda mod, i, o, li=li: cap["ln2"].__setitem__(li, o[0].float())))
         hooks.append(layer.mlp.down_proj.register_forward_hook(lambda mod, i, o, li=li: cap["act"].__setitem__(li, i[0][0].float())))
+        hooks.append(layer.self_attn.o_proj.register_forward_hook(lambda mod, i, o, li=li: cap["oin"].__setitem__(li, i[0][0].float())))
         hooks.append(layer.register_forward_hook(lambda mod, i, o, li=li: cap["out"].__setitem__(li, (o[0] if isinstance(o, tuple) else o)[0].float())))
     ids = torch.tensor([seq], device=model.device)
     out = model(ids, output_attentions=True, use_cache=False)
@@ -183,7 +184,7 @@ def internals(model, seq, cfg):
     emb = torch.cat((ang, ang), -1)
     cos, sin = emb.cos(), emb.sin()
 
-    res = {"att": att, "act": cap["act"], "out": cap["out"], "ln1": cap["ln1"], "ln2": cap["ln2"], "qk": {}, "lse": []}
+    res = {"att": att, "act": cap["act"], "out": cap["out"], "ln1": cap["ln1"], "ln2": cap["ln2"], "oin": cap["oin"], "qk": {}, "lse": []}
     mask = torch.triu(torch.ones(T, T, dtype=torch.bool, device=model.device), 1)
     max_err = 0.0
     for li, layer in enumerate(m.layers):
@@ -370,6 +371,56 @@ def export_question(qi, text, tok, model, cfg):
             })
         neuron[li], dot[li] = nlist, dlist
 
+    # 矩阵乘法的“一个输出元素”：y[j] = Σ_i x[i]·W[j, i]，导出贡献最大的 12 项和总和
+    def mm_entry(x, w, total, j):
+        c = x * w
+        top = torch.topk(c.abs(), TOPN).indices.tolist()
+        return {"j": j, "dims": top, "x": [round(float(x[i]), 5) for i in top], "w": [float(w[i]) for i in top],
+                "total": round(float(total), 5), "shown": round(float(c[top].sum()), 5)}
+
+    mm = {}
+    theta_base = rope_theta(cfg)
+    Dh = cfg.head_dim
+    for li in FOCUS_LAYERS:
+        layer = model.model.layers[li]
+        a = layer.self_attn
+        Wq, Wo, Wd = a.q_proj.weight.float(), a.o_proj.weight.float(), layer.mlp.down_proj.weight.float()
+        qfull, _ = r["qk"][li]
+        per = []
+        for g, row in enumerate(rows):
+            x = r["ln1"][li][row]
+            h = dot[li][g]["head"]
+            qraw = (x @ Wq[h * Dh:(h + 1) * Dh].T)          # 这个头的 128 维（投影后、归一化和旋转之前）
+            d = int(torch.argmax(qraw.abs()))
+            j = h * Dh + d
+            eq = mm_entry(x, Wq[j], qraw[d], j)
+            qn = rms(qraw, a.q_norm.weight, cfg.rms_norm_eps)
+            partner = d + Dh // 2 if d < Dh // 2 else d - Dh // 2
+            k = d % (Dh // 2)
+            ang = row / (theta_base ** (2 * k / Dh))
+            eq.update({"head": h, "dim": d, "partner": partner, "pos": row, "angle": round(ang, 6), "freq": k,
+                       "qn": round(float(qn[d]), 5), "qnP": round(float(qn[partner]), 5), "qnW": float(a.q_norm.weight[d]),
+                       "rms": round(float(qraw.pow(2).mean().sqrt()), 5),
+                       "qr": round(float(qfull[row, h, d]), 5), "qrP": round(float(qfull[row, h, partner]), 5)})
+            oin = r["oin"][li][row]
+            oout = oin @ Wo.T
+            jo = int(torch.argmax(oout.abs()))
+            act = r["act"][li][row]
+            dout = act @ Wd.T
+            jd = int(torch.argmax(dout.abs()))
+            per.append({"q": eq, "o": mm_entry(oin, Wo[jo], oout[jo], jo), "down": mm_entry(act, Wd[jd], dout[jd], jd)})
+        mm[li] = per
+    # 输出头：被选中的词元的分数 = 最终向量 · 它在嵌入表里的那一行
+    E = model.lm_head.weight.float()
+    last = cfg.num_hidden_layers - 1
+    head_mm = []
+    for g, row in enumerate(rows):
+        hN = rms(r["out"][last][row], model.model.norm.weight, cfg.rms_norm_eps)
+        cid = steps[g]["chosen"]
+        ent = mm_entry(hN, E[cid], hN @ E[cid], cid)
+        ent["token"] = disp(cid)
+        head_mm.append(ent)
+
     meta = {
         "id": f"q{qi + 1:02d}",
         "question": text,
@@ -380,6 +431,8 @@ def export_question(qi, text, tok, model, cfg):
         "norms": norms,
         "embNorm": emb_norm,
         "neuron": {str(k): v for k, v in neuron.items()},
+        "mm": {str(k): v for k, v in mm.items()},
+        "headMM": head_mm,
         "dot": {str(k): v for k, v in dot.items()},
         "bin": b.index,
         "attCheck": r["check"],
@@ -419,6 +472,21 @@ def main():
         print("  →", items[-1]["reply"])
     n_params = sum(p.numel() for p in model.parameters())
     sample_w = model.model.layers[FOCUS_LAYERS[1]].mlp.gate_proj.weight
+    thumbs = bytearray()
+    thumb_index = {}
+    B = 32
+    for li, layer in enumerate(model.model.layers):
+        a, mlp = layer.self_attn, layer.mlp
+        for name, W in (("q", a.q_proj), ("k", a.k_proj), ("v", a.v_proj), ("o", a.o_proj), ("gate", mlp.gate_proj), ("up", mlp.up_proj), ("down", mlp.down_proj)):
+            w = W.weight.float()                      # [out, in]
+            o, i = w.shape
+            blk = w.pow(2).reshape(o // B, B, i // B, B).mean(dim=(1, 3)).sqrt()   # [out/B, in/B]
+            v = blk / blk.max()
+            img = (v.T.flip(0) * 255).round().to(torch.uint8).cpu().numpy()        # 行 = 输入（上下翻转，0 在底部），列 = 输出
+            thumb_index[f"{li}:{name}"] = {"offset": len(thumbs), "w": img.shape[1], "h": img.shape[0]}
+            thumbs += img.tobytes()
+    (OUT / "weights.bin").write_bytes(bytes(thumbs))
+    (OUT / "weights.bin.gz").write_bytes(gzip.compress(bytes(thumbs), 9, mtime=0))
     manifest = {
         "model": {
             "name": "Qwen3-0.6B",
@@ -438,6 +506,7 @@ def main():
         "mlpTopk": MLP_TOPK,
         "questions": items,
         "weightSample": [float(v) for v in sample_w[0, :8]],
+        "thumbs": {"block": B, "index": thumb_index},
     }
     if args.only:
         print(json.dumps(items, ensure_ascii=False, indent=1)[:3000])

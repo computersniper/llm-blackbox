@@ -1,4 +1,4 @@
-import { loadManifest, loadQuestion } from './data.js';
+import { loadManifest, loadQuestion, loadThumbs } from './data.js';
 import { Chat } from './chat.js';
 import { Timeline } from './timeline.js';
 import { Controls, SPEEDS } from './controls.js';
@@ -107,6 +107,7 @@ async function ensureEngine() {
   const eng = await import('./stage/engine.js');
   const mach = await import('./stage/machine.js');
   THREE = eng.THREE;
+  loadThumbs().then((b) => machine?.mats.setThumbs(b, manifest.thumbs.index)).catch(() => { /* 没有缩略图时用装饰纹理 */ });
   engine = new eng.Engine($('#gl'), { onFrame, onHover, onPick, onFreeChange: (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); } });
   machine = new mach.Machine(engine);
 }
@@ -280,6 +281,7 @@ function onHover(info, e) {
     case 'bulb': h = `<span class="k">神经元 #${info.n}</span>SiLU(g)·u = <span class="v">${info.v.toFixed(3)}</span>${info.full ? '' : '<br><span style="color:var(--dim)">这一层只导出了最亮的 16 个</span>'}`; break;
     case 'pin': h = `<span class="k">输入第 ${info.dim} 维</span>x = <span class="v">${info.x.toFixed(4)}</span><br>w<sub>gate</sub> = ${info.wg}<br>w<sub>up</sub> = ${info.wu}<br><span class="v">点击，看这个权重的比特</span>`; break;
     case 'wire': h = `<span class="k">${info.which === 'gate' ? 'gate' : 'up'} 权重</span>x × w = ${info.x.toFixed(3)} × ${info.w.toFixed(4)} = <span class="v">${info.prod.toFixed(4)}</span>`; break;
+    case 'mmcell': h = `<span class="k">格子 (${info.d}, ${info.j})</span>x[${info.d}] × W[${info.d}, ${info.j}] = ${info.x.toFixed(4)} × ${info.w} = <span class="v">${info.prod.toFixed(4)}</span><br><span class="v">点击选中，再按 ＋ 看这个权重的比特</span>`; break;
     case 'key': h = `<span class="k">第 ${info.i} 位 · ${info.i === 0 ? '符号' : info.i <= 8 ? '指数' : '尾数'}</span>点击翻转`; break;
     default: return hideTip();
   }
@@ -297,6 +299,10 @@ function onPick(info) {
     machine.detail.flip(info.i);
     sfx.bit();
     discover('bits');
+  } else if (info.type === 'mmcell') {
+    machine.micro.selD = info.d;
+    sfx.click();
+    if (tl.step.mi === 'mul' && tl.canInto()) tl.into();
   } else if (info.type === 'pin') {
     machine.detail.selectPin(info.k);
     sfx.click();

@@ -40,10 +40,7 @@ export function linesFor(s, Q) {
     case 'head': return !s.sub ? [16, 17] : s.sub === 'softmax' ? [17] : [16];
     case 'sample': return (!s.sub ? [17, 18] : s.sub === 'temp' ? [17] : [18]).concat(last ? [19] : []);
     case 'layer':
-      if (s.mi) {
-        if (s.op === 'attn') return [10];
-        return s.mi === 'mul' || s.mi === 'sum' ? [14] : [15];
-      }
+      if (s.mi) return { qkv: s.mi === 'rope' ? [8] : [7], score: [10], mix: [12], up: [14], act: [15], down: [15] }[s.sub] || [5];
       if (s.sub) return { qkv: [7, 8, 9], score: [10], softmax: [11], mix: [12], up: [14], act: [15], down: [15] }[s.sub];
       if (s.op) return { ln1: [6], attn: [7, 8, 9, 10, 11, 12], add1: [12], ln2: [13], mlp: [14, 15], add2: [15] }[s.op];
       return [5];
@@ -88,6 +85,7 @@ export function explain(s, Q, ctx = {}) {
     case 'layer': return layerExplain(s, Q, ctx, i, cur);
     case 'head': {
       const top = st.top.slice(0, 3).map(([, p, t]) => `${tokHTML(t, 'r-assistant')} ${P(p)}`).join('，');
+      if (s.mi) return mmExplain(s, Q.headMMAt(g), `「${Q.headMMAt(g)?.token ?? ''}」的分数`, 'E', 1024, `最终向量 h 的 1024 个数，和嵌入表里「${esc(Q.headMMAt(g)?.token ?? '')}」那一行逐项相乘再相加，就是它的分数（logit）。模型给词表里每个词元都这样算一遍，一共 151936 次。`);
       if (!s.sub) return `最后一个位置的向量做一次 RMSNorm，再乘上<b>和嵌入表共用的那块权重</b>（1024 × 151936），得到词表里每个词元的分数，softmax 成概率：${top}……`;
       if (s.sub === 'norm') return `最终 RMSNorm：把第 28 层输出的向量拉回统一的尺度。`;
       if (s.sub === 'unembed') return `乘上输出矩阵，得到 <b>151936</b> 个分数（logits）。Qwen3-0.6B 的输出矩阵和嵌入表是同一块权重（tied embeddings），省下了 1.5 亿个参数。`;
@@ -107,6 +105,14 @@ export function explain(s, Q, ctx = {}) {
   return '';
 }
 
+// 矩阵乘法里的一个输出元素
+function mmExplain(s, e, out, W, n, tail) {
+  if (!e) return '';
+  if (s.mi === 'pick') return `放大 ${W} 的<b>第 ${e.j} 列</b>。${out} 就是输入的 ${n} 个数和这一列的 ${n} 个权重<b>逐项相乘再相加</b>：${out} = Σ<sub>i</sub> x[i] · W[i, ${e.j}]。${tail}`;
+  if (s.mi === 'mul') return `逐项相乘。第 i 行的输入沿着第 i 行走到这一列，和格子里的权重相乘。这里显示贡献最大的 12 项；橙色为正，蓝色为负。<span class="dimmed">点一个格子，再按 ＋ 看这个权重的比特。</span>`;
+  return `${n} 项全部加起来：${out} = <b>${e.total.toFixed(3)}</b>（前 12 项合计 ${e.shown.toFixed(3)}，其余 ${n - 12} 项合计 ${(e.total - e.shown).toFixed(3)}）。`;
+}
+
 function layerExplain(s, Q, ctx, i, cur) {
   const { L, g } = s;
   const lens = Q.lensAt(g, L);
@@ -119,6 +125,19 @@ function layerExplain(s, Q, ctx, i, cur) {
   if (s.op === 'add1') return `<b>残差相加</b>：注意力的输出（经过 o_proj）直接加回原来的向量。每层只是“往上加一点”，信息不会被覆盖。当前向量长度 ‖x‖ = <b>${Q.norm(L, i).toFixed(1)}</b>。`;
   if (s.op === 'add2') return `前馈网络的输出加回残差流，第 ${L} 层结束。逻辑透镜此刻读到的是 ${guess}。`;
   const h = ctx.head ?? interestingHead(Q, L, i);
+  if (s.mi && s.sub === 'qkv') {
+    const e = Q.mmAt(L, g)?.q;
+    if (s.mi === 'rope' && e) return `这个数还要再加工两次：先做 <b>q_norm</b>（这个头的 128 个数一起除以均方根 ${e.rms.toFixed(3)}，再乘缩放 γ），得到 ${e.qn.toFixed(4)}；再做 <b>RoPE</b>：和第 ${e.partner} 维配成一对，按位置 ${e.pos} 转一个角度，得到 <b>${e.qr.toFixed(4)}</b>。位置越靠后转得越多，两个词元的点积因此只和它们的相对距离有关。`;
+    return mmExplain(s, e, e ? `q[${e.j}]` : 'q', 'W<sub>q</sub>', 1024, e ? `q 一共 2048 个数，每个都这样算。这里放大的是第 ${e.head} 头第 ${e.dim} 维（第 ${e.j} 列）。k、v 也完全一样，只是换成 W<sub>k</sub>、W<sub>v</sub>。` : '');
+  }
+  if (s.mi && s.sub === 'mix') { const e = Q.mmAt(L, g)?.o; return mmExplain(s, e, e ? `Δx[${e.j}]` : 'Δx', 'W<sub>o</sub>', 2048, '16 个头的输出拼成 2048 个数，再和 W<sub>o</sub> 的一列逐项相乘相加，得到回到残差流的 1024 个数之一。'); }
+  if (s.mi && s.sub === 'down') { const e = Q.mmAt(L, g)?.down; return mmExplain(s, e, e ? `Δx[${e.j}]` : 'Δx', 'W<sub>down</sub>', 3072, '3072 个神经元的输出，和 W<sub>down</sub> 的一列逐项相乘相加，得到加回残差流的 1024 个数之一。'); }
+  if (s.mi && s.sub === 'up') {
+    const n = Q.neuronAt(L, g);
+    if (!n) return '';
+    const e = { j: n.n, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
+    return mmExplain(s, e, `g[${n.n}]`, 'W<sub>gate</sub>', 1024, `同一个神经元 #${n.n} 在 W<sub>up</sub> 里也有一列，同样乘加得到 u = <b>${n.uz.toFixed(3)}</b>。`);
+  }
   if (s.op === 'attn') {
     if (!s.sub) return `<b>分组查询注意力（GQA）</b>：16 个查询头，每 2 个共用一组键值头，共 8 组。${cur} 平均最关注 ${tgt}。`;
     const row = Q.att(L, h, i);
@@ -141,8 +160,6 @@ function layerExplain(s, Q, ctx, i, cur) {
   if (s.sub === 'down') return `down_proj 把 3072 维压回 1024 维，准备加回残差流。`;
   const n = Q.neuronAt(L, g);
   if (!n) return '';
-  if (s.mi === 'mul') return `神经元 <b>#${n.n}</b>：1024 个输入分别乘 gate 和 up 两组权重。这里显示贡献最大的 12 项（全是真实的 bf16 权重）。`;
-  if (s.mi === 'sum') return `全部加起来：g = <b>${n.gz.toFixed(3)}</b>，u = <b>${n.uz.toFixed(3)}</b>。`;
   if (s.mi === 'silu') return `SiLU(g) = g · σ(g) = <b>${n.silu.toFixed(3)}</b>。负数会被压到接近 0。`;
   return `SiLU(g) × u = <b>${(n.silu * n.uz).toFixed(3)}</b>：这就是神经元 #${n.n} 的输出。`;
 }
@@ -160,12 +177,17 @@ export function shapeOf(s, Q) {
     case 'head':
       if (s.sub === 'norm') return `x[-1] ${D(`[1×${H}]`)} ÷ RMS × γ ${D(`[${H}]`)}`;
       if (s.sub === 'softmax') return `softmax(logits ${D(`[1×${V}]`)}) → p ${D(`[1×${V}]`)}，和为 1`;
+      if (s.mi) return `logit[id] = h ${D(`[${H}]`)} · E[id] ${D(`[${H}]`)} → 1 个数`;
       return `x[-1] ${D(`[1×${H}]`)} @ Eᵀ ${D(`[${H}×${V}]`)} → logits ${D(`[1×${V}]`)}`;
     case 'sample': return `p ${D(`[${V}]`)} → ÷0.7 → 前 20 → 累计 80% → 候选 ${D(`[${Q.steps[s.g].pool.length}]`)} → 1 个词元`;
     case 'layer': {
       if (!s.op) return `x ${D(x)} → 注意力 → 前馈 → ${D(x)}`;
       if (s.op === 'ln1' || s.op === 'ln2') return `h = x ${D(x)} ÷ RMS(x) × γ ${D(`[${H}]`)} → ${D(x)}`;
       if (s.op === 'add1' || s.op === 'add2') return `x ${D(x)} + Δx ${D(x)} → ${D(x)}`;
+      if (s.mi && s.sub === 'qkv') return s.mi === 'rope' ? `q<sub>头</sub> ${D(`[${M.headDim}]`)} ÷ RMS × γ → 每两维一对旋转 θ = 位置 / 10⁶<sup>2k/128</sup>` : `q[j] = h ${D(`[${H}]`)} · W<sub>q</sub>[:, j] ${D(`[${H}]`)} → 1 个数`;
+      if (s.mi && s.sub === 'mix') return `Δx[j] = 拼接 ${D(`[${qd}]`)} · W<sub>o</sub>[:, j] ${D(`[${qd}]`)} → 1 个数`;
+      if (s.mi && s.sub === 'down') return `Δx[j] = a ${D(`[${F}]`)} · W<sub>down</sub>[:, j] ${D(`[${F}]`)} → 1 个数`;
+      if (s.mi && s.sub === 'up') return `g[n] = h ${D(`[${H}]`)} · W<sub>gate</sub>[:, n] ${D(`[${H}]`)}；u[n] 同理用 W<sub>up</sub>`;
       if (s.op === 'attn') {
         if (!s.sub || s.sub === 'qkv') return `h ${D(x)} @ W<sub>q</sub> ${D(`[${H}×${qd}]`)} → q ${D(`[${n}×${qd}]`)} = ${M.heads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>k</sub> ${D(`[${H}×${kd}]`)} → k = ${M.kvHeads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>v</sub> ${D(`[${H}×${kd}]`)} → v = ${M.kvHeads} 头 × ${M.headDim}`;
         if (s.sub === 'score') {
@@ -219,7 +241,7 @@ export function renderWatch(el, rows) {
 
 const OP_NAME = { ln1: 'RMSNorm', attn: '注意力', add1: '残差 ⊕', ln2: 'RMSNorm', mlp: '前馈 SwiGLU', add2: '残差 ⊕' };
 const SUB_NAME = { qkv: 'Q·K·V', score: '打分', softmax: 'softmax', mix: '加权求和', up: '升维', act: '门控激活', down: '降维', norm: 'RMSNorm', unembed: '输出矩阵', temp: '温度', topk: 'top-k', topp: 'top-p', draw: '掷骰子' };
-const MI_NAME = { mul: '逐项相乘', sum: '求和', scale: '÷√128', silu: 'SiLU', gate: '× u' };
+const MI_NAME = { mul: '逐项相乘', sum: '求和', scale: '÷√128', silu: 'SiLU', gate: '× u', pick: '选一列', rope: 'q_norm + RoPE' };
 
 export function stepLabel(s) {
   switch (s.ph) {
@@ -227,7 +249,7 @@ export function stepLabel(s) {
     case 'read': return s.g === 0 ? '套聊天模板' : '接上新词元';
     case 'embed': return '嵌入';
     case 'layers': return '28 层';
-    case 'head': return s.sub ? `输出 · ${SUB_NAME[s.sub]}` : '输出头';
+    case 'head': return s.mi ? `输出 · ${SUB_NAME[s.sub]} · ${MI_NAME[s.mi]}` : s.sub ? `输出 · ${SUB_NAME[s.sub]}` : '输出头';
     case 'sample': return s.sub ? `采样 · ${SUB_NAME[s.sub]}` : '采样';
     case 'layer': return [`第 ${s.L} 层`, s.op && OP_NAME[s.op], s.sub && SUB_NAME[s.sub], s.mi && MI_NAME[s.mi]].filter(Boolean).join(' · ');
   }
@@ -242,6 +264,9 @@ export function crumbs(depth, s) {
     if (s.ph === 'layer') out.push({ d: 3, label: '层塔' });
     else out.push({ d: 3, label: { read: '读入', embed: '嵌入', head: '输出头', sample: '采样' }[s.ph] || DEPTH_NAMES[3] });
   }
+  if ((s.ph === 'head' || s.ph === 'sample') && depth >= 4 && s.sub) out.push({ d: 4, label: SUB_NAME[s.sub] });
+  if (s.ph === 'head' && depth >= 5 && s.mi) out.push({ d: 5, label: '一次乘加' });
+  if (s.ph === 'head' && depth >= 6 && s.mi === 'mul') out.push({ d: 6, label: '比特' });
   if (depth >= 4 && s.ph === 'layer') out.push({ d: 4, label: `第 ${s.L} 层` });
   if (depth >= 5 && s.op) out.push({ d: 5, label: OP_NAME[s.op] });
   if (depth >= 6 && s.sub) out.push({ d: 6, label: SUB_NAME[s.sub] });
