@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>智能体工作流 · 看编程 Agent 如何思考、调用工具、改代码</title>
+  <meta name="description" content="使用开源 Qwen3 模型真实运行的编程智能体。看它接到任务后如何思考、调用工具（终端、编辑器）、执行命令、修改文件、运行测试，直到完成任务。一层层深入：屏幕显示、模型与工具循环、上下文 token 变化、字符逐个生成的概率。">
+  <meta name="theme-color" content="#060d1a">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="agent.css">
+</head>
+<body class="mode-agent">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="../" aria-label="揭开黑箱">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">BLACK&nbsp;BOX</span>
+      <span class="brand-zh">揭开黑箱</span>
+    </a>
+    <nav class="top-nav" aria-label="主导航">
+      <a href="../">推理</a>
+      <a href="#" class="disabled">训练</a>
+      <a href="#" class="disabled">多模态</a>
+      <a href="./" class="active">智能体</a>
+    </nav>
+    <div class="top-actions">
+      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="agent-app">
+    <!-- 任务选择面板 -->
+    <section class="task-panel" id="taskPanel">
+      <div class="task-header">
+        <div>
+          <div class="eyebrow">TASK LIBRARY · 任务库</div>
+          <h2>选择一个任务，看智能体如何完成</h2>
+        </div>
+      </div>
+      <div class="task-grid">
+        <button class="task-card" data-task="fix-bug">
+          <div class="task-icon">🐛</div>
+          <h3>修复 Bug</h3>
+          <p>找到并修复一个数组越界错误，添加单元测试</p>
+          <span class="task-meta">Python · 3 个文件 · 约 2 分钟</span>
+        </button>
+        <button class="task-card" data-task="add-feature">
+          <div class="task-icon">✨</div>
+          <h3>添加功能</h3>
+          <p>为 REST API 添加分页功能，更新文档</p>
+          <span class="task-meta">JavaScript · 4 个文件 · 约 3 分钟</span>
+        </button>
+        <button class="task-card" data-task="refactor">
+          <div class="task-icon">♻️</div>
+          <h3>代码重构</h3>
+          <p>将重复代码提取为公共函数，保持测试通过</p>
+          <span class="task-meta">TypeScript · 5 个文件 · 约 4 分钟</span>
+        </button>
+      </div>
+      <footer class="task-footer">
+        <p>这些是真实的编程任务，使用开源 Qwen3-7B 模型在沙箱环境中录制。和 Claude Code、Cursor 等工具的工作方式相同：<strong>模型 + 工具 + 循环</strong>。</p>
+      </footer>
+    </section>
+
+    <!-- 主工作区 -->
+    <section class="workspace" id="workspace" hidden>
+      <div class="ws-left">
+        <!-- 终端 -->
+        <div class="terminal" id="terminal">
+          <div class="term-head">
+            <span class="term-dot"></span>
+            <span class="term-dot"></span>
+            <span class="term-dot"></span>
+            <span class="term-title">终端</span>
+          </div>
+          <div class="term-body" id="termBody"></div>
+        </div>
+
+        <!-- 编辑器 -->
+        <div class="editor" id="editor">
+          <div class="ed-head">
+            <div class="ed-tabs" id="edTabs"></div>
+          </div>
+          <div class="ed-body" id="edBody">
+            <div class="ed-gutter" id="edGutter"></div>
+            <pre class="ed-code" id="edCode"></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="ws-right">
+        <!-- 智能体思考 -->
+        <div class="agent-think" id="agentThink">
+          <header class="think-head">
+            <span class="avatar" aria-hidden="true"><i></i></span>
+            <div>
+              <b>Qwen3-7B Agent</b>
+              <span class="think-status" id="thinkStatus">思考中...</span>
+            </div>
+          </header>
+          <div class="think-body" id="thinkBody">
+            <div class="think-section">
+              <div class="think-label">💭 思考过程</div>
+              <div class="think-content" id="thinkContent"></div>
+            </div>
+            <div class="think-section">
+              <div class="think-label">🔧 调用工具</div>
+              <div class="tool-calls" id="toolCalls"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 测试结果 -->
+        <div class="test-panel" id="testPanel" hidden>
+          <div class="test-head">✓ 测试通过</div>
+          <div class="test-body" id="testBody"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 深度探索面板 -->
+    <aside class="depth-panel" id="depthPanel" hidden>
+      <header class="depth-head">
+        <b>深度探索</b>
+        <button class="depth-close" id="btnDepthClose" type="button">✕</button>
+      </header>
+      <div class="depth-body" id="depthBody">
+        <div class="depth-layer" data-layer="screen">
+          <h3>📺 屏幕显示层</h3>
+          <p>用户看到的界面：终端输出、文件改动、测试结果</p>
+        </div>
+        <div class="depth-layer" data-layer="loop">
+          <h3>🔄 模型-工具循环</h3>
+          <p>模型输出 → 工具执行 → 结果返回 → 模型继续思考</p>
+          <div class="loop-viz" id="loopViz"></div>
+        </div>
+        <div class="depth-layer" data-layer="context">
+          <h3>📊 上下文 Token 变化</h3>
+          <p>每次循环后上下文的增长情况</p>
+          <canvas id="tokenChart" width="600" height="200"></canvas>
+        </div>
+        <div class="depth-layer" data-layer="generation">
+          <h3>🔤 字符生成与概率</h3>
+          <p>模型逐字符生成过程，每个字符的概率分布</p>
+          <div class="gen-viz" id="genViz"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 控制栏 -->
+    <div class="agent-ctl" id="agentCtl" hidden>
+      <div class="ctl-progress">
+        <div class="ctl-steps" id="ctlSteps"></div>
+      </div>
+      <div class="ctl-bar">
+        <button class="ctl-btn" id="btnReset" type="button" title="重新选择任务">⟲</button>
+        <div class="ctl-play">
+          <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+          <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+          <button class="ctl-btn" id="btnNext" type="button" title="下一步（→）">⏭</button>
+        </div>
+        <button class="ctl-btn depth" id="btnDepth" type="button" title="深入探索（D）">🔍 深入</button>
+        <div class="ctl-info">
+          <span class="ctl-step" id="ctlStep">0 / 0</span>
+          <span class="ctl-time" id="ctlTime">00:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="agent.js"></script>
+</body>
+</html>
