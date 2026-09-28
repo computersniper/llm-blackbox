@@ -62,6 +62,12 @@ button { font: inherit; color: inherit; }
 @keyframes spin { to { transform: rotateY(360deg) rotateX(360deg); } }
 .brand-en { font-family: var(--mono); font-weight: 700; font-size: 12.5px; letter-spacing: .28em; }
 .brand-zh { font-family: var(--serif); font-weight: 600; font-size: 15px; color: var(--ink2); padding-left: 12px; border-left: 1px solid var(--line2); }
+.top-nav, .nav-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; }
+.top-nav a, .nav-tabs a { display: flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 999px; border: 1px solid transparent; color: var(--ink2); font-size: 14px; text-decoration: none; transition: color .2s, background .2s, border-color .2s; }
+.top-nav a:hover, .nav-tabs a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
+.top-nav a.active, .nav-tabs a.active { color: var(--acc); border-color: rgba(94, 240, 212, .5); background: rgba(94, 240, 212, .1); }
+.top-nav a.disabled, .nav-tabs a.disabled { opacity: .4; cursor: not-allowed; }
+.top-nav a.disabled:hover, .nav-tabs a.disabled:hover { color: var(--ink2); background: none; }
 .crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; white-space: nowrap; font-size: 13px; }
 .crumbs button { border: 0; background: none; padding: 4px 8px; border-radius: 8px; color: var(--dim); cursor: pointer; transition: color .2s, background .2s; }
 .crumbs button:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }

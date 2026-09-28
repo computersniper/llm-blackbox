@@ -123,6 +123,8 @@ async function enterInspect(msg) {
     if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
     if (matchMedia('(max-width: 900px)').matches && !$('#dbg').classList.contains('folded')) { $('#dbg').classList.add('folded'); $('#btnDbgFold').textContent = '+'; }
     updateInsets();
+    // 显示导航标签
+    if ($('#navTabs')) $('#navTabs').style.display = 'flex';
     sfx.dive();
   }
   await attach(msg, from);
@@ -175,6 +177,8 @@ function exitInspect() {
   document.body.classList.replace('mode-inspect', 'mode-chat');
   document.body.classList.remove('chat-open');
   controls.renderCrumbs(null);
+  // 隐藏导航标签
+  if ($('#navTabs')) $('#navTabs').style.display = 'none';
   if (tl) tl.pause();
   if (cur) {
     const n = tl ? tl.g : 0;

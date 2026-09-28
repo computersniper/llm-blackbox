@@ -165,97 +165,143 @@ export class Detail {
     const maxC = Math.max(...n.x.map((x, k) => Math.abs(x * n.wg[k])));
     this.pins = [];
     this.wires = [];
-    const gateP = v3(0, 0.8, 0), upP = v3(0, -0.8, 0);
+
+    // 标题
+    const title = label(`神经元 #${n.n} · SwiGLU 公式板`, 'lbl title');
+    title.position.set(-2.1, 1.85, 0);
+    title.center.set(0, 0.5);
+    R.add(title);
+
+    // 左侧：输入向量的 12 个显著维度（垂直排列）
+    const inputTitle = label('输入 x', 'lbl part');
+    inputTitle.position.set(-2.4, 1.45, 0);
+    inputTitle.center.set(0.5, 0.5);
+    R.add(inputTitle);
+
     n.x.forEach((x, k) => {
-      const y = 1.65 - k * 0.3;
-      const pin = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.15, 0.15, 2, 0.03), new THREE.MeshStandardMaterial({ color: 0x0b1222, emissive: x >= 0 ? AMBER : BLUE, emissiveIntensity: 0.2 + Math.min(1, Math.abs(x) / 3) * 0.9 }));
+      const y = 1.3 - k * 0.22;
+      const pin = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.13, 0.08, 2, 0.025),
+        new THREE.MeshStandardMaterial({
+          color: 0x0d1424,
+          emissive: x >= 0 ? AMBER : BLUE,
+          emissiveIntensity: 0.2 + Math.min(0.8, Math.abs(x) / 3),
+          roughness: 0.35
+        })
+      );
       pin.position.set(-2.1, y, 0);
       pin.userData.pick = { type: 'pin', k, dim: n.dims[k], x, wg: n.wg[k], wu: n.wu[k], click: true };
       this.E.pickables.push(pin);
       R.add(pin);
-      const lb = label(`x<sub>${n.dims[k]}</sub> ${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(3)}`, 'lbl num');
-      lb.position.set(-2.25, y, 0);
+      const lb = label(`x<sub>${n.dims[k]}</sub>=${x >= 0 ? '+' : ''}${x.toFixed(2)}`, 'lbl num');
+      lb.position.set(-2.35, y, 0);
       lb.center.set(1, 0.5);
       R.add(lb);
-      const wire = (to, w, c) => {
-        const prod = x * w;
-        const curve = new THREE.QuadraticBezierCurve3(v3(-2.0, y, 0), v3(-1.0, (y + to.y) / 2, 0.15), to);
-        const geo = new THREE.TubeGeometry(curve, 20, 0.004 + Math.min(0.03, Math.abs(w) * 0.4), 5, false);
-        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: signColor(prod, Math.abs(prod) / maxC), transparent: true, opacity: 0.2 + 0.8 * Math.min(1, Math.abs(prod) / maxC), blending: THREE.AdditiveBlending, depthWrite: false }));
-        m.userData.pick = { type: 'wire', k, w, x, prod, which: c };
-        this.E.pickables.push(m);
-        R.add(m);
-        return m;
-      };
-      this.wires.push({ g: wire(gateP, n.wg[k], 'gate'), u: wire(upP, n.wu[k], 'up'), k });
-      this.pins.push(pin);
+      this.pins.push({ mesh: pin, k, y });
     });
+
     const rest = label(`… 其余 ${1024 - n.x.length} 项`, 'lbl hint');
-    rest.position.set(-2.1, 1.65 - 12 * 0.3, 0);
+    rest.position.set(-2.1, 1.3 - 12 * 0.22 - 0.05, 0);
+    rest.center.set(0.5, 0.5);
     R.add(rest);
-    const node = (p, c, txt) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 16), new THREE.MeshStandardMaterial({ color: 0x0b1222, emissive: c, emissiveIntensity: 0.6 }));
-      m.position.copy(p);
-      R.add(m);
-      const lb = label(txt, 'lbl part');
-      lb.position.copy(p).add(v3(0, 0.25, 0));
-      R.add(lb);
-      return m;
-    };
-    this.gateNode = node(gateP, CYAN, 'Σ x·w<sub>gate</sub>');
-    this.upNode = node(upP, VIOLET, 'Σ x·w<sub>up</sub>');
-    // 两个“水箱”：累加的结果有多大，就灌多满
-    const tank = (p, c) => {
-      const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.1, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x88aaff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
-      glass.position.copy(p);
-      const fillGeo = new THREE.CylinderGeometry(0.145, 0.145, 1, 24);
-      fillGeo.translate(0, 0.5, 0);
-      const fill = new THREE.Mesh(fillGeo, new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.4), emissive: c, emissiveIntensity: 0.5, transparent: true, opacity: 0.9 }));
-      fill.position.copy(p).add(v3(0, -0.55, 0));
-      fill.scale.y = 0.001;
-      const lb = label('', 'lbl big');
-      lb.position.copy(p).add(v3(0, 0.75, 0));
-      R.add(glass, fill, lb);
-      return { glass, fill, lb };
-    };
-    this.tG = tank(v3(0.95, 0.8, 0), CYAN);
-    this.tU = tank(v3(0.95, -0.8, 0), VIOLET);
-    // SiLU 曲线：真实的 x·σ(x)
-    const px = (x) => 1.75 + ((x + 5) / 10) * 1.4, py = (y) => 0.35 + (y / 5) * 1.2 + 0.18;
-    const pts = [];
-    for (let i = 0; i <= 80; i++) { const x = -5 + i / 8; pts.push(v3(px(x), py(x / (1 + Math.exp(-x))), 0)); }
-    const curve = new THREE.CatmullRomCurve3(pts);
-    R.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 120, 0.018, 6, false), new THREE.MeshBasicMaterial({ color: 0x5ef0d4 })));
-    const axis = new THREE.BufferGeometry().setFromPoints([v3(px(-5), py(0), 0), v3(px(5), py(0), 0), v3(px(0), py(-0.3), 0), v3(px(0), py(5), 0)]);
-    R.add(new THREE.LineSegments(axis, new THREE.LineBasicMaterial({ color: 0x4b5572 })));
-    const sl = label('SiLU(g) = g·σ(g)', 'lbl hint');
-    sl.position.set(px(0), py(5) + 0.1, 0);
-    R.add(sl);
-    this.siluPx = px; this.siluPy = py;
-    this.ballS = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    R.add(this.ballS);
-    this.ballLbl = label('', 'lbl num pos');
-    this.ballLbl.center.set(0.5, 1.5);
-    this.ballS.add(this.ballLbl);
-    // 乘法阀门：SiLU(g) × u
-    this.mul = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 12, 40), new THREE.MeshStandardMaterial({ color: 0x111, emissive: AMBER, emissiveIntensity: 0.5 }));
-    this.mul.position.set(3.55, 0, 0);
-    R.add(this.mul);
-    const x1 = label('×', 'lbl title');
-    x1.position.copy(this.mul.position);
-    R.add(x1);
+
+    // 中间上：gate路径 (x · W_gate → g → SiLU(g))
+    const gateLabel = label('W<sub>gate</sub> 路径', 'lbl part');
+    gateLabel.position.set(-0.2, 1.45, 0);
+    gateLabel.center.set(0.5, 0.5);
+    R.add(gateLabel);
+
+    this.gateBox = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.28, 0.12, 3, 0.035),
+      new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: CYAN, emissiveIntensity: 0.5, roughness: 0.3 })
+    );
+    this.gateBox.position.set(-0.2, 0.85, 0);
+    R.add(this.gateBox);
+    this.gateLbl = label('', 'lbl big');
+    this.gateLbl.position.set(-0.2, 0.55, 0);
+    this.gateLbl.center.set(0.5, 0.5);
+    R.add(this.gateLbl);
+
+    // SiLU激活
+    this.siluBox = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.28, 0.12, 3, 0.035),
+      new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: CYAN, emissiveIntensity: 0.55, roughness: 0.3 })
+    );
+    this.siluBox.position.set(0.65, 0.85, 0);
+    R.add(this.siluBox);
+    this.siluLbl = label('', 'lbl big');
+    this.siluLbl.position.set(0.65, 0.55, 0);
+    this.siluLbl.center.set(0.5, 0.5);
+    R.add(this.siluLbl);
+
+    const arrow1 = label('→<small>SiLU</small>', 'lbl hint');
+    arrow1.position.set(0.2, 0.85, 0);
+    arrow1.center.set(0.5, 0.5);
+    R.add(arrow1);
+
+    // 中间下：up路径 (x · W_up → u)
+    const upLabel = label('W<sub>up</sub> 路径', 'lbl part');
+    upLabel.position.set(-0.2, -0.3, 0);
+    upLabel.center.set(0.5, 0.5);
+    R.add(upLabel);
+
+    this.upBox = new THREE.Mesh(
+      new RoundedBoxGeometry(0.32, 0.28, 0.12, 3, 0.035),
+      new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: VIOLET, emissiveIntensity: 0.5, roughness: 0.3 })
+    );
+    this.upBox.position.set(-0.2, -0.7, 0);
+    R.add(this.upBox);
+    this.upLbl = label('', 'lbl big');
+    this.upLbl.position.set(-0.2, -1.0, 0);
+    this.upLbl.center.set(0.5, 0.5);
+    R.add(this.upLbl);
+
+    // 右侧：乘法与输出 (SiLU(g) × u → a)
+    const mulBox = new THREE.Mesh(
+      new THREE.TorusGeometry(0.18, 0.04, 12, 32),
+      new THREE.MeshStandardMaterial({ color: 0x111, emissive: AMBER, emissiveIntensity: 0.6, roughness: 0.3 })
+    );
+    mulBox.position.set(1.55, 0.1, 0);
+    R.add(mulBox);
+    const mulLabel = label('×', 'lbl title');
+    mulLabel.position.set(1.55, 0.1, 0);
+    R.add(mulLabel);
+
+    this.outputBox = new THREE.Mesh(
+      new RoundedBoxGeometry(0.38, 0.32, 0.14, 3, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: AMBER, emissiveIntensity: 0.65, roughness: 0.3 })
+    );
+    this.outputBox.position.set(2.5, 0.1, 0);
+    R.add(this.outputBox);
     this.outLbl = label('', 'lbl big');
-    this.outLbl.position.set(3.55, -0.42, 0);
-    this.outLbl.center.set(0.5, 0);
+    this.outLbl.position.set(2.5, -0.28, 0);
+    this.outLbl.center.set(0.5, 0.5);
     R.add(this.outLbl);
-    const link = (a, b) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.012, 5), new THREE.MeshBasicMaterial({ color: 0x7a859e, transparent: true, opacity: 0.6 }));
-    this.linkS = link(v3(3.2, 1.2, 0), v3(3.5, 0.15, 0));
-    this.linkU = link(v3(1.15, -0.8, 0), v3(3.45, -0.1, 0));
-    R.add(this.linkS, this.linkU);
-    const title = label(`神经元 #${n.n}`, 'lbl title');
-    title.position.set(-2.1, 2.05, 0);
-    title.center.set(0, 0.5);
-    R.add(title);
+
+    const arrow2 = label('→', 'lbl hint');
+    arrow2.position.set(2.0, 0.1, 0);
+    arrow2.center.set(0.5, 0.5);
+    R.add(arrow2);
+
+    // 连接线（简化的线条，从输入到各个计算节点）
+    const line = (from, to, color, opacity = 0.3) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+      const l = new THREE.Line(geo, mat);
+      R.add(l);
+      return l;
+    };
+
+    this.linkToGate = line(v3(-1.9, 0.7, 0), v3(-0.5, 0.85, 0), 0x5ef0d4, 0.25);
+    this.linkToUp = line(v3(-1.9, 0, 0), v3(-0.5, -0.7, 0), 0xb39dff, 0.25);
+    this.linkSiluToMul = line(v3(0.8, 0.85, 0), v3(1.4, 0.2, 0), 0x5ef0d4, 0.35);
+    this.linkUpToMul = line(v3(0.1, -0.7, 0), v3(1.4, 0, 0), 0xb39dff, 0.35);
+
+    // 小型SiLU曲线参考（可选，放在右下角）
+    const siluHint = label('SiLU(x)=x·σ(x)', 'lbl hint');
+    siluHint.position.set(2.5, -0.75, 0);
+    siluHint.center.set(0.5, 0.5);
+    R.add(siluHint);
   }
 
   updateRig(st, show, t) {
@@ -267,41 +313,63 @@ export class Detail {
     const key = `${st.g}|${s.L}`;
     if (key !== this.rigKey) { this.rigKey = key; this.buildRig(n); this.bitsIndex = 0; this.flips.clear(); }
     const bp = this.bulbPos(st, n.n);
-    this.rig.position.copy(bp).add(v3(0.35, 0.05, 0.55));
-    this.rig.scale.setScalar(0.3);
-    this.rigCenter = this.rig.position.clone().add(v3(0.7 * 0.3, 0.05, 0));
-    if (st.view === 'bits') this.rig.visible = false; // 看比特时，把神经元装置藏起来，只留键帽
+    this.rig.position.copy(bp).add(v3(0.4, 0.05, 0.55));
+    this.rig.scale.setScalar(0.32);
+    this.rigCenter = this.rig.position.clone().add(v3(0.8 * 0.32, 0.05, 0));
+    if (st.view === 'bits') this.rig.visible = false;
+
     const mi = s.mi || 'gate', p = st.p;
     const done = (m) => ['mul', 'sum', 'silu', 'gate'].indexOf(mi) > ['mul', 'sum', 'silu', 'gate'].indexOf(m);
-    const wireP = mi === 'mul' ? p * 1.15 : 1;
-    this.wires.forEach(({ g, u, k }) => {
+
+    // 输入引脚高亮
+    const wireP = mi === 'mul' ? p * 1.15 : done('mul') ? 1 : 0;
+    this.pins.forEach(({ mesh, k }) => {
       const on = k / 12 < wireP;
-      g.visible = u.visible = on;
+      mesh.material.emissiveIntensity = on ? 0.5 + 0.3 * Math.sin(t * 5) : 0.2;
     });
-    const fillP = mi === 'sum' ? easeOut(p) : done('sum') ? 1 : 0;
-    const mx = Math.max(Math.abs(n.gz), Math.abs(n.uz), 3);
-    const fill = (tk, v) => {
-      tk.fill.scale.y = Math.max(0.001, (Math.abs(v) / mx) * 1.1 * fillP);
-      tk.fill.material.emissive.copy(v >= 0 ? (tk === this.tG ? CYAN : VIOLET) : BLUE);
-      tk.lb.el.textContent = fillP > 0 ? `${tk === this.tG ? 'g' : 'u'} = ${(v * fillP).toFixed(3)}` : '';
-      tk.lb.visible = fillP > 0;
-    };
-    fill(this.tG, n.gz);
-    fill(this.tU, n.uz);
-    const sp = mi === 'silu' ? easeOut(p) : done('silu') ? 1 : 0;
-    this.ballS.visible = sp > 0;
-    if (sp > 0) {
-      const gx = Math.max(-5, Math.min(5, n.gz));
-      const x = -5 + (gx + 5) * sp;
-      const y = x / (1 + Math.exp(-x));
-      this.ballS.position.set(this.siluPx(x), this.siluPy(y) + 0.08, 0.02);
-      this.ballLbl.el.textContent = `${y.toFixed(3)}`;
+
+    // 连接线透明度
+    const linkOpacity = wireP > 0.5 ? 0.35 + 0.15 * Math.sin(t * 4) : 0.15;
+    this.linkToGate.material.opacity = linkOpacity;
+    this.linkToUp.material.opacity = linkOpacity;
+
+    // gate 累加结果
+    const sumP = mi === 'sum' ? easeOut(p) : done('sum') ? 1 : 0;
+    this.gateBox.material.emissiveIntensity = sumP > 0 ? 0.5 + 0.3 * Math.sin(t * 5) : 0.3;
+    this.gateLbl.visible = sumP > 0.2;
+    if (this.gateLbl.visible) {
+      this.gateLbl.el.innerHTML = `<b>g = ${(n.gz * sumP).toFixed(2)}</b><br><small>Σ x·w<sub>gate</sub></small>`;
     }
-    const gp = mi === 'gate' ? easeOut(p) : 0;
-    this.mul.material.emissiveIntensity = 0.5 + gp * 2.2;
-    this.outLbl.visible = gp > 0.3;
-    this.outLbl.el.textContent = `a = ${(n.silu * n.uz).toFixed(3)}`;
-    this.linkS.material.opacity = this.linkU.material.opacity = 0.2 + gp * 0.8;
+
+    this.upBox.material.emissiveIntensity = sumP > 0 ? 0.5 + 0.3 * Math.sin(t * 5) : 0.3;
+    this.upLbl.visible = sumP > 0.2;
+    if (this.upLbl.visible) {
+      this.upLbl.el.innerHTML = `<b>u = ${(n.uz * sumP).toFixed(2)}</b><br><small>Σ x·w<sub>up</sub></small>`;
+    }
+
+    // SiLU 激活
+    const siluP = mi === 'silu' ? easeOut(p) : done('silu') ? 1 : 0;
+    this.siluBox.visible = siluP > 0.1;
+    if (this.siluBox.visible) {
+      this.siluBox.material.emissiveIntensity = 0.55 + 0.35 * Math.sin(t * 5);
+      this.siluLbl.visible = true;
+      const siluVal = n.silu * siluP;
+      this.siluLbl.el.innerHTML = `<b>${siluVal.toFixed(3)}</b><br><small>SiLU(g)</small>`;
+    } else {
+      this.siluBox.visible = false;
+      this.siluLbl.visible = false;
+    }
+
+    // 最终乘法与输出
+    const gateP = mi === 'gate' ? easeOut(p) : 0;
+    this.linkSiluToMul.material.opacity = gateP > 0.3 ? 0.5 + 0.3 * Math.sin(t * 4) : 0.2;
+    this.linkUpToMul.material.opacity = gateP > 0.3 ? 0.5 + 0.3 * Math.sin(t * 4) : 0.2;
+    this.outputBox.material.emissiveIntensity = gateP > 0 ? 0.65 + 0.45 * gateP : 0.4;
+    this.outLbl.visible = gateP > 0.3;
+    if (this.outLbl.visible) {
+      const outVal = n.silu * n.uz * gateP;
+      this.outLbl.el.innerHTML = `<b>a = ${outVal.toFixed(3)}</b><br><small>SiLU(g) × u</small>`;
+    }
   }
 
   /* ------------------------------------------------------------ 一次 Q·K 打分 */
@@ -310,39 +378,93 @@ export class Detail {
     dispose(this.dot);
     this.dot.clear();
     const R = this.dot;
-    const mxv = Math.max(...d.q.map(Math.abs), ...d.k.map(Math.abs));
     const prods = d.q.map((q, i) => q * d.k[i]);
     const mxp = Math.max(...prods.map(Math.abs));
     this.dotBars = [];
+
+    // 标题：从左到右的算式板
+    const title = label(`Q[头${d.head}] · K[${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}]`, 'lbl part');
+    title.position.set(-2.4, 0.85, 0);
+    title.center.set(0, 0.5);
+    R.add(title);
+
+    // 从左到右排列：q[i] × k[i] = 乘积
     d.q.forEach((q, i) => {
-      const x = -1.9 + i * 0.32;
-      const bar = (v, y, c, scale) => {
-        const h = Math.max(0.01, (Math.abs(v) / scale) * 0.7);
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.2, h, 0.2), new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.5), emissive: c, emissiveIntensity: 0.22, roughness: 0.4 }));
-        m.position.set(x, y + (v >= 0 ? h / 2 : -h / 2), 0);
-        R.add(m);
-        return m;
-      };
-      const qb = bar(q, 0.95, CYAN, mxv), kb = bar(d.k[i], -0.95, AMBER, mxv);
-      const pb = bar(prods[i], 0, prods[i] >= 0 ? AMBER : BLUE, mxp);
-      const lb = label(`${prods[i] >= 0 ? '+' : '−'}${Math.abs(prods[i]).toFixed(1)}`, `lbl num ${prods[i] >= 0 ? 'pos' : 'neg'}`);
-      lb.position.set(x, -0.08, 0.15);
-      lb.center.set(0.5, 1);
-      R.add(lb);
-      this.dotBars.push({ pb, lb, i });
+      const x0 = -2.1 + i * 0.7;  // 更宽的间距
+      const y = 0.15;
+
+      // q[i] 值（青色方块）
+      const qBox = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 0.16, 0.08, 2, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: CYAN, emissiveIntensity: 0.45, roughness: 0.35 })
+      );
+      qBox.position.set(x0, y, 0);
+      R.add(qBox);
+      const qLbl = label(`${q >= 0 ? '+' : ''}${q.toFixed(2)}`, 'lbl num');
+      qLbl.position.set(x0, y + 0.22, 0);
+      qLbl.center.set(0.5, 0.5);
+      R.add(qLbl);
+
+      // × 符号
+      const times = label('×', 'lbl hint');
+      times.position.set(x0 + 0.14, y, 0);
+      times.center.set(0.5, 0.5);
+      R.add(times);
+
+      // k[i] 值（琥珀色方块）
+      const kBox = new THREE.Mesh(
+        new RoundedBoxGeometry(0.16, 0.16, 0.08, 2, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0x0d1424, emissive: AMBER, emissiveIntensity: 0.45, roughness: 0.35 })
+      );
+      kBox.position.set(x0 + 0.26, y, 0);
+      R.add(kBox);
+      const kLbl = label(`${d.k[i] >= 0 ? '+' : ''}${d.k[i].toFixed(2)}`, 'lbl num');
+      kLbl.position.set(x0 + 0.26, y + 0.22, 0);
+      kLbl.center.set(0.5, 0.5);
+      R.add(kLbl);
+
+      // = 符号
+      const eq = label('=', 'lbl hint');
+      eq.position.set(x0 + 0.4, y, 0);
+      eq.center.set(0.5, 0.5);
+      R.add(eq);
+
+      // 乘积结果（根据正负显示颜色）
+      const prod = prods[i];
+      const prodBox = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.18, 0.1, 2, 0.025),
+        new THREE.MeshStandardMaterial({
+          color: 0x0d1424,
+          emissive: prod >= 0 ? AMBER : BLUE,
+          emissiveIntensity: 0.3 + Math.min(0.65, Math.abs(prod) / mxp * 0.7),
+          roughness: 0.3
+        })
+      );
+      prodBox.position.set(x0 + 0.56, y, 0);
+      R.add(prodBox);
+
+      const prodLbl = label(`<b>${prod >= 0 ? '+' : '−'}${Math.abs(prod).toFixed(1)}</b>`, `lbl num ${prod >= 0 ? 'pos' : 'neg'}`);
+      prodLbl.position.set(x0 + 0.56, y - 0.24, 0);
+      prodLbl.center.set(0.5, 0.5);
+      R.add(prodLbl);
+
+      this.dotBars.push({ qBox, kBox, prodBox, qLbl, kLbl, prodLbl, i });
     });
-    const L = (html, x, y, cls = 'lbl part') => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); return o; };
-    L(`Q · 第 ${d.head} 头`, -2.15, 1.35);
-    L(`K · 第 ${d.kv} 组（${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}）`, -2.15, -1.35);
-    L('q<sub>i</sub>·k<sub>i</sub>', -2.15, 0);
+
+    // 右侧：求和与最终得分
     this.dotSum = label('', 'lbl big');
-    this.dotSum.position.set(2.45, 0.3, 0);
+    this.dotSum.position.set(6.5, 0.4, 0);
+    this.dotSum.center.set(0, 0.5);
     R.add(this.dotSum);
+
     this.dotScore = label('', 'lbl big');
-    this.dotScore.position.set(2.45, -0.3, 0);
+    this.dotScore.position.set(6.5, -0.15, 0);
+    this.dotScore.center.set(0, 0.5);
     R.add(this.dotScore);
+
     const hint = label(`只画出了 128 维里乘积最大的 12 维`, 'lbl hint');
-    hint.position.set(0, 1.85, 0);
+    hint.position.set(2.2, 0.85, 0);
+    hint.center.set(0, 0.5);
     R.add(hint);
   }
 
@@ -355,18 +477,22 @@ export class Detail {
     const key = `${st.g}|${s.L}`;
     if (key !== this.dotKey) { this.dotKey = key; this.buildDot(d); }
     const xf = this.M.xFocus(st);
-    this.dot.position.set(xf - 1.1, this.base() + 0.62 * this.M.e + 0.95, 0.7);
-    this.dot.scale.setScalar(0.3);
-    this.dotCenter = this.dot.position.clone().add(v3(0.4 * 0.3, 0, 0));
+    this.dot.position.set(xf - 2.2, this.base() + 0.62 * this.M.e + 0.95, 0.7);
+    this.dot.scale.setScalar(0.26);
+    this.dotCenter = this.dot.position.clone().add(v3(1.2 * 0.26, 0, 0));
     const mi = s.mi || 'scale', p = st.p;
     const mulP = mi === 'mul' ? p * 1.15 : 1;
-    this.dotBars.forEach(({ pb, lb, i }) => { pb.visible = i / 12 < mulP; lb.visible = pb.visible; });
+    this.dotBars.forEach(({ qBox, kBox, prodBox, qLbl, kLbl, prodLbl, i }) => {
+      const visible = i / 12 < mulP;
+      qBox.visible = kBox.visible = prodBox.visible = visible;
+      qLbl.visible = kLbl.visible = prodLbl.visible = visible;
+    });
     const sumP = mi === 'sum' ? easeOut(p) : mi === 'scale' ? 1 : 0;
     this.dotSum.visible = sumP > 0;
-    this.dotSum.el.textContent = `Σ = ${(d.sum * sumP).toFixed(2)}`;
+    this.dotSum.el.innerHTML = `<b>Σ 12项 = ${(d.sum * sumP).toFixed(2)}</b><br><small style="font-size:11px">完整128维求和</small>`;
     const scP = mi === 'scale' ? easeOut(p) : 0;
     this.dotScore.visible = scP > 0.2;
-    this.dotScore.el.innerHTML = `÷ √128 = ${d.score.toFixed(3)} → 权重 ${fmtPct(d.w)}`;
+    this.dotScore.el.innerHTML = `<b>÷ √128 = ${d.score.toFixed(3)}</b><br><small style="font-size:11px">→ softmax后权重 ${fmtPct(d.w)}</small>`;
   }
 
   /* ------------------------------------------------------------ 比特 */
@@ -476,9 +602,21 @@ export class Detail {
         const look = v3((x0 + x1) / 2, pp.y - 0.3, -0.2);
         return { pos: look.clone().add(v3(0.4, 0.5, d)), look };
       }
-      case 'neuron': { const look = (this.rigCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(2.05, 1.45, 1.12); return { pos: look.clone().add(v3(0.1, 0.12, d)), look }; }
-      case 'dot': { const look = (this.dotCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(1.9, 1.35, 1.12); return { pos: look.clone().add(v3(0.08, 0.12, d)), look }; }
-      case 'bits': { const look = (this.bitsCenter || this.panelPos(st)).clone().add(v3(0, 0.02, 0)); const d = this.E.fitDistance(0.5, 0.25, 1.1); return { pos: look.clone().add(v3(0, d * 0.3, d)), look }; }
+      case 'neuron': {
+        const look = (this.rigCenter || this.panelPos(st)).clone();
+        const d = this.E.fitDistance(2.8, 1.55, 1.08);
+        return { pos: look.clone().add(v3(0.15, 0.15, d)), look };
+      }
+      case 'dot': {
+        const look = (this.dotCenter || this.panelPos(st)).clone();
+        const d = this.E.fitDistance(5.2, 1.45, 1.08);
+        return { pos: look.clone().add(v3(0.12, 0.15, d)), look };
+      }
+      case 'bits': {
+        const look = (this.bitsCenter || this.panelPos(st)).clone().add(v3(0, 0.02, 0));
+        const d = this.E.fitDistance(0.5, 0.25, 1.1);
+        return { pos: look.clone().add(v3(0, d * 0.3, d)), look };
+      }
     }
     return { pos: v3(10, 8, 20), look: v3(0, 4, 0) };
   }

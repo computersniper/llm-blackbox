@@ -1,0 +1,124 @@
+/* ============================================================
+   训练页面专用样式
+   ============================================================ */
+
+/* 主导航标签 */
+.nav-tabs { display: flex; gap: 4px; flex: 1; min-width: 0; }
+.nav-tabs a { display: flex; align-items: center; height: 34px; padding: 0 16px; border-radius: 999px; border: 1px solid transparent; color: var(--ink2); font-size: 14px; text-decoration: none; transition: color .2s, background .2s, border-color .2s; }
+.nav-tabs a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
+.nav-tabs a.active { color: var(--acc); border-color: rgba(94, 240, 212, .5); background: rgba(94, 240, 212, .1); }
+.nav-tabs a.disabled { opacity: .4; cursor: not-allowed; }
+.nav-tabs a.disabled:hover { color: var(--ink2); background: none; }
+
+/* 训练应用布局 */
+.training-app { display: flex; flex-direction: column; }
+.overview { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line2) transparent; }
+.training-stage { flex: 1; display: flex; position: relative; background: #050b17; }
+
+/* 概览页面 */
+.overview-content { max-width: 1100px; margin: 0 auto; padding: 60px 40px; }
+.page-header { text-align: center; margin-bottom: 60px; }
+.page-header h1 { margin: 0 0 16px; font-family: var(--serif); font-weight: 900; font-size: 42px; color: var(--ink); letter-spacing: .02em; }
+.page-header .subtitle { margin: 0; font-size: 17px; line-height: 1.8; color: var(--ink2); max-width: 700px; margin: 0 auto; }
+
+.scenarios { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 32px; }
+
+.scenario-card { padding: 28px; border-radius: 20px; border: 1px solid var(--line2); background: linear-gradient(135deg, rgba(94, 240, 212, .04), rgba(10, 17, 31, .7)); transition: border-color .3s, transform .3s var(--ease), box-shadow .3s; cursor: pointer; }
+.scenario-card:hover { border-color: rgba(94, 240, 212, .5); transform: translateY(-4px); box-shadow: 0 20px 50px rgba(0, 0, 0, .4); }
+
+.card-tag { display: inline-block; padding: 4px 12px; border-radius: 999px; background: rgba(94, 240, 212, .15); border: 1px solid rgba(94, 240, 212, .4); color: var(--acc); font-family: var(--mono); font-size: 11px; letter-spacing: .12em; margin-bottom: 14px; }
+
+.scenario-card h2 { margin: 0 0 12px; font-family: var(--serif); font-weight: 600; font-size: 26px; color: var(--ink); }
+.card-desc { margin: 0 0 20px; font-size: 15px; line-height: 1.75; color: var(--ink2); }
+
+.card-features { margin: 0 0 24px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.card-features li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--ink2); line-height: 1.6; }
+.feat-icon { flex: none; font-size: 18px; }
+
+.scenario-btn { width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(94, 240, 212, .6); background: rgba(94, 240, 212, .12); color: var(--acc); font-size: 15px; font-weight: 600; cursor: pointer; transition: background .2s, box-shadow .2s, transform .2s var(--ease); }
+.scenario-btn:hover { background: rgba(94, 240, 212, .2); box-shadow: 0 0 24px rgba(94, 240, 212, .3); transform: translateY(-2px); }
+
+/* 训练面板 */
+.training-panel { position: absolute; z-index: 4; top: 20px; right: 20px; bottom: 20px; width: 380px; display: flex; flex-direction: column; border-radius: 18px; background: rgba(10, 17, 31, .92); border: 1px solid var(--line2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 20px 60px rgba(0, 0, 0, .5); overflow: hidden; }
+
+.panel-header { padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 14px; }
+.back-btn { flex: none; width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .03); color: var(--ink2); font-size: 18px; cursor: pointer; transition: border-color .2s, color .2s; }
+.back-btn:hover { border-color: var(--line3); color: var(--ink); }
+.panel-header h3 { margin: 0 0 4px; font-size: 17px; font-weight: 600; color: var(--ink); }
+.panel-subtitle { margin: 0; font-size: 12px; color: var(--dim); line-height: 1.5; }
+
+.panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; scrollbar-width: thin; }
+
+/* 训练进度 */
+.training-progress { display: flex; flex-direction: column; gap: 10px; }
+.progress-info { display: flex; justify-content: space-between; align-items: center; }
+.step-display { font-family: var(--mono); font-size: 15px; color: var(--ink); }
+.step-display b { color: var(--acc); font-weight: 700; }
+.progress-bar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--acc), var(--blue)); transition: width .3s ease; box-shadow: 0 0 12px var(--acc); }
+
+/* 指标卡片 */
+.metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.metric-card { padding: 14px 16px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--line2); }
+.metric-label { display: block; font-size: 11px; color: var(--dim); margin-bottom: 6px; }
+.metric-value { display: block; font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--acc); }
+.metric-value.small { font-size: 16px; }
+
+/* 样本输出 */
+.sample-output { padding: 16px; border-radius: 12px; background: rgba(8, 14, 28, .6); border: 1px solid var(--line2); }
+.sample-header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.sample-prompt { font-size: 13px; color: var(--ink2); }
+.sample-text { font-size: 14px; line-height: 1.8; color: var(--ink); min-height: 60px; }
+.sample-text .placeholder { color: var(--dim); font-style: italic; }
+.sample-text .gibberish { color: var(--rose); opacity: .7; }
+.sample-text .improving { color: var(--amber); }
+.sample-text .good { color: var(--acc); }
+
+/* 阶段指示器 */
+.phase-indicator { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; background: rgba(255, 255, 255, .03); border: 1px solid var(--line2); }
+.phase-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); transition: background .3s, box-shadow .3s; }
+.phase-dot.active { background: var(--acc); box-shadow: 0 0 12px var(--acc); }
+.phase-label { flex: 1; font-family: var(--mono); font-size: 14px; color: var(--ink); font-weight: 600; }
+
+/* 梯度流可视化 */
+.gradient-flow { padding: 16px; border-radius: 12px; background: rgba(8, 14, 28, .6); border: 1px solid var(--line2); }
+.flow-header { margin-bottom: 12px; }
+.flow-header h4 { margin: 6px 0 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+.gradient-viz { display: flex; justify-content: center; }
+#gradCanvas { border-radius: 8px; background: rgba(0, 0, 0, .3); }
+
+/* 权重更新细节 */
+.weight-update-detail { padding: 16px; border-radius: 12px; background: rgba(8, 14, 28, .6); border: 1px solid var(--line2); }
+.detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.weight-coords { font-family: var(--mono); font-size: 14px; color: var(--ink); }
+.update-steps { display: flex; flex-direction: column; gap: 8px; }
+.update-line { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.update-line.highlight { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.update-label { font-size: 13px; color: var(--ink2); }
+.update-value { font-size: 14px; color: var(--cyan); }
+.update-value.grad { color: var(--amber); }
+.update-line.highlight .update-value { color: var(--acc); font-weight: 700; font-size: 16px; }
+
+/* 控制按钮 */
+.stage-controls { display: flex; gap: 10px; align-items: center; padding-top: 10px; border-top: 1px solid var(--line); }
+.ctrl-btn { flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .05); color: var(--ink2); font-size: 16px; cursor: pointer; transition: border-color .2s, color .2s, background .2s; }
+.ctrl-btn:hover { border-color: var(--line3); color: var(--ink); background: rgba(255, 255, 255, .08); }
+.ctrl-btn.big { width: 48px; height: 48px; font-size: 18px; border-color: rgba(94, 240, 212, .5); color: var(--acc); }
+.ctrl-btn.big:hover { background: rgba(94, 240, 212, .12); box-shadow: 0 0 20px rgba(94, 240, 212, .2); }
+
+.speed-controls { display: flex; gap: 6px; margin-left: auto; }
+.speed-btn { width: 38px; height: 32px; border-radius: 8px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .03); color: var(--ink2); font-family: var(--mono); font-size: 11px; cursor: pointer; transition: border-color .2s, color .2s, background .2s; }
+.speed-btn:hover { border-color: var(--line3); color: var(--ink); }
+.speed-btn.active { border-color: var(--acc); color: var(--acc); background: rgba(94, 240, 212, .12); }
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .scenarios { grid-template-columns: 1fr; }
+  .training-panel { width: 340px; }
+}
+
+@media (max-width: 768px) {
+  .overview-content { padding: 40px 20px; }
+  .page-header h1 { font-size: 32px; }
+  .training-panel { right: 10px; left: 10px; width: auto; bottom: 10px; top: auto; max-height: 60vh; }
+}

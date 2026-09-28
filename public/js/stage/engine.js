@@ -36,12 +36,12 @@ export class Engine {
 
     const pmrem = new THREE.PMREMGenerator(r);
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.3;
-    scene.add(new THREE.HemisphereLight(0x9fb8ff, 0x0a0f1c, 0.5));
-    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    scene.environmentIntensity = 0.15;
+    scene.add(new THREE.HemisphereLight(0x9fb8ff, 0x0a0f1c, 0.28));
+    const key = new THREE.DirectionalLight(0xffffff, 0.55);
     key.position.set(8, 14, 12);
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0x5ef0d4, 0.6);
+    const rim = new THREE.DirectionalLight(0x5ef0d4, 0.32);
     rim.position.set(-10, 6, -12);
     scene.add(rim);
 

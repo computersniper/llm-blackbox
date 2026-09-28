@@ -216,7 +216,7 @@ export class Micro {
       this.ropeLbl.visible = rp > 0;
       if (rp > 0) {
         this.ropeLbl.el.innerHTML = `<b style="color:var(--ink)">q_norm</b>：${f(e.total)} ÷ RMS ${e.rms.toFixed(3)} × γ ${e.qnW.toFixed(4)} = <b style="color:var(--cyan)">${f(e.qn, 4)}</b><br>
-          <b style="color:var(--ink)">RoPE</b>：第 ${e.dim} 维和第 ${e.partner} 维配成一对，按位置 ${e.pos} 旋转 θ = ${e.pos} / 10⁶<sup>${(2 * e.freq / 128).toFixed(3)}</sup> = ${e.angle.toFixed(3)} 弧度
+          <b style="color:var(--ink)">RoPE</b>：第 ${e.dim} 维和第 ${e.partner} 维配成一对，按位置 ${e.pos || e.j || 0} 旋转 θ = ${e.pos || e.j || 0} / 10⁶<sup>${(2 * e.freq / 128).toFixed(3)}</sup> = ${e.angle.toFixed(3)} 弧度
           ${dial(e)}
           旋转后 q[${e.j}] = <b style="color:var(--cyan)">${f(e.qr, 4)}</b>（这就是拿去和 K 做点积的数）`;
       }
