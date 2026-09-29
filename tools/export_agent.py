@@ -376,7 +376,7 @@ def export_task(task: Dict, model, tokenizer) -> Dict[str, Any]:
 
 def main():
     parser = argparse.ArgumentParser(description="录制 Agent 运行数据")
-    parser.add_argument("--model", required=True, help="模型路径")
+    parser.add_argument("--model", default="/d/gmlab/cjc/m3repro/models/Qwen3-8B", help="模型路径")
     parser.add_argument("--task", type=int, help="只运行第几个任务（1-3）")
     args = parser.parse_args()
 
