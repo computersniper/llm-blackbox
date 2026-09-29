@@ -1,0 +1,135 @@
+{
+  "task_id": "add-feature",
+  "title": "添加功能",
+  "description": "为 REST API 添加分页功能，更新文档",
+  "steps": [
+    {
+      "type": "think",
+      "content": "我需要为 /users API 添加分页功能。首先看看现有的代码结构。",
+      "status": "分析需求..."
+    },
+    {
+      "type": "tool",
+      "tool": "read_file",
+      "file": "api.js",
+      "content": "const express = require('express');\nconst app = express();\n\n// 获取用户列表\napp.get('/users', (req, res) => {\n    const users = Array.from({length: 100}, (_, i) => ({\n        id: i + 1,\n        name: `User${i + 1}`\n    }));\n    res.json(users);\n});\n\napp.listen(3000);"
+    },
+    {
+      "type": "think",
+      "content": "现在返回所有用户。我需要添加 page 和 limit 参数来支持分页。",
+      "status": "设计方案..."
+    },
+    {
+      "type": "tool",
+      "tool": "edit_file",
+      "file": "api.js",
+      "changes": [
+        {
+          "line": 5,
+          "old": "app.get('/users', (req, res) => {",
+          "new": "app.get('/users', (req, res) => {\n    const page = parseInt(req.query.page) || 1;\n    const limit = parseInt(req.query.limit) || 10;"
+        }
+      ]
+    },
+    {
+      "type": "think",
+      "content": "现在需要实现分页逻辑，计算起始位置和返回数据。",
+      "status": "实现分页..."
+    },
+    {
+      "type": "tool",
+      "tool": "write_file",
+      "file": "api.js",
+      "content": "const express = require('express');\nconst app = express();\n\n// 获取用户列表\napp.get('/users', (req, res) => {\n    const page = parseInt(req.query.page) || 1;\n    const limit = parseInt(req.query.limit) || 10;\n\n    const allUsers = Array.from({length: 100}, (_, i) => ({\n        id: i + 1,\n        name: `User${i + 1}`\n    }));\n\n    const startIndex = (page - 1) * limit;\n    const endIndex = startIndex + limit;\n    const users = allUsers.slice(startIndex, endIndex);\n\n    res.json({\n        page,\n        limit,\n        total: allUsers.length,\n        data: users\n    });\n});\n\napp.listen(3000);"
+    },
+    {
+      "type": "think",
+      "content": "代码完成了。现在需要更新 README 文档来说明新的 API 参数。",
+      "status": "更新文档..."
+    },
+    {
+      "type": "tool",
+      "tool": "write_file",
+      "file": "README.md",
+      "content": "# API 文档\n\n## 获取用户列表\nGET /users\n\n### 查询参数\n- `page` (可选): 页码，默认为 1\n- `limit` (可选): 每页数量，默认为 10\n\n### 返回格式\n```json\n{\n  \"page\": 1,\n  \"limit\": 10,\n  \"total\": 100,\n  \"data\": [...]\n}\n```\n\n### 示例\n```\nGET /users?page=2&limit=20\n```"
+    },
+    {
+      "type": "tool",
+      "tool": "bash",
+      "command": "node api.js &",
+      "output": "Server started on port 3000"
+    },
+    {
+      "type": "tool",
+      "tool": "bash",
+      "command": "curl 'http://localhost:3000/users?page=1&limit=5'",
+      "output": "{\"page\":1,\"limit\":5,\"total\":100,\"data\":[{\"id\":1,\"name\":\"User1\"},{\"id\":2,\"name\":\"User2\"},{\"id\":3,\"name\":\"User3\"},{\"id\":4,\"name\":\"User4\"},{\"id\":5,\"name\":\"User5\"}]}"
+    },
+    {
+      "type": "complete",
+      "summary": "任务完成！已为 /users API 添加分页功能，支持 page 和 limit 参数，并更新了文档。",
+      "files_changed": [
+        "api.js",
+        "README.md"
+      ],
+      "tests_passed": 1
+    }
+  ],
+  "tokenHistory": [
+    534,
+    789,
+    1123,
+    1567,
+    1998,
+    2345,
+    2678,
+    2912,
+    3145
+  ],
+  "generation": {
+    "text": "const page = parseInt(req.query.page)",
+    "chars": [
+      {
+        "char": "c",
+        "prob": 0.91
+      },
+      {
+        "char": "o",
+        "prob": 0.96
+      },
+      {
+        "char": "n",
+        "prob": 0.98
+      },
+      {
+        "char": "s",
+        "prob": 0.97
+      },
+      {
+        "char": "t",
+        "prob": 0.95
+      },
+      {
+        "char": " ",
+        "prob": 0.99
+      },
+      {
+        "char": "p",
+        "prob": 0.87
+      },
+      {
+        "char": "a",
+        "prob": 0.93
+      },
+      {
+        "char": "g",
+        "prob": 0.96
+      },
+      {
+        "char": "e",
+        "prob": 0.98
+      }
+    ]
+  },
+  "elapsed_time": 18.3
+}
