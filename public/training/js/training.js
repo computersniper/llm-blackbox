@@ -1,23 +1,67 @@
+// ⚠️ 本页面使用模拟数据演示训练可视化功能
+// 真实数据需要运行: python tools/train_small_model.py
+
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, sleep } from '../../js/ui.js';
 
-// 从零训练场景的模拟数据
-const FROM_SCRATCH_DATA = {
-  totalSteps: 3000,
-  checkpoints: [
-    { step: 0, loss: 8.524, perplexity: 5041, sample: '��$#@春天�%&*花朵��^!@#天气', quality: 'gibberish' },
-    { step: 100, loss: 7.234, perplexity: 1384, sample: '春天春天春天春天春天春天春天春天', quality: 'gibberish' },
-    { step: 200, loss: 6.012, perplexity: 408, sample: '春天是一个季节，有很多花', quality: 'improving' },
-    { step: 300, loss: 5.123, perplexity: 168, sample: '春天来了，花儿开了，鸟儿叫了', quality: 'improving' },
-    { step: 500, loss: 4.456, perplexity: 86, sample: '春风拂面花满园，柳绿莺歌燕舞欢', quality: 'improving' },
-    { step: 800, loss: 3.678, perplexity: 40, sample: '春回大地万物苏，桃红柳绿映江湖', quality: 'good' },
-    { step: 1200, loss: 2.934, perplexity: 19, sample: '东风送暖入屠苏，春色满园关不住', quality: 'good' },
-    { step: 1800, loss: 2.456, perplexity: 12, sample: '春江潮水连海平，海上明月共潮生\n滟滟随波千万里，何处春江无月明', quality: 'good' },
-    { step: 2500, loss: 2.187, perplexity: 9, sample: '春眠不觉晓，处处闻啼鸟\n夜来风雨声，花落知多少', quality: 'good' },
-    { step: 3000, loss: 2.089, perplexity: 8, sample: '碧玉妆成一树高，万条垂下绿丝绦\n不知细叶谁裁出，二月春风似剪刀', quality: 'good' }
-  ]
-};
+// 训练数据（从文件加载或使用内置模拟数据）
+let FROM_SCRATCH_DATA = null;
+let ONE_STEP_DATA = null;
+
+// 异步加载真实数据
+async function loadTrainingData() {
+  try {
+    const curveRes = await fetch('data/training_curve.json.gz');
+    if (curveRes.ok) {
+      const blob = await curveRes.blob();
+      const ds = new DecompressionStream('gzip');
+      const decompressed = blob.stream().pipeThrough(ds);
+      const text = await new Response(decompressed).text();
+      const data = JSON.parse(text);
+      FROM_SCRATCH_DATA = {
+        totalSteps: data.training_config.total_steps,
+        checkpoints: data.checkpoints
+      };
+      console.log('✓ 加载训练曲线数据');
+    }
+  } catch (e) {
+    console.warn('未找到训练曲线数据，使用内置模拟数据', e);
+  }
+
+  try {
+    const stepRes = await fetch('data/step_500.json.gz');
+    if (stepRes.ok) {
+      const blob = await stepRes.blob();
+      const ds = new DecompressionStream('gzip');
+      const decompressed = blob.stream().pipeThrough(ds);
+      const text = await new Response(decompressed).text();
+      ONE_STEP_DATA = JSON.parse(text);
+      console.log('✓ 加载单步训练数据');
+    }
+  } catch (e) {
+    console.warn('未找到单步训练数据', e);
+  }
+
+  // 如果没有加载到数据，使用内置模拟数据作为回退
+  if (!FROM_SCRATCH_DATA) {
+    FROM_SCRATCH_DATA = {
+      totalSteps: 3000,
+      checkpoints: [
+        { step: 0, loss: 8.524, perplexity: 5041, sample: '春天来了花儿开春天来了春天', quality: 'gibberish' },
+        { step: 300, loss: 7.234, perplexity: 1384, sample: '春天天天天天天天天', quality: 'gibberish' },
+        { step: 600, loss: 6.012, perplexity: 408, sample: '春天来了，花儿开了', quality: 'improving' },
+        { step: 900, loss: 5.123, perplexity: 168, sample: '春天来了，花儿开了，鸟儿叫了', quality: 'improving' },
+        { step: 1200, loss: 4.456, perplexity: 86, sample: '春风拂面花满园', quality: 'improving' },
+        { step: 1500, loss: 3.678, perplexity: 40, sample: '春回大地万物苏，桃红柳绿', quality: 'good' },
+        { step: 1800, loss: 2.934, perplexity: 19, sample: '春江潮水连海平，海上明月', quality: 'good' },
+        { step: 2100, loss: 2.456, perplexity: 12, sample: '春眠不觉晓，处处闻啼鸟', quality: 'good' },
+        { step: 2500, loss: 2.187, perplexity: 9, sample: '碧玉妆成一树高，万条垂下绿丝绦', quality: 'good' },
+        { step: 3000, loss: 2.089, perplexity: 8, sample: '床前明月光，疑是地上霜。举头望明月，低头思故乡。', quality: 'good' }
+      ]
+    };
+  }
+}
 
 // 一步训练场景的模拟数据
 const ONE_STEP_DATA = {
@@ -45,6 +89,9 @@ let scratchEngine = null, oneStepEngine = null;
 /* ---------------------------------------------------------------- 启动 */
 
 async function boot() {
+  // 加载训练数据
+  await loadTrainingData();
+
   new Background($('#bg'));
 
   // 声音按钮
