@@ -18,10 +18,17 @@ import os
 from typing import List, Dict, Any
 
 import numpy as np
-import torch
-from PIL import Image
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
-from qwen_vl_utils import process_vision_info
+
+# 可选依赖：仅在使用真实模型时需要
+try:
+    import torch
+    from PIL import Image
+    from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+    from qwen_vl_utils import process_vision_info
+    MODELS_AVAILABLE = True
+except ImportError:
+    MODELS_AVAILABLE = False
+    print("注意：transformers或qwen_vl_utils未安装，将使用模拟数据模式")
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "public" / "multimodal" / "data"
@@ -89,6 +96,9 @@ def download_images():
 
 def load_model(model_path: str):
     """加载Qwen2-VL模型"""
+    if not MODELS_AVAILABLE:
+        raise ImportError("transformers或相关依赖未安装")
+
     print(f"正在加载模型: {model_path}")
 
     # 加载模型和处理器
