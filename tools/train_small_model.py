@@ -402,7 +402,7 @@ def train(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=str, default="public/training/data/", help="输出目录")
-    parser.add_argument("--tokenizer-path", type=str, default="D:/cjc/model-weights/qwen3/Qwen3-0.6B",
+    parser.add_argument("--tokenizer-path", type=str, default="/d/gmlab/cjc/m3repro/models/Qwen3-8B",
                         help="Tokenizer路径（复用Qwen3的tokenizer）")
     args = parser.parse_args()
 
