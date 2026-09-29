@@ -3,11 +3,28 @@
 // ============================================================
 
 // 录制数据（真实的 Qwen3 agent 运行记录）
-const TASKS = {
-  'fix-bug': {
-    title: '修复 Bug',
-    description: '找到并修复一个数组越界错误，添加单元测试',
-    steps: [
+let TASKS = {};
+
+// 从 JSON 文件加载任务数据
+async function loadTaskData() {
+  try {
+    const response = await fetch('./data/manifest.json');
+    const manifest = await response.json();
+
+    // 转换数据格式
+    for (const task of manifest.tasks) {
+      TASKS[task.task_id] = task;
+    }
+
+    console.log('✓ 已加载任务数据:', Object.keys(TASKS));
+  } catch (error) {
+    console.error('加载任务数据失败，使用内置数据:', error);
+    // 回退到内置数据
+    TASKS = {
+      'fix-bug': {
+        title: '修复 Bug',
+        description: '找到并修复一个数组越界错误，添加单元测试',
+        steps: [
       {
         type: 'think',
         content: '我需要先了解项目结构，看看哪里有数组越界的问题。',
@@ -142,8 +159,10 @@ if __name__ == '__main__':
         { char: ':', prob: 0.95 }
       ]
     }
+  };
+    }
   }
-};
+}
 
 // 状态管理
 let currentTask = null;
@@ -187,7 +206,10 @@ const els = {
 };
 
 // 初始化
-function init() {
+async function init() {
+  // 先加载任务数据
+  await loadTaskData();
+
   // 绑定任务卡片
   document.querySelectorAll('.task-card').forEach(card => {
     card.addEventListener('click', () => {
