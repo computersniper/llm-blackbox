@@ -238,12 +238,15 @@ class MultimodalApp {
         this.drawImage(img);
         resolve();
       };
-      img.onerror = () => {
+      img.onerror = (err) => {
+        console.error('Failed to load image:', src, err);
         // 创建占位符
         this.drawPlaceholder();
         resolve();
       };
-      img.src = src;
+      // 确保路径相对于HTML文档，而不是当前模块
+      // 从模块路径 js/multimodal.js 回到 multimodal/ 目录
+      img.src = new URL(`../${src}`, import.meta.url).href;
     });
   }
 
