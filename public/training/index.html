@@ -8,8 +8,8 @@
   <meta name="theme-color" content="#060d1a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="../css/app.css">
-  <link rel="stylesheet" href="css/training.css">
+  <link rel="stylesheet" href="../css/app.css?v=1">
+  <link rel="stylesheet" href="css/training.css?v=1">
 </head>
 <body class="mode-overview">
   <canvas id="bg" aria-hidden="true"></canvas>
@@ -24,8 +24,8 @@
     <nav class="nav-tabs" aria-label="主导航">
       <a href="../">推理</a>
       <a href="./" class="active">训练</a>
-      <a href="../multimodal/" class="disabled">多模态</a>
-      <a href="../agent/" class="disabled">智能体</a>
+      <a href="../multimodal/">多模态</a>
+      <a href="../agent/">智能体</a>
     </nav>
     <div class="top-actions">
       <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
@@ -215,6 +215,6 @@
   </div>
 
   <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
-  <script type="module" src="js/training.js"></script>
+  <script type="module" src="js/training.js?v=1"></script>
 </body>
 </html>
