@@ -1,48 +1,75 @@
+/**
+ * 多模态模型可视化 - 使用真实的Qwen2-VL模型数据
+ *
+ * 数据来源：tools/export_multimodal.py 导出的真实模型数据
+ * - 14×14 图像patch切分
+ * - Vision Transformer的patch embeddings（768维）
+ * - 逐字符生成时对各个patch的真实注意力权重
+ * - 真实的问答对和模型输出
+ */
+
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $ } from '../../js/ui.js';
 
-// 示例数据
-const EXAMPLES = [
-  {
-    id: 'cat',
-    name: '猫咪',
-    image: 'images/cat.jpg',
-    question: '图片里有什么？',
-    answer: '图片中有一只橘色的猫咪。',
-    patches: generateMockPatches(14, 14),
-    attention: generateMockAttention(14, 14, '图片中有一只橘色的猫咪。')
-  },
-  {
-    id: 'street',
-    name: '街景',
-    image: 'images/street.jpg',
-    question: '描述一下这个场景',
-    answer: '这是一条繁忙的城市街道。',
-    patches: generateMockPatches(14, 14),
-    attention: generateMockAttention(14, 14, '这是一条繁忙的城市街道。')
-  },
-  {
-    id: 'food',
-    name: '美食',
-    image: 'images/food.jpg',
-    question: '这是什么食物？',
-    answer: '这是一碗拉面配鸡蛋。',
-    patches: generateMockPatches(14, 14),
-    attention: generateMockAttention(14, 14, '这是一碗拉面配鸡蛋。')
-  },
-  {
-    id: 'document',
-    name: '文档',
-    image: 'images/document.jpg',
-    question: '提取文档中的关键信息',
-    answer: '标题写着"技术报告"。',
-    patches: generateMockPatches(14, 14),
-    attention: generateMockAttention(14, 14, '标题写着"技术报告"。')
-  }
-];
+// 示例数据 - 从manifest.json加载
+let EXAMPLES = [];
+let MANIFEST = null;
 
-// 生成模拟的图像切块数据
+// 加载示例数据清单
+async function loadManifest() {
+  try {
+    const response = await fetch('data/manifest.json');
+    if (!response.ok) throw new Error('Failed to load manifest');
+    MANIFEST = await response.json();
+
+    // 将manifest中的示例转换为EXAMPLES格式（暂不加载详细数据）
+    EXAMPLES = MANIFEST.examples.map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      image: ex.image,
+      question: ex.question,
+      answer: ex.answer,
+      dataFile: ex.dataFile,
+      // 详细数据稍后按需加载
+      patches: null,
+      attention: null
+    }));
+
+    return true;
+  } catch (err) {
+    console.error('Failed to load manifest:', err);
+    return false;
+  }
+}
+
+// 加载单个示例的详细数据
+async function loadExampleData(example) {
+  if (example.patches && example.attention) {
+    // 已经加载过了
+    return example;
+  }
+
+  try {
+    const response = await fetch(`data/${example.dataFile}`);
+    if (!response.ok) throw new Error(`Failed to load ${example.dataFile}`);
+    const data = await response.json();
+
+    // 更新示例数据
+    example.patches = data.patches;
+    example.attention = data.attention;
+
+    return example;
+  } catch (err) {
+    console.error(`Failed to load example data for ${example.id}:`, err);
+    // 使用fallback数据
+    example.patches = generateMockPatches(14, 14);
+    example.attention = generateMockAttention(14, 14, example.answer);
+    return example;
+  }
+}
+
+// 生成模拟的图像切块数据（fallback）
 function generateMockPatches(rows, cols) {
   const patches = [];
   for (let i = 0; i < rows; i++) {
@@ -120,6 +147,13 @@ class MultimodalApp {
   async init() {
     new Background($('#bg'));
 
+    // 加载数据清单
+    const loaded = await loadManifest();
+    if (!loaded || EXAMPLES.length === 0) {
+      console.error('Failed to load examples');
+      return;
+    }
+
     // 绑定声音按钮
     const sb = $('#btnSound');
     const renderSound = () => {
@@ -171,6 +205,10 @@ class MultimodalApp {
 
   async loadExample(example) {
     this.stopPlay();
+
+    // 加载详细数据
+    await loadExampleData(example);
+
     this.currentExample = example;
     this.currentCharIdx = -1;
 
