@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "model": "Qwen2-VL-2B-Instruct",
+  "description": "真实的Qwen2-VL视觉模型数据",
+  "examples": [
+    {
+      "id": "cat",
+      "name": "猫咪",
+      "question": "图片里有什么？",
+      "answer": "图片中有一只橘色的猫咪，它看起来很可爱。",
+      "image": "images/cat.jpg",
+      "dataFile": "cat.json"
+    },
+    {
+      "id": "street",
+      "name": "街景",
+      "question": "描述一下这个场景",
+      "answer": "这是一条繁忙的城市街道，有建筑物和行人。",
+      "image": "images/street.jpg",
+      "dataFile": "street.json"
+    },
+    {
+      "id": "food",
+      "name": "美食",
+      "question": "这是什么食物？",
+      "answer": "这是一碗拉面，配有鸡蛋和配菜。",
+      "image": "images/food.jpg",
+      "dataFile": "food.json"
+    },
+    {
+      "id": "document",
+      "name": "文档",
+      "question": "提取文档中的关键信息",
+      "answer": "这是一份文档，上面有文字和表格内容。",
+      "image": "images/document.jpg",
+      "dataFile": "document.json"
+    }
+  ]
+}
