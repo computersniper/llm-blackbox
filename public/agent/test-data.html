@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试 Agent 数据加载</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #ddd;
+    }
+    h1 { color: #5ef0d4; }
+    .task {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 5px;
+    }
+    .step {
+      background: #333;
+      padding: 10px;
+      margin: 5px 0;
+      border-left: 3px solid #5ef0d4;
+    }
+    .success { color: #5ef0d4; }
+    .error { color: #ff6b6b; }
+    pre {
+      background: #1a1a1a;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Agent 数据加载测试</h1>
+  <div id="status">加载中...</div>
+  <div id="content"></div>
+
+  <script>
+    async function testDataLoading() {
+      const statusEl = document.getElementById('status');
+      const contentEl = document.getElementById('content');
+
+      try {
+        // 加载 manifest
+        const response = await fetch('./data/manifest.json');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const manifest = await response.json();
+
+        statusEl.innerHTML = `<span class="success">✓ 数据加载成功</span>`;
+        statusEl.innerHTML += `<p>模型: ${manifest.model}</p>`;
+        statusEl.innerHTML += `<p>时间: ${manifest.timestamp}</p>`;
+        statusEl.innerHTML += `<p>任务数: ${manifest.tasks.length}</p>`;
+
+        // 显示每个任务
+        manifest.tasks.forEach(task => {
+          const taskDiv = document.createElement('div');
+          taskDiv.className = 'task';
+
+          let html = `
+            <h2>${task.title}</h2>
+            <p>${task.description}</p>
+            <p><strong>步骤数:</strong> ${task.steps.length}</p>
+            <p><strong>耗时:</strong> ${task.elapsed_time}s</p>
+            <p><strong>Token历史:</strong> ${task.tokenHistory.join(' → ')}</p>
+          `;
+
+          // 显示前3个步骤
+          html += '<h3>前3个步骤:</h3>';
+          task.steps.slice(0, 3).forEach((step, i) => {
+            html += `
+              <div class="step">
+                <strong>步骤 ${i + 1}: ${step.type}</strong><br>
+                ${step.content ? `内容: ${step.content}<br>` : ''}
+                ${step.tool ? `工具: ${step.tool}<br>` : ''}
+                ${step.status ? `状态: ${step.status}` : ''}
+              </div>
+            `;
+          });
+
+          // 显示生成统计
+          if (task.generation) {
+            html += '<h3>字符生成示例:</h3>';
+            html += '<div style="font-family: monospace;">';
+            task.generation.chars.slice(0, 10).forEach(c => {
+              html += `<span title="概率: ${c.prob}">${c.char}</span>`;
+            });
+            html += '</div>';
+          }
+
+          taskDiv.innerHTML = html;
+          contentEl.appendChild(taskDiv);
+        });
+
+        // 显示原始 JSON
+        const jsonDiv = document.createElement('div');
+        jsonDiv.className = 'task';
+        jsonDiv.innerHTML = '<h2>原始 JSON 数据预览</h2><pre>' +
+          JSON.stringify(manifest, null, 2).substring(0, 1000) +
+          '\n...</pre>';
+        contentEl.appendChild(jsonDiv);
+
+      } catch (error) {
+        statusEl.innerHTML = `<span class="error">✗ 加载失败: ${error.message}</span>`;
+        console.error('Error:', error);
+      }
+    }
+
+    testDataLoading();
+  </script>
+</body>
+</html>
