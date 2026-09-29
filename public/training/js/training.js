@@ -61,25 +61,27 @@ async function loadTrainingData() {
       ]
     };
   }
-}
 
-// 一步训练场景的模拟数据
-const ONE_STEP_DATA = {
-  phases: [
-    { name: 'forward', label: '前向传播', duration: 2000 },
-    { name: 'backward', label: '反向传播', duration: 3000 },
-    { name: 'update', label: '权重更新', duration: 1500 }
-  ],
-  layers: [
-    'Embedding',
-    'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4',
-    'Layer 5', 'Layer 6', 'Layer 7', 'Layer 8', 'Layer 9',
-    'Layer 10', 'Layer 11', 'Layer 12', 'Layer 13', 'Layer 14',
-    'Layer 15', 'Layer 16', 'Layer 17', 'Layer 18', 'Layer 19',
-    'Layer 20', 'Layer 21', 'Layer 22', 'Layer 23', 'Layer 24',
-    'Layer 25', 'Layer 26', 'Layer 27', 'Output'
-  ]
-};
+  // 一步训练场景的模拟数据（如果没有从文件加载）
+  if (!ONE_STEP_DATA) {
+    ONE_STEP_DATA = {
+      phases: [
+        { name: 'forward', label: '前向传播', duration: 2000 },
+        { name: 'backward', label: '反向传播', duration: 3000 },
+        { name: 'update', label: '权重更新', duration: 1500 }
+      ],
+      layers: [
+        'Embedding',
+        'Layer 0', 'Layer 1', 'Layer 2', 'Layer 3', 'Layer 4',
+        'Layer 5', 'Layer 6', 'Layer 7', 'Layer 8', 'Layer 9',
+        'Layer 10', 'Layer 11', 'Layer 12', 'Layer 13', 'Layer 14',
+        'Layer 15', 'Layer 16', 'Layer 17', 'Layer 18', 'Layer 19',
+        'Layer 20', 'Layer 21', 'Layer 22', 'Layer 23', 'Layer 24',
+        'Layer 25', 'Layer 26', 'Layer 27', 'Layer 28', 'Output'
+      ]
+    };
+  }
+}
 
 let currentScenario = null;
 let scratchState = { step: 0, playing: false, speed: 1 };
