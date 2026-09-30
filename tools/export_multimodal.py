@@ -1,427 +1,197 @@
-"""用真实的 Qwen2-VL 模型为多模态页面生成真实数据
+"""Record verifiable Qwen2-VL image tokens and language attention.
 
-用法：
-    python tools/export_multimodal.py
-
-导出内容：
-- 4个示例图片及其14×14的patch切分数据
-- Vision Transformer的patch embeddings (每个patch的768维向量)
-- 逐token生成时对各个patch的注意力权重
-- 每个图片的问答对和模型真实输出
-
-数据保存到 public/multimodal/data/ 目录。
+Requires a complete local checkpoint. No synthetic fallback is produced.
+Heatmaps show final language-layer attention averaged over heads and normalized
+within image tokens; attention is a measurement, not a causal explanation.
 """
+
 import argparse
+import gzip
+import hashlib
 import json
 import pathlib
-import os
-from typing import List, Dict, Any
-
-import numpy as np
-
-# 可选依赖：仅在使用真实模型时需要
-try:
-    import torch
-    from PIL import Image
-    from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
-    from qwen_vl_utils import process_vision_info
-    MODELS_AVAILABLE = True
-except ImportError:
-    MODELS_AVAILABLE = False
-    print("注意：transformers或qwen_vl_utils未安装，将使用模拟数据模式")
+import shutil
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "public" / "multimodal" / "data"
-IMG_DIR = ROOT / "public" / "multimodal" / "images"
-
-# 确保输出目录存在
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-IMG_DIR.mkdir(parents=True, exist_ok=True)
-
-# 示例配置
+OUT = ROOT / "public/multimodal"
+SOURCES = pathlib.Path("D:/models/photos")
 EXAMPLES = [
-    {
-        "id": "cat",
-        "name": "猫咪",
-        "image_url": "https://images.unsplash.com/photo-1574158622682-e40e69881006?w=600",
-        "question": "图片里有什么？",
-        "filename": "cat.jpg"
-    },
-    {
-        "id": "street",
-        "name": "街景",
-        "image_url": "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600",
-        "question": "描述一下这个场景",
-        "filename": "street.jpg"
-    },
-    {
-        "id": "food",
-        "name": "美食",
-        "image_url": "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600",
-        "question": "这是什么食物？",
-        "filename": "food.jpg"
-    },
-    {
-        "id": "document",
-        "name": "文档",
-        "image_url": "https://images.unsplash.com/photo-1568667256549-094345857637?w=600",
-        "question": "提取文档中的关键信息",
-        "filename": "document.jpg"
-    }
+    ("cat", "橘猫", "这张照片里有什么？", "cat.jpg"),
+    ("street", "街景", "描述这张照片的主要场景。", "street.jpg"),
+    ("food", "小笼包", "这张照片里是什么食物？", "food.jpg"),
+    ("sign", "路牌", "读出照片中左上方蓝色路牌上的主要地名。", "sign.jpg"),
 ]
 
 
-def download_images():
-    """下载示例图片"""
-    import requests
-
-    print("正在下载示例图片...")
-    for ex in EXAMPLES:
-        img_path = IMG_DIR / ex["filename"]
-        if img_path.exists():
-            print(f"  ✓ {ex['filename']} 已存在")
-            continue
-
-        print(f"  下载 {ex['filename']}...")
-        try:
-            response = requests.get(ex["image_url"], timeout=30)
-            response.raise_for_status()
-            with open(img_path, 'wb') as f:
-                f.write(response.content)
-            print(f"  ✓ {ex['filename']} 下载完成")
-        except Exception as e:
-            print(f"  ✗ {ex['filename']} 下载失败: {e}")
-    print()
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
-def load_model(model_path: str):
-    """加载Qwen2-VL模型"""
-    if not MODELS_AVAILABLE:
-        raise ImportError("transformers或相关依赖未安装")
-
-    print(f"正在加载模型: {model_path}")
-
-    # 加载模型和处理器
-    model = Qwen2VLForConditionalGeneration.from_pretrained(
-        model_path,
-        torch_dtype=torch.bfloat16,
-        device_map="auto"
-    )
-    processor = AutoProcessor.from_pretrained(model_path)
-
-    print("模型加载完成\n")
-    return model, processor
+def atomic_json(path, value):
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    tmp.write_bytes(raw)
+    tmp.replace(path)
+    if path.name != "manifest.json":
+        compressed = path.with_suffix(path.suffix + ".gz")
+        tmp_gzip = compressed.with_suffix(compressed.suffix + ".tmp")
+        tmp_gzip.write_bytes(gzip.compress(raw, compresslevel=9, mtime=0))
+        tmp_gzip.replace(compressed)
 
 
-def process_image_example(model, processor, example: Dict[str, Any]) -> Dict[str, Any]:
-    """处理单个图片示例，提取patch和注意力数据"""
-    print(f"处理示例: {example['name']}")
+def ensure_complete_model(path):
+    index = json.loads((path / "model.safetensors.index.json").read_text(encoding="utf-8"))
+    missing = [name for name in set(index["weight_map"].values()) if not (path / name).is_file()]
+    if missing:
+        raise FileNotFoundError(f"模型权重缺失: {', '.join(missing)}")
 
-    img_path = IMG_DIR / example["filename"]
-    if not img_path.exists():
-        print(f"  ✗ 图片不存在: {img_path}")
-        return None
 
-    # 构造消息
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image",
-                    "image": str(img_path),
-                },
-                {"type": "text", "text": example["question"]},
-            ],
-        }
-    ]
+def local_model_revision(path):
+    metadata = path / ".cache/huggingface/download/config.json.metadata"
+    return metadata.read_text(encoding="utf-8").splitlines()[0] if metadata.is_file() else None
 
-    # 准备输入
-    text = processor.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    image_inputs, video_inputs = process_vision_info(messages)
-    inputs = processor(
-        text=[text],
-        images=image_inputs,
-        videos=video_inputs,
-        padding=True,
-        return_tensors="pt",
-    )
+
+def record_one(model, processor, source, name, question, image_path, max_tokens):
+    import torch
+    from PIL import Image
+
+    image = Image.open(image_path).convert("RGB")
+    messages = [{"role": "user", "content": [
+        {"type": "image"},
+        {"type": "text", "text": question},
+    ]}]
+    prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    inputs = processor(text=[prompt], images=[image], padding=True, return_tensors="pt")
     inputs = inputs.to(model.device)
+    grid = inputs.image_grid_thw[0].tolist()
+    temporal, raw_rows, raw_cols = (int(x) for x in grid)
+    merge = int(model.config.vision_config.spatial_merge_size)
+    rows, cols = raw_rows // merge, raw_cols // merge
+    image_positions = (inputs.input_ids[0] == model.config.image_token_id).nonzero().flatten().tolist()
+    if temporal != 1 or len(image_positions) != rows * cols:
+        raise ValueError(f"图像词元网格不匹配: grid={grid}, image tokens={len(image_positions)}")
 
-    # 生成回答，并获取注意力权重
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=50,
-            output_attentions=True,
-            return_dict_in_generate=True,
-        )
+    with torch.inference_mode():
+        visual = model.visual(inputs.pixel_values.to(model.visual.dtype), grid_thw=inputs.image_grid_thw).float().cpu()
+        if visual.shape[0] != len(image_positions):
+            raise ValueError("视觉向量数与图像词元数不一致")
+        generated = model.generate(**inputs, max_new_tokens=max_tokens, do_sample=False,
+                                   output_attentions=False)
+        token_ids = generated[0, inputs.input_ids.shape[1]:].tolist()
+        eos = {model.config.eos_token_id, model.config.pad_token_id}
+        token_ids = [token for token in token_ids if token not in eos]
+        if not token_ids:
+            raise ValueError("模型未生成可展示的回答词元")
+        answer = processor.tokenizer.decode(token_ids, skip_special_tokens=True)
 
-    # 解码生成的文本
-    generated_ids = outputs.sequences
-    generated_ids_trimmed = [
-        out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-    ]
-    answer = processor.batch_decode(
-        generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-    )[0]
-
-    print(f"  问题: {example['question']}")
-    print(f"  回答: {answer}")
-
-    # 提取图像patch embeddings和注意力数据
-    result = extract_vision_data(model, processor, inputs, outputs, answer, img_path)
-    result["id"] = example["id"]
-    result["name"] = example["name"]
-    result["question"] = example["question"]
-    result["answer"] = answer
-    result["image"] = f"images/{example['filename']}"
-
-    print(f"  ✓ 完成\n")
-    return result
-
-
-def extract_vision_data(model, processor, inputs, outputs, answer: str, img_path: pathlib.Path) -> Dict[str, Any]:
-    """提取视觉相关数据：patch embeddings和注意力权重"""
-
-    # 获取图像的patch数量 (Qwen2-VL通常使用28x28或14x14的patches)
-    # 这里我们简化为14x14
-    num_patches = 196  # 14 * 14
-    patch_size = 14
-
-    # 生成patch数据 (简化版本，实际应该从vision encoder提取)
-    patches = []
-    for i in range(patch_size):
-        for j in range(patch_size):
-            patch_id = i * patch_size + j
-            # 创建随机embedding作为示例 (实际应该从模型提取)
-            embedding = np.random.randn(768).astype(np.float32).tolist()
-            patches.append({
-                "id": patch_id,
-                "row": i,
-                "col": j,
-                "embedding": embedding
+        # Query position predicting token i is prompt[-1] for i=0, else token i-1.
+        full_ids = torch.cat([inputs.input_ids, torch.tensor([token_ids], device=model.device)], dim=1)
+        forward_inputs = dict(inputs)
+        forward_inputs["input_ids"] = full_ids
+        forward_inputs["attention_mask"] = torch.ones_like(full_ids)
+        forward_inputs.pop("pixel_values_videos", None)
+        forward_inputs.pop("video_grid_thw", None)
+        output = model(**forward_inputs, output_attentions=True, use_cache=False, return_dict=True)
+        if not output.attentions or output.attentions[-1] is None:
+            raise RuntimeError("未获得语言层注意力；请确认 attn_implementation='eager'")
+        last = output.attentions[-1][0].float()
+        prompt_len = inputs.input_ids.shape[1]
+        records = []
+        for idx, token_id in enumerate(token_ids):
+            per_head = last[:, prompt_len + idx - 1, image_positions]
+            weights = per_head.mean(dim=0)
+            image_mass = float(weights.sum().item())
+            if image_mass <= 0:
+                raise ValueError(f"词元 {idx} 的图像注意力总量为零")
+            head_masses = per_head.sum(dim=1)
+            if torch.any(head_masses <= 0):
+                raise ValueError(f"词元 {idx} 有注意力头对图像权重为零")
+            records.append({
+                "id": int(token_id),
+                "text": processor.tokenizer.decode([token_id], skip_special_tokens=True),
+                "imageAttentionMass": round(image_mass, 8),
+                "weights": [round(float(w / image_mass), 7) for w in weights.cpu().tolist()],
+                "heads": [{
+                    "imageAttentionMass": round(float(head_masses[h]), 8),
+                    "weights": [round(float(w / head_masses[h]), 7) for w in per_head[h].cpu().tolist()],
+                } for h in range(per_head.shape[0])],
             })
+        del output
 
-    # 提取每个生成token的注意力权重
-    attention_data = []
-    answer_chars = list(answer)
-
-    # outputs.attentions是一个tuple，每个元素对应一个生成步骤
-    # 每个步骤包含所有层的注意力
-    if hasattr(outputs, 'attentions') and outputs.attentions:
-        num_generated = len(outputs.attentions)
-
-        for char_idx, char in enumerate(answer_chars):
-            if char_idx >= num_generated:
-                # 如果字符数多于生成步骤，使用模拟数据
-                weights = generate_mock_attention_weights(num_patches, char_idx, len(answer_chars))
-            else:
-                # 从注意力中提取对图像patch的权重
-                # 这里简化处理，实际需要识别哪些位置对应图像tokens
-                weights = extract_image_attention(outputs.attentions[char_idx], num_patches)
-
-            attention_data.append({
-                "char": char,
-                "charIdx": char_idx,
-                "weights": weights
-            })
-    else:
-        # 如果没有注意力数据，生成模拟数据
-        for char_idx, char in enumerate(answer_chars):
-            weights = generate_mock_attention_weights(num_patches, char_idx, len(answer_chars))
-            attention_data.append({
-                "char": char,
-                "charIdx": char_idx,
-                "weights": weights
-            })
-
+    patches = [{
+        "id": idx, "row": idx // cols, "col": idx % cols,
+        "norm": round(float(vector.norm().item()), 5),
+        "head": [round(float(x), 5) for x in vector[:12].tolist()],
+    } for idx, vector in enumerate(visual)]
     return {
-        "patches": patches,
-        "attention": attention_data
+        "schema": 2, "source": "model", "id": source, "name": name,
+        "question": question, "answer": answer,
+        "image": f"images/{source}.jpg", "imageSha256": sha256(image_path),
+        "originalSize": [image.width, image.height],
+        "processedSize": [raw_cols * 14, raw_rows * 14],
+        "grid": {"rows": rows, "cols": cols, "rawRows": raw_rows, "rawCols": raw_cols,
+                 "rawPatchSize": int(model.config.vision_config.patch_size), "merge": merge,
+                 "featureDim": int(visual.shape[1])},
+        "attention": {"layer": int(model.config.num_hidden_layers) - 1,
+                      "heads": int(model.config.num_attention_heads),
+                      "method": "mean heads; normalized among image tokens only"},
+        "patches": patches, "tokens": records,
     }
-
-
-def extract_image_attention(layer_attentions, num_patches: int) -> List[float]:
-    """从注意力张量中提取对图像patches的注意力权重"""
-    # layer_attentions: tuple of tensors, 每个对应一层
-    # 简化处理：平均所有层和所有头的注意力
-
-    # 这里生成模拟数据，实际需要从真实注意力矩阵提取
-    weights = np.random.rand(num_patches)
-    # 归一化
-    weights = weights / weights.sum()
-    return weights.tolist()
-
-
-def generate_mock_attention_weights(num_patches: int, char_idx: int, total_chars: int) -> List[float]:
-    """生成模拟的注意力权重分布"""
-    rows = cols = 14
-    weights = []
-
-    for i in range(num_patches):
-        row = i // cols
-        col = i % cols
-
-        # 根据字符位置模拟不同的注意力模式
-        progress = char_idx / max(total_chars, 1)
-
-        if progress < 0.33:
-            # 早期关注左上
-            center_row, center_col = 3, 3
-        elif progress < 0.67:
-            # 中期关注中心
-            center_row, center_col = 7, 7
-        else:
-            # 后期关注右下
-            center_row, center_col = 11, 11
-
-        # 高斯分布
-        dist_sq = (row - center_row) ** 2 + (col - center_col) ** 2
-        weight = np.exp(-dist_sq / 20.0)
-        weight += np.random.rand() * 0.1  # 添加噪声
-        weights.append(weight)
-
-    # 归一化
-    total = sum(weights)
-    weights = [w / total for w in weights]
-    return weights
 
 
 def main():
-    parser = argparse.ArgumentParser(description="导出Qwen2-VL多模态数据")
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="Qwen/Qwen2-VL-2B-Instruct",
-        help="模型路径或HuggingFace模型ID"
-    )
-    parser.add_argument(
-        "--skip-download",
-        action="store_true",
-        help="跳过图片下载"
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", type=pathlib.Path, default=pathlib.Path("D:/models/Qwen2-VL-2B-Instruct"))
+    parser.add_argument("--photos", type=pathlib.Path, default=SOURCES)
+    parser.add_argument("--max-new-tokens", type=int, default=64)
+    parser.add_argument("--only", choices=[item[0] for item in EXAMPLES], help="只处理一张照片")
+    parser.add_argument("--probe", action="store_true", help="验证真实提取但不写入站点")
     args = parser.parse_args()
-
-    # 下载示例图片
-    if not args.skip_download:
-        download_images()
-
-    # 加载模型
-    try:
-        model, processor = load_model(args.model)
-    except Exception as e:
-        print(f"模型加载失败: {e}")
-        print("\n如果没有本地模型，将使用模拟数据生成...")
-        print("生成模拟数据不需要真实模型\n")
-        # 使用模拟数据
-        generate_mock_data()
-        return
-
-    # 处理每个示例
+    if args.only and not args.probe:
+        parser.error("--only 仅可与 --probe 一起使用，避免产生混合版本数据")
+    ensure_complete_model(args.model)
+    import torch
+    from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
+    if not torch.cuda.is_available():
+        raise RuntimeError("当前导出需要 CUDA GPU；未生成任何替代数据")
+    model = Qwen2VLForConditionalGeneration.from_pretrained(
+        args.model, dtype=torch.bfloat16, device_map="auto", attn_implementation="eager"
+    ).eval()
+    processor = AutoProcessor.from_pretrained(args.model)
+    # 256 merged image tokens keep eager full-sequence attention within 8 GB VRAM.
+    processor.image_processor.max_pixels = 256 * 28 * 28
+    (OUT / "images").mkdir(parents=True, exist_ok=True)
+    (OUT / "data").mkdir(parents=True, exist_ok=True)
     results = []
-    for example in EXAMPLES:
-        result = process_image_example(model, processor, example)
-        if result:
-            results.append(result)
-            # 保存单个示例数据
-            save_example_data(result)
-
-    # 保存总索引
-    save_manifest(results)
-    print("所有数据导出完成！")
-
-
-def generate_mock_data():
-    """生成模拟数据（不需要真实模型）"""
-    print("生成模拟数据...")
-
-    results = []
-    for example in EXAMPLES:
-        print(f"  处理 {example['name']}...")
-
-        # 简单的模拟回答
-        mock_answers = {
-            "cat": "图片中有一只橘色的猫咪，它看起来很可爱。",
-            "street": "这是一条繁忙的城市街道，有建筑物和行人。",
-            "food": "这是一碗拉面，配有鸡蛋和配菜。",
-            "document": "这是一份文档，上面有文字和表格内容。"
-        }
-
-        answer = mock_answers.get(example["id"], "这是一张图片。")
-
-        result = {
-            "id": example["id"],
-            "name": example["name"],
-            "question": example["question"],
-            "answer": answer,
-            "image": f"images/{example['filename']}",
-            "patches": [],
-            "attention": []
-        }
-
-        # 生成14x14的patches
-        for i in range(14):
-            for j in range(14):
-                patch_id = i * 14 + j
-                embedding = np.random.randn(768).astype(np.float32).tolist()
-                result["patches"].append({
-                    "id": patch_id,
-                    "row": i,
-                    "col": j,
-                    "embedding": embedding
-                })
-
-        # 生成注意力数据
-        for char_idx, char in enumerate(answer):
-            weights = generate_mock_attention_weights(196, char_idx, len(answer))
-            result["attention"].append({
-                "char": char,
-                "charIdx": char_idx,
-                "weights": weights
-            })
-
-        results.append(result)
-        save_example_data(result)
-        print(f"  ✓ 完成")
-
-    save_manifest(results)
-    print("\n模拟数据生成完成！")
-
-
-def save_example_data(data: Dict[str, Any]):
-    """保存单个示例的数据"""
-    filename = f"{data['id']}.json"
-    filepath = OUT_DIR / filename
-
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def save_manifest(results: List[Dict[str, Any]]):
-    """保存数据清单"""
-    manifest = {
-        "version": "1.0",
-        "model": "Qwen2-VL-2B-Instruct",
-        "description": "真实的Qwen2-VL视觉模型数据",
-        "examples": [
-            {
-                "id": r["id"],
-                "name": r["name"],
-                "question": r["question"],
-                "answer": r["answer"],
-                "image": r["image"],
-                "dataFile": f"{r['id']}.json"
-            }
-            for r in results
-        ]
-    }
-
-    filepath = OUT_DIR / "manifest.json"
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    captures = []
+    for key, name, question, filename in EXAMPLES:
+        if args.only and key != args.only:
+            continue
+        image_path = args.photos / filename
+        if not image_path.is_file():
+            raise FileNotFoundError(image_path)
+        print(f"录制 {name}: {image_path}", flush=True)
+        data = record_one(model, processor, key, name, question, image_path, args.max_new_tokens)
+        captures.append((key, image_path, data))
+        results.append({"id": key, "name": name, "question": question,
+                        "answer": data["answer"], "image": data["image"],
+                        "imageSha256": data["imageSha256"], "dataFile": f"{key}.json",
+                        "grid": data["grid"]})
+        print(f"  {data['grid']['rows']}×{data['grid']['cols']} image tokens; {len(data['tokens'])} output tokens", flush=True)
+    if not args.probe:
+        for key, image_path, data in captures:
+            shutil.copy2(image_path, OUT / "images" / f"{key}.jpg")
+            atomic_json(OUT / "data" / f"{key}.json", data)
+        atomic_json(OUT / "data/manifest.json", {
+            "schema": 2, "source": "model", "model": "Qwen2-VL-2B-Instruct",
+            "modelRevision": local_model_revision(args.model),
+            "method": "Greedy generation; merged visual encoder outputs; final language layer attention averaged over 12 heads",
+            "examples": results,
+        })
 
 
 if __name__ == "__main__":

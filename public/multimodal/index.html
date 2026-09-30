@@ -4,14 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>多模态模型 · 看 AI 如何理解图像</title>
-  <meta name="description" content="探索真实的 Qwen 视觉模型如何将图像切块、转换为词元，并在生成每个字时关注图像的不同区域。">
+  <meta name="description" content="逐层查看 Qwen2-VL 如何将真实照片编码为视觉词元，并生成回答。">
   <meta name="theme-color" content="#060d1a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../css/app.css?v=1">
-  <link rel="stylesheet" href="css/multimodal.css?v=1">
+  <link rel="stylesheet" href="../css/lab.css?v=1">
+  <link rel="stylesheet" href="css/multimodal.css?v=2">
 </head>
-<body>
+<body class="mode-pick">
   <canvas id="bg" aria-hidden="true"></canvas>
   <div class="grain" aria-hidden="true"></div>
 
@@ -27,70 +28,51 @@
       <a href="./" class="active">多模态</a>
       <a href="../agent/">智能体</a>
     </nav>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
     <div class="top-actions">
+      <button class="hud-btn mm-mobile-side" id="btnSide" type="button" aria-label="打开照片与提问">照片</button>
       <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
     </div>
   </header>
 
-  <div class="mm-app">
-    <section class="mm-sidebar">
-      <div class="mm-sidebar-content">
-        <div class="mm-title">
-          <h1>多模态模型</h1>
-          <p>看 AI 如何理解图像</p>
-        </div>
-
-        <div class="mm-section">
-          <h3>选择示例</h3>
-          <div class="mm-examples" id="examples"></div>
-        </div>
-
-        <div class="mm-section">
-          <h3>提问</h3>
-          <div class="mm-question" id="question">图片里有什么？</div>
-        </div>
-
-        <div class="mm-section">
-          <h3>模型回答</h3>
-          <div class="mm-response" id="response"></div>
-          <div class="mm-controls">
-            <button class="mm-btn" id="btnPlay" type="button" title="播放">▶</button>
-            <button class="mm-btn" id="btnPrev" type="button" title="上一个字">‹</button>
-            <button class="mm-btn" id="btnNext" type="button" title="下一个字">›</button>
-            <div class="mm-progress">
-              <span id="charPos">0</span> / <span id="charTotal">0</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="mm-section">
-          <h3>当前关注</h3>
-          <div class="mm-info" id="attnInfo">
-            <p class="dim">播放时会显示模型在生成每个字时关注图像的哪些区域</p>
-          </div>
-        </div>
+  <div class="app">
+    <section class="pick" id="pick" aria-label="多模态概览">
+      <div class="pick-in">
+        <div class="eyebrow">MULTIMODAL · 模型运行录像</div>
+        <h1>从照片走进语言模型</h1>
+        <p class="lead" id="lead">正在读取模型记录…</p>
+        <div class="spec" id="spec"></div>
+        <div class="cards" id="cards"></div>
+        <div class="how"><b>怎么看：</b>选择照片后，按 <kbd>＋</kbd> 进入更细的一层，<kbd>−</kbd> 退出，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放。图像词元进入语言模型的自注意力，与文字词元共同计算。</div>
+        <p class="credit" id="credit"></p>
       </div>
     </section>
 
-    <section class="mm-stage">
-      <div class="mm-canvas-wrap">
-        <canvas id="imageCanvas"></canvas>
-        <div id="patchOverlay" class="patch-overlay"></div>
-      </div>
-      <div class="stage-label" id="stageLabel">图像切块</div>
-      <div class="mm-stage-controls">
-        <button class="view-btn active" data-view="patches">切块视图</button>
-        <button class="view-btn" data-view="tokens">词元视图</button>
-        <button class="view-btn" data-view="attention">注意力视图</button>
+    <aside class="side" id="side" aria-label="照片和回答">
+      <div class="side-head"><button class="side-back" id="btnBack" type="button" title="回到概览">‹</button><div><b>Qwen2-VL-2B-Instruct</b><span>真实照片 · 离线录制</span></div></div>
+      <div class="side-body" id="sideBody"></div>
+    </aside>
+
+    <section class="stage lab-stage" id="stage" aria-label="视觉语言模型内部">
+      <div class="view" id="view"></div>
+      <aside class="dbg" id="dbg" aria-label="调试器">
+        <header class="dbg-h"><span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono">Qwen2-VL</span><button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button></header>
+        <div class="dbg-body"><pre class="code" id="code"></pre><div class="dbg-explain" id="explain"></div><div class="dbg-watch" id="watch"></div></div>
+      </aside>
+      <div class="ctl" id="ctl">
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-bar">
+          <div class="ctl-depth"><button class="ctl-btn" id="btnOut" type="button" title="退回上一层">−</button><span class="ctl-dname" id="dname"></span><button class="ctl-btn plus" id="btnIn" type="button" title="进入下一层">＋</button></div>
+          <div class="ctl-play"><button class="ctl-btn" id="btnPrev" type="button" title="上一步">⏮</button><button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停">▶</button><button class="ctl-btn" id="btnNextStep" type="button" title="下一步">⏭</button></div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div><div class="ctl-pos mono" id="pos"></div>
+        </div>
       </div>
     </section>
   </div>
 
-  <div id="tooltip" role="tooltip"></div>
-
   <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
-  <script type="module" src="js/multimodal.js?v=1"></script>
+  <script type="module" src="js/multimodal.js?v=2"></script>
 </body>
 </html>

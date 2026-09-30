@@ -4,7 +4,7 @@
 //   D2 一步训练   取数据 / 前向 / 损失 / 反向 / 裁剪 / AdamW
 //   D3 逐层       前向第 0→3 层；反向第 3→0 层；损失逐位置；AdamW 的每一行公式
 //   D4 一层之内   RMSNorm → 注意力 → ⊕ → RMSNorm → SwiGLU → ⊕（反向：前馈的梯度、注意力的梯度）
-//   D5 头 / 神经元 4 个注意力头各自的注意力矩阵；SwiGLU 的升维 / 门控 / 降维
+//   D5 头 / 神经元 4 个注意力头各自的注意力矩阵；SwiGLU 的升维 / 门控 / 降维及活跃神经元摘要
 
 import { Lab, fetchJSON, fmt, fmtP, heat, linePath } from '../js/lab/core.js';
 import { $, esc } from '../js/ui.js';
@@ -168,7 +168,7 @@ function pcaHTML(s, { w = 420, h = 300 } = {}) {
     const cls = /[，。]/.test(c) ? 'pu' : c.length > 1 ? 'sp' : i < 60 ? 'hi' : '';
     return `<text x="${X(x).toFixed(1)}" y="${Y(y).toFixed(1)}" class="pc ${cls}">${esc(c)}</text>`;
   }).join('');
-  return `<svg class="fit pca" viewBox="0 0 ${w} ${h}">${pts}</svg><p class="note">最常见的 240 个字，每个字的 256 维嵌入向量投影到平面上（坐标轴固定用训练结束时的两个主成分）。一开始是随机的一团；训练中意思相近、用法相近的字慢慢聚到一起。</p>`;
+  return `<svg class="fit pca" viewBox="0 0 ${w} ${h}">${pts}</svg><p class="note">最常见的 240 个字，每个字的 256 维嵌入向量投影到平面上（投影方向固定用训练结束时的两个主成分，每个时刻自动缩放）。一开始是随机的一团；训练中意思相近、用法相近的字慢慢聚到一起。</p>`;
 }
 
 function barsHTML(items, win) {
@@ -420,7 +420,7 @@ function paramsHTML(d, L, filter) {
   const list = d.params.filter((p) => p.name.startsWith(pre) && (!filter || p.name.includes(filter)));
   const mx = Math.max(...list.map((p) => p.g));
   return `<div class="panel"><h3>${L < 0 ? '嵌入表' : `第 ${L} 层`}每个参数矩阵的梯度 <small>‖g‖ · 更新量 ‖Δw‖ / ‖w‖</small></h3><div class="ptab">${list.map((p) => `<div class="pr"><span class="pn">${esc(p.name.replace(pre, '').replace('.weight', ''))}</span><span class="ps">[${p.shape.join('×')}]</span><span class="pb"><i style="width:${((p.g / mx) * 100).toFixed(1)}%"></i></span><span class="pv">${p.g.toExponential(2)}</span><span class="pv">${((p.upd / p.w) * 100).toFixed(3)}%</span></div>`).join('')}</div>
-  <p class="note">每个矩阵每一步只动千分之几。AdamW 按每个权重自己的历史梯度大小来缩放步长，所以梯度小的矩阵也能正常学习。</p></div>`;
+  <p class="note">表中的百分比是这一步更新向量的长度与原权重长度之比，各矩阵数值不同。AdamW 按每个权重自己的历史梯度大小来缩放步长，所以梯度小的矩阵也能正常学习。</p></div>`;
 }
 
 function updTable(d) {
@@ -469,7 +469,7 @@ function adamHTML(d, part) {
     extra = `<div class="panel"><h3>它的 32 个比特 <small>float32 · 1 位符号 · 8 位指数 · 23 位尾数</small></h3>
     <div class="note">更新前 ${a.w.toPrecision(9)}</div>${bitsHTML(a.bitsBefore, a.bitsAfter)}
     <div class="note">更新后 ${a.w1.toPrecision(9)}</div>${bitsHTML(a.bitsAfter, a.bitsBefore)}
-    <p class="note">琥珀框是这一步翻转了的比特。一次更新只动了尾数最后面的一些位：学习就是千万个权重每一步都这样挪动一点点。（推理页的 Qwen3 存成 bfloat16，只有 7 位尾数；训练时通常用 float32 或混合精度，否则这么小的更新会被舍入掉。）</p></div>`;
+    <p class="note">琥珀框是这一步翻转了的比特；比较更新前后，能看到 float32 如何存储这次变化。学习就是数百万个权重每一步各自挪动一点。（推理页的 Qwen3 存成 bfloat16，只有 7 位尾数；训练时通常用 float32 或混合精度，避免小更新被舍入掉。）</p></div>`;
   }
   return `${extra}${trajHTML(d)}<div class="panel"><h3>AdamW 更新这一个权重 <small>第 t = ${a.t} 步 · lr = ${fmt(a.lr, 6)}</small></h3>
   <div class="formula"><div class="${on('m')}">m = 0.9 × <span class="val">${e(a.m0)}</span> + 0.1 × <span class="val">${e(a.g)}</span> = <span class="val">${e(a.m1)}</span></div>
@@ -497,7 +497,7 @@ function sideRender(s) {
   }).join('');
   $('#sideBody').innerHTML = `<div><h4>录制点 · 点一下跳过去</h4><div class="cklist">${list}</div></div>
   <div class="blk"><b>模型</b>：Qwen3ForCausalLM（transformers）· ${run.model.layers} 层 · 隐藏 ${run.model.hidden} · ${run.model.heads} 头 / ${run.model.kvHeads} 组 KV · SwiGLU ${run.model.ffn} · 词表 ${run.model.vocab} · 共 ${(run.model.params / 1e6).toFixed(2)}M 参数。<br><b>训练</b>：AdamW（β=${run.train.betas.join(', ')}，权重衰减 ${run.train.wd}）· 峰值学习率 ${run.train.lr} · 预热 ${run.train.warmup} 步后余弦衰减 · 每批 ${run.train.batch} 首 · 梯度裁剪 ${run.train.clip} · 单卡 RTX 5060 用时 ${Math.round(run.elapsed)} 秒。</div>`;
-  $('#sideBody').querySelectorAll('.ckl').forEach((b) => b.addEventListener('click', () => { lab.tree.pause(); lab.tree.seekRoot(run.detail.indexOf(Number(b.dataset.step)), lab.tree.depth); }));
+  $('#sideBody').querySelectorAll('.ckl').forEach((b) => b.addEventListener('click', () => { lab.tree.pause(); lab.tree.seekRoot(run.detail.indexOf(Number(b.dataset.step)), lab.tree.depth); document.body.classList.remove('side-open'); $('#btnSideOpen').setAttribute('aria-expanded', 'false'); }));
   $('#sideBody').querySelector('.ckl.on')?.scrollIntoView({ block: 'nearest' });
 }
 
@@ -572,8 +572,8 @@ async function boot() {
     return;
   }
   const last = run.detail[run.detail.length - 1];
-  const l0 = run.log.loss[0], lN = run.val[run.val.length - 1][1];
-  $('#lead').innerHTML = `下面是一次<b>真实的训练</b>：用 transformers 的 <b>Qwen3ForCausalLM</b>（和推理页 Qwen3-0.6B 同一套结构，缩小到 4 层 · 256 维 · ${(run.model.params / 1e6).toFixed(1)}M 参数），从随机初始化开始，在 ${run.data.poems.toLocaleString()} 首唐代五言诗上训练 ${run.train.steps} 步。损失从 ${l0.toFixed(2)} 降到验证集 ${lN.toFixed(2)}。我们录下了 ${run.detail.length} 个时刻的每一个中间量。`;
+  const v0 = run.val[0][1], vN = run.val[run.val.length - 1][1];
+  $('#lead').innerHTML = `下面是一次<b>真实的训练</b>：用 transformers 的 <b>Qwen3ForCausalLM</b>（和推理页 Qwen3-0.6B 同一套结构，缩小到 4 层 · 256 维 · ${(run.model.params / 1e6).toFixed(1)}M 参数），从随机初始化开始，在 ${run.data.poems.toLocaleString()} 首唐代五言诗上训练 ${run.train.steps} 步。验证损失从 ${v0.toFixed(2)} 降到 ${vN.toFixed(2)}。我们在 ${run.detail.length} 个时刻录下逐层、逐位置以及选定权重的数值。`;
   $('#spec').innerHTML = `<span>架构 <b>Qwen3 · ${run.model.layers} 层</b></span><span>隐藏 <b>${run.model.hidden}</b></span><span>注意力 <b>${run.model.heads} 头 / ${run.model.kvHeads} 组 KV</b></span><span>SwiGLU <b>${run.model.ffn}</b></span><span>词表 <b>${run.model.vocab} 字</b></span><span>优化器 <b>AdamW</b></span><span>批大小 <b>${run.train.batch}</b></span><span>用时 <b>${Math.round(run.elapsed)} 秒</b></span>`;
   const pickSteps = [1, 300, 1000, last];
   $('#cards').innerHTML = pickSteps.map((st) => {
@@ -585,7 +585,7 @@ async function boot() {
   lab = new Lab({
     roots: run.detail.map((s) => ({ t: 'ck', s, label: `第 ${s} 步`, crumb: `第 ${s} 步`, dur: 2.4, kids: () => phases(s) })),
     maxDepth: 5,
-    depthNames: ['', '训练全程', '一步训练', '逐层', '一层之内', '头 / 神经元'],
+    depthNames: ['', '训练全程', '一步训练', '逐层', '一层之内', '头 / 活跃神经元'],
     code: CODE,
     explain,
     render,
@@ -595,12 +595,16 @@ async function boot() {
   window.__lab = lab;
 
   const enter = (st) => {
+    document.body.classList.remove('side-open');
+    $('#btnSideOpen').setAttribute('aria-expanded', 'false');
     document.body.classList.replace('mode-pick', 'mode-inspect');
     lab.tree.seekRoot(Math.max(0, run.detail.indexOf(st)), 1);
     Promise.all(run.detail.map(loadStep)).catch(() => {});
   };
   $('#cards').addEventListener('click', (e) => { const c = e.target.closest('.card'); if (c) enter(Number(c.dataset.step)); });
-  $('#btnBack').addEventListener('click', () => { lab.tree.pause(); document.body.classList.replace('mode-inspect', 'mode-pick'); });
+  $('#btnSideOpen').addEventListener('click', () => { document.body.classList.add('side-open'); $('#btnSideOpen').setAttribute('aria-expanded', 'true'); });
+  $('#btnSideClose').addEventListener('click', () => { document.body.classList.remove('side-open'); $('#btnSideOpen').setAttribute('aria-expanded', 'false'); });
+  $('#btnBack').addEventListener('click', () => { lab.tree.pause(); document.body.classList.remove('side-open'); document.body.classList.replace('mode-inspect', 'mode-pick'); });
   const want = new URLSearchParams(location.search).get('step');
   if (want) enter(Number(want));
 }

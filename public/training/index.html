@@ -10,7 +10,7 @@
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="../css/app.css?v=2">
   <link rel="stylesheet" href="../css/lab.css?v=1">
-  <link rel="stylesheet" href="training.css?v=1">
+  <link rel="stylesheet" href="training.css?v=2">
 </head>
 <body class="mode-pick">
   <canvas id="bg" aria-hidden="true"></canvas>
@@ -42,7 +42,7 @@
         <div class="how">
           <b>怎么看：</b>选一个时刻进入后，和推理页一样用调试器一层层往里钻。
           <kbd>＋</kbd> 单步进入更细的一层，<kbd>−</kbd> 跳出，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放。
-          <br>D1 训练全程（31 个录制点）→ D2 一步训练（取数据 / 前向 / 损失 / 反向 / 裁剪 / 更新）→ D3 逐层（前向第 0→3 层、反向第 3→0 层、AdamW 的每一行）→ D4 一层之内的算子 → D5 注意力的每个头、前馈的每个神经元。
+          <br>D1 训练全程（31 个录制点）→ D2 一步训练（取数据 / 前向 / 损失 / 反向 / 裁剪 / 更新）→ D3 逐层（前向第 0→3 层、反向第 3→0 层、AdamW 的每一行）→ D4 一层之内的算子 → D5 每个注意力头、前馈中录下的活跃神经元。
         </div>
         <p class="credit" id="credit"></p>
       </div>
@@ -52,11 +52,13 @@
       <div class="side-head">
         <button class="side-back" id="btnBack" type="button" title="回到概览">‹</button>
         <div><b>从零训练 · 五言诗</b><span id="sideSub">Qwen3 架构 · 4 层 · 256 维</span></div>
+        <button class="side-close" id="btnSideClose" type="button" title="关闭录制点列表" aria-label="关闭录制点列表">×</button>
       </div>
       <div class="side-body" id="sideBody"></div>
     </aside>
 
     <section class="stage lab-stage" id="stage" aria-label="训练过程">
+      <button class="side-open-btn" id="btnSideOpen" type="button" aria-label="打开录制点列表" aria-controls="side" aria-expanded="false">☰ <span>录制点</span></button>
       <div class="view" id="view"></div>
 
       <aside class="dbg" id="dbg" aria-label="调试器">
@@ -92,6 +94,6 @@
   </div>
 
   <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
-  <script type="module" src="training.js?v=1"></script>
+  <script type="module" src="training.js?v=2"></script>
 </body>
 </html>

@@ -1,542 +1,139 @@
-/**
- * 多模态模型可视化 - 使用真实的Qwen2-VL模型数据
- *
- * 数据来源：tools/export_multimodal.py 导出的真实模型数据
- * - 14×14 图像patch切分
- * - Vision Transformer的patch embeddings（768维）
- * - 逐字符生成时对各个patch的真实注意力权重
- * - 真实的问答对和模型输出
- */
-
-import { Background } from '../../js/bg.js';
+// Qwen2-VL recording viewer. Only schema 2 model captures are accepted.
+import { Lab, fetchJSON } from '../../js/lab/core.js';
+import { $, esc } from '../../js/ui.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
-import { $ } from '../../js/ui.js';
 
-// 示例数据 - 从manifest.json加载
-let EXAMPLES = [];
-let MANIFEST = null;
+const DATA = new Map();
+const CODE = [
+  'image = load(photo)',
+  'pixels, grid = processor(image)',
+  'patches = vision.patch_embed(pixels)  # 14px raw patches',
+  'vision_tokens = vision.merge(patches) # 2×2 spatial merge',
+  'sequence = [text, image_tokens, question]',
+  'for layer in language_model.layers:',
+  '    sequence = self_attention(sequence)',
+  '    sequence = feed_forward(sequence)',
+  'answer_token = greedy_decode(sequence)',
+];
+let lab;
 
-// 加载示例数据清单
-async function loadManifest() {
+function assertCapture(d) {
+  if (d.schema !== 2 || d.source !== 'model' || !Array.isArray(d.tokens) || !d.tokens.length) throw new Error('需要 schema 2 真实模型记录');
+  if (d.patches.length !== d.grid.rows * d.grid.cols) throw new Error('视觉词元网格不匹配');
+  for (const t of d.tokens) {
+    if (t.weights.length !== d.patches.length || t.weights.some(w => !Number.isFinite(w) || w < 0)) throw new Error('注意力数据不完整');
+    if (!Array.isArray(t.heads) || t.heads.length !== d.attention.heads || t.heads.some(h => h.weights.length !== d.patches.length)) throw new Error('注意力头数据不完整');
+  }
+  return d;
+}
+
+const get = n => DATA.get(n?.key);
+const leaf = (t, label, extra = {}) => ({ t, label, dur: 1.4, ...extra });
+function roots(examples) {
+  return examples.map(ex => leaf('photo', ex.name, {
+    key: ex.id, crumb: ex.name, dur: 2.4,
+    kids: () => [
+      leaf('pixels', '照片与预处理', { key: ex.id, kids: () => [leaf('raw', '原始照片', { key: ex.id }), leaf('grid', '动态切块网格', { key: ex.id })] }),
+      leaf('vision', '视觉编码器', { key: ex.id, kids: () => DATA.get(ex.id).patches.map(p => leaf('patch', `视觉词元 #${p.id}`, { key: ex.id, patch: p.id })) }),
+      leaf('fusion', '进入语言模型', { key: ex.id, kids: () => [leaf('sequence', '图像词元与文字词元', { key: ex.id }), leaf('self', '共享自注意力', { key: ex.id })] }),
+      leaf('answer', '逐词元生成回答', { key: ex.id, kids: () => DATA.get(ex.id).tokens.map((t, i) => leaf('token', `${i + 1} · ${t.text || '空白'}`, { key: ex.id, token: i, crumb: `词元 ${i + 1}`, kids: () => [leaf('heat', '12 头平均注意力', { key: ex.id, token: i }), ...Array.from({ length: DATA.get(ex.id).attention.heads }, (_, h) => leaf('head', `注意力头 ${h}`, { key: ex.id, token: i, head: h })), leaf('vector', '视觉最终特征', { key: ex.id, token: i })] })) }),
+    ],
+  }));
+}
+
+function focus(path) {
+  for (let i = path.length - 1; i >= 0; i--) if (path[i].token != null) return path[i].token;
+  return 0;
+}
+function chosenPatch(path) {
+  for (let i = path.length - 1; i >= 0; i--) if (path[i].patch != null) return path[i].patch;
+  return null;
+}
+
+function side(d, node, path) {
+  const idx = focus(path);
+  const shown = node.t === 'answer' ? 0 : ['token', 'heat', 'head', 'vector'].includes(node.t) ? idx + 1 : 0;
+  const text = shown ? d.tokens.slice(0, shown).map(t => t.text).join('') : '';
+  $('#sideBody').innerHTML = `<img class="mm-side-photo" src="${esc(d.image)}" alt="${esc(d.name)}">
+    <div><h4>提问</h4><div class="blk">${esc(d.question)}</div></div>
+    <div><h4>模型回答 · ${shown}/${d.tokens.length} 词元</h4><div class="blk mm-answer">${esc(text || '按 ＋ 进入逐词元生成步骤')}</div></div>
+    <div><h4>来源</h4><div class="blk mm-source">Qwen2-VL-2B-Instruct · 贪心解码<br>照片 SHA-256：<code title="${esc(d.imageSha256)}">${esc(d.imageSha256.slice(0, 16))}…</code><br>视觉网格 ${d.grid.rows}×${d.grid.cols} · 每个融合词元 ${d.grid.featureDim} 维</div></div>`;
+}
+
+function picture(d, weights = null, selected = null) {
+  const { rows, cols } = d.grid;
+  const max = weights ? Math.max(...weights) : 0;
+  const cells = d.patches.map(p => {
+    const w = weights?.[p.id] || 0;
+    const alpha = weights && max > 0 ? Math.min(.65, .06 + .59 * w / max) : 0;
+    return `<button class="mm-cell ${p.id === selected ? 'on' : ''}" type="button" data-patch="${p.id}" style="--heat:${alpha}" title="视觉词元 #${p.id} · 行 ${p.row} 列 ${p.col}${weights ? ` · 图像内注意力 ${(w * 100).toFixed(2)}%` : ''}"></button>`;
+  }).join('');
+  return `<div class="mm-photo-frame"><img src="${esc(d.image)}" alt="${esc(d.name)}"><div class="mm-grid" style="grid-template-columns:repeat(${cols},1fr);grid-template-rows:repeat(${rows},1fr)">${cells}</div></div>`;
+}
+
+function feature(d, patchIndex) {
+  const p = d.patches[patchIndex];
+  if (!p) return '';
+  return `<div class="mm-feature"><b>视觉词元 #${p.id}</b><span>网格 ${p.row}, ${p.col}</span><span>向量维度 ${d.grid.featureDim}</span><span>范数 ${p.norm.toFixed(3)}</span><small>前 12 个实测分量</small><code>${p.head.map(x => x.toFixed(3)).join('  ')}</code></div>`;
+}
+
+function render(n, path) {
+  const d = get(n);
+  if (!d) return;
+  side(d, n, path);
+  const tokenIndex = focus(path), token = d.tokens[tokenIndex];
+  const heat = ['token', 'heat', 'head', 'vector'].includes(n.t);
+  const weights = n.t === 'head' ? token.heads[n.head].weights : heat ? token.weights : null;
+  const selected = chosenPatch(path);
+  const top = weights ? weights.map((w, i) => [i, w]).sort((a, b) => b[1] - a[1]).slice(0, 4) : [];
+  let heading = { photo: '从真实照片开始', pixels: '照片与动态分辨率', raw: '原始照片', grid: '图像切块', vision: '视觉编码器最终输出', patch: `视觉词元 #${selected}`, fusion: '图像与文字汇合', sequence: '共同进入语言序列', self: '语言模型自注意力', answer: '逐词元生成回答', token: `生成词元 ${tokenIndex + 1}`, heat: '最后一层 · 12 头平均', head: `最后一层 · 注意力头 ${n.head}`, vector: '视觉最终向量' }[n.t];
+  let detail = '';
+  if (n.t === 'grid' || n.t === 'pixels') detail = `原图 ${d.originalSize.join('×')} 像素，模型预处理为 ${d.processedSize.join('×')} 像素；先切成 ${d.grid.rawRows}×${d.grid.rawCols} 个 14 像素原始块，再每 2×2 块合并为 ${d.grid.rows}×${d.grid.cols} 个视觉词元。网格来自这次实际模型输入。`;
+  else if (n.t === 'vision' || n.t === 'patch') detail = `这里只录制视觉编码器最终输出：${d.patches.length} 个 ${d.grid.featureDim} 维向量；不包含 ViT 中间层。点击网格单元查看实测向量的范数与前 12 维。`;
+  else if (n.t === 'fusion' || n.t === 'sequence' || n.t === 'self') detail = 'Qwen2-VL 把视觉编码器输出放入语言词元序列；文字与图像词元在语言模型的自注意力中交互。';
+  else if (n.t === 'answer') detail = `模型以贪心解码生成 ${d.tokens.length} 个词元。进入下一层可逐个看词元及其图像注意力。`;
+  else if (heat) detail = `当前词元「${esc(token.text)}」ID ${token.id}。语言模型最后一层第 ${d.attention.layer} 层${n.t === 'head' ? `注意力头 ${n.head}` : ` ${d.attention.heads} 个头的均值`}；仅在图像词元内部归一化。原始图像注意力质量 ${((n.t === 'head' ? token.heads[n.head].imageAttentionMass : token.imageAttentionMass) * 100).toFixed(2)}%。热区不能直接当作因果解释。`;
+  $('#view').innerHTML = `<div class="panel mm-main"><h3>${heading}<small>${d.name} · ${d.grid.rows}×${d.grid.cols} 视觉词元</small></h3><p class="note">${detail}</p>${picture(d, weights, selected)}</div>
+    <div class="panel mm-readout"><h3>${heat ? '关注区域' : '步骤数据'}<small>MODEL TRACE</small></h3>${heat ? `<div class="mm-top">${top.map(([i,w],rank) => `<button type="button" data-patch="${i}"><span>${rank + 1} · 词元 #${i}</span><b>${(w * 100).toFixed(2)}%</b></button>`).join('')}</div>` : `<div class="kv"><span class="k">原图</span><span class="v">${d.originalSize.join(' × ')} px</span><span class="k">原始切块</span><span class="v">${d.grid.rawRows} × ${d.grid.rawCols}</span><span class="k">融合词元</span><span class="v">${d.patches.length}</span></div>`}<div id="mmFeature">${feature(d, selected ?? top[0]?.[0] ?? 0)}</div></div>`;
+  $('#view').querySelectorAll('[data-patch]').forEach(b => b.addEventListener('click', () => {
+    const i = Number(b.dataset.patch);
+    $('#mmFeature').innerHTML = feature(d, i);
+    $('#view').querySelectorAll('.mm-cell').forEach(c => c.classList.toggle('on', Number(c.dataset.patch) === i));
+  }));
+}
+
+function explain(n, path) {
+  const d = get(n); if (!d) return {};
+  const lines = { photo:[1], pixels:[2], raw:[1], grid:[3], vision:[3,4], patch:[4], fusion:[5], sequence:[5], self:[6,7,8], answer:[9], token:[7,9], heat:[7], head:[7], vector:[4] }[n.t] || [];
+  const token = d.tokens[focus(path)];
+  return { lines, shape: n.t === 'patch' || n.t === 'vision' ? `[${d.patches.length}, ${d.grid.featureDim}]` : ['token', 'heat', 'head'].includes(n.t) ? `[${d.patches.length}]` : '',
+    html: `<p>${n.t === 'self' ? '视觉词元和文本词元共用语言模型的自注意力。' : n.t === 'heat' ? '图像热力图取语言模型最后一层所有注意力头的均值。' : n.t === 'head' ? `单独查看第 ${n.head} 个头到图像词元的实测注意力。` : '图像和回答均来自同一次离线模型运行。'}</p>`,
+    watch: [['照片', d.name], ['网格', `${d.grid.rows}×${d.grid.cols}`], ['向量维度', d.grid.featureDim], ...(['token', 'heat', 'head'].includes(n.t) ? [['当前词元', token.text], ['token ID', token.id], ['图像注意力质量', `${((n.t === 'head' ? token.heads[n.head].imageAttentionMass : token.imageAttentionMass) * 100).toFixed(2)}%`]] : [])] };
+}
+
+async function boot() {
+  const sound = $('#btnSound');
+  const renderSound = () => { sound.classList.toggle('on', soundOn()); sound.setAttribute('aria-pressed', String(soundOn())); };
+  sound.addEventListener('click', () => { setSound(!soundOn()); renderSound(); sfx.click(); }); renderSound();
+  $('#btnSide').addEventListener('click', () => document.body.classList.toggle('side-open'));
+  $('#btnBack').addEventListener('click', () => { if (document.body.classList.contains('side-open')) document.body.classList.remove('side-open'); else { lab?.tree.pause(); document.body.classList.replace('mode-inspect', 'mode-pick'); } });
   try {
-    const response = await fetch('data/manifest.json');
-    if (!response.ok) throw new Error('Failed to load manifest');
-    MANIFEST = await response.json();
-
-    // 将manifest中的示例转换为EXAMPLES格式（暂不加载详细数据）
-    EXAMPLES = MANIFEST.examples.map(ex => ({
-      id: ex.id,
-      name: ex.name,
-      image: ex.image,
-      question: ex.question,
-      answer: ex.answer,
-      dataFile: ex.dataFile,
-      // 详细数据稍后按需加载
-      patches: null,
-      attention: null
-    }));
-
-    return true;
-  } catch (err) {
-    console.error('Failed to load manifest:', err);
-    return false;
+    const manifest = await fetchJSON('data/manifest.json');
+    if (manifest.schema !== 2 || manifest.source !== 'model') throw new Error('现有数据是旧版模拟数据，尚未录制真实模型数据');
+    const examples = manifest.examples;
+    await Promise.all(examples.map(async ex => DATA.set(ex.id, assertCapture(await fetchJSON(`data/${ex.dataFile}`)))));
+    $('#lead').innerHTML = `用 <b>${esc(manifest.model)}</b> 对真实照片提问，打开一次实际推理记录：图像切块、视觉编码器输出、图文词元的自注意力，以及逐词元回答。`;
+    $('#spec').innerHTML = `<span>视觉块 <b>14 px</b></span><span>空间融合 <b>2×2</b></span><span>语言层 <b>28</b></span><span>照片 <b>${examples.length} 张</b></span>`;
+    $('#cards').innerHTML = examples.map(ex => `<button class="card" type="button" data-id="${esc(ex.id)}"><span class="tag">真实照片 · ${ex.grid.rows}×${ex.grid.cols} 视觉词元</span><img src="${esc(ex.image)}" alt="${esc(ex.name)}"><h3>${esc(ex.name)}</h3><p>${esc(ex.question)}</p><span class="go">打开模型运行 →</span></button>`).join('');
+    $('#credit').textContent = '来源：tools/export_multimodal.py 录制；照片 SHA-256、模型输出、视觉向量与最后一层语言注意力保存在每个示例 JSON 中。';
+    lab = new Lab({ roots: roots(examples), maxDepth: 4, depthNames: ['', '照片', '处理流程', '视觉 / 生成词元', '词元细节'], code: CODE, explain, render, onExit: () => document.body.classList.replace('mode-inspect', 'mode-pick') });
+    $('#cards').addEventListener('click', e => { const card = e.target.closest('[data-id]'); if (!card) return; document.body.classList.replace('mode-pick', 'mode-inspect'); document.body.classList.remove('side-open'); lab.tree.seekRoot(examples.findIndex(x => x.id === card.dataset.id), 1); });
+  } catch (error) {
+    $('#lead').textContent = `真实模型记录暂不可用：${error.message}`;
+    $('#spec').textContent = '当前数据不会作为真实注意力展示。';
+    $('#cards').innerHTML = '';
+    $('#credit').textContent = '需要先运行 tools/export_multimodal.py，完成真实模型录制。';
+    console.error(error);
   }
 }
-
-// 加载单个示例的详细数据
-async function loadExampleData(example) {
-  if (example.patches && example.attention) {
-    // 已经加载过了
-    return example;
-  }
-
-  try {
-    const response = await fetch(`data/${example.dataFile}`);
-    if (!response.ok) throw new Error(`Failed to load ${example.dataFile}`);
-    const data = await response.json();
-
-    // 更新示例数据
-    example.patches = data.patches;
-    example.attention = data.attention;
-
-    return example;
-  } catch (err) {
-    console.error(`Failed to load example data for ${example.id}:`, err);
-    // 使用fallback数据
-    example.patches = generateMockPatches(14, 14);
-    example.attention = generateMockAttention(14, 14, example.answer);
-    return example;
-  }
-}
-
-// 生成模拟的图像切块数据（fallback）
-function generateMockPatches(rows, cols) {
-  const patches = [];
-  for (let i = 0; i < rows; i++) {
-    for (let j = 0; j < cols; j++) {
-      patches.push({
-        id: i * cols + j,
-        row: i,
-        col: j,
-        embedding: Array(768).fill(0).map(() => Math.random() * 2 - 1)
-      });
-    }
-  }
-  return patches;
-}
-
-// 生成模拟的注意力数据
-function generateMockAttention(rows, cols, answer) {
-  const chars = answer.split('');
-  const totalPatches = rows * cols;
-  const attention = [];
-
-  chars.forEach((char, charIdx) => {
-    const weights = [];
-    // 为每个字符生成对所有patch的注意力权重
-    for (let i = 0; i < totalPatches; i++) {
-      // 根据字符位置，关注不同的区域
-      const row = Math.floor(i / cols);
-      const col = i % cols;
-
-      // 模拟：不同字符关注不同区域
-      let weight = 0;
-      if (charIdx < chars.length / 3) {
-        // 前部分关注左上
-        weight = Math.exp(-((row - 3) ** 2 + (col - 3) ** 2) / 20);
-      } else if (charIdx < chars.length * 2 / 3) {
-        // 中部分关注中间
-        weight = Math.exp(-((row - rows/2) ** 2 + (col - cols/2) ** 2) / 20);
-      } else {
-        // 后部分关注右下
-        weight = Math.exp(-((row - rows + 3) ** 2 + (col - cols + 3) ** 2) / 20);
-      }
-      weight += Math.random() * 0.1;
-      weights.push(weight);
-    }
-
-    // 归一化
-    const sum = weights.reduce((a, b) => a + b, 0);
-    const normalized = weights.map(w => w / sum);
-
-    attention.push({
-      char,
-      charIdx,
-      weights: normalized
-    });
-  });
-
-  return attention;
-}
-
-class MultimodalApp {
-  constructor() {
-    this.currentExample = null;
-    this.currentView = 'patches';
-    this.currentCharIdx = -1;
-    this.playing = false;
-    this.playTimer = null;
-
-    this.canvas = $('#imageCanvas');
-    this.ctx = this.canvas.getContext('2d');
-    this.patchOverlay = $('#patchOverlay');
-
-    this.init();
-  }
-
-  async init() {
-    new Background($('#bg'));
-
-    // 加载数据清单
-    const loaded = await loadManifest();
-    if (!loaded || EXAMPLES.length === 0) {
-      console.error('Failed to load examples');
-      return;
-    }
-
-    // 绑定声音按钮
-    const sb = $('#btnSound');
-    const renderSound = () => {
-      sb.classList.toggle('on', soundOn());
-      sb.setAttribute('aria-pressed', soundOn());
-      sb.title = soundOn() ? '关闭声音' : '打开声音';
-    };
-    sb.addEventListener('click', () => {
-      setSound(!soundOn());
-      renderSound();
-      sfx.click();
-    });
-    renderSound();
-
-    // 渲染示例列表
-    this.renderExamples();
-
-    // 绑定控制按钮
-    $('#btnPlay').addEventListener('click', () => this.togglePlay());
-    $('#btnPrev').addEventListener('click', () => this.prevChar());
-    $('#btnNext').addEventListener('click', () => this.nextChar());
-
-    // 绑定视图切换
-    document.querySelectorAll('.view-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.switchView(btn.dataset.view);
-      });
-    });
-
-    // 加载第一个示例
-    await this.loadExample(EXAMPLES[0]);
-  }
-
-  renderExamples() {
-    const container = $('#examples');
-    container.innerHTML = EXAMPLES.map((ex, idx) => `
-      <div class="mm-example ${idx === 0 ? 'active' : ''}" data-id="${ex.id}">
-        <div class="mm-example-label">${ex.name}</div>
-      </div>
-    `).join('');
-
-    // 绑定点击事件
-    container.querySelectorAll('.mm-example').forEach((elem, idx) => {
-      elem.addEventListener('click', () => {
-        this.loadExample(EXAMPLES[idx]);
-      });
-    });
-  }
-
-  async loadExample(example) {
-    this.stopPlay();
-
-    // 加载详细数据
-    await loadExampleData(example);
-
-    this.currentExample = example;
-    this.currentCharIdx = -1;
-
-    // 更新选中状态
-    document.querySelectorAll('.mm-example').forEach(elem => {
-      elem.classList.toggle('active', elem.dataset.id === example.id);
-    });
-
-    // 更新问题
-    $('#question').textContent = example.question;
-
-    // 更新回答
-    this.renderResponse();
-
-    // 加载图片
-    await this.loadImage(example.image);
-
-    // 更新视图
-    this.updateView();
-  }
-
-  loadImage(src) {
-    return new Promise((resolve, reject) => {
-      // 尝试加载真实图片，失败则使用占位符
-      const img = new Image();
-      img.onload = () => {
-        this.drawImage(img);
-        resolve();
-      };
-      img.onerror = (err) => {
-        console.error('Failed to load image:', src, err);
-        // 创建占位符
-        this.drawPlaceholder();
-        resolve();
-      };
-      // 确保路径相对于HTML文档，而不是当前模块
-      // 从模块路径 js/multimodal.js 回到 multimodal/ 目录
-      img.src = new URL(`../${src}`, import.meta.url).href;
-    });
-  }
-
-  drawImage(img) {
-    const maxWidth = 800;
-    const maxHeight = 600;
-    let width = img.width;
-    let height = img.height;
-
-    // 保持宽高比缩放
-    if (width > maxWidth) {
-      height = (height * maxWidth) / width;
-      width = maxWidth;
-    }
-    if (height > maxHeight) {
-      width = (width * maxHeight) / height;
-      height = maxHeight;
-    }
-
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.ctx.drawImage(img, 0, 0, width, height);
-
-    this.imageWidth = width;
-    this.imageHeight = height;
-  }
-
-  drawPlaceholder() {
-    const width = 640;
-    const height = 480;
-    this.canvas.width = width;
-    this.canvas.height = height;
-
-    // 绘制渐变背景
-    const gradient = this.ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, '#1a2847');
-    gradient.addColorStop(1, '#0f1829');
-    this.ctx.fillStyle = gradient;
-    this.ctx.fillRect(0, 0, width, height);
-
-    // 绘制网格
-    this.ctx.strokeStyle = 'rgba(94, 240, 212, 0.1)';
-    this.ctx.lineWidth = 1;
-    const gridSize = 40;
-    for (let x = 0; x <= width; x += gridSize) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, 0);
-      this.ctx.lineTo(x, height);
-      this.ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += gridSize) {
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, y);
-      this.ctx.lineTo(width, y);
-      this.ctx.stroke();
-    }
-
-    // 绘制文字
-    this.ctx.fillStyle = 'rgba(94, 240, 212, 0.6)';
-    this.ctx.font = '24px "JetBrains Mono", monospace';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('示例图片', width / 2, height / 2);
-
-    this.imageWidth = width;
-    this.imageHeight = height;
-  }
-
-  renderResponse() {
-    if (!this.currentExample) return;
-
-    const response = $('#response');
-    const answer = this.currentExample.answer;
-    response.innerHTML = answer.split('').map((char, idx) =>
-      `<span class="char ${idx <= this.currentCharIdx ? 'shown' : ''} ${idx === this.currentCharIdx ? 'current' : ''}">${char}</span>`
-    ).join('');
-
-    $('#charPos').textContent = Math.max(0, this.currentCharIdx + 1);
-    $('#charTotal').textContent = answer.length;
-  }
-
-  switchView(view) {
-    this.currentView = view;
-    document.querySelectorAll('.view-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === view);
-    });
-
-    const labels = {
-      patches: '图像切块',
-      tokens: '词元视图',
-      attention: '注意力视图'
-    };
-    $('#stageLabel').textContent = labels[view];
-
-    this.updateView();
-  }
-
-  updateView() {
-    if (!this.currentExample) return;
-
-    this.patchOverlay.innerHTML = '';
-
-    if (this.currentView === 'patches') {
-      this.renderPatches();
-    } else if (this.currentView === 'tokens') {
-      this.renderTokens();
-    } else if (this.currentView === 'attention') {
-      this.renderAttention();
-    }
-  }
-
-  renderPatches() {
-    const { patches } = this.currentExample;
-    const rows = 14;
-    const cols = 14;
-    const patchWidth = this.imageWidth / cols;
-    const patchHeight = this.imageHeight / rows;
-
-    patches.forEach(patch => {
-      const div = document.createElement('div');
-      div.className = 'patch';
-      div.style.left = `${patch.col * patchWidth}px`;
-      div.style.top = `${patch.row * patchHeight}px`;
-      div.style.width = `${patchWidth}px`;
-      div.style.height = `${patchHeight}px`;
-
-      const label = document.createElement('div');
-      label.className = 'patch-label';
-      label.textContent = patch.id;
-      div.appendChild(label);
-
-      div.addEventListener('mouseenter', (e) => this.showPatchTooltip(patch, e));
-      div.addEventListener('mouseleave', () => this.hideTooltip());
-
-      this.patchOverlay.appendChild(div);
-    });
-  }
-
-  renderTokens() {
-    // 在token视图中显示图像块转换为词元的过程
-    const info = $('#attnInfo');
-    info.innerHTML = `
-      <p style="color: var(--ink2); margin: 8px 0;">
-        <strong>词元化过程：</strong><br>
-        1. 图像被切分为 14×14 = 196 个块<br>
-        2. 每个块通过视觉编码器生成 768 维嵌入<br>
-        3. 这些嵌入作为词元输入语言模型<br>
-        4. 加上文本词元，共同参与注意力计算
-      </p>
-    `;
-
-    this.renderPatches();
-  }
-
-  renderAttention() {
-    if (this.currentCharIdx < 0) {
-      $('#attnInfo').innerHTML = '<p class="dim">开始播放以查看注意力分布</p>';
-      return;
-    }
-
-    const { attention, patches } = this.currentExample;
-    const charAttn = attention[this.currentCharIdx];
-
-    if (!charAttn) return;
-
-    const rows = 14;
-    const cols = 14;
-    const patchWidth = this.imageWidth / cols;
-    const patchHeight = this.imageHeight / rows;
-
-    // 找出权重最高的几个patch
-    const topPatches = charAttn.weights
-      .map((w, i) => ({ weight: w, idx: i }))
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 5);
-
-    // 渲染所有patch，高亮注意力高的
-    patches.forEach(patch => {
-      const weight = charAttn.weights[patch.id];
-      const isTop = topPatches.some(p => p.idx === patch.id);
-
-      const div = document.createElement('div');
-      div.className = 'patch' + (isTop ? ' highlight' : '');
-      div.style.left = `${patch.col * patchWidth}px`;
-      div.style.top = `${patch.row * patchHeight}px`;
-      div.style.width = `${patchWidth}px`;
-      div.style.height = `${patchHeight}px`;
-
-      if (isTop) {
-        div.style.opacity = 0.3 + weight * 0.7;
-      } else {
-        div.style.opacity = 0.1 + weight * 0.2;
-      }
-
-      this.patchOverlay.appendChild(div);
-    });
-
-    // 显示注意力信息
-    $('#attnInfo').innerHTML = `
-      <p style="color: var(--ink2); margin: 0 0 8px 0;">
-        <strong>生成字符：</strong><span class="attn-value">"${charAttn.char}"</span>
-      </p>
-      <p style="color: var(--dim); font-size: 12px; margin: 0 0 8px 0;">
-        注意力最集中的图像区域：
-      </p>
-      ${topPatches.map((p, i) => {
-        const patch = patches[p.idx];
-        return `<div class="patch-info" style="margin: 4px 0; font-size: 12px;">
-          <span style="color: var(--amber);">块 ${p.idx}</span>
-          (行${patch.row}, 列${patch.col})
-          <span class="attn-value">${(p.weight * 100).toFixed(1)}%</span>
-        </div>`;
-      }).join('')}
-    `;
-  }
-
-  showPatchTooltip(patch, e) {
-    const tip = $('#tooltip');
-    tip.innerHTML = `
-      <span class="k">图像块 #${patch.id}</span>
-      位置：第 ${patch.row} 行，第 ${patch.col} 列<br>
-      嵌入维度：<span class="v">768</span>
-    `;
-    tip.classList.add('on');
-
-    const r = tip.getBoundingClientRect();
-    let x = e.clientX + 16;
-    let y = e.clientY + 16;
-    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 16;
-    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 12;
-    tip.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
-  }
-
-  hideTooltip() {
-    $('#tooltip').classList.remove('on');
-  }
-
-  togglePlay() {
-    if (this.playing) {
-      this.stopPlay();
-    } else {
-      this.startPlay();
-    }
-  }
-
-  startPlay() {
-    this.playing = true;
-    $('#btnPlay').textContent = '⏸';
-
-    if (this.currentCharIdx >= this.currentExample.answer.length - 1) {
-      this.currentCharIdx = -1;
-    }
-
-    this.playTimer = setInterval(() => {
-      this.nextChar();
-      if (this.currentCharIdx >= this.currentExample.answer.length - 1) {
-        this.stopPlay();
-      }
-    }, 500);
-
-    sfx.click();
-  }
-
-  stopPlay() {
-    this.playing = false;
-    $('#btnPlay').textContent = '▶';
-    if (this.playTimer) {
-      clearInterval(this.playTimer);
-      this.playTimer = null;
-    }
-  }
-
-  nextChar() {
-    if (this.currentCharIdx < this.currentExample.answer.length - 1) {
-      this.currentCharIdx++;
-      this.renderResponse();
-      this.updateView();
-      sfx.tick();
-    }
-  }
-
-  prevChar() {
-    if (this.currentCharIdx > -1) {
-      this.currentCharIdx--;
-      this.renderResponse();
-      this.updateView();
-      sfx.tick();
-    }
-  }
-}
-
-// 启动应用
-new MultimodalApp();
+boot();

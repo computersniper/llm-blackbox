@@ -1,5 +1,13 @@
 /* 训练页 */
 
+.side-open-btn, .side-close { display: none; }
+@media (max-width: 900px) {
+  .side-open-btn { display: flex; position: absolute; z-index: 4; top: 10px; left: 12px; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line2); border-radius: 9px; background: var(--panel); color: var(--acc); font: 12px var(--sans); cursor: pointer; }
+  .side-open-btn:hover, .side-close:hover { border-color: var(--acc); }
+  .side-close { display: block; margin-left: auto; width: 30px; height: 30px; border: 1px solid var(--line2); border-radius: 50%; background: none; color: var(--ink2); font-size: 20px; cursor: pointer; }
+  .view { top: 48px; }
+}
+
 .loss-chart { height: 210px; overflow: visible; }
 .loss-chart .grid { stroke: var(--line); stroke-width: 1; }
 .loss-chart .tk { fill: var(--faint); font-family: var(--mono); font-size: 10px; }

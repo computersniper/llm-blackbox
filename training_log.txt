@@ -1,1 +1,0 @@
-/usr/bin/bash: line 2: D:/coding/anaconda3/envs/xnewenv/python.exe: No such file or directory
