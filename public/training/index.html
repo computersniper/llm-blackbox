@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>训练过程 · 看大模型如何从乱码学会写诗</title>
-  <meta name="description" content="观看大模型训练的全过程：从零训练小模型，看它如何从输出乱码到学会写诗；深入一步训练，看梯度如何反向传播、权重如何更新。">
+  <title>训练 · 看一个小模型从乱码学会写诗</title>
+  <meta name="description" content="真实训练一个 Qwen3 同架构的小模型写五言诗，把每一步录下来：一批数据、前向逐层、注意力、损失、反向传播、梯度裁剪、AdamW 更新一个具体的权重，直到它的比特。">
   <meta name="theme-color" content="#060d1a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="../css/app.css?v=1">
-  <link rel="stylesheet" href="css/training.css?v=1">
+  <link rel="stylesheet" href="../css/app.css?v=2">
+  <link rel="stylesheet" href="../css/lab.css?v=1">
+  <link rel="stylesheet" href="training.css?v=1">
 </head>
-<body class="mode-overview">
+<body class="mode-pick">
   <canvas id="bg" aria-hidden="true"></canvas>
   <div class="grain" aria-hidden="true"></div>
 
@@ -21,200 +22,76 @@
       <span class="brand-en">BLACK&nbsp;BOX</span>
       <span class="brand-zh">揭开黑箱</span>
     </a>
-    <nav class="nav-tabs" aria-label="主导航">
+    <nav class="top-nav" aria-label="主导航">
       <a href="../">推理</a>
       <a href="./" class="active">训练</a>
       <a href="../multimodal/">多模态</a>
       <a href="../agent/">智能体</a>
     </nav>
-    <div class="top-actions">
-      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-      </button>
-    </div>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
   </header>
 
-  <div class="app training-app">
-    <!-- 概览：选择训练场景 -->
-    <section class="overview" id="overview" aria-label="训练场景">
-      <div class="overview-content">
-        <header class="page-header">
-          <h1>看大模型如何训练</h1>
-          <p class="subtitle">从零开始，看模型如何从输出乱码到学会写诗；深入一步训练，看梯度反向传播、权重更新的每一个细节。</p>
-        </header>
-
-        <div class="scenarios">
-          <article class="scenario-card" data-scenario="from-scratch">
-            <div class="card-tag">场景一</div>
-            <h2>从零训练小模型</h2>
-            <p class="card-desc">训练一个 Qwen3 同架构的小模型（4 层 · 256 维），看它如何从输出乱码逐渐学会写诗、回答问题。</p>
-            <ul class="card-features">
-              <li><span class="feat-icon">📊</span>损失曲线：从 8.5 降到 2.1</li>
-              <li><span class="feat-icon">✍️</span>生成样本：每 100 步看一次输出</li>
-              <li><span class="feat-icon">🎯</span>能力涌现：何时学会押韵、何时理解语义</li>
-            </ul>
-            <button class="scenario-btn" type="button">开始观看</button>
-          </article>
-
-          <article class="scenario-card" data-scenario="one-step">
-            <div class="card-tag">场景二</div>
-            <h2>深入一步训练</h2>
-            <p class="card-desc">在真实的 Qwen3-0.6B 上走一步训练，像调试器一样看梯度如何反向传播、某个具体权重如何更新。</p>
-            <ul class="card-features">
-              <li><span class="feat-icon">🔄</span>前向传播：计算损失</li>
-              <li><span class="feat-icon">⬅️</span>反向传播：梯度从输出层流回输入层</li>
-              <li><span class="feat-icon">⚡</span>权重更新：AdamW 优化器的每一步计算</li>
-            </ul>
-            <button class="scenario-btn" type="button">开始观看</button>
-          </article>
+  <div class="app">
+    <section class="pick" id="pick" aria-label="训练概览">
+      <div class="pick-in">
+        <div class="eyebrow">TRAINING · 真实训练录像</div>
+        <h1>看一个小模型从乱码学会写诗</h1>
+        <p class="lead" id="lead">正在载入训练记录…</p>
+        <div class="spec" id="spec"></div>
+        <div class="cards" id="cards"></div>
+        <div class="how">
+          <b>怎么看：</b>选一个时刻进入后，和推理页一样用调试器一层层往里钻。
+          <kbd>＋</kbd> 单步进入更细的一层，<kbd>−</kbd> 跳出，<kbd>←</kbd> <kbd>→</kbd> 单步，<kbd>空格</kbd> 播放。
+          <br>D1 训练全程（31 个录制点）→ D2 一步训练（取数据 / 前向 / 损失 / 反向 / 裁剪 / 更新）→ D3 逐层（前向第 0→3 层、反向第 3→0 层、AdamW 的每一行）→ D4 一层之内的算子 → D5 注意力的每个头、前馈的每个神经元。
         </div>
+        <p class="credit" id="credit"></p>
       </div>
     </section>
 
-    <!-- 场景一：从零训练 -->
-    <section class="stage training-stage" id="stageFromScratch" hidden aria-label="从零训练">
-      <div class="gl" id="glScratch"></div>
+    <aside class="side" id="side" aria-label="训练记录">
+      <div class="side-head">
+        <button class="side-back" id="btnBack" type="button" title="回到概览">‹</button>
+        <div><b>从零训练 · 五言诗</b><span id="sideSub">Qwen3 架构 · 4 层 · 256 维</span></div>
+      </div>
+      <div class="side-body" id="sideBody"></div>
+    </aside>
 
-      <aside class="training-panel">
-        <header class="panel-header">
-          <button class="back-btn" id="btnBackScratch" type="button" title="返回场景选择">←</button>
-          <div>
-            <h3>从零训练小模型</h3>
-            <p class="panel-subtitle">4 层 · 256 维 · 训练数据：3000 条诗歌和问答</p>
-          </div>
+    <section class="stage lab-stage" id="stage" aria-label="训练过程">
+      <div class="view" id="view"></div>
+
+      <aside class="dbg" id="dbg" aria-label="调试器">
+        <header class="dbg-h">
+          <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono">train.py</span>
+          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
         </header>
-
-        <div class="panel-body">
-          <div class="training-progress">
-            <div class="progress-info">
-              <span class="eyebrow">训练进度</span>
-              <div class="step-display">
-                <b id="currentStep">0</b> / <span id="totalSteps">3000</span> 步
-              </div>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-            </div>
-          </div>
-
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span class="metric-label">损失 Loss</span>
-              <span class="metric-value" id="lossValue">8.524</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">学习率</span>
-              <span class="metric-value small" id="lrValue">3e-4</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">困惑度</span>
-              <span class="metric-value" id="perplexity">5041</span>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">用时</span>
-              <span class="metric-value small" id="elapsed">0s</span>
-            </div>
-          </div>
-
-          <div class="sample-output">
-            <div class="sample-header">
-              <span class="eyebrow">模型输出样本</span>
-              <span class="sample-prompt">提示：写一首关于春天的诗</span>
-            </div>
-            <div class="sample-text" id="sampleText">
-              <span class="placeholder">训练开始后，每 100 步会展示模型的输出…</span>
-            </div>
-          </div>
-
-          <div class="stage-controls">
-            <button class="ctrl-btn big" id="btnPlayScratch" type="button" title="播放">▶</button>
-            <button class="ctrl-btn" id="btnPauseScratch" type="button" title="暂停" hidden>⏸</button>
-            <button class="ctrl-btn" id="btnStepScratch" type="button" title="单步">⏭</button>
-            <button class="ctrl-btn" id="btnResetScratch" type="button" title="重置">↻</button>
-            <div class="speed-controls">
-              <button class="speed-btn active" data-speed="1">1×</button>
-              <button class="speed-btn" data-speed="5">5×</button>
-              <button class="speed-btn" data-speed="10">10×</button>
-            </div>
-          </div>
+        <div class="dbg-body">
+          <pre class="code" id="code"></pre>
+          <div class="dbg-explain" id="explain"></div>
+          <div class="dbg-watch" id="watch"></div>
         </div>
       </aside>
-    </section>
 
-    <!-- 场景二：一步训练 -->
-    <section class="stage training-stage" id="stageOneStep" hidden aria-label="一步训练">
-      <div class="gl" id="glOneStep"></div>
-
-      <aside class="training-panel">
-        <header class="panel-header">
-          <button class="back-btn" id="btnBackOneStep" type="button" title="返回场景选择">←</button>
-          <div>
-            <h3>深入一步训练</h3>
-            <p class="panel-subtitle">Qwen3-0.6B · 单个训练样本</p>
+      <div class="ctl" id="ctl">
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-bar">
+          <div class="ctl-depth">
+            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+            <span class="ctl-dname" id="dname"></span>
+            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
           </div>
-        </header>
-
-        <div class="panel-body">
-          <div class="phase-indicator">
-            <div class="phase-dot" data-phase="forward"></div>
-            <span class="phase-label" id="phaseLabel">前向传播</span>
-            <div class="phase-dot" data-phase="backward"></div>
-            <div class="phase-dot" data-phase="update"></div>
+          <div class="ctl-play">
+            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
           </div>
-
-          <div class="gradient-flow">
-            <div class="flow-header">
-              <span class="eyebrow">当前层</span>
-              <h4 id="currentLayer">Layer 27 · 输出层</h4>
-            </div>
-            <div class="gradient-viz" id="gradientViz">
-              <canvas id="gradCanvas" width="300" height="120"></canvas>
-            </div>
-          </div>
-
-          <div class="weight-update-detail">
-            <div class="detail-header">
-              <span class="eyebrow">选中权重</span>
-              <div class="weight-coords">
-                <span class="mono">W[</span><span id="weightRow">512</span>, <span id="weightCol">1024</span><span class="mono">]</span>
-              </div>
-            </div>
-            <div class="update-steps">
-              <div class="update-line">
-                <span class="update-label">当前值</span>
-                <span class="update-value mono" id="weightCurrent">0.0234</span>
-              </div>
-              <div class="update-line">
-                <span class="update-label">梯度 g</span>
-                <span class="update-value mono grad" id="weightGrad">-0.0012</span>
-              </div>
-              <div class="update-line">
-                <span class="update-label">动量 m</span>
-                <span class="update-value mono" id="weightMomentum">-0.0008</span>
-              </div>
-              <div class="update-line">
-                <span class="update-label">方差 v</span>
-                <span class="update-value mono" id="weightVariance">1.4e-6</span>
-              </div>
-              <div class="update-line highlight">
-                <span class="update-label">更新后</span>
-                <span class="update-value mono" id="weightNew">0.0238</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="stage-controls">
-            <button class="ctrl-btn big" id="btnPlayOneStep" type="button" title="播放">▶</button>
-            <button class="ctrl-btn" id="btnPauseOneStep" type="button" title="暂停" hidden>⏸</button>
-            <button class="ctrl-btn" id="btnStepOneStep" type="button" title="单步">⏭</button>
-            <button class="ctrl-btn" id="btnResetOneStep" type="button" title="重置">↻</button>
-          </div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+          <div class="ctl-pos mono" id="pos"></div>
         </div>
-      </aside>
+      </div>
     </section>
   </div>
 
   <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
-  <script type="module" src="js/training.js?v=1"></script>
+  <script type="module" src="training.js?v=1"></script>
 </body>
 </html>

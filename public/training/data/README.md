@@ -1,61 +1,8 @@
-# 训练页面数据
+# 训练页数据
 
-⚠️ **这是模拟数据，用于演示训练可视化功能**
+由 `tools/train_poet.py` 一次真实训练导出（conda 环境 xnewenv，RTX 5060，约 5 分钟）：
 
-## 文件说明
+- `run.json`：模型与训练配置、词表、3000 步的损失 / 学习率 / 梯度范数、每 50 步的验证损失、31 个录制点上的生成样本、《静夜思》逐字预测、240 个常用字嵌入的二维投影。
+- `step_NNNN.json`：31 个录制步（第 1、100、200 … 3000 步），这一步真实那批数据中第 0 首诗的完整前向、损失、反向梯度、每个参数矩阵的梯度与更新量，以及 embed[月, k] 这个权重的 AdamW 更新全过程。
 
-- `training_curve.json` - 训练曲线（3000步，10个检查点）
-- `step_500.json` - 第500步的详细训练数据（前向、反向、权重更新）
-- `weights.bin` - 权重分布快照（4层×7个矩阵×32×32网格）
-- `*.gz` - 压缩版本（网页加载用）
-
-## 数据格式
-
-### training_curve.json
-```json
-{
-  "model_config": {...},
-  "training_config": {...},
-  "checkpoints": [
-    {
-      "step": 0,
-      "loss": 8.524,
-      "perplexity": 5041,
-      "lr": 0.001,
-      "sample": "生成的文本",
-      "quality": "gibberish"
-    },
-    ...
-  ]
-}
-```
-
-### step_500.json
-```json
-{
-  "step": 500,
-  "forward": {
-    "input_text": "...",
-    "layers": [...],
-    "logits_top5": [...],
-    "loss": 4.456
-  },
-  "backward": {
-    "layers": [...]
-  },
-  "weight_updates": {
-    "example_weights": [...]
-  }
-}
-```
-
-## 重新生成
-
-```bash
-python tools/export_training_mock.py --output public/training/data/
-```
-
-要生成真实数据，需要运行：
-```bash
-python tools/train_small_model.py --output public/training/data/
-```
+每个文件另有 `.gz`，网页优先读取压缩版本。
