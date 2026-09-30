@@ -1,5 +1,7 @@
 # 真实数据生成计划
 
+> 以下为早期计划。2026-10-01 当前分支是 `codex/real-data-work`：唐诗训练真实数据已完成，多模态四张真实照片数据已完成；智能体 `fix-bug` 已验证，其余任务继续录制。实际入口是 `train_poet.py`、`export_multimodal.py` 和 `record_agent.py`，详见 README。
+
 ## 当前状态
 - **分支**: cjc-real-data
 - **目标**: 为3个页面生成真实模型数据，替换模拟数据

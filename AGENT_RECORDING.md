@@ -1,5 +1,7 @@
 # Agent 数据录制完成总结
 
+> 本文是早期演示数据的记录，以下任务描述和完成状态不代表当前真实录制。当前使用 `tools/record_agent.py` 和 Qwen3-1.7B；网页仅展示 `public/agent/data/manifest.json` 中通过验证的任务。失败记录保留供诊断，禁止用 mock 导出覆盖真实记录。
+
 ## ✅ 已完成的工作
 
 ### 1. 创建核心脚本

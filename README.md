@@ -50,7 +50,17 @@ python tools/export_qwen.py --model /path/to/Qwen3-0.6B
 
 需要 torch、transformers（5.x 已测试）、safetensors；模型可从 ModelScope 或 Hugging Face 下载。
 
-## 本地运行
+## 其他真实数据页面
+
+- **训练**：`tools/train_poet.py` 从随机权重训练四层、256 维的 Qwen3 架构小模型，记录唐诗训练曲线、生成样本、前向传播、梯度和 AdamW 更新，数据在 `public/training/data/`。
+- **多模态**：`tools/export_multimodal.py` 使用 Qwen2-VL-2B-Instruct 录制四张真实照片的回答、视觉向量和语言自注意力，数据在 `public/multimodal/data/`。
+- **智能体**：`tools/record_agent.py` 使用 Qwen3-1.7B 录制工具调用和逐词元采样。只有通过任务验证的记录进入 `public/agent/data/manifest.json`；失败记录可保留用于诊断。执行限制是任务目录和命令白名单，并非操作系统级沙箱。
+
+这些页面播放离线模型记录，浏览器无需下载模型权重。旧的 `export_*_mock.py` 是早期演示工具，不能用于更新当前真实数据。
+
+当前工作分支为 `codex/real-data-work`，基于 `cjc-real-data`。
+
+## 本地运行方式
 
 纯静态站点，没有构建步骤：
 

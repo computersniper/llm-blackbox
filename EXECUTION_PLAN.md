@@ -1,5 +1,7 @@
 # 真实数据生成 - 执行计划
 
+> 早期执行计划，资源路径和“保留多模态模拟数据”的方案已过时。当前多模态已使用真实 Qwen2-VL-2B-Instruct 数据，训练使用 `train_poet.py`，智能体使用 Qwen3-1.7B 的 `record_agent.py`。当前工作分支为 `codex/real-data-work`。
+
 ## 使用资源
 - **模型**: Qwen3-8B (`/d/gmlab/cjc/m3repro/models/Qwen3-8B`)
 - **环境**: 当前Python + PyTorch（已有）
