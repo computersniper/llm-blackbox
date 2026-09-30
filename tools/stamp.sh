@@ -5,5 +5,5 @@
 set -eu
 dir=$1
 v=$2
-find "$dir" -name '*.html' -exec sed -i -E "s#((href|src)=\"[^\":?]*\.(css|js))\"#\1?v=$v\"#g" {} +
-find "$dir" -name '*.js' -exec sed -i -E "s#(from ['\"][^'\"?]*\.js)(['\"])#\1?v=$v\2#g; s#(import\(['\"][^'\"?]*\.js)(['\"]\))#\1?v=$v\2#g" {} +
+find "$dir" -name '*.html' -exec sed -i -E "s#((href|src)=\"[^\":?]*\.(css|js))(\?v=[^\"]*)?\"#\1?v=$v\"#g" {} +
+find "$dir" -name '*.js' -exec sed -i -E "s#(from ['\"][^'\"?:]*\.js)(\?v=[^'\"]*)?(['\"])#\1?v=$v\3#g; s#(import\(['\"][^'\"?:]*\.js)(\?v=[^'\"]*)?(['\"]\))#\1?v=$v\3#g" {} +
