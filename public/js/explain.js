@@ -1,6 +1,7 @@
 // 调试器里的“代码 / 这一步 / 变量”三块内容，全部用真实导出的数值填充。
 import { esc, tokHTML, tokPlain, fmtPct } from './ui.js';
 import { DEPTH_NAMES } from './timeline.js';
+import { sums, neuronId, neuronMM, ropePos } from './stage/fields.js';
 
 const K = (s) => `<span class="kw">${s}</span>`;
 const F = (s) => `<span class="fn">${s}</span>`;
@@ -85,7 +86,11 @@ export function explain(s, Q, ctx = {}) {
     case 'layer': return layerExplain(s, Q, ctx, i, cur);
     case 'head': {
       const top = st.top.slice(0, 3).map(([, p, t]) => `${tokHTML(t, 'r-assistant')} ${P(p)}`).join('，');
-      if (s.mi) return mmExplain(s, Q.headMMAt(g), `「${Q.headMMAt(g)?.token ?? ''}」的分数`, 'E', 1024, `最终向量 h 的 1024 个数，和嵌入表里「${esc(Q.headMMAt(g)?.token ?? '')}」那一行逐项相乘再相加，就是它的分数（logit）。模型给词表里每个词元都这样算一遍，一共 151936 次。`);
+      if (s.mi) {
+        const e = Q.headMMAt(g);
+        if (ctx.view === 'bits') return bitsExplain('嵌入表里被选中的那个权重');
+        return mmExplain(s, e, { y: 'logit', x: 'h', w: 'E', wi: e ? `E[${e.j}, i]` : '', n: 1024, tail: e ? `最终向量 ${X('h')} 的 1024 个数，和嵌入表里「${esc(tokPlain(e.token))}」那一行逐项相乘再相加，就是它的分数（logit）。模型给词表里全部 151936 个词元都这样算一遍，再用 softmax 变成概率。` : '' });
+      }
       if (!s.sub) return `最后一个位置的向量做一次 RMSNorm，再乘上<b>和嵌入表共用的那块权重</b>（1024 × 151936），得到词表里每个词元的分数，softmax 成概率：${top}……`;
       if (s.sub === 'norm') return `最终 RMSNorm：把第 28 层输出的向量拉回统一的尺度。`;
       if (s.sub === 'unembed') return `乘上输出矩阵，得到 <b>151936</b> 个分数（logits）。Qwen3-0.6B 的输出矩阵和嵌入表是同一块权重（tied embeddings），省下了 1.5 亿个参数。`;
@@ -105,12 +110,73 @@ export function explain(s, Q, ctx = {}) {
   return '';
 }
 
-// 矩阵乘法里的一个输出元素
-function mmExplain(s, e, out, W, n, tail) {
-  if (!e) return '';
-  if (s.mi === 'pick') return `放大 ${W} 的<b>第 ${e.j} 列</b>。${out} 就是输入的 ${n} 个数和这一列的 ${n} 个权重<b>逐项相乘再相加</b>：${out} = Σ<sub>i</sub> x[i] · W[i, ${e.j}]。${tail}`;
-  if (s.mi === 'mul') return `逐项相乘。第 i 行的输入沿着第 i 行走到这一列，和格子里的权重相乘。这里显示贡献最大的 12 项；橙色为正，蓝色为负。<span class="dimmed">点一个格子，再按 ＋ 看这个权重的比特。</span>`;
-  return `${n} 项全部加起来：${out} = <b>${e.total.toFixed(3)}</b>（前 12 项合计 ${e.shown.toFixed(3)}，其余 ${n - 12} 项合计 ${(e.total - e.shown).toFixed(3)}）。`;
+// 一次乘加 / 比特：和算式板、3D 舞台同一套颜色（输入蓝、权重紫、乘积橙、结果青）
+const X = (t) => `<span class="cx">${t}</span>`;
+const W = (t) => `<span class="cw">${t}</span>`;
+const Y = (t) => `<span class="cy">${t}</span>`;
+const PR = (t) => `<span class="cp">${t}</span>`;
+const sg = (v, d = 3) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(d)}`;
+const LOADING = '<span class="dimmed">正在载入这一层的乘加数据…</span>';
+
+function bitsExplain(what) {
+  return `<b>比特</b>：${what}在显存里就是 16 个 0/1（bfloat16）：1 位符号、8 位指数、7 位尾数，值 = (−1)<sup>s</sup> × 2<sup>e−127</sup> × (1 + m/128)。点算式板或舞台上的任意一位把它翻过来：别的数都没变，所以结果可以精确地重算出来。<span class="dimmed">翻指数位，数会成倍地变；翻尾数位，只改一点点。</span>`;
+}
+
+// 矩阵乘法里的一个输出元素：y[j] = Σ x[i] · W[i, j]
+function mmExplain(s, e, { y, x, w, wi, n, tail = '' }) {
+  if (!e) return LOADING;
+  const sm = sums(e, n), N = sm.n;
+  const yj = Y(`${y}[${e.j}]`);
+  if (s.mi === 'pick') return `放大 ${W(w)} 的<b>第 ${e.j} 列</b>：${yj} = Σ ${X(`${x}[i]`)} × ${W(wi || `${w}[i, ${e.j}]`)}，输入的 ${N} 个数和这一列的 ${N} 个权重一一配对、相乘、再全部加起来。${tail}`;
+  if (s.mi === 'mul') return `逐项相乘：舞台上${X('蓝点')}沿第 i 行走到这一列（${W('紫色')}格子），乘出来的积（${PR('橙色')}）顺着这一列飞进输出格（${Y('青色')}）。算式板按贡献从大到小列出前 12 项。<span class="dimmed">点算式板的一行（或舞台上的格子），再按 ＋ 看那个权重的 16 个比特。</span>`;
+  const pn = sm.pos != null && sm.neg != null ? `所有正的乘积加起来 ${sg(sm.pos, 2)}，负的 ${sg(sm.neg, 2)}，大部分相互抵消了。` : '';
+  return `${N} 项全部加起来：${yj} = <b>${sg(e.total)}</b>。前 12 项合计 ${sg(e.shown)}，其余 ${N - 12} 项合计 ${sg(e.total - e.shown)}：单项都很小，但合起来不能忽略。${pn}`;
+}
+
+// D6 / D7 的每一个微观步骤
+function microExplain(s, Q, ctx, L, g) {
+  const bits = ctx.view === 'bits';
+  if (s.sub === 'score') {
+    const d = Q.dotAt(L, g);
+    if (!d) return LOADING;
+    const k = T(Q, d.key);
+    if (bits) return bitsExplain(`第 ${d.head} 号头的 q 里被选中的那一维（激活值也是 bf16）`);
+    if (s.mi === 'mul') return `第 <b>${d.head}</b> 号头（用第 ${d.kv} 组键值头）拿当前词元的 ${X('q')} 和 ${k} 的 ${W('k')}，在 128 个维度上逐一相乘。算式板列出乘积最大的 12 维。`;
+    if (s.mi === 'sum') { const sm = sums(d, 128); return `128 项全部加起来：${Y('q·k')} = <b>${sg(d.sum, 2)}</b>。${sm.pos != null ? `正的乘积合计 ${sg(sm.pos, 2)}，负的 ${sg(sm.neg, 2)}。` : ''}两个向量越“同向”，点积越大。`; }
+    return `除以 √128 ≈ 11.31 得到打分 <b>${sg(d.score)}</b>；和前面所有词元的打分一起做 softmax 之后，这个头给 ${k} 的权重是 ${P(d.w)}。`;
+  }
+  if (s.sub === 'act') {
+    const n = Q.neuronAt(L, g);
+    if (!n) return LOADING;
+    const id = neuronId(n);
+    if (s.mi === 'silu') return `${X('g')} = ${sg(n.gz)} 先过 <b>SiLU</b>：SiLU(g) = g × σ(g) = <b>${sg(n.silu)}</b>。σ 是 0 到 1 之间的 S 形曲线，所以负的 g 被压到接近 0，正的 g 几乎原样通过。`;
+    return `再乘上 ${W('u')} = ${sg(n.uz)}：${Y(`a[${id}]`)} = SiLU(g) × u = <b>${sg(n.silu * n.uz)}</b>，这就是神经元 #${id} 的输出。SiLU(g) 像一道<b>阀门</b>，决定放多少 u 通过。`;
+  }
+  if (s.sub === 'qkv') {
+    const e = Q.mmAt(L, g)?.q;
+    if (!e) return LOADING;
+    if (bits) return bitsExplain(`W<sub>q</sub> 里被选中的那个权重`);
+    if (s.mi === 'rope') return `${Y(`q[${e.j}]`)} 还要再加工两次：先做 <b>q_norm</b>（第 ${e.head} 号头的 128 个数一起除以均方根 ${e.rms.toFixed(3)}，再乘缩放 γ），得到 ${sg(e.qn, 4)}；再做 <b>RoPE</b>：和第 ${e.partner} 维配成一对，按位置 ${ropePos(e)} 转一个角度，得到 <b>${sg(e.qr, 4)}</b>。位置越靠后转得越多，两个词元的点积因此只和它们的相对距离有关。`;
+    return mmExplain(s, e, { y: 'q', x: 'h', w: 'W<sub>q</sub>', n: 1024, tail: `q 一共 2048 个数（16 个头 × 128），这里是第 ${e.head} 号头的第 ${e.dim} 维。k、v 也完全一样，只是换成 W<sub>k</sub>、W<sub>v</sub>。` });
+  }
+  if (s.sub === 'mix') {
+    const e = Q.mmAt(L, g)?.o;
+    if (bits && e) return bitsExplain(`W<sub>o</sub> 里被选中的那个权重`);
+    return mmExplain(s, e, { y: 'Δx', x: 'z', w: 'W<sub>o</sub>', n: 2048, tail: `16 个头各自加权求和的结果拼成 2048 个数（${X('z')}），乘 W<sub>o</sub> 得到加回残差流的 1024 个数之一。` });
+  }
+  if (s.sub === 'down') {
+    const e = Q.mmAt(L, g)?.down;
+    if (bits && e) return bitsExplain(`W<sub>down</sub> 里被选中的那个权重`);
+    return mmExplain(s, e, { y: 'Δx', x: 'a', w: 'W<sub>down</sub>', n: 3072, tail: `3072 个神经元的输出（${X('a')}）乘 W<sub>down</sub>，得到加回残差流的 1024 个数之一。` });
+  }
+  if (s.sub === 'up') {
+    const n = Q.neuronAt(L, g);
+    if (!n) return LOADING;
+    if (bits) return bitsExplain(`W<sub>gate</sub> 里被选中的那个权重`);
+    const id = neuronId(n);
+    return mmExplain(s, neuronMM(n).g, { y: 'g', x: 'h', w: 'W<sub>gate</sub>', n: 1024, tail: `同一个神经元 #${id} 在 W<sub>up</sub> 里也有一列，同样乘加得到 ${W(`u[${id}]`)} = <b>${sg(n.uz)}</b>。` });
+  }
+  return '';
 }
 
 function layerExplain(s, Q, ctx, i, cur) {
@@ -124,20 +190,8 @@ function layerExplain(s, Q, ctx, i, cur) {
   if (s.op === 'ln2') return `再做一次 <b>RMSNorm</b>，准备进入前馈网络。`;
   if (s.op === 'add1') return `<b>残差相加</b>：注意力的输出（经过 o_proj）直接加回原来的向量。每层只是“往上加一点”，信息不会被覆盖。当前向量长度 ‖x‖ = <b>${Q.norm(L, i).toFixed(1)}</b>。`;
   if (s.op === 'add2') return `前馈网络的输出加回残差流，第 ${L} 层结束。逻辑透镜此刻读到的是 ${guess}。`;
+  if (s.mi) return microExplain(s, Q, ctx, L, g);
   const h = ctx.head ?? interestingHead(Q, L, i);
-  if (s.mi && s.sub === 'qkv') {
-    const e = Q.mmAt(L, g)?.q;
-    if (s.mi === 'rope' && e) return `这个数还要再加工两次：先做 <b>q_norm</b>（这个头的 128 个数一起除以均方根 ${e.rms.toFixed(3)}，再乘缩放 γ），得到 ${e.qn.toFixed(4)}；再做 <b>RoPE</b>：和第 ${e.partner} 维配成一对，按位置 ${e.row} 转一个角度，得到 <b>${e.qr.toFixed(4)}</b>。位置越靠后转得越多，两个词元的点积因此只和它们的相对距离有关。`;
-    return mmExplain(s, e, e ? `q[${e.j}]` : 'q', 'W<sub>q</sub>', 1024, e ? `q 一共 2048 个数，每个都这样算。这里放大的是第 ${e.head} 头第 ${e.dim} 维（第 ${e.j} 列）。k、v 也完全一样，只是换成 W<sub>k</sub>、W<sub>v</sub>。` : '');
-  }
-  if (s.mi && s.sub === 'mix') { const e = Q.mmAt(L, g)?.o; return mmExplain(s, e, e ? `Δx[${e.j}]` : 'Δx', 'W<sub>o</sub>', 2048, '16 个头的输出拼成 2048 个数，再和 W<sub>o</sub> 的一列逐项相乘相加，得到回到残差流的 1024 个数之一。'); }
-  if (s.mi && s.sub === 'down') { const e = Q.mmAt(L, g)?.down; return mmExplain(s, e, e ? `Δx[${e.j}]` : 'Δx', 'W<sub>down</sub>', 3072, '3072 个神经元的输出，和 W<sub>down</sub> 的一列逐项相乘相加，得到加回残差流的 1024 个数之一。'); }
-  if (s.mi && s.sub === 'up') {
-    const n = Q.neuronAt(L, g);
-    if (!n) return '';
-    const e = { j: n.j, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
-    return mmExplain(s, e, `g[${n.j}]`, 'W<sub>gate</sub>', 1024, `同一个神经元 #${n.j} 在 W<sub>up</sub> 里也有一列，同样乘加得到 u = <b>${n.uz.toFixed(3)}</b>。`);
-  }
   if (s.op === 'attn') {
     if (!s.sub) return `<b>分组查询注意力（GQA）</b>：16 个查询头，每 2 个共用一组键值头，共 8 组。${cur} 平均最关注 ${tgt}。`;
     const row = Q.att(L, h, i);
@@ -145,28 +199,20 @@ function layerExplain(s, Q, ctx, i, cur) {
     if (s.sub === 'qkv') return `新向量分别乘 W<sub>q</sub>、W<sub>k</sub>、W<sub>v</sub>：得到 <b>16 × 128</b> 维的 Q，和各 <b>8 × 128</b> 维的 K、V。Q、K 先各自做 RMSNorm（Qwen3 新加的），再按位置旋转（<b>RoPE</b>，θ = 10⁶）。K、V 存进缓存。`;
     if (s.sub === 'score') return `第 <b>${h}</b> 头用自己的 Q 和缓存里每个词元的 K 做点积，再除以 √128。它打分最高的是 ${best ? T(Q, best.j) : ''}：<b>${best ? best.s.toFixed(2) : ''}</b>。`;
     if (s.sub === 'softmax') return `softmax 把分数变成加起来等于 1 的权重。第 ${h} 头给 ${best ? T(Q, best.j) : ''} ${best ? P(best.w) : ''}。后面的词元被因果遮罩挡住，永远看不见。`;
-    if (s.sub === 'mix') return `按权重把各个词元的 V 加起来。16 个头的结果拼成 2048 维，再乘 W<sub>o</sub> 回到 1024 维。`;
-    const d = Q.dotAt(L, g);
-    if (!d) return '';
-    if (s.mi === 'mul') return `第 ${d.head} 个 Q 头（用第 ${d.kv} 组 KV）和 ${T(Q, d.key)} 的 K 在 128 个维度上逐一相乘。这里显示乘积最大的 12 项。`;
-    if (s.mi === 'sum') return `128 项全部加起来：<b>${d.sum.toFixed(3)}</b>。`;
-    return `除以 √128 ≈ 11.31，得到打分 <b>${d.score.toFixed(3)}</b>。softmax 之后，这个头给 ${T(Q, d.key)} 的权重是 ${P(d.w)}。`;
+    return `按权重把各个词元的 V 加起来。16 个头的结果拼成 2048 维，再乘 W<sub>o</sub> 回到 1024 维。`;
   }
   // mlp
   const count = Q.mlpCount(g, L);
   if (!s.sub) return `<b>SwiGLU 前馈网络</b>：先扩到 3072 维，经过门控激活，再压回 1024 维。这一步有 <b>${count}</b> 个神经元明显激活。`;
   if (s.sub === 'up') return `gate_proj 和 up_proj 两个矩阵，同时把 1024 维扩到 <b>3072</b> 维，得到两组数：<b>g</b> 和 <b>u</b>。`;
   if (s.sub === 'act') return `g 经过 <b>SiLU</b> 激活，再和 u 逐个相乘。g 像一道<b>阀门</b>，决定每个神经元放多少 u 通过。明显激活的有 <b>${count}</b> 个。`;
-  if (s.sub === 'down') return `down_proj 把 3072 维压回 1024 维，准备加回残差流。`;
-  const n = Q.neuronAt(L, g);
-  if (!n) return '';
-  if (s.mi === 'silu') return `SiLU(g) = g · σ(g) = <b>${n.silu.toFixed(3)}</b>。负数会被压到接近 0。`;
-  return `SiLU(g) × u = <b>${(n.silu * n.uz).toFixed(3)}</b>：这就是神经元 #${n.j} 的输出。`;
+  return `down_proj 把 3072 维压回 1024 维，准备加回残差流。`;
 }
 
 // 这一步的矩阵形状（预填充时 n = 提示长度，之后每步 n = 1）
 const D = (s) => `<b>${s}</b>`;
-export function shapeOf(s, Q) {
+export function shapeOf(s, Q, ctx = {}) {
+  if (s.mi && ctx.view === 'bits') return `值 = (−1)<sup>s</sup> × 2<sup>e−127</sup> × (1 + m/128)<br><span class="dimmed">bfloat16：1 位符号 + 8 位指数 + 7 位尾数 = 16 位</span>`;
   const M = Q.M, n = s.g === 0 ? Q.P : 1, L = Q.P + s.g;
   const H = M.hidden, qd = M.heads * M.headDim, kd = M.kvHeads * M.headDim, F = M.ffn, V = M.vocab;
   const x = `[${n}×${H}]`;
@@ -177,28 +223,28 @@ export function shapeOf(s, Q) {
     case 'head':
       if (s.sub === 'norm') return `x[-1] ${D(`[1×${H}]`)} ÷ RMS × γ ${D(`[${H}]`)}`;
       if (s.sub === 'softmax') return `softmax(logits ${D(`[1×${V}]`)}) → p ${D(`[1×${V}]`)}，和为 1`;
-      if (s.mi) return `logit[id] = h ${D(`[${H}]`)} · E[id] ${D(`[${H}]`)} → 1 个数`;
+      if (s.mi) return `${Y('logit[id]')} = ${X('h')} ${D(`[${H}]`)} · ${W('E[id]')} ${D(`[${H}]`)} → 1 个数`;
       return `x[-1] ${D(`[1×${H}]`)} @ Eᵀ ${D(`[${H}×${V}]`)} → logits ${D(`[1×${V}]`)}`;
     case 'sample': return `p ${D(`[${V}]`)} → ÷0.7 → 前 20 → 累计 80% → 候选 ${D(`[${Q.steps[s.g].pool.length}]`)} → 1 个词元`;
     case 'layer': {
       if (!s.op) return `x ${D(x)} → 注意力 → 前馈 → ${D(x)}`;
       if (s.op === 'ln1' || s.op === 'ln2') return `h = x ${D(x)} ÷ RMS(x) × γ ${D(`[${H}]`)} → ${D(x)}`;
       if (s.op === 'add1' || s.op === 'add2') return `x ${D(x)} + Δx ${D(x)} → ${D(x)}`;
-      if (s.mi && s.sub === 'qkv') return s.mi === 'rope' ? `q<sub>头</sub> ${D(`[${M.headDim}]`)} ÷ RMS × γ → 每两维一对旋转 θ = 位置 / 10⁶<sup>2k/128</sup>` : `q[j] = h ${D(`[${H}]`)} · W<sub>q</sub>[:, j] ${D(`[${H}]`)} → 1 个数`;
-      if (s.mi && s.sub === 'mix') return `Δx[j] = 拼接 ${D(`[${qd}]`)} · W<sub>o</sub>[:, j] ${D(`[${qd}]`)} → 1 个数`;
-      if (s.mi && s.sub === 'down') return `Δx[j] = a ${D(`[${F}]`)} · W<sub>down</sub>[:, j] ${D(`[${F}]`)} → 1 个数`;
-      if (s.mi && s.sub === 'up') return `g[n] = h ${D(`[${H}]`)} · W<sub>gate</sub>[:, n] ${D(`[${H}]`)}；u[n] 同理用 W<sub>up</sub>`;
+      if (s.mi && s.sub === 'qkv') return s.mi === 'rope' ? `q<sub>头</sub> ${D(`[${M.headDim}]`)} ÷ RMS × γ → 每两维一对旋转 θ = 位置 / 10⁶<sup>2k/128</sup>` : `${Y('q[j]')} = ${X('h')} ${D(`[${H}]`)} · ${W('W<sub>q</sub>[:, j]')} ${D(`[${H}]`)} → 1 个数`;
+      if (s.mi && s.sub === 'mix') return `${Y('Δx[j]')} = ${X('z')} ${D(`[${qd}]`)} · ${W('W<sub>o</sub>[:, j]')} ${D(`[${qd}]`)} → 1 个数<br><span class="dimmed">z = 16 个头的输出拼在一起</span>`;
+      if (s.mi && s.sub === 'down') return `${Y('Δx[j]')} = ${X('a')} ${D(`[${F}]`)} · ${W('W<sub>down</sub>[:, j]')} ${D(`[${F}]`)} → 1 个数`;
+      if (s.mi && s.sub === 'up') return `${Y('g[n]')} = ${X('h')} ${D(`[${H}]`)} · ${W('W<sub>gate</sub>[:, n]')} ${D(`[${H}]`)}；u[n] 同理用 W<sub>up</sub>`;
       if (s.op === 'attn') {
         if (!s.sub || s.sub === 'qkv') return `h ${D(x)} @ W<sub>q</sub> ${D(`[${H}×${qd}]`)} → q ${D(`[${n}×${qd}]`)} = ${M.heads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>k</sub> ${D(`[${H}×${kd}]`)} → k = ${M.kvHeads} 头 × ${M.headDim}<br>h ${D(x)} @ W<sub>v</sub> ${D(`[${H}×${kd}]`)} → v = ${M.kvHeads} 头 × ${M.headDim}`;
         if (s.sub === 'score') {
-          if (s.mi) return `q<sub>头</sub> ${D(`[${M.headDim}]`)} · k ${D(`[${M.headDim}]`)} → 标量，÷ √${M.headDim}`;
+          if (s.mi) return `${Y('q·k')} = ${X('q')} ${D(`[${M.headDim}]`)} · ${W('k')} ${D(`[${M.headDim}]`)} → 1 个数，再 ÷ √${M.headDim}`;
           return `q ${D(`[${M.heads}×${n}×${M.headDim}]`)} @ Kᵀ ${D(`[${M.heads}×${M.headDim}×${L}]`)} → s ${D(`[${M.heads}×${n}×${L}]`)}<br><span class="dimmed">K 只有 ${M.kvHeads} 头，每个复用给 2 个 Q 头</span>`;
         }
         if (s.sub === 'softmax') return `softmax(s ${D(`[${M.heads}×${n}×${L}]`)} + 遮罩) → a，每行和为 1`;
         return `a ${D(`[${M.heads}×${n}×${L}]`)} @ V ${D(`[${M.heads}×${L}×${M.headDim}]`)} → ${D(`[${M.heads}×${n}×${M.headDim}]`)}<br>拼接 ${D(`[${n}×${qd}]`)} @ W<sub>o</sub> ${D(`[${qd}×${H}]`)} → Δx ${D(x)}`;
       }
       if (s.op === 'mlp') {
-        if (s.mi) return `x ${D(`[${H}]`)} · w<sub>gate</sub> ${D(`[${H}]`)} → g（标量）；x · w<sub>up</sub> → u；输出 silu(g)·u`;
+        if (s.mi) return `${Y('a[n]')} = silu(${X('g[n]')}) × ${W('u[n]')} → 1 个数`;
         if (!s.sub || s.sub === 'up') return `h ${D(x)} @ W<sub>gate</sub> ${D(`[${H}×${F}]`)} → g ${D(`[${n}×${F}]`)}<br>h ${D(x)} @ W<sub>up</sub> ${D(`[${H}×${F}]`)} → u ${D(`[${n}×${F}]`)}`;
         if (s.sub === 'act') return `silu(g) ⊙ u：${D(`[${n}×${F}]`)} 逐个相乘`;
         return `${D(`[${n}×${F}]`)} @ W<sub>down</sub> ${D(`[${F}×${H}]`)} → Δx ${D(x)}`;
@@ -225,7 +271,7 @@ export function watch(s, Q, ctx = {}) {
     }
     if (s.op === 'attn') rows.push(['head', ctx.head == null ? `${interestingHead(Q, s.L, i)}` : `${ctx.head}`], ['kv_group', `${Math.floor((ctx.head ?? interestingHead(Q, s.L, i)) / 2)}`]);
     if (s.op === 'mlp') rows.push(['active', `${Q.mlpCount(g, s.L)} / 3072`]);
-    if (s.mi && s.op === 'mlp') { const n = Q.neuronAt(s.L, g); if (n) rows.push(['neuron', `#${n.j}`], ['g', n.gz.toFixed(4)], ['u', n.uz.toFixed(4)], ['silu(g)*u', (n.silu * n.uz).toFixed(4)]); }
+    if (s.mi && s.op === 'mlp') { const n = Q.neuronAt(s.L, g); if (n) rows.push(['neuron', `#${neuronId(n)}`], ['g', n.gz.toFixed(4)], ['u', n.uz.toFixed(4)], ['silu(g)*u', (n.silu * n.uz).toFixed(4)]); }
     if (s.mi && s.op === 'attn') { const d = Q.dotAt(s.L, g); if (d) rows.push(['q·k', d.sum.toFixed(4)], ['score', d.score.toFixed(4)], ['weight', fmtPct(d.w)]); }
   }
   if (s.ph === 'head' || s.ph === 'sample' || s.ph === 'pass') {
@@ -269,7 +315,7 @@ export function crumbs(depth, s) {
   if (s.ph === 'head' && depth >= 6 && s.mi === 'mul') out.push({ d: 6, label: '比特' });
   if (depth >= 4 && s.ph === 'layer') out.push({ d: 4, label: `第 ${s.L} 层` });
   if (depth >= 5 && s.op) out.push({ d: 5, label: OP_NAME[s.op] });
-  if (depth >= 6 && s.sub) out.push({ d: 6, label: SUB_NAME[s.sub] });
-  if (depth >= 7 && s.mi === 'mul') out.push({ d: 7, label: '比特' });
+  if (depth >= 6 && s.sub && s.ph === 'layer') out.push({ d: 6, label: SUB_NAME[s.sub] });
+  if (depth >= 7 && s.mi === 'mul' && s.ph === 'layer') out.push({ d: 7, label: '比特' });
   return out;
 }
