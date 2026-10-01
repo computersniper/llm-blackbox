@@ -85,6 +85,7 @@ function onSend(q, im) {
   const userEl = chat.addUser(q, im);
   const msg = chat.addBot(q, userEl);
   loadQuestion(q, manifest).catch(() => { /* 揭开时再报错 */ });
+  if (!saveData()) warmEngine();
   if (mode === 'inspect') attach(msg);
   else streamNormal(msg, 0);
 }
@@ -166,6 +167,13 @@ async function ensureEngine() {
   };
   scene = new sc.Scene(engine);
   measure('揭开·new Engine + Scene', t0);
+}
+
+// 用户发出了问题（多半接着会点 ＋）：提前建好引擎和场景（WebGL 上下文、环境贴图），在聊天模式下空跑一帧，
+// 让后期处理（泛光、输出）这些和问题无关的着色器先编译好；场景里的材质点 ＋ 之后再编译。
+// 失败了不提示，点 ＋ 时会重试并报错
+function warmEngine() {
+  ensureEngine().then(() => { if (mode === 'chat') engine.composer.render(); }).catch(() => {});
 }
 
 async function enterInspect(msg) {

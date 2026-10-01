@@ -62,8 +62,8 @@ async function boot() {
 function onSend(q) {
   chat.addUser(q);
   const msg = chat.addBot(q);
-  // 回答开始流式输出时，就在后台取这条回复的数据，点 ＋ 时多半已经到了
-  if (!saveData()) loadQuestion(q.id, manifest).catch(() => { /* 揭开时再报错 */ });
+  // 回答开始流式输出时，就在后台取这条回复的数据、建好引擎，点 ＋ 时多半都已经好了
+  if (!saveData()) { loadQuestion(q.id, manifest).catch(() => { /* 揭开时再报错 */ }); warmEngine(); }
   if (mode === 'inspect') attach(msg);
   else streamNormal(msg, 0);
   if (q.id === 'q03' || q.id === 'q04') setTimeout(() => discover('wrong'), 2500);
@@ -144,6 +144,13 @@ function wantThumbs() {
   if (thumbsAsked || !machine || !tl || tl.depth < 3 || performance.now() < thumbsRetry) return;
   thumbsAsked = true;
   loadThumbs().then((b) => machine.mats.setThumbs(b, manifest.thumbs.index), () => { thumbsAsked = false; thumbsRetry = performance.now() + 15000; });
+}
+
+// 用户发出了问题（多半接着会点 ＋）：提前建好引擎（WebGL 上下文、环境贴图），在聊天模式下空跑一帧，
+// 让后期处理（泛光、输出）这些和问题无关的着色器先编译好；机器本身的材质点 ＋ 之后再编译。
+// 失败了不提示，点 ＋ 时会重试并报错
+function warmEngine() {
+  ensureEngine().then(() => { if (mode === 'chat') engine.composer.render(); }).catch(() => {});
 }
 
 async function enterInspect(msg) {
