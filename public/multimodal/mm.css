@@ -56,6 +56,9 @@ body.mode-inspect .site-nav { display: none; }
 
 /* ---------------- 舞台：图像监视器 ---------------- */
 
+/* CSS2D 标签会给每个元素设 z-index：把整个 3D 层关进自己的层叠上下文，免得标签盖到面板上 */
+.gl { z-index: 0; }
+
 .stage-top { left: calc(var(--mon-w) + 28px); }
 .mon { position: absolute; z-index: 4; left: 14px; top: 14px; width: var(--mon-w); max-height: calc(100% - 128px); display: flex; flex-direction: column; border-radius: 16px; background: var(--panel); border: 1px solid var(--line2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 20px 50px rgba(0, 0, 0, .4); overflow: hidden; }
 .mon-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--line); }
@@ -108,3 +111,5 @@ body.mode-inspect .site-nav { display: none; }
   .topbar { gap: 10px; padding: 0 12px; }
   body.mode-chat .crumbs { display: none; }
 }
+
+.cmp-input .ph { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }

@@ -95,6 +95,8 @@ export class Monitor {
     const pk = anim ? Math.round(st.p * 40) : 0;
     const key = [this.Q.id, view, s.ph, s.sub, s.L, s.op, s.mi, st.g, st.vq, pk, this.mode.heat, this.mode.vit, this.mode.lens].join('|');
     if (key === this.key) return;
+    const vkey = [view, s.ph, s.sub, s.L, s.op, s.mi].join('|');
+    if (vkey !== this.vkey) { this.vkey = vkey; this.tip(null); }
     this.key = key;
     this.fit();
     const V = this.Q.V, g = this.g, W = this.W, H = this.H;
@@ -367,8 +369,7 @@ export class Monitor {
 
   lensWords(L) {
     const V = this.Q.V, g = this.g, cw = this.W / V.mw, ch = this.H / V.mh;
-    const fs = Math.min(cw / 2.2, ch / 1.6, 13 * this.dpr);
-    g.font = `600 ${fs}px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif`;
+    const fs = Math.min(cw / 2.1, ch / 1.6, 13 * this.dpr);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     for (let m = 0; m < V.Nv; m++) {
@@ -376,8 +377,11 @@ export class Monitor {
       const w = s.trim().replace(/\n/g, '');
       if (!w || p < 0.05 || /<\|/.test(w)) continue;
       const r = Math.floor(m / V.mw), c = m % V.mw;
-      g.fillStyle = `rgba(233, 239, 249, ${0.35 + 0.6 * Math.min(1, p * 2)})`;
-      g.fillText(w.length > 3 ? w.slice(0, 3) : w, (c + 0.5) * cw, (r + 0.5) * ch);
+      const latin = /^[\x00-\x7f]+$/.test(w);
+      const txt = latin ? (w.length > 5 ? w.slice(0, 5) : w) : w.length > 2 ? w.slice(0, 2) : w;
+      g.font = `600 ${latin ? fs * 0.8 : fs}px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif`;
+      g.fillStyle = `rgba(233, 239, 249, ${0.3 + 0.65 * Math.min(1, p * 1.6)})`;
+      g.fillText(txt, (c + 0.5) * cw, (r + 0.5) * ch);
     }
   }
 

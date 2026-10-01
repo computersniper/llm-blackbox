@@ -261,12 +261,12 @@ export class Scene {
     this.llmLbl.center.set(0.5, 1.4);
     root.add(this.llmLbl);
     this.layerLbl = label('', 'lbl lens');
-    this.layerLbl.center.set(0, 0.5);
+    this.layerLbl.center.set(1, 0.5);
     root.add(this.layerLbl);
 
     // 层板上的热力图：生成当前这个字时，这一层对每个视觉词元的注意力（真实数据）
     this.heatCv = document.createElement('canvas');
-    this.heatCv.width = mw * 16; this.heatCv.height = mh * 16;
+    this.heatCv.width = mw * 24; this.heatCv.height = mh * 24;
     this.heatTex = new THREE.CanvasTexture(this.heatCv);
     this.heatTex.colorSpace = THREE.SRGBColorSpace;
     this.heat = new THREE.Mesh(GEO.plane, new THREE.MeshBasicMaterial({ map: this.heatTex, transparent: true, opacity: 0, depthWrite: false }));
@@ -361,9 +361,9 @@ export class Scene {
     const winLbl = new THREE.Mesh(new THREE.PlaneGeometry(winW, winW * 0.12), new THREE.MeshBasicMaterial({ map: textTexture('图片从这里进去', { color: '#c9a36b', font: '500 56px "PingFang SC","Microsoft YaHei",sans-serif', w: 900, h: 108 }), transparent: true }));
     winLbl.position.set(PX - cx, PY + 0.1 - winH / 2 - 0.16, 0.035);
     front.add(winLbl);
-    const lw = Math.min(W * 0.45, 7);
+    const lw = Math.min(W * 0.3, 6);
     const logo = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.22), new THREE.MeshBasicMaterial({ map: textTexture('Qwen3-VL-2B', { color: '#5ef0d4', font: '700 110px "JetBrains Mono",monospace', w: 1200, h: 264 }), transparent: true }));
-    logo.position.set((PX + this.pw / 2 + x1) / 2 - cx, H * 0.58, 0.035);
+    logo.position.set(x0 + W * 0.36 - cx, H * 0.58, 0.035);
     front.add(logo);
     const m = Q.manifest.model;
     const sub = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.07), new THREE.MeshBasicMaterial({ map: textTexture(`视觉 ${m.vision.depth} 层 + 语言 ${m.text.layers} 层 · ${(m.params.total / 1e8).toFixed(1)} 亿参数`, { color: '#7a859e', font: '500 60px "PingFang SC","Microsoft YaHei",sans-serif', w: 1400, h: 98 }), transparent: true }));
@@ -468,9 +468,10 @@ export class Scene {
       const sl = this.slabs[L];
       const on = L === lit.L;
       const passed = lit.upTo >= L;
-      const dimV = vis.text ? 1 : 0.35;   // 还在看图的时候，语言模型那边先暗着
-      sl.material.opacity = (on ? 0.2 : passed ? 0.08 : 0.04) * open * dimV;
-      sl.material.emissiveIntensity = on ? 0.35 : passed ? 0.06 : 0;
+      // 还在看图的时候，语言模型那边先暗着；逐层看的时候，当前层上面的层板几乎透明，免得挡住热力图
+      const dimV = lit.upTo < 0 ? 0.22 : st.depth >= 3 && lit.L >= 0 && L > lit.L ? 0.18 : 1;
+      sl.material.opacity = (on ? 0.16 : passed ? 0.07 : 0.04) * open * dimV;
+      sl.material.emissiveIntensity = on ? 0.3 : passed ? 0.05 : 0;
       sl.edge.material.opacity = (on ? 0.6 : 0.14) * open * dimV;
       sl.visible = open > 0.02;
     }
@@ -493,7 +494,7 @@ export class Scene {
       const lens = Q.lensAt(g, lit.L)[0];
       const html = `<span class="l">L${String(lit.L).padStart(2, '0')}</span>看图 <span class="p">${fmtPct(Q.mass(g, lit.L))}</span>　透镜 <b>${esc(tokPlain(lens[0]))}</b>`;
       if (this.layerLbl.el.innerHTML !== html) this.layerLbl.el.innerHTML = html;
-      this.layerLbl.position.set(this.xEnd + 0.35, LY0 + lit.L * LG, 0);
+      this.layerLbl.position.set(this.bx - 0.25, LY0 + lit.L * LG, this.bd / 2);
       this.layerLbl.el.classList.remove('hide');
     } else this.layerLbl.el.classList.add('hide');
     // 输出
@@ -502,7 +503,7 @@ export class Scene {
       const st2 = Q.steps[g];
       const html = `${esc(tokPlain(st2.chosenS))}<small style="margin-left:6px;color:var(--amber)">${fmtPct(st2.p)}</small>`;
       if (this.outLbl.el.innerHTML !== html) this.outLbl.el.innerHTML = html;
-      if (open < 0.5) this.outLbl.position.set(this.box.x1 - 2, this.box.y1 + 0.2 + 0.6 * easeOut((p - 0.55) / 0.45), 0);
+      if (open < 0.5) this.outLbl.position.set(this.box.x0 + (this.box.x1 - this.box.x0) * 0.45, this.box.y1 + 0.2 + 0.6 * easeOut((p - 0.55) / 0.45), this.box.z0);
       else this.outLbl.position.set(this.tx[Math.min(row + 1, Q.T - 1)] ?? qx + S, top + 0.35 + 0.25 * easeOut(s.ph === 'head' ? p : 1), 0);
     }
     this.outLbl.el.classList.toggle('hide', !outOn);
@@ -516,7 +517,7 @@ export class Scene {
     // 照片标签
     const pl = `图片<small>${V.spec.orig[0]}×${V.spec.orig[1]} → ${V.gw * 16}×${V.gh * 16} · ${V.gh}×${V.gw} 块</small>`;
     if (this.photoLbl.el.innerHTML !== pl) this.photoLbl.el.innerHTML = pl;
-    this.photoLbl.el.classList.toggle('hide', open < 0.5 || vis.photo < 0.3);
+    this.photoLbl.el.classList.toggle('hide', open < 0.5 || vis.photo < 1 || vis.fly > 0);
   }
 
   // 根据当前步骤，算出视觉流水线各部分的状态
@@ -558,10 +559,11 @@ export class Scene {
 
   updatePhoto(vis, st, t) {
     const V = this.V, { gh, gw, Np } = V;
-    const k = [vis.split, vis.fly, vis.enter ?? 1, vis.resize ?? 1, st.dAnim > 1.5 ? 1 : 0].map((x) => x.toFixed(3)).join(',');
+    const k = [vis.split, vis.fly, vis.enter ?? 1, vis.resize ?? 1, st.dAnim > 1.5 ? 1 : 0, vis.micro ? Math.min(1, st.p * 3) : 0].map((x) => x.toFixed(3)).join(',');
+    const hot = vis.micro ? V.micro.row * gw + V.micro.col : -1;   // 微观视图里被放大的那个图块
     this.photoMat.uniforms.bright.value = 0.82 * (vis.photo >= 1 ? 1 : 0.55);
     const enter = vis.enter ?? 1;
-    const ez = (1 - easeInOut(enter)) * 3.2;
+    const ez = (1 - easeInOut(enter)) * (this.box.z0 + 2.6);   // 从外壳前面推进取景窗
     this.photoFrame.position.set(PX, PY, ez);
     this.photoFrame.material.opacity = 0.45 * (1 - vis.fly) * (st.dAnim < 1.5 || vis.photo > 0 ? 1 : 0);
     if (k === this.photoKey) return;
@@ -583,6 +585,14 @@ export class Scene {
         const sc = 1 - 0.14 * f;
         tmpS.set(sc, sc, sc);
       } else { tmpQ.copy(UPRIGHT); tmpS.set(1, 1, 1); }
+      if (i === hot) {
+        // 从塔底的格子里升起来，转向镜头，放大
+        const u = st.step.mi === 'pick' ? easeOut(Math.min(1, st.p * 2)) : 1;
+        tmpP.y += 0.9 * u;
+        tmpP.z += 0.6 * u;
+        tmpQ.slerp(UPRIGHT, u);
+        tmpS.setScalar(1 + 4 * u);
+      }
       tmpM.compose(tmpP, tmpQ, tmpS);
       this.photo.setMatrixAt(i, tmpM);
     }
@@ -652,7 +662,7 @@ export class Scene {
       this.heatKey = key;
       const a = Q.attImg(g, L);
       const hg = this.heatCv.getContext('2d');
-      drawHeat(hg, null, this.heatCv.width, this.heatCv.height, a, V.mh, V.mw, { gamma: 0.85 });
+      drawHeat(hg, V.img, this.heatCv.width, this.heatCv.height, a, V.mh, V.mw, { gamma: 0.85, dim: 0.32 });
       this.heatTex.needsUpdate = true;
       // 光束：图片里最受关注的 10 个词元 + 文字里最受关注的 4 个位置
       const pos = this.beamGeo.attributes.position.array, colA = this.beamGeo.attributes.color.array;
@@ -689,7 +699,8 @@ export class Scene {
     switch (view) {
       case 'box': {
         const b = this.box;
-        return fromFront(v3(b.cx, b.y1 / 2, b.z0), b.x1 - b.x0, b.y1 + 1.2, 0.42, s.ph === 'see' ? -0.18 : 0.1, 1.08);
+        const w = (b.x1 - b.x0) * 0.6;
+        return fromFront(v3(b.x0 + w / 2, b.y1 / 2, b.z0), w, b.y1 + 1.4, 0.4, s.ph === 'see' ? -0.22 : 0.1, 1.05);
       }
       case 'image': return fromFront(v3(PX, PY, 0), this.pw + 0.6, this.ph + 0.8, 0.08, 0, 1.25);
       case 'embed':
