@@ -91,7 +91,7 @@ tools/              导出脚本、截图测试、字体子集、版本号、发
 deploy/             服务器端 post-receive 钩子与初始化脚本
 ```
 
-改了页面上的中文标题后，重新生成字体子集：`python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf`。
+标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（四个页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`）：`python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf`。
 
 ## 部署
 
