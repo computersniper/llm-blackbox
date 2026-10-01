@@ -1,5 +1,7 @@
 // 分镜表：每个镜头的时间、机器状态、机位、字幕、数据条、事件。
 // 节拍：96 BPM（一拍 0.625 秒，一小节 2.5 秒），所有段落都卡在小节线上，配乐（compose.py）用同一张表。
+//
+// 问题：「天空为什么是蓝色的？」（q01）。字幕和数据条里的数字全部从真实数据里现取。
 import { THREE } from './lib/engine.js';
 import { path, blendCam, orbit, handheld, clamp, lerp, seg, smooth, smoother, easeOut, easeIn, easeInOut, v3, pchip } from './lib/cam.js';
 import { viewOf } from '/public/js/timeline.js';
@@ -9,10 +11,12 @@ export const BPM = 96, BEAT = 60 / BPM, BAR = 4 * BEAT;
 const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
 
 const tk = (s) => esc(tokPlain(s));
-const q = (s) => `<q>${tk(s)}</q>`;
+const q = (s) => `<q>${s === '<|endoftext|>' ? '结束符' : tk(s)}</q>`;
 const m = (s) => `<span class="m">${s}</span>`;
 const pct = (p) => fmtPct(p);
-const f = (v, d = 2) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const f2 = (v, d = 2) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+const V = (a) => v3(a[0], a[1], a[2]);
+const cam = (p, l, fov = 32) => ({ pos: V(p), look: V(l), fov });
 
 function mst(depth, g, step, p, o = {}) {
   const s = { g, ...step };
@@ -41,29 +45,35 @@ export function buildScore(Q) {
 
   const shots = [];
   const shot = (name, t0, t1, fn) => shots.push({ name, t0, t1, fn });
-  const endCam = new Map(); // 每个镜头最后一帧的机位（下一个镜头从这里平滑接过去）
+  const endCam = new Map(); // 每个镜头（及镜头内每个小段）最后一帧的机位：下一段从这里平滑接过去
   const prevCam = (name, fallback) => endCam.get(name) || fallback;
 
-  const st0 = Q.steps[0], st4 = Q.steps[4];
+  const S = (g) => Q.steps[g];
   const user = Q.tokens.map((t, i) => ({ ...t, i })).filter((t) => t.role === 'user' && !t.sp && t.s !== 'user' && t.s !== '\n');
-  const G4 = 4, LX = 20; // 拆开的那一步、那一层
-  const row4 = Q.row(G4);
-  const dot = Q.dotAt(LX, G4), neu = Q.neuronAt(LX, G4), hm4 = Q.headMMAt(G4);
-  const att13 = Q.att(LX, dot.head, row4);
-  const sinkHeads = Array.from({ length: Q.H }, (_, h) => Q.att(LX, h, row4)[0]).filter((r) => r && r.j === 0).length;
-  const lensTop = (g, L) => Q.lensAt(g, L).top[0];
+  const lens = (g, L) => Q.lensAt(g, L).top;
+  const lensTop = (g, L) => lens(g, L)[0];
+  const G0 = 0, LX = 24, GK = 14; // 拆开的是第 1 个词的第 24 层；第 15 个词「散」是第二个重点
+  const row0 = Q.row(G0), rowK = Q.row(GK);
+  const dot = Q.dotAt(LX, G0), neu = Q.neuronAt(LX, G0);
+  const attD = Q.att(LX, dot.head, row0);
+  const keyTok = Q.tokens[dot.key].s;
+  const sinkHeads = Array.from({ length: Q.H }, (_, h) => Q.att(LX, h, row0)[0]).filter((r) => r && r.j === 0).length;
+  const keyHeads = Array.from({ length: Q.H }, (_, h) => Q.att(LX, h, row0).find((r) => r.j === dot.key)).filter((r) => r && r.w > 0.2).length;
+  const hm0 = Q.headMMAt(G0), hmK = Q.headMMAt(GK);
+  const X = (M, i) => M.x(i);
 
   /* ------------------------------------------------------------ A 冷开场 0 – 12.5 */
   const qTimes = user.map((_, k) => B(0, 3) + k * BEAT);
   qTimes.forEach((t, i) => ev(t, 'type', { i }));
-  section('cold', 0, B(5), { energy: 0.15 });
+  section('cold', 0, B(5), { energy: 0.12 });
   sub(B(2, 3), B(3, 3) + 0.2, '你问它一个问题。');
   sub(B(3, 3) + 0.4, B(5) - 0.15, '在它开口之前，黑箱里发生了什么？');
-  const coldCam = path([{ t: 0, p: [-9.5, 3.0, 50], l: [0, 5.8, 0], fov: 30 }, { t: B(5), p: [-5.2, 3.9, 37.5], l: [0, 5.9, 0], fov: 30 }]);
+  const coldCam = path([{ t: 0, p: [-15, 3.0, 74], l: [0, 5.8, 0], fov: 30 }, { t: B(5), p: [-9, 4.0, 58], l: [0, 5.9, 0], fov: 30 }]);
   shot('cold', 0, B(5), (lt, t) => ({
     st: mst(1, 0, { ph: 'pass' }, 0.04 + 0.42 * smooth(seg(t, 9.5, 12.4))),
     cam: () => coldCam(t),
-    fade: t < 4.5 ? lerp(1, 0.56, smooth(seg(t, 0.4, 4.5))) : lerp(0.56, 0.3, seg(t, 4.5, 12.4)),
+    dof: { focus: 14, range: 18, blur: 9 * (1 - smooth(seg(t, 10.5, 12.5))) },
+    fade: t < 4.5 ? lerp(1, 0.62, smooth(seg(t, 0.4, 4.5))) : lerp(0.62, 0.35, seg(t, 4.5, 12.4)),
     ov: { band: 0.5, qline: smooth(seg(t, qTimes[0] - 0.6, qTimes[0])) * (1 - smooth(seg(t, 11.5, 12.35))), qScale: 1 + 0.05 * smooth(seg(t, 11.5, 12.35)), qBlur: 7 * smooth(seg(t, 11.5, 12.35)) },
   }));
 
@@ -72,43 +82,42 @@ export function buildScore(Q) {
   section('title', B(5), B(8), { energy: 0.35 });
   const titleCam = (lt) => {
     const k = smooth(lt / 7.5);
-    const yaw = THREE.MathUtils.degToRad(lerp(-33, -12, k)), R = lerp(31, 27.5, k), h = lerp(2.3, 3.6, k);
+    const yaw = THREE.MathUtils.degToRad(lerp(-34, -13, k)), R = lerp(50, 45, k), h = lerp(2.4, 3.8, k);
     const look = v3(0, 5.6, 0);
     return { pos: look.clone().add(v3(R * Math.sin(yaw), h - 5.6, R * Math.cos(yaw))), look, fov: 32 };
   };
   shot('title', B(5), B(8), (lt) => ({
     st: mst(1, 0, { ph: 'pass' }, 0.04),
     cam: () => titleCam(lt),
-    fade: 0.32 * (1 - smooth(seg(lt, 0, 0.6))),
+    fade: 0.38 * (1 - smooth(seg(lt, 0, 0.6))) + 0.25,
     ov: { band: 0, title: smooth(seg(lt, 0.1, 1.0)) * (1 - smooth(seg(lt, 6.3, 7.3))), titleK: seg(lt, 0.05, 3.4), titleBlur: 7 * smooth(seg(lt, 6.3, 7.3)) },
+    dof: { focus: 20, range: 30, blur: 3 },
   }));
 
   /* ------------------------------------------------------------ C 揭开 + 分词 20 – 30 */
   section('tokenize', B(8), B(12), { energy: 0.45 });
   chapter(B(8) + 0.3, B(12) - 0.2, '01', '分词', 'TOKENIZE');
   ev(B(8), 'open');
-  ev(B(9) - 0.1, 'whoosh');
+  ev(B(8, 3), 'whoosh');
   const dropT0 = 23.0, dropD = 4.0;
   const landT = (i) => dropT0 + dropD * ((i / Q.P) * 0.7 + 0.3);
-  for (let i = 0; i < Q.P; i++) ev(landT(i), 'tick', { i, k: Q.tokens[i].role === 'user' ? 1 : 0.5 });
+  for (let i = 0; i < Q.P; i++) ev(landT(i), 'tick', { i, k: Q.tokens[i].role === 'user' ? 1 : 0.45 });
   sub(B(8) + 0.4, B(9) + 0.6, '第一步：分词。');
   sub(B(9) + 0.9, B(10) + 1.8, `聊天模板把系统提示、你的问题和特殊标记拼在一起：一共 ${m(Q.P)} 个词元。`);
-  sub(B(10) + 2.1, B(12) - 0.2, '注意，「首都是」被切成了「首」和「都是」——分词并不管词义。');
+  sub(B(10) + 2.1, B(12) - 0.2, `模型看到的不是文字，而是一串编号：${q(user[3].s)}是 ${m(user[3].id)}。`);
   strip(B(10) + 2.1, B(12) - 0.2, user.map((t) => `<span class="tk">${tk(t.s)}</span> ${m(t.id)}`).join('<span class="sep"></span>'));
-  const xEnd = (i) => (i < 0 ? -1 : 0); void xEnd;
   const tokCamKeys = (M) => {
-    const X = (i) => M.x(i);
-    const tr = (i, dx = -3.4, dy = 1.25, dz = 4.6) => ({ p: [X(i) + dx, 0.3 + dy, dz], l: [X(i) + 0.6, 0.28, 0] });
-    const u0 = user[0].i, u1 = user[user.length - 1].i, uc = (X(u0) + X(u1)) / 2;
+    const tr = (i) => ({ p: [X(M, i) - 3.0, 1.75, 4.4], l: [X(M, i) + 0.9, 0.22, 0] });
+    const uc = (X(M, user[0].i) + X(M, user[user.length - 1].i)) / 2;
     const T = titleCam(7.5);
     return [
       { t: 0, p: T.pos.toArray(), l: T.look.toArray(), fov: 32 },
-      { t: 2.4, p: [-2.6, 8.2, 19.0], l: [-1.2, 2.4, 0], fov: 32 },
-      { t: landT(0) - B(8) - 0.15, ...tr(0), fov: 30 },
+      { t: 2.4, p: [-4.5, 6.8, 37], l: [-3.0, 4.0, 0], fov: 32 },
+      { t: landT(0) - B(8) - 0.1, ...tr(0), fov: 30 },
       { t: landT(19) - B(8), ...tr(19), fov: 30 },
-      { t: landT(38) - B(8), ...tr(38, -3.0, 1.3, 4.5), fov: 30 },
-      { t: 7.6, p: [uc - 1.6, 1.75, 4.6], l: [uc + 0.25, 0.22, 0], fov: 30 },
-      { t: 10.0, p: [uc - 1.0, 1.35, 3.85], l: [uc + 0.25, 0.2, 0], fov: 30 },
+      { t: landT(38) - B(8), ...tr(38), fov: 30 },
+      { t: 7.6, p: [uc - 1.5, 1.85, 4.9], l: [uc + 0.25, 0.2, 0], fov: 30 },
+      { t: 10.0, p: [uc - 1.0, 1.5, 4.1], l: [uc + 0.25, 0.18, 0], fov: 30 },
     ];
   };
   let tokPath = null;
@@ -118,36 +127,35 @@ export function buildScore(Q) {
       st: mst(2, 0, { ph: 'read' }, seg(t, dropT0, dropT0 + dropD), { dAnim: dA }),
       cam: () => { tokPath ||= path(tokCamKeys(M)); return tokPath(lt); },
       extras: { ids: smooth(seg(t, landT(0), landT(0) + 0.5)), idsFocus: t > 27.4 },
-      ov: { cornerA: 0 },
     };
   });
 
   /* ------------------------------------------------------------ D 嵌入 30 – 37.5 */
   section('embed', B(12), B(15), { energy: 0.5 });
   chapter(B(12) + 0.3, B(15) - 0.2, '02', '嵌入', 'EMBEDDING');
-  for (let i = 0; i < Q.P; i += 3) ev(30.5 + (i / Q.P) * 0.55 * 2.7, 'blip', { i });
+  for (let i = 0; i < Q.P; i += 2) ev(30.4 + 3.4 * ((i / Q.P) * 0.5 + 0.5), 'blip', { i });
   sub(B(12) + 0.4, B(13) + 1.8, `每个编号去嵌入表里，取出属于自己的那一行：${m('1024')} 个数。`);
   sub(B(13) + 2.1, B(15) - 0.2, `从这里开始，每个词元都是一个 ${m('1024')} 维的向量。`);
-  strip(B(12) + 0.6, B(15) - 0.2, `嵌入表 ${m('151,936 × 1,024')}<span class="sep"></span>${m('155,582,464')} 个参数<span class="sep"></span>「法国」= 第 ${m(user[0].id)} 行`);
+  strip(B(12) + 0.6, B(15) - 0.2, `嵌入表 ${m('151,936 × 1,024')}<span class="sep"></span>${m('155,582,464')} 个参数<span class="sep"></span>${q(user[0].s)}在第 ${m(user[0].id)} 行`);
   let embPath = null;
   shot('embed', B(12), B(15), (lt, t, { M }) => {
     const keys = tokCamKeys(M);
     const last = keys[keys.length - 1];
     embPath ||= path([
       { t: 0, p: last.p, l: last.l, fov: 30 },
-      { t: 2.6, p: [-6.2, 4.5, 17.0], l: [-3.4, 3.0, 0], fov: 32 },
-      { t: 7.5, p: [-3.6, 5.9, 18.6], l: [-1.4, 3.5, 0], fov: 32 },
+      { t: 2.8, p: [-6.6, 4.4, 21.5], l: [-8.0, 4.4, -0.6], fov: 32 },
+      { t: 7.5, p: [-7.6, 4.9, 19.4], l: [-8.1, 4.5, -0.6], fov: 32 },
     ]);
     return {
-      st: mst(2, 0, { ph: 'embed' }, seg(t, 32.0, 36.2), { dAnim: 2.6 }),
+      st: mst(2, 0, { ph: 'embed' }, seg(t, 33.4, 37.0), { dAnim: 2.6 }),
       cam: () => embPath(lt),
-      extras: { ids: 1 - smooth(seg(t, 30.0, 30.8)), idsFocus: true, emb: smooth(seg(t, 30.0, 30.7)) * (1 - smooth(seg(t, 36.6, 37.5))), embK: seg(t, 30.4, 33.6) },
-      ov: { cornerA: 0 },
+      slabDim: 0.88 * smooth(seg(t, 30.0, 31.0)) * (1 - smooth(seg(t, 36.2, 37.5))),
+      extras: { ids: 1 - smooth(seg(t, 30.0, 30.8)), idsFocus: true, emb: smooth(seg(t, 30.2, 31.0)) * (1 - smooth(seg(t, 36.4, 37.4))), embK: seg(t, 30.6, 34.0) },
     };
   });
 
   /* ------------------------------------------------------------ E 第 1 个词：28 层 37.5 – 60 */
-  section('layers1', B(15), B(24), { energy: 0.75 });
+  section('layers1', B(15), B(24), { energy: 0.78 });
   chapter(B(15) + 0.3, B(24) - 0.2, '03', '穿过 28 层', 'TRANSFORMER LAYERS');
   const sched1 = lay(B(15, 3), [
     { L: 0, d: 2 * BEAT },
@@ -157,181 +165,63 @@ export function buildScore(Q) {
     { L: 24, d: 4 * BEAT },
     { L: 25, d: BEAT }, { L: 26, d: BEAT }, { L: 27, d: BEAT },
   ]);
-  sched1.forEach((s) => ev(s.t0, 'layer', { L: s.L, k: s.d > BEAT * 1.5 ? 1 : 0.6 }));
-  ev(sched1[21].t0, 'reveal', { k: 0.8 });
-  ev(sched1[24].t0, 'reveal', { k: 1 });
   const l1 = (L) => sched1.find((s) => s.L === L);
+  sched1.forEach((s) => ev(s.t0, 'layer', { L: s.L, k: s.d > BEAT * 1.5 ? 1 : 0.6 }));
+  ev(l1(21).t0, 'reveal', { k: 0.7 });
+  ev(l1(24).t0, 'reveal', { k: 1.1 });
+  const hold1 = l1(27).t1; // 28 层走完
   sub(B(15) + 0.3, B(16) + 1.2, '然后，穿过 28 层 Transformer。');
   sub(B(16) + 1.5, l1(17).t0 - 0.15, '每过一层，用「逻辑透镜」偷看一眼：如果此刻就开口，它会说什么？');
-  sub(l1(17).t0 + 0.1, l1(21).t0 - 0.1, `前二十层，还说不出像样的词：${q(lensTop(0, 17)[2])}、${q(lensTop(0, 18)[2] === '<|endoftext|>' ? '结束符' : lensTop(0, 18)[2])}……`);
-  sub(l1(21).t0 + 0.05, l1(24).t0 - 0.1, `第 21 层：${q(lensTop(0, 21)[2])} ${m(pct(lensTop(0, 21)[1]))}。`);
-  sub(l1(24).t0 + 0.05, l1(25).t0 + 0.4, `第 24 层，它想到的是${q(lensTop(0, 24)[2])}（${m(pct(lensTop(0, 24)[1]))}）——答案已经在了。`);
-  sub(l1(25).t0 + 0.6, B(22) + 1.0, `可现在要说的是第一个词：最后一层，${q(lensTop(0, 27)[2])} ${m(pct(lensTop(0, 27)[1]))}。`);
-  sub(B(22) + 1.3, B(24) - 0.2, `向量一层层往上累加：长度从 ${m(Q.norm(0, Q.row(0)).toFixed(1))} 涨到 ${m(Math.max(...Array.from({ length: NL }, (_, L) => Q.norm(L, Q.row(0)))).toFixed(0))}。`);
+  sub(l1(17).t0 + 0.1, l1(21).t0 - 0.1, `前面十几层，还说不出像样的词：${q(lensTop(0, 17)[2])}、${q(lensTop(0, 18)[2])}……`);
+  sub(l1(21).t0 + 0.05, l1(24).t0 - 0.1, `第 21 层：${q(lensTop(0, 21)[2])} ${m(pct(lensTop(0, 21)[1]))}——它想直接回答「为什么」。`);
+  sub(l1(24).t0 + 0.05, l1(25).t0 - 0.05, `第 24 层，它改口了：${q(lensTop(0, 24)[2])} ${m(pct(lensTop(0, 24)[1]))}。`);
+  sub(l1(25).t0 + 0.05, B(23) - 0.2, `最后一层：${q(lensTop(0, 27)[2])} ${m(pct(lensTop(0, 27)[1]))}。先把问题复述一遍，再解释原因。`);
+  sub(B(23), B(24) - 0.15, '第 24 层发生了什么？停下来，把它拆开。');
   for (const s of sched1) {
     const top = lensTop(0, s.L);
-    strip(s.t0, s.t1 + (s.L === 27 ? 4.6 : 0), `<span class="k">L${String(s.L).padStart(2, '0')}</span><span class="v">此刻开口：${q(top[2])} ${m(pct(top[1]))}</span>`, { fin: 0.06, fout: 0.06 });
+    strip(s.t0, s.t1 + (s.L === 27 ? B(23) - hold1 - 0.1 : 0), `<span class="k">L${String(s.L).padStart(2, '0')}</span><span class="v">此刻开口：${q(top[2])} ${m(pct(top[1]))}</span>`, { fin: 0.06, fout: 0.06 });
   }
-  const camLayers1 = (M, t) => {
-    const Ls = [[B(15), 0], [l1(0).t0, 0], [l1(17).t0, 15.5], [l1(21).t0, 20.0], [l1(24).t0, 23.2], [l1(25).t0, 24.4], [B(22), 27.0]];
-    const Lc = pchip(Ls.map((a) => a[0]), Ls.map((a) => a[1]))(t);
+  const towerCam = (M, Lc, g, o = {}) => {
     const y = 0.95 + Lc * 0.26;
-    const yaw = lerp(-6, 10, smooth(seg(t, B(15), B(22))));
-    const look = v3(7.6, y + 0.1, 0.3);
-    const base = { pos: look.clone().add(v3(5.0, 1.45, 8.6)), look, fov: 32 };
-    return orbit(base, yaw, 0, 1);
+    const xf = M.x(Q.row(g));
+    const look = v3(xf + (o.lx ?? -1.2), y - 0.25, -0.2);
+    return orbit({ pos: look.clone().add(v3(o.dx ?? 6.6, o.dy ?? 3.4, o.dz ?? 8.6)), look, fov: 32 }, o.yaw ?? 0, 0, o.dist ?? 1);
   };
-  let l1Path = null;
+  const camLayers1 = (M, t) => {
+    const Ls = [[B(15), 0.5], [l1(0).t0, 0.5], [l1(17).t0, 15.5], [l1(21).t0, 20.0], [l1(24).t0, 23.2], [l1(25).t0, 24.3], [hold1, 26.5]];
+    const Lc = pchip(Ls.map((a) => a[0]), Ls.map((a) => a[1]))(t);
+    return towerCam(M, Lc, 0, { yaw: lerp(-4, 8, smooth(seg(t, B(15), hold1))) });
+  };
+  let e1In = null;
   shot('layers1', B(15), B(24), (lt, t, { M }) => {
     const s = pick(sched1, t);
     const before = t < sched1[0].t0;
     const st = mst(3, 0, { ph: 'layer', L: s.L }, before ? 0 : s.p, { dAnim: 3 });
-    const cam = () => {
-      const live = camLayers1(M, t);
-      if (lt < 2.2) { // 从嵌入的远景接进来
-        l1Path ||= path([{ t: 0, p: [-3.6, 5.9, 18.6], l: [-1.4, 3.5, 0], fov: 32 }, { t: 2.2, p: camLayers1(M, B(15) + 2.2).pos.toArray(), l: camLayers1(M, B(15) + 2.2).look.toArray(), fov: 32 }]);
-        return blendCam(l1Path(lt), live, smoother(lt / 2.2));
-      }
-      if (t > B(22)) { // 拉开：整座塔
-        const far = { pos: v3(19.5, 9.4, 21.5), look: v3(3.8, 5.0, 0), fov: 32 };
-        return blendCam(live, far, smoother(seg(t, B(22), B(24) - 0.3)));
-      }
-      return handheld(live, t, 0.004);
-    };
-    return {
-      st, cam,
-      ov: { lens: { a: smooth(seg(t, B(16) + 1.5, B(16) + 2.2)) * (1 - smooth(seg(t, B(24) - 0.8, B(24)))), g: 0, upto: before ? -0.01 : s.L + (s.L === 27 ? 1 : s.p) - 0.0001, other: '巴黎' }, corner: { g: 0, L: before ? null : s.L }, cornerA: smooth(seg(t, B(15), B(15) + 0.6)) },
-    };
-  });
-
-  /* ------------------------------------------------------------ F0 第 1 个词：输出与采样 60 – 70 */
-  section('sample1', B(24), B(28), { energy: 0.6 });
-  chapter(B(24) + 0.3, B(28) - 0.2, '04', '输出与采样', 'SAMPLING');
-  const samp1 = lay(B(24), [
-    { s: { ph: 'head', sub: 'norm' }, d: 1.5 * BEAT },
-    { s: { ph: 'head', sub: 'unembed' }, d: 1.5 * BEAT },
-    { s: { ph: 'head', sub: 'softmax' }, d: 3 * BEAT },
-    { s: { ph: 'sample', sub: 'temp' }, d: 2 * BEAT },
-    { s: { ph: 'sample', sub: 'topk' }, d: BEAT },
-    { s: { ph: 'sample', sub: 'topp' }, d: 2 * BEAT },
-    { s: { ph: 'sample', sub: 'draw' }, d: 6 * BEAT },
-  ]);
-  const draw1 = samp1[6];
-  ev(draw1.t0 + 0.05, 'dice');
-  ev(draw1.t0 + draw1.d * 0.8, 'emit', { g: 0 });
-  sub(B(24) + 0.3, samp1[2].t0 + 0.9, `输出头给 ${m('151,936')} 个词元各打一个分，softmax 成概率。`);
-  sub(samp1[2].t0 + 1.2, samp1[4].t0 - 0.1, `${q(st0.top[0][2])} ${m(pct(st0.top[0][1]))}，${q(st0.top[1][2])} ${m(pct(st0.top[1][1]))}。温度 0.7 让高的更高：${m(pct(st0.temps['0.7'][0]))}。`);
-  sub(samp1[4].t0 + 0.1, draw1.t0 + 1.5, `top-k、top-p 截断之后，只剩 ${m(st0.pool.length)} 个候选。`);
-  sub(draw1.t0 + 1.8, B(28) - 0.15, `随机数 u = ${m(st0.u.toFixed(3))}。第一个词：${q(st0.chosenS)}。`);
-  strip(samp1[2].t0 + 0.2, samp1[3].t0, `logits ${m('[1 × 151936]')} → softmax`);
-  strip(samp1[3].t0 + 0.1, samp1[5].t0 + 0.4, `÷ 温度 ${m('0.7')} → 前 ${m('20')} 名 → 累计 ${m('80%')}`);
-  strip(draw1.t0 + 0.2, B(28) - 0.15, `候选池：${q(st0.pool[0][2])} ${m(pct(st0.pool[0][1]))}<span class="sep"></span>u = ${m(st0.u.toFixed(4))}`);
-  const headCam = (M, st, dx = 1.3, dy = 0.85, dz = 7.7) => {
-    const hx = M.headX(st);
-    const look = v3(hx, M.yTop + 1.65, 0.1);
-    return { pos: look.clone().add(v3(dx, dy, dz)), look, fov: 32 };
-  };
-  shot('sample1', B(24), B(28), (lt, t, { M }) => {
-    const s = pick(samp1, t);
-    const st = mst(4, 0, s.s, s.p, { dAnim: 4 });
     return {
       st,
       cam: () => {
-        const live = headCam(M, st, lerp(1.6, 0.6, smooth(lt / 10)), lerp(1.1, 0.7, smooth(lt / 10)), lerp(8.6, 7.2, smooth(lt / 10)));
-        const from = prevCam('layers1', live);
-        return blendCam(from, live, smoother(seg(lt, 0, 2.0)));
+        const live = camLayers1(M, t);
+        if (lt < 2.4) { // 从嵌入的远景接进来
+          e1In ||= prevCam('embed', live);
+          return blendCam(e1In, live, smoother(lt / 2.4));
+        }
+        if (t > hold1) { // 拉开看整座塔，再往第 24 层扎下去
+          const wide = towerCam(M, 14, 0, { lx: -5, dx: 13, dy: 4.6, dz: 22 });
+          const dive = cam([3.4, 8.9, 7.6], [0.5, 7.7, 0.2]);
+          const k1 = smoother(seg(t, hold1, B(23) + 0.3)), k2 = smoother(seg(t, B(23) + 0.3, B(24)));
+          return blendCam(blendCam(live, wide, k1), dive, k2);
+        }
+        return handheld(live, t, 0.003);
       },
-      ov: { corner: { g: 0, what: s.s.sub === 'draw' ? '采样' : '输出头' }, cornerA: 1 },
+      lensWin: t > hold1 ? 28 : 9,
+      ov: { lens: { a: smooth(seg(t, B(16) + 1.5, B(16) + 2.2)) * (1 - smooth(seg(t, B(23) + 0.2, B(23) + 1.0))), g: 0, upto: before ? -0.01 : s.L + (s.L === 27 ? 1 : s.p) - 0.0001, other: lensTop(0, 21)[2], side: 'left' }, corner: { g: 0, L: before ? null : s.L }, cornerA: smooth(seg(t, B(15), B(15) + 0.6)) },
     };
   });
 
-  /* ------------------------------------------------------------ G1 自回归：第 2 – 4 个词 70 – 80 */
-  section('loop1', B(28), B(32), { energy: 0.7 });
-  chapter(B(28) + 0.3, B(32) - 0.2, '05', '自回归', 'AUTOREGRESSION');
-  const PH = [{ ph: 'read', d: 0.2 }, { ph: 'embed', d: 0.1 }, { ph: 'layers', d: 0.32 }, { ph: 'head', d: 0.12 }, { ph: 'sample', d: 0.26 }];
-  const tokSched = (g, t0, d) => ({ g, t0, t1: t0 + d, d, emit: t0 + d * (1 - 0.26 * 0.2) });
-  const loop1 = [tokSched(1, B(28), 1.5 * BAR), tokSched(2, B(29, 2), 1.25 * BAR), tokSched(3, B(30, 3), 1.25 * BAR)];
-  loop1.forEach((s) => ev(s.emit, 'emit', { g: s.g }));
-  const loopState = (list, t) => {
-    const s = list.find((x) => t < x.t1) || list[list.length - 1];
-    let u = clamp((t - s.t0) / s.d), acc = 0;
-    for (const ph of PH) { if (u < acc + ph.d || ph === PH[PH.length - 1]) return { g: s.g, ph: ph.ph, p: clamp((u - acc) / ph.d) }; acc += ph.d; }
-    return null;
-  };
-  sub(B(28) + 0.3, B(29) + 1.6, `${q(st0.chosenS)} 接回序列末尾，整套计算再来一遍：这叫自回归。`);
-  sub(B(29) + 1.9, B(31) - 0.1, '前面词元的 K、V 都存在缓存里，每一步只需要算新来的这一个。');
-  sub(B(31) + 0.1, B(32) - 0.15, `${q(Q.steps[1].chosenS)}、${q(Q.steps[2].chosenS)}、${q(Q.steps[3].chosenS)}……下一个，是关键的那个词。`);
-  const machineCam = (M, t, yaw, distK = 1, dy = 0) => {
-    const look = v3(0.8, 4.6 + dy, 0);
-    const base = { pos: look.clone().add(v3(1.5, 2.6, 25.5 * distK)), look, fov: 32 };
-    return orbit(base, yaw, 0, 1);
-  };
-  shot('loop1', B(28), B(32), (lt, t, { M }) => {
-    const s = loopState(loop1, t);
-    const st = mst(2, s.g, { ph: s.ph }, s.p, { dAnim: 2.7 });
-    const n = 1 + loop1.filter((x) => t >= x.emit).length;
-    const newest = loop1.filter((x) => t >= x.emit).pop();
-    return {
-      st,
-      cam: () => {
-        const live = machineCam(M, t, lerp(24, 4, smooth(lt / 10)), lerp(0.92, 1.0, smooth(lt / 10)));
-        return blendCam(prevCam('sample1', live), live, smoother(seg(lt, 0, 2.4)));
-      },
-      ov: { reply: { a: smooth(seg(lt, 0.2, 0.8)), n, k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.4)) : 1 }, corner: { g: s.g }, cornerA: 1 },
-    };
-  });
-
-  /* ------------------------------------------------------------ G2 第 5 个词：再穿过 28 层 80 – 95 */
-  section('layers5', B(32), B(38), { energy: 0.8 });
-  chapter(B(32) + 0.3, B(38) - 0.2, '06', `第 5 个词`, 'THE KEY TOKEN');
-  const sched5 = lay(B(32), [
-    { s: { ph: 'read' }, d: 0.6 }, { s: { ph: 'embed' }, d: 2 * BEAT - 0.6 },
-    ...Array.from({ length: 16 }, (_, k) => ({ L: k, d: BEAT / 2 })),
-    ...Array.from({ length: 4 }, (_, k) => ({ L: 16 + k, d: BEAT })),
-    { L: 20, d: 2 * BEAT }, { L: 21, d: 2 * BEAT }, { L: 22, d: 3 * BEAT },
-    { L: 22, d: B(38) - B(32) - (2 + 8 + 4 + 2 + 2 + 3) * BEAT, hold: true },
-  ]);
-  sched5.forEach((s) => { if (s.L != null && !s.hold) ev(s.t0, 'layer', { L: s.L, k: s.d > BEAT * 1.5 ? 1 : 0.6 }); });
-  const l5 = (L) => sched5.find((s) => s.L === L && !s.hold);
-  ev(l5(20).t0, 'reveal', { k: 0.7 });
-  ev(l5(22).t0, 'reveal', { k: 1.2 });
-  sub(B(32) + 0.3, B(33) + 1.0, `第 5 个词。同样的 28 层，再走一遍。`);
-  sub(B(33) + 1.3, l5(16).t0 - 0.1, `透镜里先是一些标点、${q(lensTop(4, 17)[2])}、${q(lensTop(4, 18)[2])}……`);
-  sub(l5(16).t0 + 0.1, l5(20).t0 - 0.1, '它在等：后面该填一个地名。');
-  sub(l5(20).t0 + 0.05, l5(21).t0 - 0.1, `第 20 层：好几个注意力头回头盯住了「法国」。`);
-  sub(l5(21).t0 + 0.05, l5(22).t0 - 0.1, `第 21 层：${q(lensTop(4, 21)[2])} ${m(pct(lensTop(4, 21)[1]))}。`);
-  sub(l5(22).t0 + 0.05, B(38) - 0.15, `第 22 层：${q(lensTop(4, 22)[2])} ${m(pct(lensTop(4, 22)[1]))}。它是怎么想到的？回到第 20 层。`);
-  for (const s of sched5) {
-    if (s.L == null || s.hold) continue;
-    const top = lensTop(4, s.L);
-    strip(s.t0, s.t1 + (s.L === 22 ? sched5[sched5.length - 1].d : 0), `<span class="k">L${String(s.L).padStart(2, '0')}</span><span class="v">此刻开口：${q(top[2])} ${m(pct(top[1]))}</span>`, { fin: 0.06, fout: 0.06 });
-  }
-  const camLayers5 = (M, t) => {
-    const Ls = [[B(32), -1.5], [l5(0).t0, 0], [l5(16).t0, 14.5], [l5(20).t0, 19.0], [l5(22).t0, 21.4], [B(37), 22.0], [B(38), 20.4]];
-    const Lc = pchip(Ls.map((a) => a[0]), Ls.map((a) => a[1]))(t);
-    const y = 0.95 + Lc * 0.26;
-    const look = v3(6.4, y + 0.15, 0.2);
-    const base = { pos: look.clone().add(v3(-2.6, 2.3, 8.9)), look, fov: 32 };
-    return orbit(base, lerp(4, -10, smooth(seg(t, B(32), B(38)))), 0, lerp(1, 0.88, smooth(seg(t, l5(20).t0, B(38)))));
-  };
-  shot('layers5', B(32), B(38), (lt, t, { M }) => {
-    const s = pick(sched5, t);
-    const st = s.L == null ? mst(3, G4, s.s, s.p, { dAnim: 3 }) : mst(3, G4, { ph: 'layer', L: s.L }, s.hold ? 1 : s.p, { dAnim: 3 });
-    return {
-      st,
-      cam: () => { const live = handheld(camLayers5(M, t), t, 0.004); return blendCam(prevCam('loop1', live), live, smoother(seg(lt, 0, 2.2))); },
-      ov: {
-        lens: { a: smooth(seg(t, B(33) + 1.3, B(33) + 2.0)) * (1 - smooth(seg(t, B(38) - 0.6, B(38)))), g: G4, upto: s.L == null ? -0.01 : s.L + (s.hold ? 1 : s.p) - 0.0001, other: '法国' },
-        reply: { a: 1 - smooth(seg(lt, 0, 0.8)), n: 4, k: 1 },
-        corner: { g: G4, L: s.L }, cornerA: 1,
-      },
-    };
-  });
-
-  /* ------------------------------------------------------------ H 拆开第 20 层 95 – 165 */
-  section('dissect', B(38), B(66), { energy: 0.55 });
-  chapter(B(38) + 0.3, B(66) - 0.2, '07', '拆开第 20 层', 'INSIDE LAYER 20');
-  const D = lay(B(38), [
+  /* ------------------------------------------------------------ H 拆开第 24 层 60 – 130 */
+  section('dissect', B(24), B(52), { energy: 0.55 });
+  chapter(B(24) + 0.3, B(52) - 0.2, '04', `拆开第 ${LX} 层`, `INSIDE LAYER ${LX}`);
+  const D = lay(B(24), [
     { key: 'over', depth: 4, s: { op: 'ln1' }, d: 2 * BAR, p0: true },
     { key: 'ln1', depth: 4, s: { op: 'ln1' }, d: 2 * BAR },
     { key: 'qkv', depth: 5, s: { op: 'attn', sub: 'qkv' }, d: 3 * BAR },
@@ -355,215 +245,340 @@ export function buildScore(Q) {
     { key: 'out', depth: 4, s: null, d: BAR },
   ]);
   const Dk = (k) => D.find((x) => x.key === k);
-  // 事件
   D.forEach((x) => { if (['ln1', 'qkv', 'score', 'mix', 'add1', 'up', 'act', 'down', 'pick', 'silu', 'gate'].includes(x.key)) ev(x.t0, 'step', { k: 0.6 }); });
-  ev(Dk('over').t0, 'hit', { k: 0.7 });
+  ev(Dk('over').t0, 'hit', { k: 0.8 });
   ev(Dk('dmul').t0, 'hit', { k: 0.5 });
-  for (let h = 0; h < 16; h++) ev(Dk('heads').t0 + h * (Dk('heads').d / 16), 'tick', { k: h === dot.head ? 1 : 0.45 });
-  for (let k = 0; k < 12; k++) ev(Dk('mul').t0 + (k / 12) * Dk('mul').d / 1.1, 'tick', { k: 0.4 });
-  for (let k = 0; k < 16; k++) ev(Dk('bits').t0 + 0.6 + k * 0.09, 'bit', { k });
+  for (let h = 0; h < 16; h++) ev(Dk('heads').t0 + 0.1 + h * (2.4 / 16), 'tick', { k: 0.4 });
+  ev(Dk('heads').t0 + 2.6, 'reveal', { k: 0.6 });
+  for (let k = 0; k < 12; k++) ev(Dk('mul').t0 + (k / 12) * Dk('mul').d / 1.1, 'tick', { k: 0.35 });
+  for (let k = 0; k < 12; k++) ev(Dk('dmul').t0 + (k / 12) * Dk('dmul').d / 1.15, 'tick', { k: 0.3 });
+  for (let k = 0; k < 16; k++) ev(Dk('bits').t0 + 0.8 + k * 0.08, 'bit', { k });
   ev(Dk('out').t0, 'whoosh', { k: 1 });
-  ev(Dk('out').t1, 'hit', { k: 0.6 });
-  // 字幕
-  const inNorm = Q.norm(LX - 1, row4);
-  sub(Dk('over').t0 + 0.3, Dk('over').t0 + 2.4, '把第 20 层拆开。');
+  const inNorm = Q.norm(LX - 1, row0);
+  sub(Dk('over').t0 + 0.3, Dk('over').t0 + 2.4, `这是第 ${LX} 层。`);
   sub(Dk('over').t0 + 2.6, Dk('ln1').t0 - 0.1, '每一层都是同样的六步：归一化、注意力、残差，归一化、前馈、残差。');
   sub(Dk('ln1').t0 + 0.2, Dk('qkv').t0 - 0.15, 'RMSNorm：把向量除以它的均方根，再乘一组学到的缩放系数。');
-  strip(Dk('ln1').t0 + 0.4, Dk('qkv').t0 - 0.15, `进入第 20 层的向量 ‖x‖ = ${m(inNorm.toFixed(1))}<span class="sep"></span>均方根 ${m((inNorm / 32).toFixed(2))} → ${m('1')}`);
+  strip(Dk('ln1').t0 + 0.4, Dk('qkv').t0 - 0.15, `进入第 ${LX} 层的向量（最后一个位置）‖x‖ = ${m(inNorm.toFixed(1))}<span class="sep"></span>均方根 ${m((inNorm / 32).toFixed(2))} → ${m('1')}`);
   sub(Dk('qkv').t0 + 0.3, Dk('qkv').t0 + 3.5, '注意力：先乘三块权重矩阵，得到 Q、K、V。');
   sub(Dk('qkv').t0 + 3.8, Dk('score').t0 - 0.15, 'Q 有 16 个头，K、V 只有 8 个：每两个查询头共用一组（GQA）。');
-  card(Dk('qkv').t0 + 0.6, Dk('score').t0 - 0.2, `<span class="k">SHAPES · 解码阶段每步只算 1 个位置</span><span class="m">h [1×1024] @ W<sub>q</sub> [1024×2048] → q：<b>16</b> 头 × 128</span><br><span class="m">h [1×1024] @ W<sub>k</sub> [1024×1024] → k：<b>8</b> 头 × 128</span><br><span class="m">h [1×1024] @ W<sub>v</sub> [1024×1024] → v：<b>8</b> 头 × 128</span><br>k、v 存进 KV 缓存：现在一共 <b>${row4 + 1}</b> 个位置`, { style: 'left:76px;top:150px' });
-  sub(Dk('score').t0 + 0.2, Dk('softmax').t0 - 0.1, `新词元的 Q，和缓存里 ${m(row4 + 1)} 个 K 逐一做点积，再除以 √128。`);
+  card(Dk('qkv').t0 + 0.6, Dk('score').t0 - 0.2, `<span class="k">预填充：${Q.P} 个位置一起算</span><span class="m">h [${Q.P}×1024] @ W<sub>q</sub> [1024×2048] → Q：<b>16</b> 头 × 128</span><br><span class="m">h [${Q.P}×1024] @ W<sub>k</sub> [1024×1024] → K：<b>8</b> 头 × 128</span><br><span class="m">h [${Q.P}×1024] @ W<sub>v</sub> [1024×1024] → V：<b>8</b> 头 × 128</span><br>K、V 存进缓存；下面只看最后一个位置`, { style: 'left:76px;top:150px' });
+  sub(Dk('score').t0 + 0.2, Dk('softmax').t0 - 0.1, `最后一个位置的 Q，和全部 ${m(Q.P)} 个 K 逐一做点积，再除以 √128。`);
   sub(Dk('softmax').t0 + 0.1, Dk('heads').t0 - 0.1, 'softmax：打分变成权重，每一行加起来等于 1。');
-  sub(Dk('heads').t0 + 0.1, Dk('heads').t0 + 2.4, `16 个头各看各的。${m(sinkHeads)} 个头把最多的注意力放在开头的标记上——这叫「注意力汇」。`);
-  sub(Dk('heads').t0 + 2.6, Dk('dmul').t0 - 0.1, `第 ${dot.head} 头：${m(pct(att13[0].w))} 的注意力给了${q(Q.tokens[att13[0].j].s)}。`);
-  sub(Dk('dmul').t0 + 0.1, Dk('dsum').t0 - 0.1, `放大这一次打分：两个 128 维向量，逐项相乘。`);
-  sub(Dk('dsum').t0 + 0.05, Dk('mix').t0 - 0.1, `加起来 q·k = ${m(f(dot.sum, 2))}，÷ √128 = ${m(f(dot.score, 2))}，softmax 后 ${m(pct(dot.w))}。`);
-  sub(Dk('mix').t0 + 0.1, Dk('add1').t0 - 0.1, '按权重把 V 加起来：「法国」的信息被搬到了这里。');
-  sub(Dk('add1').t0 + 0.1, Dk('up').t0 - 0.1, '再乘 W_o 回到 1024 维，加回残差流。');
-  sub(Dk('up').t0 + 0.1, Dk('act').t0 - 0.1, '前馈网络 SwiGLU：先把 1024 维扩成 3072 维。');
+  sub(Dk('heads').t0 + 0.1, Dk('heads').t0 + 2.4, `16 个头各看各的：${m(sinkHeads)} 个头把最多的注意力放在开头的标记上（注意力汇）。`);
+  sub(Dk('heads').t0 + 2.6, Dk('dmul').t0 - 0.1, `${m(keyHeads)} 个头在看问题里的${q(keyTok)}——第 ${m(dot.head)} 头给了它 ${m(pct(attD[0].w))}。`);
+  sub(Dk('dmul').t0 + 0.1, Dk('dsum').t0 - 0.1, '放大这一次打分：两个 128 维向量，逐项相乘。');
+  sub(Dk('dsum').t0 + 0.05, Dk('mix').t0 - 0.1, `加起来 q·k = ${m(f2(dot.sum))}，÷ √128 = ${m(f2(dot.score))}，softmax 之后 ${m(pct(dot.w))}。`);
+  sub(Dk('mix').t0 + 0.1, Dk('add1').t0 - 0.1, `按权重把 V 加起来：${q(keyTok)}的信息被搬到了最后一个位置。`);
+  sub(Dk('add1').t0 + 0.1, Dk('up').t0 - 0.1, `再乘 W_o 回到 1024 维，加回残差流。这一层之后，透镜读到的就是${q(lensTop(0, LX)[2])}。`);
+  sub(Dk('up').t0 + 0.1, Dk('act').t0 - 0.1, '前馈网络 SwiGLU：先把 1024 维扩成 3072 维，得到 g 和 u。');
   sub(Dk('act').t0 + 0.1, Dk('act').t0 + 2.4, 'g 经过 SiLU，像一道阀门，决定每个神经元放行多少 u。');
-  sub(Dk('act').t0 + 2.6, Dk('down').t0 - 0.1, `这一步明显激活的有 ${m(Q.mlpCount(G4, LX))} 个神经元，最亮的是 #${m(neu.j)}。`);
+  sub(Dk('act').t0 + 2.6, Dk('down').t0 - 0.1, `明显激活的有 ${m(Q.mlpCount(G0, LX))} 个神经元（这里画出最亮的 16 个），最亮的是 #${m(neu.j)}。`);
   sub(Dk('down').t0 + 0.1, Dk('pick').t0 - 0.1, '再用 W_down 压回 1024 维，加回残差流。');
   sub(Dk('pick').t0 + 0.1, Dk('mul').t0 + 0.6, `放大到一个神经元：#${m(neu.j)}。`);
   sub(Dk('mul').t0 + 0.8, Dk('sum').t0 - 0.1, `1024 个输入，和 W_gate 第 ${m(neu.j)} 列逐项相乘……`);
   sub(Dk('sum').t0 + 0.1, Dk('silu').t0 - 0.1, `……再全部加起来：g = ${m(neu.gz.toFixed(3))}。同一列在 W_up 里得到 u = ${m(neu.uz.toFixed(3))}。`);
   sub(Dk('silu').t0 + 0.1, Dk('gate').t0 - 0.1, `SiLU(g) = g · σ(g) = ${m(neu.silu.toFixed(3))}。`);
   sub(Dk('gate').t0 + 0.1, Dk('bits').t0 - 0.1, `${m(neu.silu.toFixed(3))} × ${m(neu.uz.toFixed(3))} = ${m((neu.silu * neu.uz).toFixed(2))}：这就是神经元 #${m(neu.j)} 的输出。`);
-  const wb = neu.wg[0], bits = Array.from(new Uint8Array(new Float32Array([wb]).buffer)); void bits;
+  const wb = neu.wg[0];
   const e2 = Math.floor(Math.log2(Math.abs(wb))), mant = Math.abs(wb) / 2 ** e2;
   sub(Dk('bits').t0 + 0.2, Dk('bits').t0 + 3.6, `再放大：权重 W_gate[${m(neu.dims[0])}, ${m(neu.j)}] = ${m(wb.toFixed(4))}，在内存里只是 16 个比特。`);
-  sub(Dk('bits').t0 + 3.8, Dk('out').t0 - 0.1, `1 位符号、8 位指数、7 位尾数：${m(`2^${e2} × ${mant.toFixed(4)}`)}。`);
+  sub(Dk('bits').t0 + 3.8, Dk('out').t0 - 0.1, `1 位符号、8 位指数、7 位尾数：${m(`${wb < 0 ? '−' : ''}2<sup>${e2}</sup> × ${mant.toFixed(4)}`)}。`);
   sub(Dk('out').t0 + 0.1, Dk('out').t1 - 0.1, `${m('596,049,920')} 个这样的数，一起算出了下一个词。`);
-  const fxD = (M, st) => M.camera(st);
-  shot('dissect', B(38), B(66), (lt, t, { M }) => {
+  const L = (M) => ({ xf: M.x(row0), y: M.yL(LX), e: M.e });
+  const dCam = {
+    over: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 4.6, y + 2.6, 9.4], [xf + 0.9, y + 1.15, 0.2]), cam([xf + 3.0, y + 1.9, 6.9], [xf + 0.8, y + 1.15, 0.2]), smooth(p)); },
+    ln1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.9, y + 0.85, 3.5], [xf + 0.35, y + 0.3, 0.1]), cam([xf - 0.55, y + 0.65, 2.75], [xf + 0.35, y + 0.28, 0.1]), smooth(p)); },
+    qkv: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.3, y + 1.85, 4.95], [xf + 1.8, y + 1.35, 0.62]), cam([xf + 3.2, y + 1.9, 4.6], [xf + 2.6, y + 1.4, 0.62]), smooth(p)); },
+    score: (M, p) => { const { xf, y } = L(M); const kx = M.x(dot.key); return blendCam(cam([(kx + xf) / 2 - 0.6, y + 1.9, 8.4], [(kx + xf) / 2, y + 0.95, 0]), cam([(kx + xf) / 2 + 0.2, y + 1.6, 7.2], [(kx + xf) / 2 + 0.1, y + 0.95, 0]), smooth(p)); },
+    heads: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 0.3, y + 2.6, 14.2], [xf + 0.5, y + 0.9, 0]), cam([xf + 0.6, y + 2.3, 13.2], [xf + 0.55, y + 0.9, 0]), smooth(p)); },
+    dot: (M, p) => { const c = M.detail.dotCenter || v3(L(M).xf - 1, L(M).y + 1.6, 0.7); return blendCam(cam([c.x + 0.35, c.y + 0.3, c.z + 3.3], [c.x + 0.05, c.y + 0.02, c.z]), cam([c.x + 0.1, c.y + 0.18, c.z + 2.75], [c.x + 0.05, c.y + 0.02, c.z]), smooth(p)); },
+    mix: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 0.8, y + 1.85, 4.3], [xf + 1.3, y + 1.55, 0.62]), cam([xf + 1.8, y + 1.85, 4.0], [xf + 1.4, y + 1.55, 0.62]), smooth(p)); },
+    add1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.4, y + 1.6, 2.9], [xf + 0.45, y + 1.1, 0.1]), cam([xf - 0.2, y + 1.7, 4.2], [xf + 0.6, y + 1.15, 0.1]), smooth(p)); },
+    mlp: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.6, y + 3.6, 7.6], [xf + 1.2, y + 2.85, -0.2]), cam([xf + 1.25, y + 3.4, 6.3], [xf + 1.2, y + 2.85, -0.2]), smooth(p)); },
+    mm: (M, p, st) => { const c = M.micro.camera(st); if (c) endCam.set('mm', c); const b = endCam.get('mm') || dCam.mlp(M, 1); return orbit({ ...b, fov: 32 }, lerp(-5, 4, smooth(p)), 0, lerp(1.08, 0.96, smooth(p))); },
+    neuron: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-6, 5, smooth(p)), 0, lerp(1.05, 0.95, smooth(p))); },
+    bits: (M, p, st) => { const c = M.detail.camera(st); const d = c.pos.distanceTo(c.look); const k = lerp(2.6, 1.15, easeInOut(p)); return orbit({ pos: c.look.clone().add(c.pos.clone().sub(c.look).normalize().multiplyScalar(d * k)), look: c.look, fov: 32 }, lerp(-12, 6, smooth(p)), lerp(8, 0, smooth(p)), 1); },
+  };
+  const camKey = { over: 'over', ln1: 'ln1', qkv: 'qkv', score: 'score', softmax: 'score', heads: 'heads', dmul: 'dot', dsum: 'dot', dscale: 'dot', mix: 'mix', add1: 'add1', up: 'mlp', act: 'mlp', down: 'mlp', pick: 'mm', mul: 'mm', sum: 'mm', silu: 'neuron', gate: 'neuron', bits: 'bits' };
+  const camSpan = {}; // 同一个机位 key 跨越的时间段
+  D.forEach((x) => { const k = camKey[x.key]; if (!k) return; camSpan[k] ||= { t0: x.t0, t1: x.t1 }; camSpan[k].t1 = x.t1; });
+  const BLEND = { over: 2.8, ln1: 1.3, qkv: 1.5, score: 1.4, heads: 1.6, dot: 1.4, mix: 1.3, add1: 1.1, mlp: 1.5, mm: 1.5, neuron: 1.4, bits: 1.6 };
+  const headCam = (M, st, o = {}) => {
+    const hx = M.headX(st);
+    const look = v3(hx + (o.lx ?? -0.9), M.yTop + (o.ly ?? 2.3), 0.1);
+    return { pos: look.clone().add(v3(o.dx ?? 0.9, o.dy ?? 1.1, o.dz ?? 8.6)), look, fov: 32 };
+  };
+  shot('dissect', B(24), B(52), (lt, t, { M }) => {
     const s = pick(D, t);
-    if (s.key === 'out') { // 拉出来：回到输出头
-      const st = mst(4, G4, { ph: 'head', sub: 'norm' }, 0, { dAnim: 4 });
+    if (s.key === 'out') { // 拉出来：回到塔顶的输出头
+      const st = mst(4, G0, { ph: 'head', sub: 'norm' }, 0, { dAnim: 4 });
       return {
         st,
         cam: () => {
-          const target = headCam(M, st, 1.6, 1.1, 8.8);
-          const far = { pos: v3(17, 13.5, 21), look: v3(5.5, 8.0, 0), fov: 34 };
-          const k = s.p;
-          if (k < 0.55) return blendCam(endCam.get('dissect-bits') || far, far, easeIn(k / 0.55) * 0.85 + 0.15 * smoother(k / 0.55));
-          return blendCam(far, target, smoother((k - 0.55) / 0.45));
+          const a = endCam.get('d-bits') || headCam(M, st);
+          const far = cam([M.x(row0) + 9, 15.5, 23], [M.x(row0) - 1.5, 8.6, 0], 34);
+          const target = headCam(M, st);
+          return s.p < 0.5 ? blendCam(a, far, easeIn(s.p / 0.5)) : blendCam(far, target, smoother((s.p - 0.5) / 0.5));
         },
-        ov: { corner: { g: G4 }, cornerA: 1 },
+        ov: { corner: { g: G0 }, cornerA: 1 },
       };
     }
     let head = null;
-    if (s.key === 'score' || s.key === 'softmax' || s.key.startsWith('d')) head = dot.head;
-    if (s.key === 'heads') head = Math.min(15, Math.floor(s.p * 16 * 1.0));
-    const st = mst(s.depth, G4, { ph: 'layer', L: LX, ...s.s }, s.p0 ? 0 : s.p, { dAnim: s.depth, head });
-    const camFor = (M2, k) => {
-      const stc = { ...st, head: head == null ? null : dot.head };
-      let c = fxD(M2, stc);
-      c = { ...c, fov: 32 };
-      switch (k) {
-        case 'over': return orbit(c, lerp(22, 8, smooth(s.p)), lerp(4, 0, smooth(s.p)), lerp(1.25, 1.02, smooth(s.p)));
-        case 'ln1': {
-          const xf = M2.x(row4), y = M2.yL(LX) + 0.25 * M2.e;
-          const look = v3(xf + 0.35, y + 0.12, 0);
-          return { pos: look.clone().add(v3(lerp(-1.7, -1.2, s.p), lerp(1.0, 0.75, s.p), lerp(3.9, 3.2, s.p))), look, fov: 32 };
-        }
-        case 'qkv': return orbit(c, lerp(-16, 6, smooth(s.p)), 2, lerp(1.1, 0.97, smooth(s.p)));
-        case 'score': case 'softmax': case 'heads': {
-          const u = smooth(seg(t, Dk('score').t0, Dk('heads').t1));
-          return orbit(c, lerp(-18, 14, u), lerp(-2, 4, u), lerp(1.05, 0.95, u));
-        }
-        case 'dmul': case 'dsum': case 'dscale': return orbit(c, lerp(-8, 6, smooth(seg(t, Dk('dmul').t0, Dk('dscale').t1))), 0, 1.0);
-        case 'mix': return orbit(c, lerp(-10, 4, smooth(s.p)), 0, 1.02);
-        case 'add1': return orbit(c, lerp(12, 4, smooth(s.p)), 3, 1.0);
-        case 'up': case 'act': case 'down': return orbit(c, lerp(-12, 10, smooth(seg(t, Dk('up').t0, Dk('down').t1))), 0, lerp(1.08, 0.94, smooth(seg(t, Dk('up').t0, Dk('down').t1))));
-        case 'pick': case 'mul': case 'sum': return orbit(c, lerp(-6, 5, smooth(seg(t, Dk('pick').t0, Dk('sum').t1))), 0, lerp(1.06, 0.98, smooth(seg(t, Dk('pick').t0, Dk('sum').t1))));
-        case 'silu': case 'gate': return orbit(c, lerp(-5, 5, smooth(seg(t, Dk('silu').t0, Dk('gate').t1))), 0, 1.0);
-        case 'bits': return orbit(c, lerp(-10, 8, smooth(s.p)), lerp(6, 0, smooth(s.p)), lerp(1.15, 0.92, smooth(s.p)));
-      }
-      return c;
-    };
-    // 每换一种视图，镜头用 1 秒左右从上一种视图的机位平滑过渡过来
-    const VIEW_BLEND = { over: 2.6, ln1: 1.2, qkv: 1.4, score: 1.3, mix: 1.2, add1: 1.1, up: 1.4, pick: 1.4, silu: 1.2, bits: 1.6, dmul: 1.3 };
+    if (['score', 'softmax', 'dmul', 'dsum', 'dscale'].includes(s.key)) head = dot.head;
+    const hk = Dk('heads');
+    if (s.key === 'heads') head = t < hk.t0 + 2.6 ? Math.min(15, Math.floor(clamp((t - hk.t0 - 0.1) / 2.4) * 16)) : dot.head;
+    const st = mst(s.depth, G0, { ph: 'layer', L: LX, ...s.s }, s.p0 ? 0 : s.p, { dAnim: s.depth, head });
+    const ck = camKey[s.key], span = camSpan[ck];
     return {
       st,
+      iso: smooth(seg(t, B(24), B(24) + 2)) * (s.key === 'over' ? 0.55 : 0.85),
       cam: () => {
-        const live = handheld(camFor(M, s.key), t, 0.003);
+        const live = handheld(dCam[ck](M, clamp((t - span.t0) / (span.t1 - span.t0)), st), t, 0.0025);
         let out = live;
-        const bl = VIEW_BLEND[s.key];
-        if (bl) {
-          const from = s.key === 'over' ? prevCam('layers5', live) : endCam.get(`dissect-${D[s.i - 1].key}`) || live;
-          out = blendCam(from, live, smoother(clamp((t - s.t0) / bl)));
+        const bl = BLEND[ck];
+        if (bl && t - span.t0 < bl) {
+          const prevKey = s.key === 'over' ? null : camKey[D[D.findIndex((x) => x.t0 === span.t0) - 1].key];
+          const from = prevKey ? endCam.get(`d-${prevKey}`) : prevCam('layers1', live);
+          if (from) out = blendCam(from, live, smoother((t - span.t0) / bl));
         }
-        endCam.set(`dissect-${s.key}`, out);
+        endCam.set(`d-${ck}`, out);
         return out;
       },
-      dof: s.key === 'bits' ? { range: 0.6, blur: 7 } : (s.key.startsWith('d') || ['pick', 'mul', 'sum', 'silu', 'gate'].includes(s.key)) ? { range: 2.2, blur: 4 } : null,
+      hide: [...(['score', 'heads', 'dot'].includes(ck) ? ['attnMats'] : []), ...(ck === 'bits' ? ['exDeco'] : [])],
+      bitsFx: ck === 'bits' ? `g[${neu.j}] = … + x × 这个权重 + …（x = ${neu.x[0].toFixed(3)}）` : null,
+      dof: ck === 'bits' ? { range: 0.5, blur: 6 } : ['dot', 'mm', 'neuron'].includes(ck) ? { range: 1.6, blur: 3.5 } : null,
       ov: {
-        att: { a: smooth(seg(t, Dk('softmax').t0 + 0.2, Dk('softmax').t0 + 0.8)) * (1 - smooth(seg(t, Dk('dmul').t0 - 0.2, Dk('dmul').t0 + 0.4))), L: LX, g: G4, head: s.key === 'heads' ? head : dot.head, reveal: seg(t, Dk('softmax').t0 + 0.2, Dk('softmax').t0 + 1.4) },
-        corner: { g: G4, L: LX, what: { over: '', ln1: 'RMSNorm', qkv: '注意力 · Q K V', score: '注意力 · 打分', softmax: '注意力 · softmax', heads: '注意力 · 16 个头', dmul: '一次 Q·K 打分', dsum: '一次 Q·K 打分', dscale: '一次 Q·K 打分', mix: '注意力 · 加权求和', add1: '残差 ⊕', up: '前馈 · 升维', act: '前馈 · 门控激活', down: '前馈 · 降维', pick: '一次乘加', mul: '一次乘加', sum: '一次乘加', silu: 'SiLU', gate: 'SiLU × u', bits: 'bf16 比特' }[s.key] },
+        att: { a: smooth(seg(t, hk.t0 + 0.1, hk.t0 + 0.8)) * (1 - smooth(seg(t, hk.t1 - 0.3, hk.t1 + 0.3))), L: LX, g: G0, head: s.key === 'heads' ? head : dot.head, reveal: seg(t, hk.t0 + 0.1, hk.t0 + 1.2), side: 'right' },
+        corner: { g: G0, L: LX, what: { over: '', ln1: 'RMSNorm', qkv: '注意力 · Q K V', score: '注意力 · 打分', softmax: '注意力 · softmax', heads: '注意力 · 16 个头', dmul: '一次 Q·K 打分', dsum: '一次 Q·K 打分', dscale: '一次 Q·K 打分', mix: '注意力 · 加权求和', add1: '残差 ⊕', up: '前馈 · 升维', act: '前馈 · 门控激活', down: '前馈 · 降维', pick: '一次乘加', mul: '一次乘加', sum: '一次乘加', silu: 'SiLU', gate: 'SiLU × u', bits: 'bf16 比特' }[s.key] },
         cornerA: 1,
       },
     };
   });
 
-  /* ------------------------------------------------------------ I 第 5 个词：输出与采样 165 – 180 */
-  section('sample5', B(66), B(72), { energy: 0.7 });
-  chapter(B(66) + 0.3, B(72) - 0.2, '08', '输出与采样', 'SAMPLING');
-  const samp5 = lay(B(66), [
-    { depth: 4, s: { ph: 'head', sub: 'norm' }, d: 2 * BEAT },
-    { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'pick' }, d: 2 * BEAT },
-    { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'mul' }, d: 4 * BEAT },
-    { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'sum' }, d: 2 * BEAT },
-    { depth: 4, s: { ph: 'head', sub: 'softmax' }, d: 3 * BEAT },
-    { depth: 4, s: { ph: 'sample', sub: 'temp' }, d: 2 * BEAT },
-    { depth: 4, s: { ph: 'sample', sub: 'topk' }, d: BEAT },
-    { depth: 4, s: { ph: 'sample', sub: 'topp' }, d: 2 * BEAT },
-    { depth: 4, s: { ph: 'sample', sub: 'draw' }, d: 6 * BEAT },
+  /* ------------------------------------------------------------ F 第 1 个词：输出与采样 130 – 142.5 */
+  section('sample1', B(52), B(57), { energy: 0.6 });
+  chapter(B(52) + 0.3, B(57) - 0.2, '05', '输出与采样', 'LOGITS & SAMPLING');
+  const samp = (g, t0, beats) => lay(t0, [
+    { depth: 4, s: { ph: 'head', sub: 'norm' }, d: beats[0] * BEAT },
+    ...(beats[1] ? [
+      { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'pick' }, d: beats[1] * BEAT * 0.25 },
+      { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'mul' }, d: beats[1] * BEAT * 0.5 },
+      { depth: 5, s: { ph: 'head', sub: 'unembed', mi: 'sum' }, d: beats[1] * BEAT * 0.25 },
+    ] : []),
+    { depth: 4, s: { ph: 'head', sub: 'softmax' }, d: beats[2] * BEAT },
+    { depth: 4, s: { ph: 'sample', sub: 'temp' }, d: beats[3] * BEAT },
+    { depth: 4, s: { ph: 'sample', sub: 'topk' }, d: beats[4] * BEAT },
+    { depth: 4, s: { ph: 'sample', sub: 'topp' }, d: beats[5] * BEAT },
+    { depth: 4, s: { ph: 'sample', sub: 'draw' }, d: beats[6] * BEAT },
   ]);
-  const draw5 = samp5[8];
-  ev(draw5.t0 + 0.05, 'dice');
-  ev(draw5.t0 + draw5.d * 0.8, 'emit', { g: 4, k: 1.4 });
-  ev(samp5[1].t0, 'step', { k: 0.6 });
-  ev(samp5[4].t0, 'step', { k: 0.6 });
-  sub(B(66) + 0.15, samp5[1].t0 - 0.1, '最后一次 RMSNorm。');
-  sub(samp5[1].t0 + 0.1, samp5[3].t0 - 0.1, `再乘输出矩阵：它和嵌入表是同一块权重。${q(hm4.token)}的分数 = h · E[${tk(hm4.token)}]……`);
-  sub(samp5[3].t0 + 0.05, samp5[4].t0 + 0.3, `……${m('1024')} 项乘加，= ${m(hm4.total.toFixed(2))}。151936 个词元，每个都这样算一遍。`);
-  sub(samp5[4].t0 + 0.5, samp5[6].t0 - 0.05, `softmax：${q(st4.top[0][2])} ${m(pct(st4.top[0][1]))}；温度 0.7 之后 ${m(pct(st4.temps['0.7'][0]))}。`);
-  sub(samp5[6].t0 + 0.05, draw5.t0 + 1.2, `top-p 截断：只剩 ${m(st4.pool.length)} 个候选。`);
-  sub(draw5.t0 + 1.5, B(72) - 0.15, `u = ${m(st4.u.toFixed(3))}。第 5 个词：${q(st4.chosenS)}。`);
-  strip(samp5[1].t0 + 0.3, samp5[4].t0, `logit[${m(hm4.j)}] = h ${m('[1024]')} · E[${m(hm4.j)}] ${m('[1024]')}`);
-  strip(draw5.t0 + 0.2, B(72) - 0.15, `候选池：${q(st4.pool[0][2])} ${m(pct(st4.pool[0][1]))}<span class="sep"></span>u = ${m(st4.u.toFixed(4))}`);
-  shot('sample5', B(66), B(72), (lt, t, { M }) => {
-    const s = pick(samp5, t);
-    const st = mst(s.depth, G4, s.s, s.p, { dAnim: s.depth });
-    const isMM = !!s.s.mi;
+  const sp1 = samp(0, B(52), [2, 8, 3, 2, 1, 1, 3]);
+  const spk = (list, k) => list.find((x) => (x.s.sub === k && !x.s.mi) || x.s.mi === k);
+  const emitOf = (list) => { const d = list[list.length - 1]; return d.t0 + d.d * 0.8; };
+  ev(spk(sp1, 'draw').t0 + 0.05, 'dice');
+  ev(emitOf(sp1), 'emit', { g: 0, k: 1.2 });
+  ev(spk(sp1, 'pick').t0, 'step', { k: 0.6 });
+  ev(spk(sp1, 'softmax').t0, 'step', { k: 0.6 });
+  const st0 = S(0);
+  sub(B(52) + 0.15, spk(sp1, 'pick').t0 - 0.1, '28 层之后：最后一次 RMSNorm。');
+  sub(spk(sp1, 'pick').t0 + 0.1, spk(sp1, 'sum').t0 - 0.1, `再乘输出矩阵（和嵌入表是同一块权重）：${q(hm0.token)}的分数 = h · E[${tk(hm0.token)}]……`);
+  sub(spk(sp1, 'sum').t0 + 0.05, spk(sp1, 'softmax').t0 + 0.4, `……= ${m(hm0.total.toFixed(2))}。词表里 ${m('151,936')} 个词元，每个都这样算一遍。`);
+  sub(spk(sp1, 'softmax').t0 + 0.6, spk(sp1, 'topk').t0 - 0.05, `softmax：${q(st0.top[0][2])} ${m(pct(st0.top[0][1]))}，${q(st0.top[1][2])} ${m(pct(st0.top[1][1]))}，${q(st0.top[2][2])} ${m(pct(st0.top[2][1]))}……`);
+  sub(spk(sp1, 'topk').t0 + 0.05, spk(sp1, 'draw').t0 + 0.6, `温度 0.7、top-k 20、top-p 0.8：只剩 ${m(st0.pool.length)} 个候选。`);
+  sub(spk(sp1, 'draw').t0 + 0.8, B(57) - 0.15, `随机数 u = ${m(st0.u.toFixed(3))}。第一个词：${q(st0.chosenS)}。`);
+  strip(spk(sp1, 'pick').t0 + 0.3, spk(sp1, 'softmax').t0, `logit[${m(hm0.j)}] = h ${m('[1024]')} · E[${m(hm0.j)}] ${m('[1024]')}`);
+  strip(spk(sp1, 'softmax').t0 + 0.2, spk(sp1, 'draw').t0, `logits ${m('[1 × 151936]')} → softmax → ÷ 温度 ${m('0.7')} → 前 ${m('20')} 名 → 累计 ${m('80%')}`);
+  strip(spk(sp1, 'draw').t0 + 0.2, B(57) - 0.15, `候选池：${q(st0.pool[0][2])} ${m(pct(st0.pool[0][1]))}<span class="sep"></span>u = ${m(st0.u.toFixed(4))}`);
+  const sampleShot = (name, g, list, t0, t1, prevName, blendIn) => shot(name, t0, t1, (lt, t, { M }) => {
+    const s = pick(list, t);
+    const st = mst(s.depth, g, s.s, s.p, { dAnim: s.depth });
+    const mmA = list.find((x) => x.s.mi === 'pick'), mmZ = list.find((x) => x.s.sub === 'softmax');
     return {
       st,
       cam: () => {
-        const head = headCam(M, st, lerp(1.4, 0.7, smooth(lt / 15)), lerp(1.0, 0.75, smooth(lt / 15)), lerp(8.2, 7.4, smooth(lt / 15)));
+        const head = headCam(M, st, { dz: lerp(9.2, 8.0, smooth(lt / (t1 - t0))), dx: lerp(1.3, 0.4, smooth(lt / (t1 - t0))) });
         let live = head;
-        const mmK = smooth(seg(t, samp5[1].t0, samp5[1].t0 + 1.2)) * (1 - smooth(seg(t, samp5[4].t0, samp5[4].t0 + 1.2)));
-        if (mmK > 0) {
-          const mc = M.micro.camera({ ...st, step: isMM ? st.step : { g: G4, ph: 'head', sub: 'unembed', mi: 'sum' } });
-          if (mc) endCam.set('mm5', { ...mc, fov: 32 });
-          const mcc = endCam.get('mm5');
-          if (mcc) live = blendCam(head, orbit(mcc, lerp(-6, 6, seg(t, samp5[1].t0, samp5[4].t0)), 0, 1.0), mmK);
+        if (mmA) {
+          const mmK = smooth(seg(t, mmA.t0, mmA.t0 + 1.1)) * (1 - smooth(seg(t, mmZ.t0, mmZ.t0 + 1.1)));
+          if (mmK > 0) {
+            const mc = M.micro.camera({ ...st, step: s.s.mi ? st.step : { g, ph: 'head', sub: 'unembed', mi: 'sum' } });
+            if (mc) endCam.set(`${name}-mm`, { ...mc, fov: 32 });
+            const mcc = endCam.get(`${name}-mm`);
+            if (mcc) live = blendCam(head, orbit(mcc, lerp(-6, 6, seg(t, mmA.t0, mmZ.t0)), 0, 1.02), mmK);
+          }
         }
-        return blendCam(prevCam('dissect', live), live, smoother(seg(lt, 0, 0.3)));
+        return blendCam(prevCam(prevName, live), live, smoother(seg(lt, 0, blendIn)));
       },
-      ov: { corner: { g: G4, what: s.s.ph === 'sample' ? '采样' : '输出头' }, cornerA: 1 },
+      ov: { corner: { g, what: s.s.ph === 'sample' ? '采样' : '输出头' }, cornerA: 1 },
     };
   });
+  sampleShot('sample1', 0, sp1, B(52), B(57), 'dissect', 1.0);
 
-  /* ------------------------------------------------------------ J 句号与结束符 180 – 190 */
-  section('loop2', B(72), B(76), { energy: 0.5 });
-  chapter(B(72) + 0.3, B(76) - 0.2, '09', '说完', 'END OF TURN');
-  const loop2 = [tokSched(5, B(72), 1.75 * BAR), tokSched(6, B(73, 3), 2.25 * BAR)];
-  ev(loop2[0].emit, 'emit', { g: 5 });
-  ev(loop2[1].emit, 'end');
-  sub(B(72) + 0.3, B(73) + 2.0, `${q(st4.chosenS)} 接回去，再算一轮：句号。`);
-  sub(B(73) + 2.3, B(76) - 0.2, `最后选中了结束标记 ${m('&lt;|im_end|&gt;')}（${m(pct(Q.steps[6].chosenP1))}）：回答到此为止。`);
-  shot('loop2', B(72), B(76), (lt, t, { M }) => {
-    const s = loopState(loop2, t);
-    const st = mst(2, s.g, { ph: s.ph }, s.p, { dAnim: 2.7 });
-    const n = 5 + loop2.filter((x) => t >= x.emit).length;
-    const newest = loop2.filter((x) => t >= x.emit).pop();
+  /* ------------------------------------------------------------ G 自回归：第 2 – 14 个词 142.5 – 157.5 */
+  section('loop1', B(57), B(63), { energy: 0.72 });
+  chapter(B(57) + 0.3, B(63) - 0.2, '06', '自回归', 'AUTOREGRESSION');
+  // 每个词元：读入 → 嵌入 → 28 层 → 输出头 → 采样
+  const PH = [{ ph: 'read', d: 0.2 }, { ph: 'embed', d: 0.1 }, { ph: 'layers', d: 0.32 }, { ph: 'head', d: 0.12 }, { ph: 'sample', d: 0.26 }];
+  const emitFrac = 1 - 0.26 * 0.2;
+  const toks = (g0, t0, durs) => { let t = t0; return durs.map((d, k) => { const a = { g: g0 + k, t0: t, t1: t + d, d, emit: t + d * emitFrac }; t += d; return a; }); };
+  const loop1 = toks(1, B(57), [6.25, ...Array.from({ length: 12 }, (_, k) => (B(63) - B(57) - 6.25) / 12)]);
+  loop1.forEach((s) => ev(s.emit, 'emit', { g: s.g, k: s.g === 1 ? 1.1 : 0.7 }));
+  ev(loop1[0].t0 + 6.25 * 0.74 + 0.05, 'dice');
+  const loopState = (list, t) => {
+    const s = list.find((x) => t < x.t1) || list[list.length - 1];
+    const u = clamp((t - s.t0) / s.d);
+    let acc = 0;
+    for (const ph of PH) { if (u < acc + ph.d || ph === PH[PH.length - 1]) return { g: s.g, ph: ph.ph, p: clamp((u - acc) / ph.d) }; acc += ph.d; }
+    return null;
+  };
+  const st1 = S(1);
+  sub(B(57) + 0.3, B(58) + 1.4, `${q(st0.chosenS)} 接回序列末尾，整套计算再来一遍：这叫自回归。`);
+  sub(B(58) + 1.6, loop1[0].emit - 0.6, `第 2 个词：${q(st1.top[0][2])} ${m(pct(st1.top[0][1]))}，${q(st1.top[1][2])} ${m(pct(st1.top[1][1]))}。`);
+  sub(loop1[0].emit - 0.4, loop1[1].t0 + 1.4, `随机数 u = ${m(st1.u.toFixed(3))}，落在了${q(st1.chosenS)}上——不是概率最高的那个。`);
+  sub(loop1[1].t0 + 1.6, B(61) + 1.2, '前面词元的 K、V 都存在缓存里，每一步只算新来的这一个。');
+  sub(B(61) + 1.4, B(63) - 0.15, `${Q.steps.slice(2, 14).map((x) => tk(x.chosenS)).join('')}……`);
+  strip(loop1[0].t0 + 6.25 * 0.74, loop1[1].t0 + 1.4, `候选池：${st1.pool.map((x) => `${q(x[2])} ${m(pct(x[1]))}`).join(' · ')}<span class="sep"></span>u = ${m(st1.u.toFixed(4))}`);
+  const machineCam = (M, lx, o = {}) => {
+    const look = v3(lx, o.ly ?? 5.9, 0);
+    return orbit({ pos: look.clone().add(v3(1.6, o.dy ?? 4.6, o.dz ?? 31)), look, fov: 32 }, o.yaw ?? 0, 0, 1);
+  };
+  shot('loop1', B(57), B(63), (lt, t, { M }) => {
+    const s = loopState(loop1, t);
+    const detail = s.g === 1 && (s.ph === 'head' || s.ph === 'sample');
+    const st = detail ? mst(4, 1, { ph: s.ph, sub: s.ph === 'head' ? 'softmax' : 'draw' }, s.ph === 'head' ? s.p : s.p, { dAnim: 2.7 }) : mst(2, s.g, { ph: s.ph }, s.p, { dAnim: 2.7 });
+    const done = loop1.filter((x) => t >= x.emit);
+    const n = 1 + done.length;
+    const newest = done[done.length - 1];
+    const fx = M.x(Q.row(s.g));
     return {
       st,
-      cam: () => { const live = machineCam(M, t, lerp(-14, 6, smooth(lt / 10)), lerp(0.95, 1.06, smooth(lt / 10))); return blendCam(prevCam('sample5', live), live, smoother(seg(lt, 0, 2.4))); },
-      ov: { reply: { a: smooth(seg(lt, 0.2, 0.8)), n: Math.max(5, n), k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.4)) : 1 }, corner: { g: s.g }, cornerA: 1 },
+      cam: () => {
+        const wide = machineCam(M, lerp(-1.5, 2.2, smooth(seg(t, B(58), B(63)))), { yaw: lerp(16, 2, smooth(lt / 15)) });
+        const close = headCam(M, mst(4, 1, { ph: 'sample', sub: 'draw' }, 0), { dz: 9.4 });
+        const kc = smooth(seg(t, loop1[0].t0 + 6.25 * 0.5, loop1[0].t0 + 6.25 * 0.66)) * (1 - smooth(seg(t, loop1[1].t0 + 0.2, loop1[1].t0 + 1.6)));
+        const live = blendCam(wide, close, kc);
+        return blendCam(prevCam('sample1', live), live, smoother(seg(lt, 0, 2.2)));
+      },
+      ov: { reply: { a: smooth(seg(lt, 0.2, 0.8)), n, k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.35)) : 1 }, corner: { g: s.g }, cornerA: 1 },
+      after: () => void fx,
     };
   });
 
-  /* ------------------------------------------------------------ K 片尾 190 – 210 */
-  section('end', B(76), B(84), { energy: 0.25 });
+  /* ------------------------------------------------------------ H 第 15 个词「散」：再穿过 28 层 157.5 – 172.5 */
+  section('layersK', B(63), B(69), { energy: 0.85 });
+  chapter(B(63) + 0.3, B(69) - 0.2, '07', `第 ${GK + 1} 个词`, 'THE KEY WORD');
+  const schedK = lay(B(63), [
+    { s: { ph: 'read' }, d: BEAT * 1.2 }, { s: { ph: 'embed' }, d: BEAT * 0.8 },
+    ...Array.from({ length: 20 }, (_, k) => ({ L: k, d: BEAT / 2 })),
+    ...Array.from({ length: 5 }, (_, k) => ({ L: 20 + k, d: BEAT })),
+    { L: 25, d: 2 * BEAT }, { L: 26, d: 2 * BEAT }, { L: 27, d: 3 * BEAT },
+  ]);
+  const lk = (Lx) => schedK.find((s) => s.L === Lx);
+  schedK.forEach((s) => { if (s.L != null) ev(s.t0, 'layer', { L: s.L, k: s.d > BEAT * 1.5 ? 1 : 0.6 }); });
+  ev(lk(23).t0, 'reveal', { k: 0.6 });
+  ev(lk(27).t0, 'reveal', { k: 1.2 });
+  const stK = S(GK);
+  const reflect = lens(GK, 23)[0];
+  sub(B(63) + 0.3, B(64) + 0.6, `第 ${GK + 1} 个词。前面写到「${Q.steps.slice(7, 14).map((x) => tk(x.chosenS)).join('')}」——然后呢？`);
+  sub(B(64) + 0.8, lk(20).t0 - 0.1, '同样的 28 层，再走一遍。');
+  sub(lk(20).t0 + 0.05, lk(25).t0 - 0.1, `从第 20 层起，它一直想说${q(reflect[2])}：第 23 层 ${m(pct(reflect[1]))}。`);
+  sub(lk(25).t0 + 0.05, lk(27).t0 - 0.1, `第 25 层变成${q(lensTop(GK, 25)[2])}，第 26 层是${q(lensTop(GK, 26)[2])}……`);
+  sub(lk(27).t0 + 0.05, B(69) - 0.1, `直到最后一层，${q(lensTop(GK, 27)[2])}才排到第一：${m(pct(lensTop(GK, 27)[1]))}。`);
+  for (const s of schedK) {
+    if (s.L == null) continue;
+    const top = lensTop(GK, s.L);
+    strip(s.t0, s.t1, `<span class="k">L${String(s.L).padStart(2, '0')}</span><span class="v">此刻开口：${q(top[2])} ${m(pct(top[1]))}</span>`, { fin: 0.06, fout: 0.06 });
+  }
+  shot('layersK', B(63), B(69), (lt, t, { M }) => {
+    const s = pick(schedK, t);
+    const st = s.L == null ? mst(3, GK, s.s, s.p, { dAnim: 3 }) : mst(3, GK, { ph: 'layer', L: s.L }, s.p, { dAnim: 3 });
+    const Ls = [[B(63), 0], [lk(0).t0, 0], [lk(20).t0, 18.5], [lk(25).t0, 23.6], [B(69), 26.8]];
+    const Lc = pchip(Ls.map((a) => a[0]), Ls.map((a) => a[1]))(t);
+    return {
+      st,
+      cam: () => {
+        const live = handheld(towerCam(M, Lc, GK, { lx: -1.6, dx: -5.2, dy: 2.0, dz: 9.0, yaw: lerp(6, -8, smooth(lt / 15)) }), t, 0.003);
+        return blendCam(prevCam('loop1', live), live, smoother(seg(lt, 0, 2.0)));
+      },
+      lensWin: 9,
+      ov: {
+        lens: { a: smooth(seg(t, B(64), B(64) + 0.7)) * (1 - smooth(seg(t, B(69) - 0.5, B(69)))), g: GK, upto: s.L == null ? -0.01 : s.L + s.p - 0.0001, other: reflect[2], side: 'right' },
+        reply: { a: 1 - smooth(seg(lt, 0, 0.8)), n: GK, k: 1 },
+        corner: { g: GK, L: s.L }, cornerA: 1,
+      },
+    };
+  });
+
+  /* ------------------------------------------------------------ I 「散」：输出与采样 172.5 – 180 */
+  section('sampleK', B(69), B(72), { energy: 0.7 });
+  const spK = samp(GK, B(69), [1, 0, 3, 2, 1, 2, 3]);
+  ev(spk(spK, 'draw').t0 + 0.05, 'dice');
+  ev(emitOf(spK), 'emit', { g: GK, k: 1.4 });
+  sub(B(69) + 0.15, spk(spK, 'temp').t0 - 0.05, `softmax：${stK.top.slice(0, 3).map((x) => `${q(x[2])} ${m(pct(x[1]))}`).join('、')}。`);
+  sub(spk(spK, 'temp').t0 + 0.05, spk(spK, 'draw').t0 - 0.05, `温度 0.7、top-p 之后剩 ${m(stK.pool.length)} 个候选：${stK.pool.map((x) => m(pct(x[1]))).join('、')}。`);
+  sub(spk(spK, 'draw').t0 + 0.05, B(72) - 0.1, `u = ${m(stK.u.toFixed(3))}，落在${q(stK.chosenS)}上。差一点，它就说成了别的。`);
+  strip(spk(spK, 'topp').t0 + 0.1, B(72) - 0.1, `候选池：${stK.pool.map((x) => `${q(x[2])} ${m(pct(x[1]))}`).join(' · ')}<span class="sep"></span>u = ${m(stK.u.toFixed(4))}`);
+  sampleShot('sampleK', GK, spK, B(69), B(72), 'layersK', 1.6);
+
+  /* ------------------------------------------------------------ J 自回归写完 180 – 197.5 */
+  section('loop2', B(72), B(79), { energy: 0.9 });
+  chapter(B(72) + 0.3, B(79) - 0.2, '08', '写完整句', 'TO THE END');
+  const rest = Q.G - (GK + 1);
+  const durs2 = Array.from({ length: rest }, (_, k) => (k === rest - 1 ? 2.4 : k < 6 ? 0.95 : k < 16 ? 0.62 : 0.5));
+  const scale2 = (B(79) - B(72)) / durs2.reduce((a, b) => a + b, 0);
+  const loop2 = toks(GK + 1, B(72), durs2.map((d) => d * scale2));
+  loop2.forEach((s) => ev(s.emit, s.g === Q.G - 1 ? 'end' : 'emit', { g: s.g, k: 0.55 }));
+  const lowRank = Q.steps.map((x, g) => ({ g, r: x.chosenRank })).filter((x) => x.r > 0).length;
+  const stEnd = S(Q.G - 1);
+  sub(B(72) + 0.3, B(74) - 0.2, '剩下的词，一个接一个地写出来。');
+  sub(B(74), B(76) + 1.0, `下划线是每个词被选中时的概率；红色的 ${m(lowRank)} 个，都不是当时概率最高的那个。`);
+  sub(B(76) + 1.2, loop2[loop2.length - 1].t0 - 0.1, '采样让每一次回答都可能不太一样。');
+  sub(loop2[loop2.length - 1].t0 + 0.1, B(79) - 0.1, `最后选中结束标记 ${m('&lt;|im_end|&gt;')}（${m(pct(stEnd.chosenP1))}）：回答结束。`);
+  shot('loop2', B(72), B(79), (lt, t, { M }) => {
+    const s = loopState(loop2, t);
+    const st = mst(2, s.g, { ph: s.ph }, s.p, { dAnim: 2.7 });
+    const done = loop2.filter((x) => t >= x.emit);
+    const n = GK + 1 + done.length;
+    const newest = done[done.length - 1];
+    return {
+      st,
+      cam: () => {
+        const live = machineCam(M, lerp(3.5, 8.0, smooth(lt / 17.5)), { yaw: lerp(-12, 8, smooth(lt / 17.5)), dz: lerp(30, 33, smooth(lt / 17.5)) });
+        return blendCam(prevCam('sampleK', live), live, smoother(seg(lt, 0, 2.2)));
+      },
+      ov: { reply: { a: 1, n: Math.min(Q.G, n), k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.3)) : 1 }, corner: { g: s.g }, cornerA: 1 },
+    };
+  });
+
+  /* ------------------------------------------------------------ K 片尾 197.5 – 215 */
+  section('end', B(79), B(86), { energy: 0.22 });
   // 一共做了多少次乘加：每层的矩阵乘法 + 注意力里的 Q·K 和加权求和 + 输出头
   const Mo = Q.M, perTokLayer = Mo.hidden * (Mo.heads * Mo.headDim) * 2 + Mo.hidden * (Mo.kvHeads * Mo.headDim) * 2 + Mo.hidden * Mo.ffn * 3;
   let macs = 0;
   for (let pos = 0; pos < Q.P + Q.G - 1; pos++) macs += NL * (perTokLayer + 2 * Mo.heads * Mo.headDim * (pos + 1));
   macs += Q.G * Mo.hidden * Mo.vocab;
   const statLine = `${Q.G} 个词元 · 每个都走完 28 层 · 约 ${Math.round(macs / 1e8)} 亿次乘加`;
-  shot('end', B(76), B(84), (lt, t, { M }) => {
-    const dA = lerp(2.7, 1, smoother(seg(t, B(76) + 0.4, B(77) + 1.4)));
+  shot('end', B(79), B(86), (lt, t, { M }) => {
+    const dA = lerp(2.7, 1, smoother(seg(t, B(79) + 0.4, B(80) + 1.4)));
     return {
-      st: mst(2, 6, { ph: 'sample' }, 1, { dAnim: dA, view: 'machine' }),
+      st: mst(2, Q.G - 1, { ph: 'sample' }, 1, { dAnim: dA, view: 'machine' }),
       cam: () => {
-        const far = { pos: v3(-7.5, 4.0, 46), look: v3(0, 5.8, 0), fov: 30 };
-        const live = machineCam(M, B(76), 6, 1.06);
-        return blendCam(prevCam('loop2', live), far, smoother(seg(lt, 0, 9)));
+        const far = cam([-11, 4.4, 66], [0, 5.8, 0], 30);
+        const live = machineCam(M, 8.0, { yaw: 8, dz: 33 });
+        return blendCam(prevCam('loop2', live), far, smoother(seg(lt, 0, 10)));
       },
-      fade: lerp(0, 0.6, smooth(seg(t, B(77), B(78)))) + 0.4 * smooth(seg(t, B(83) + 1.0, B(84) - 0.05)),
+      dof: { focus: 14, range: 24, blur: 6 * smooth(seg(t, B(80), B(81))) },
+      fade: lerp(0, 0.62, smooth(seg(t, B(80), B(81)))) + 0.38 * smooth(seg(t, B(85) + 0.6, B(86) - 0.05)),
       ov: {
-        reply: { a: 1 - smooth(seg(lt, 0.2, 1.2)), n: Q.G, k: 1 },
+        reply: { a: 1 - smooth(seg(lt, 0.6, 1.8)), n: Q.G, k: 1 },
         band: 1 - smooth(seg(lt, 0, 1)),
-        end: { a1: smooth(seg(t, B(77) + 0.4, B(77) + 1.4)) * (1 - smooth(seg(t, B(80) + 0.4, B(80) + 1.2))), k1: smooth(seg(t, B(78) + 0.6, B(78) + 1.4)), a2: smooth(seg(t, B(80) + 1.4, B(81) + 0.2)) * (1 - smooth(seg(t, B(83) + 1.2, B(84) - 0.1))), k2: seg(t, B(80) + 1.4, B(81) + 1.0) },
+        end: { a1: smooth(seg(t, B(80) + 0.4, B(80) + 1.6)) * (1 - smooth(seg(t, B(83) + 0.6, B(83) + 1.4))), k1: smooth(seg(t, B(81) + 0.8, B(81) + 1.8)), a2: smooth(seg(t, B(83) + 1.6, B(84) + 0.4)) * (1 - smooth(seg(t, B(85) + 1.0, B(86) - 0.1))), k2: seg(t, B(83) + 1.6, B(84) + 1.2) },
       },
     };
   });
-  ev(B(77) + 0.4, 'hit', { k: 0.5 });
+  ev(B(80) + 0.4, 'hit', { k: 0.5 });
+  ev(B(83) + 1.6, 'hit', { k: 0.35 });
 
-  const end = B(84);
-  shots.forEach((s, i) => { s.i = i; });
+  const end = B(86);
 
   function frame(t, ctx) {
     t = clamp(t, 0, end - 1e-6);

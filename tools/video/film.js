@@ -1,9 +1,10 @@
 // 电影模式：用网站的 3D 舞台（public/js/stage/）和真实的 Qwen3-0.6B 数据，按脚本化的时间线
 // 驱动机器和摄影机，HTML 叠加字幕。window.__film.renderAt(t) 渲染第 t 秒的画面，逐帧调用即可确定地出片。
 //
-// 片子讲的是「法国的首都是哪里？」→「法国的首都是巴黎。」这一次真实推理：
-//   第 1 个词「法国」完整走一遍（分词、嵌入、28 层、输出头、采样），自回归加速到第 5 个词「巴黎」，
-//   再走一遍 28 层，停在第 20 层（第 13 头把 82% 的注意力投向「法国」），拆到乘加和比特，最后收尾。
+// 片子讲的是「天空为什么是蓝色的？」这一次真实推理：
+//   第 1 个词「天空」完整走一遍（分词、嵌入、28 层；逻辑透镜在第 21 层说「因为」，第 24 层改口成「天空」），
+//   停在第 24 层拆开（第 6 头把 78% 的注意力投向问题里的「天空」），一直拆到乘加和 bf16 比特；
+//   再拉回输出头和采样，自回归写完整句回答，中间放慢看关键词「散」是怎么在最后一层才定下来的。
 import { FilmEngine, THREE } from './lib/engine.js';
 import { path, blendCam, orbit, handheld, clamp, lerp, seg, smooth, smoother, easeOut, easeIn, easeInOut, v3, pchip } from './lib/cam.js';
 import { el, vis, CueLayer } from './lib/overlay.js';
@@ -16,7 +17,7 @@ import { bf16Bits } from '/public/js/num.js';
 
 const params = new URLSearchParams(location.search);
 const FPS = Number(params.get('fps') || 30);
-const QID = params.get('q') || 'q12';
+const QID = params.get('q') || 'q01';
 const PREVIEW = params.has('preview');
 const $ = (s) => document.querySelector(s);
 
@@ -76,12 +77,20 @@ async function boot() {
   tameScene();
   buildExtras();
   buildOverlays();
-  window.__film = { ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
+  window.__film = { M, E, Q, probe, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
   if (PREVIEW) startPreview();
 }
 
 // 场景的“背景光”压暗：地面的径向光晕、漂浮微粒都调淡（用户不要背景光源一样的辉光）
 function tameScene() {
+  // 玻璃层板、外壳太光滑：主光的镜面高光叠在一起会形成一大团泛光（像背景里有个光源），把粗糙度调高
+  M.root.traverse((o) => {
+    const mt = o.material;
+    if (mt && mt.isMeshStandardMaterial && mt.roughness < 0.3) { mt.roughness = 0.62; mt.metalness = Math.min(mt.metalness, 0.3); }
+  });
+  M.pulses.material.color.setHex(0x8fd9e6);
+  // silu(g)⊙u 那根向量原来是纯白发光，太刺眼：换成偏冷的灰蓝
+  M.mats.mlp.din.segs.forEach((m) => { m.material.emissive.setHex(0x8fb4c8); m.material.color.setHex(0x1c2a36); });
   for (const o of E.scene.children) {
     if (o.isMesh && o.geometry?.type === 'CircleGeometry') o.material.opacity = 0.32;
     if (o.isPoints) { o.material.opacity = 0.2; o.material.size = 0.04; }
@@ -92,61 +101,61 @@ function tameScene() {
 /* ================================================================ 场景里额外的东西 */
 
 function buildExtras() {
-  // 1. 托盘方块下面的真实词元编号
+  // 1. 托盘方块前面的真实词元编号
   extras.ids = Q.tokens.map((t, i) => {
-    const lb = label(String(t.id), `lbl tid${t.role === 'user' ? ' u' : ''}`);
-    lb.position.set(0, -0.02, 0.24);
-    lb.center.set(0.5, -0.25);
+    const lb = label(String(t.id), `lbl tid${t.role === 'user' && !t.sp ? ' u' : ''}`);
+    lb.position.set(0, -0.12, 0.3);
+    lb.center.set(0.5, -0.15);
     M.tiles[i].add(lb);
     return lb;
   });
 
-  // 2. 嵌入表：151936 行 × 1024 列，每个词元按真实编号在表里的位置亮起一行，取出的向量飞向托盘
+  // 2. 嵌入表：立在机器背后的一整面墙。宽 = 1024 列，高 = 151936 行（从上往下按编号排）。
+  //    每个词元按真实编号在墙上亮起自己那一行，再从这一行落下一颗光点，落进托盘上的方块
   const g = (extras.emb = new THREE.Group());
-  const TW = 1.5, TH = 7.6, X = M.x(0) - 3.4, Y1 = 8.0;
-  extras.embGeo = { TW, TH, X, Y1 };
-  const glass = new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshBasicMaterial({ color: 0x0b1a2e, transparent: true, opacity: 0.55, depthWrite: false }));
-  glass.position.set(X, Y1 - TH / 2, 0);
-  g.add(glass);
-  const edge = new THREE.LineSegments(new THREE.EdgesGeometry(glass.geometry), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.45 }));
+  const X0 = M.x(0) - 0.5, X1 = M.x(Q.P - 1) + 0.5, Y1 = 8.6, TH = 8.0, Z = -1.12;
+  const TW = X1 - X0, XC = (X0 + X1) / 2;
+  const mk = (mesh, base) => { mesh.userData.base = base; g.add(mesh); return mesh; };
+  const glass = mk(new THREE.Mesh(new THREE.PlaneGeometry(TW, TH), new THREE.MeshBasicMaterial({ color: 0x0a1a2c, transparent: true, opacity: 0, depthWrite: false })), 0.55);
+  glass.position.set(XC, Y1 - TH / 2, Z);
+  const edge = mk(new THREE.LineSegments(new THREE.EdgesGeometry(glass.geometry), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0 })), 0.5);
   edge.position.copy(glass.position);
-  g.add(edge);
-  // 细横线：只是表格的“行”的示意（不代表数值）
+  // 细格线：表格的“行列”示意（不代表数值）
   const lines = [];
-  for (let k = 1; k < 40; k++) { const y = Y1 - (TH * k) / 40; lines.push(v3(X - TW / 2, y, 0.001), v3(X + TW / 2, y, 0.001)); }
-  const grid = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.06 }));
-  g.add(grid);
-  const head = label(`嵌入表<small>151936 × 1024</small>`, 'lbl part');
-  head.position.set(X, Y1 + 0.1, 0);
-  head.center.set(0.5, 1.2);
+  for (let k = 1; k < 32; k++) { const y = Y1 - (TH * k) / 32; lines.push(v3(X0, y, Z + 0.001), v3(X1, y, Z + 0.001)); }
+  for (let k = 1; k < 16; k++) { const x = X0 + (TW * k) / 16; lines.push(v3(x, Y1 - TH, Z + 0.001), v3(x, Y1, Z + 0.001)); }
+  mk(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0 })), 0.07);
+  const head = label(`嵌入表<small>151936 行 × 1024 列 · 每个词元按编号取一行</small>`, 'lbl part');
+  head.position.set(X0, Y1 + 0.05, Z);
+  head.center.set(0, 1.25);
   g.add(head);
+  extras.embHead = head;
+  const ax = label(`第 0 行`, 'lbl hint'); ax.position.set(X1 + 0.1, Y1, Z); ax.center.set(0, 0.5); g.add(ax);
+  const ax2 = label(`第 151935 行`, 'lbl hint'); ax2.position.set(X1 + 0.1, Y1 - TH, Z); ax2.center.set(0, 0.5); g.add(ax2);
+  extras.embAx = [ax, ax2];
   const roleCol = { system: 0x8fa6d6, user: 0x5ee4f0, assistant: 0xffb65c, tpl: 0xb39dff };
   extras.rows = Q.tokens.slice(0, Q.P).map((t, i) => {
     const y = Y1 - TH * (t.id / 151936);
     const c = roleCol[t.role] || roleCol.tpl;
-    const row = new THREE.Mesh(new THREE.PlaneGeometry(TW, 0.022), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false }));
-    row.position.set(X, y, 0.004);
+    const row = new THREE.Mesh(new THREE.PlaneGeometry(TW, 0.03), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false }));
+    row.position.set(XC, y, Z + 0.004);
     g.add(row);
-    const a = v3(X + TW / 2, y, 0.02), b = v3(M.x(i), 0.42, 0.05);
-    const ctrl = v3((a.x + b.x) / 2, Math.max(a.y, b.y) + 1.6 + 0.02 * i, 0.6);
-    const curve = new THREE.QuadraticBezierCurve3(a, ctrl, b);
-    const pk = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.95 }));
+    const a = v3(M.x(i), y, Z + 0.02), b = v3(M.x(i), 0.42, 0.02);
+    const curve = new THREE.QuadraticBezierCurve3(a, v3(M.x(i), (a.y + b.y) / 2, 0.55), b);
+    const pk = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.95 }));
     g.add(pk);
-    const trail = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.006, 4, false), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending }));
-    g.add(trail);
+    const dotA = new THREE.Mesh(new THREE.CircleGeometry(0.07, 16), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false }));
+    dotA.position.copy(a);
+    g.add(dotA);
     let lb = null;
-    if (t.role === 'user' && !t.sp && i >= 24) {
+    if (t.role === 'user' && !t.sp && t.s !== 'user' && t.s !== '\n') {
       lb = label(`${t.id} <span style="color:var(--ink)">${tk(t.s)}</span>`, 'lbl emb');
-      lb.position.set(X + TW / 2 + 0.08, y, 0.02);
-      lb.center.set(0, 0.5);
+      lb.position.set(M.x(i), y + 0.02, Z + 0.02);
+      lb.center.set(0.5, 1.35);
       g.add(lb);
     }
-    return { row, pk, trail, curve, lb, i };
+    return { row, pk, dotA, curve, lb, i };
   });
-  // 编号离得近的用户词元标签错开一点，免得叠在一起
-  const users = extras.rows.filter((r) => r.lb).sort((a, b) => b.row.position.y - a.row.position.y);
-  let lastY = Infinity;
-  for (const r of users) { const y = Math.min(r.row.position.y, lastY - 0.24); r.lb.position.y = y; lastY = y; }
   g.visible = false;
   M.root.add(g);
 
@@ -166,24 +175,29 @@ function updateExtras(t, f) {
     const tile = M.tiles[i];
     const on = ia > 0.01 && tile.visible && tile.position.y < 0.2;
     lb.visible = on;
-    if (on) lb.el.style.opacity = (ia * (ex.idsFocus ? (Q.tokens[i].role === 'user' && !Q.tokens[i].sp ? 1 : 0.35) : 1)).toFixed(3);
+    if (on) {
+      const tok = Q.tokens[i];
+      const isUser = tok.role === 'user' && !tok.sp && tok.s !== 'user' && tok.s !== '\n';
+      lb.el.style.opacity = (ia * (ex.idsFocus ? (isUser ? 1 : 0.25) : 1)).toFixed(3);
+    }
   });
   // 嵌入表
   const ea = ex.emb ?? 0;
   extras.emb.visible = ea > 0.01;
   if (extras.emb.visible) {
-    extras.emb.traverse((o) => { if (o.material && o.userData.base == null) o.userData.base = o.material.opacity; });
+    for (const o of extras.emb.children) if (o.material && o.userData.base != null) o.material.opacity = o.userData.base * ea;
+    extras.embHead.el.style.opacity = ea.toFixed(3);
+    extras.embAx.forEach((a) => { a.el.style.opacity = (ea * 0.8).toFixed(3); });
     const k = ex.embK ?? 0; // 0 → 1：取向量的进度
     for (const r of extras.rows) {
-      const t0 = r.i / Q.P * 0.55, local = clamp((k - t0) / 0.45);
-      r.row.material.opacity = ea * (local > 0 ? 0.95 * (1 - 0.6 * smooth(seg(local, 0.6, 1))) : 0.15);
-      r.pk.visible = local > 0 && local < 1;
-      if (r.pk.visible) r.pk.position.copy(r.curve.getPoint(easeInOut(local)));
-      r.trail.material.opacity = ea * (local > 0 ? 0.22 * (1 - smooth(seg(local, 0.7, 1.4))) + 0.05 : 0);
-      if (r.lb) { r.lb.visible = local > 0.05; r.lb.el.style.opacity = (ea * smooth(local * 3)).toFixed(3); }
+      const t0 = (r.i / Q.P) * 0.5, local = clamp((k - t0) / 0.5);
+      const lit = local > 0 ? 1 : 0;
+      r.row.material.opacity = ea * lit * (0.14 + 0.7 * (1 - smooth(seg(local, 0.15, 0.7))));
+      r.dotA.material.opacity = ea * lit * 0.9;
+      r.pk.visible = local > 0.02 && local < 1;
+      if (r.pk.visible) r.pk.position.copy(r.curve.getPoint(easeIn(local) * 0.4 + easeInOut(local) * 0.6));
+      if (r.lb) { r.lb.visible = local > 0.01; r.lb.el.style.opacity = (ea * smooth(local * 4)).toFixed(3); }
     }
-    for (const o of [extras.emb.children[0], extras.emb.children[1], extras.emb.children[2]]) o.material.opacity = o.userData.base * ea;
-    extras.emb.children[3].el.style.opacity = ea.toFixed(3);
   }
   // 指示
   const na = ex.next ?? 0;
@@ -193,6 +207,20 @@ function updateExtras(t, f) {
     extras.next.position.set(M.x(i), 0.62, 0.1);
     extras.next.el.style.opacity = na.toFixed(3);
   }
+}
+
+// 聚焦：深入一层时，把无关的光柱、层板、KV 缓存再压暗一些，画面更干净（在 Machine.update 之后乘上去）
+function isolate(k, st) {
+  M.kvK.material.transparent = M.kvV.material.transparent = true;
+  M.kvK.material.opacity = M.kvV.material.opacity = 1 - 0.85 * k;
+  if (k <= 0.001) return;
+  const focus = Q.row(st.g);
+  M.columns.forEach((c, i) => { if (i !== focus && c.visible) c.material.opacity *= 1 - 0.8 * k; });
+  M.slabs.forEach((sl, L) => {
+    if (L === M.explodeL) return;
+    sl.material.opacity *= 1 - 0.75 * k;
+    sl.edge.material.opacity *= 1 - 0.7 * k;
+  });
 }
 
 /* ================================================================ 叠加层 */
@@ -296,6 +324,8 @@ function updateLens(L) {
   OV.lens.style.display = L && L.a > 0.001 ? 'block' : 'none';
   if (!L || L.a <= 0.001) return;
   OV.lens.style.opacity = L.a.toFixed(3);
+  OV.lens.style.left = L.side === 'left' ? '72px' : 'auto';
+  OV.lens.style.right = L.side === 'left' ? 'auto' : '72px';
   const g = L.g, upto = L.upto; // upto：已经走过的层（可以是小数）
   const W = 382, H = 168, x = (l) => (l / 27) * W, y = (p) => H - p * H;
   const key = `${g}|${upto.toFixed(3)}`;
@@ -340,43 +370,45 @@ function updateAtt(A) {
   OV.att.style.display = A && A.a > 0.001 ? 'block' : 'none';
   if (!A || A.a <= 0.001) return;
   OV.att.style.opacity = A.a.toFixed(3);
+  OV.att.style.left = A.side === 'right' ? 'auto' : '72px';
+  OV.att.style.right = A.side === 'right' ? '72px' : 'auto';
   const key = `${A.L}|${A.g}|${A.head}|${A.reveal.toFixed(2)}`;
   if (key === OV.attKey) return;
   OV.attKey = key;
   const i = Q.row(A.g), n = i + 1;
+  const isUser = (t) => t.role === 'user' && !t.sp && t.s !== 'user' && t.s !== '\n';
   const rows = [];
   for (let h = 0; h < Q.H; h++) {
     const w = new Array(n).fill(0);
     for (const r of Q.att(A.L, h, i)) w[r.j] = r.w;
     const on = h === A.head;
     const shown = h / Q.H < A.reveal;
-    rows.push(`<div class="row${on ? ' on' : ''}"><span class="hn">H${String(h).padStart(2, '0')}</span>${w.map((v, j) => {
+    rows.push(`<div class="row${on ? ' on' : ''}"><span class="hn">${h}</span>${w.map((v) => {
       const a = shown ? Math.pow(v, 0.6) : 0;
-      const col = on ? `rgba(255,182,92,${(0.08 + 0.92 * a).toFixed(3)})` : `rgba(94,240,212,${(0.05 + 0.9 * a).toFixed(3)})`;
-      return `<i style="background:${col}${on && v > 0.5 ? ';outline:1.5px solid #fff' : ''}"></i>`;
-    }).join('')}</div>`);
+      const col = on ? `rgba(255,182,92,${(0.07 + 0.93 * a).toFixed(3)})` : `rgba(94,240,212,${(0.045 + 0.9 * a).toFixed(3)})`;
+      return `<i style="background:${col}"></i>`;
+    }).join('')}<span class="pk">${on && Q.att(A.L, h, i)[0] ? `${tk(Q.tokens[Q.att(A.L, h, i)[0].j].s)} ${pct(Q.att(A.L, h, i)[0].w)}` : ''}</span></div>`);
   }
-  const cols = Q.tokens.slice(0, n).map((t, j) => `<span class="${t.role === 'user' && !t.sp ? 'u' : ''}">${t.sp ? '·' : tk(t.s).slice(0, 3)}</span>`).join('');
-  OV.att.innerHTML = `<div class="h">第 ${A.L} 层 · 16 个头的注意力<small>查询：${q(Q.tokens[i].s)}（第 ${i} 位）· 每行 = 一个头</small></div>${rows.join('')}<div class="cols">${cols}</div>`;
+  const marks = Q.tokens.slice(0, n).map((t, j) => (j === 0 || isUser(t) ? `<span style="left:${(j * 15).toFixed(0)}px" class="${isUser(t) ? 'u' : ''}">${j === 0 ? '开头' : tk(t.s)}</span>` : '')).join('');
+  OV.att.innerHTML = `<div class="h">第 ${A.L} 层 · 16 个头的注意力<small>最后一个位置在看谁 · 每行一个头</small></div>${rows.join('')}<div class="cols">${marks}</div>`;
 }
 
-// 回答一个词一个词长出来，下面是它当时的概率和名次
+// 回答一个词一个词长出来：每个词元下面一条细线，长度 = 它被选中时的真实概率；最新的那个是琥珀色
 function updateReply(R) {
-  OV.reply.style.display = R && R.a > 0.001 ? 'flex' : 'none';
+  OV.reply.style.display = R && R.a > 0.001 ? 'block' : 'none';
   if (!R || R.a <= 0.001) return;
   OV.reply.style.opacity = R.a.toFixed(3);
-  const key = `${R.n}|${(R.k ?? 1).toFixed(2)}`;
+  OV.reply.style.transform = `translateX(-50%) translateY(${(R.dy ?? 0).toFixed(1)}px)`;
+  const key = `${R.n}|${(R.k ?? 1).toFixed(2)}|${R.hl ?? ''}`;
   if (key === OV.replyKey) return;
   OV.replyKey = key;
   OV.reply.innerHTML = Q.steps.slice(0, R.n).map((st, g) => {
     const sp = st.chosenS === '<|im_end|>';
     const newest = g === R.n - 1;
     const k = newest ? R.k ?? 1 : 1;
-    return `<div class="c${newest ? ' new' : ''}${sp ? ' sp' : ''}" style="opacity:${(0.25 + 0.75 * k).toFixed(3)};width:${sp ? 150 : 40 + 52 * tokPlain(st.chosenS).length}px">
-      <span class="s">${sp ? esc(shortSpecial(st.chosenS)) : tk(st.chosenS)}</span>
-      <span class="bar"><i style="width:${(st.chosenP1 * 100).toFixed(1)}%"></i></span>
-      <span class="p">${pct(st.chosenP1)}</span></div>`;
-  }).join('');
+    const low = st.chosenRank > 0;
+    return `<span class="c${newest ? ' new' : ''}${sp ? ' sp' : ''}${g === R.hl ? ' hl' : ''}" style="opacity:${(0.2 + 0.8 * k).toFixed(3)}"><span class="s">${sp ? esc(shortSpecial(st.chosenS)) : tk(st.chosenS)}</span><i class="${low ? 'low' : ''}" style="width:${Math.max(6, st.chosenP1 * 100).toFixed(1)}%"></i></span>`;
+  }).join('') + (R.tag ? `<span class="tag">${R.tag}</span>` : '');
 }
 
 function updateEnd(D) {
@@ -414,14 +446,35 @@ function drawGrain(frame) {
 
 /* ================================================================ 每帧 */
 
-let lastT = null, lastPanel = '';
+let lastT = null, lastPanel = '', lastF = null;
+
+// 调试：当前机器里几个关键物体的世界坐标（调机位用）
+function probe() {
+  const st = lastF?.st;
+  const v = (o) => (o ? [o.x, o.y, o.z].map((n) => +n.toFixed(3)) : null);
+  const W = (o) => v(o.getWorldPosition(new THREE.Vector3()));
+  const mc = st ? M.camera(st) : null;
+  return { shot: lastF?.shot, view: st?.view, cam: { pos: v(E.camera.position) }, xf: st ? M.x(Q.row(st.g)) : null, e: +M.e.toFixed(3), explodeL: M.explodeL, yL: M.explodeL >= 0 ? +M.yL(M.explodeL).toFixed(3) : null, yTop: +M.yTop.toFixed(3), mcam: mc && { pos: v(mc.pos), look: v(mc.look) }, attn: W(M.mats.attn), mlp: W(M.mats.mlp), panel: st ? v(M.detail.panelPos(st)) : null, rig: v(M.detail.rigCenter), dot: v(M.detail.dotCenter), bits: v(M.detail.bitsCenter), headX: st ? M.headX(st) : null };
+}
 function renderAt(t, { render = true } = {}) {
   const dt = lastT == null || t <= lastT || t - lastT > 0.5 ? 1 / FPS : t - lastT;
   lastT = t;
-  const f = SC.frame(t, { M, E, Q });
+  const f = (lastF = SC.frame(t, { M, E, Q }));
   if (f.st) {
     M.update(f.st, dt, t);
     if (f.after) f.after(M);
+    isolate(f.iso ?? 0, f.st);
+    // 层板右端的逻辑透镜读数：机器太宽（78 个位置），挪到当前词元的光柱旁边
+    const lx = M.x(Q.row(f.st.g)) + (f.lensDx ?? 0.75);
+    for (const sl of M.slabs) sl.lbl.position.x = lx;
+    // 镜头需要的临时隐藏 / 压暗（每帧都重新赋值，不会残留）
+    const hide = new Set(f.hide || []);
+    if (hide.has('attnMats')) M.mats.attn.visible = false;
+    if (hide.has('mlpMats')) M.mats.mlp.visible = false;
+    for (const o of [M.exAdd1, M.exAdd2, M.exRing1, M.exRing2, M.exUnit]) o.visible = !hide.has('exDeco');
+    if (f.bitsFx != null) M.detail.bitsFx.el.innerHTML = f.bitsFx;
+    if (f.lensWin != null && f.st.step.L != null) M.slabs.forEach((sl, L) => { if (L < f.st.step.L - f.lensWin || L > f.st.step.L) sl.lbl.visible = false; });
+    if (f.slabDim) M.slabs.forEach((sl) => { sl.material.opacity *= 1 - f.slabDim; sl.edge.material.opacity *= 1 - f.slabDim; sl.lbl.visible = false; });
     // 神经元阵列点亮的先后顺序原来用 Math.random：换成确定的哈希
     if (M.detail.panelKey && M.detail.panelKey !== lastPanel) {
       lastPanel = M.detail.panelKey;

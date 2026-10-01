@@ -35,7 +35,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .css2d { pointer-events: none; overflow: hidden; }
 #ov { pointer-events: none; }
 #vignette { pointer-events: none; background: radial-gradient(ellipse 75% 70% at 50% 46%, rgba(0, 0, 0, 0) 55%, rgba(0, 2, 6, .5) 100%); }
-#grain { width: 1920px; height: 1080px; pointer-events: none; opacity: .05; }
+#grain { width: 1920px; height: 1080px; pointer-events: none; opacity: .035; }
 #fade { background: #000; opacity: 0; pointer-events: none; }
 
 /* 预览用的时间轴（渲染时隐藏） */
@@ -97,7 +97,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 /* 冷开场：问题一个词元一个词元地拼出来 */
 .qline { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); display: flex; gap: 14px; align-items: flex-start; }
 .qtok { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.qtok .s { font-size: 70px; font-weight: 600; line-height: 1; padding: 16px 20px 18px; border-radius: 14px; border: 1px solid rgba(94, 228, 240, .28); background: rgba(94, 228, 240, .05); color: #dff8fb; letter-spacing: .02em; }
+.qtok .s { white-space: nowrap; font-size: 70px; font-weight: 600; line-height: 1; padding: 16px 20px 18px; border-radius: 14px; border: 1px solid rgba(94, 228, 240, .28); background: rgba(94, 228, 240, .05); color: #dff8fb; letter-spacing: .02em; }
 .qtok .id { font-family: var(--mono); font-size: 17px; color: var(--dim); letter-spacing: .06em; }
 .qcaret { width: 3px; height: 74px; margin-top: 18px; background: var(--cyan); }
 
@@ -110,45 +110,46 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .title .spec { margin-top: 26px; font-family: var(--mono); font-size: 15px; letter-spacing: .28em; color: var(--dim); }
 
 /* 逐层：『秋』的概率曲线（逻辑透镜） */
-.lenspanel { position: absolute; right: 72px; top: 150px; width: 430px; padding: 22px 24px 18px; border-radius: 16px; background: rgba(4, 9, 19, .62); border: 1px solid var(--line); }
+.lenspanel { position: absolute; right: 72px; top: 150px; width: 430px; padding: 22px 24px 18px; border-radius: 16px; background: rgba(3, 7, 15, .86); border: 1px solid var(--line2); backdrop-filter: blur(8px); }
 .lenspanel .h { font-size: 21px; font-weight: 600; color: var(--ink); letter-spacing: .06em; }
 .lenspanel .h small { display: block; margin-top: 4px; font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--dim); letter-spacing: .14em; }
 .lenspanel svg { display: block; margin-top: 14px; overflow: visible; }
 .lenspanel .ax { font-family: var(--mono); font-size: 12px; fill: var(--faint); }
 
 /* 16 个头的注意力矩阵 */
-.attgrid { position: absolute; left: 72px; top: 150px; padding: 18px 20px 16px; border-radius: 16px; background: rgba(4, 9, 19, .7); border: 1px solid var(--line); }
-.attgrid .h { font-size: 20px; font-weight: 600; letter-spacing: .05em; margin-bottom: 12px; }
-.attgrid .h small { font-family: var(--mono); font-size: 12.5px; color: var(--dim); font-weight: 400; margin-left: 10px; letter-spacing: .08em; }
-.attgrid .row { display: flex; align-items: center; gap: 2px; height: 17px; margin-bottom: 2px; }
-.attgrid .row .hn { width: 34px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+.attgrid { position: absolute; left: 72px; top: 150px; padding: 18px 22px 14px; border-radius: 16px; background: rgba(3, 7, 15, .9); border: 1px solid var(--line2); backdrop-filter: blur(8px); }
+.attgrid .h { font-size: 21px; font-weight: 600; letter-spacing: .05em; margin-bottom: 12px; white-space: nowrap; }
+.attgrid .h small { font-family: var(--serif); font-size: 15px; color: var(--dim); font-weight: 600; margin-left: 12px; letter-spacing: .04em; }
+.attgrid .row { display: flex; align-items: center; gap: 2px; height: 19px; margin-bottom: 2px; }
+.attgrid .row .hn { width: 30px; font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: right; padding-right: 8px; }
 .attgrid .row.on .hn { color: var(--amber); }
-.attgrid .row i { width: 12px; height: 15px; border-radius: 2px; background: rgba(94, 240, 212, .05); }
-.attgrid .cols { display: flex; gap: 2px; margin-left: 36px; margin-top: 6px; }
-.attgrid .cols span { width: 12px; font-size: 11px; color: var(--dim); text-align: center; line-height: 1.1; writing-mode: vertical-rl; height: 52px; overflow: hidden; }
+.attgrid .row i { width: 13px; height: 17px; border-radius: 2px; }
+.attgrid .row .pk { margin-left: 10px; width: 120px; font-size: 15px; color: var(--amber); white-space: nowrap; }
+.attgrid .cols { position: relative; height: 26px; margin-left: 32px; margin-top: 6px; }
+.attgrid .cols span { position: absolute; top: 0; transform: translateX(-30%); font-size: 14px; color: var(--dim); white-space: nowrap; }
 .attgrid .cols span.u { color: #8ee9f2; }
 
 /* 公式 / 形状卡片 */
-.card { position: absolute; padding: 18px 22px; border-radius: 14px; background: rgba(4, 9, 19, .72); border: 1px solid var(--line2); font-size: 21px; color: var(--ink2); line-height: 1.75; white-space: nowrap; }
+.card { position: absolute; padding: 18px 22px; border-radius: 14px; background: rgba(3, 7, 15, .88); backdrop-filter: blur(8px); border: 1px solid var(--line2); font-size: 21px; color: var(--ink2); line-height: 1.75; white-space: nowrap; }
 .card .k { display: block; font-family: var(--mono); font-size: 12.5px; letter-spacing: .22em; color: var(--cyan); margin-bottom: 6px; }
 .card .m { color: var(--ink); }
 .card b { color: var(--amber); font-weight: 600; }
 .card .m b { font-family: var(--mono); font-weight: 400; }
 
-/* 自回归：回答一个字一个字长出来，下面是它当时的概率 */
-.reply { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; gap: 6px; align-items: flex-end; }
-.reply .c { display: flex; flex-direction: column; align-items: center; width: 74px; }
-.reply .c .s { font-size: 58px; font-weight: 600; line-height: 1.15; color: var(--ink); }
+/* 自回归：回答一个词一个词长出来，每个词下面一条细线 = 它被选中时的概率 */
+.reply { position: absolute; left: 50%; top: 74px; width: 1380px; transform: translateX(-50%); text-align: center; line-height: 1.55; font-size: 44px; font-weight: 600; color: var(--ink); text-shadow: 0 2px 14px rgba(0, 0, 0, .9); }
+.reply .c { position: relative; display: inline-block; margin: 0 1px; }
+.reply .c i { position: absolute; left: 6%; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(150, 190, 235, .55); }
+.reply .c i.low { background: var(--rose); }
 .reply .c.new .s { color: var(--amber); }
-.reply .c .bar { width: 44px; height: 3px; margin-top: 10px; background: rgba(255, 255, 255, .08); border-radius: 2px; overflow: hidden; }
-.reply .c .bar i { display: block; height: 100%; background: var(--amber); }
-.reply .c .p { margin-top: 6px; font-family: var(--mono); font-size: 14px; color: var(--dim); }
-.reply .c .r { font-family: var(--mono); font-size: 12px; color: var(--rose); height: 15px; }
-.reply .c.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); padding-bottom: 14px; }
+.reply .c.new i { background: var(--amber); }
+.reply .c.hl .s { color: var(--amber); }
+.reply .c.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); vertical-align: middle; }
+.reply .tag { display: inline-block; margin-left: 16px; font-family: var(--mono); font-size: 17px; font-weight: 400; color: var(--amber); vertical-align: middle; }
 
 /* 片尾 */
 .endcard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
-.endcard .ans { font-size: 76px; font-weight: 600; letter-spacing: .12em; color: #f2f5fb; }
+.endcard .ans { width: 1240px; white-space: normal; font-size: 50px; line-height: 1.7; font-weight: 600; letter-spacing: .06em; color: #f2f5fb; }
 .endcard .stat { margin-top: 30px; font-family: var(--mono); font-size: 18px; letter-spacing: .14em; color: var(--dim); }
 .endcard .brand { font-size: 84px; font-weight: 900; letter-spacing: .1em; }
 .endcard .url { margin-top: 28px; font-family: var(--mono); font-size: 30px; letter-spacing: .08em; color: var(--cyan); }
