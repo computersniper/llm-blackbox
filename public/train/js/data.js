@@ -81,7 +81,7 @@ function readChunk(buf) {
 
 /* ---------------------------------------------------------------- 分块载入器 */
 
-const RETRY_MS = 4000;          // 失败后隔这么久才会再试
+const RETRY_MS = 4000;          // 失败后隔这么久才会再试，之后每失败一次间隔翻倍，最长 30 秒
 const MAX_INFLIGHT = 4;         // 同时在路上的分块
 const RECENT_MS = 400;          // 这么久没人再要的请求，降回后台的优先级
 
@@ -110,7 +110,7 @@ export class Loader {
   want(key, prio) {
     const it = this.items.get(key);
     if (!it || it.state === 'ok' || it.state === 'loading') return;
-    if (it.state === 'err' && (it.err?.unsupported || performance.now() - it.t < RETRY_MS)) return;
+    if (it.state === 'err' && (it.err?.unsupported || performance.now() - it.t < Math.min(30000, RETRY_MS * 2 ** (it.fails - 1)))) return;
     if (it.state === 'err') it.state = 'idle';
     it.prio = Math.max(prio, performance.now() - it.stamp < RECENT_MS ? it.prio : 0);
     it.stamp = performance.now();
@@ -139,6 +139,7 @@ export class Loader {
       it.state = 'err';
       it.err = e;
       it.t = performance.now();
+      it.fails = (it.fails || 0) + 1;
       if (!e.unsupported) console.warn('分块载入失败，稍后重试：', it.url, e.message);
     }).finally(() => {
       this.inflight--;

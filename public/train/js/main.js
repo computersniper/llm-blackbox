@@ -260,17 +260,19 @@ function request(p) {
   loader.pump();
 }
 
-// 调试器里的讲解 / 变量要用的数据都到了没有（D1 小模型的讲解要用这个检查点的逐字概率）
-function controlsReady() {
-  if (!tl || tl.depth === 0) return true;
+// 调试器里的讲解 / 变量要用的分块（D1 小模型的讲解要用这个检查点的逐字概率）
+function controlsNeed() {
+  if (!tl || tl.depth === 0) return [];
   const p = plan();
-  if (!p.need.every((key) => loader.has(key))) return false;
-  if (tl.depth === 1 && app.R.kind === 'tiny') return loader.has(app.R.D.key('ck', tl.k));
-  return true;
+  return tl.depth === 1 && app.R.kind === 'tiny' ? [...p.need, app.R.D.key('ck', tl.k)] : p.need;
 }
 
 function updateControls() {
-  if (controls && tl) controls.update(tl, app.R, ctx, controlsReady());
+  if (!controls || !tl) return;
+  const need = controlsNeed();
+  const ready = need.every((key) => loader.has(key));
+  const err = ready ? null : need.map((key) => loader.error(key)).find(Boolean) || null;
+  controls.update(tl, app.R, ctx, ready, err);
 }
 
 // 一块数据到了（或者失败了）：如果当前画面在等它，刷新调试器

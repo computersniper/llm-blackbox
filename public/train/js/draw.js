@@ -233,7 +233,7 @@ export function waitBox(g, x, y, w, h, env, wait, { label = '正在载入这部�
   g.globalAlpha = prev * a;
   if (err) {
     const tw = Math.min(w - 32, 280);
-    wrap(g, err.unsupported ? err.message : '这部分数据没有载入成功，过几秒会自动重试…', cx - tw / 2, cy, tw, size + 6, { size, color: COL.rose });
+    wrap(g, err.unsupported ? err.message : '这部分数据没有载入成功，稍后会自动重试…', cx, cy, tw, size + 6, { size, color: COL.rose, align: 'center' });
   } else {
     const r = size * 0.62, tw = measure(g, label, size);
     const sx = cx - (tw + r * 2 + 10) / 2 + r, sy = cy - size * 0.33;

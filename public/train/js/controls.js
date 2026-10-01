@@ -46,7 +46,7 @@ export class Controls {
 
   // 每换一步调用一次。ready = 讲解 / 变量要用的数据分块都到了；没到时先保留上一步的内容并调暗（CSS 里延迟一点再暗，免得一闪），
   // 到了以后页面会再调用一次
-  update(tl, R, ctx, ready = true) {
+  update(tl, R, ctx, ready = true, err = null) {
     const s = tl.step;
     this.renderCode(tl, R);
     const cr = crumbs(tl.depth, s, R);
@@ -70,9 +70,10 @@ export class Controls {
       ex.innerHTML = `${head}${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, R, ctx, tl.depth)}`;
       wt.innerHTML = watch(s, R, ctx, tl.depth).map(([k, v]) => (k === 'wh' ? `<div class="wh">${esc(v)}</div>` : `<span class="k">${esc(k)}</span><span class="v" title="${esc(String(v))}">${esc(String(v))}</span>`)).join('');
       this.shown = `${tl.depth}:${R.kind}`;
-    } else if (this.shown !== `${tl.depth}:${R.kind}`) {
-      // 上一次显示的是别的深度 / 别的训练，留着没意义：直接说正在载入
-      ex.innerHTML = `${head}<span class="dimmed">正在载入这一步的真实记录…</span>`;
+    } else if (err || this.shown !== `${tl.depth}:${R.kind}`) {
+      // 上一次显示的是别的深度 / 别的训练，留着没意义：直接说正在载入（或者为什么载入不了）
+      const msg = err ? (err.unsupported ? err.message : '这一步的数据没有载入成功，稍后会自动重试…') : '正在载入这一步的真实记录…';
+      ex.innerHTML = `${head}<span class="${err ? 'err' : 'dimmed'}">${esc(msg)}</span>`;
       wt.innerHTML = '';
       this.shown = '';
     } else stale = true;
