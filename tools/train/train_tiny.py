@@ -394,7 +394,7 @@ def main():
             mh, vh = m1 / (1 - b1 ** step), v1 / (1 - b2 ** step)
             pred = w0 * (1 - lrs[t] * wd) - lrs[t] * mh / (math.sqrt(vh) + EPS)
             err = max(err, abs(pred - w1) / float(np.spacing(np.float32(max(abs(w0), abs(w1))))))
-            merr = max(merr, abs(b1 * m0 + (1 - b1) * gg - m1) / (abs(m1) + 1e-30), abs(b2 * v0 + (1 - b2) * gg * gg - v1) / (abs(v1) + 1e-30))
+            merr = max(merr, abs(b1 * m0 + (1 - b1) * gg - m1) / (max(abs(b1 * m0), abs((1 - b1) * gg), abs(m1)) + 1e-30), abs(b2 * v0 + (1 - b2) * gg * gg - v1) / (abs(v1) + 1e-30))
     print(f'AdamW 公式复现：权重最大误差 {err:.2f} ulp（fp32），动量最大相对误差 {merr:.1e}')
 
     # 挑 4 个候选：嵌入里走得最远的、W_q 里走得最远的、W_down 里走得最远的、RMSNorm γ 里走得最远的
@@ -413,9 +413,13 @@ def main():
     flat = lambda sd: torch.cat([sd[k].float().reshape(-1) for k in names])
     thf = flat(final_state).to(dev)
     traj = torch.stack([flat(torch.load(pathlib.Path(a.ckdir) / f'step{t:05d}.pt')).to(dev) - thf for t in cks])
-    Uu, Ss, Vt = torch.linalg.svd(traj, full_matrices=False)
-    d1, d2 = Vt[0], Vt[1]
-    evr = (Ss[:2] ** 2 / (Ss ** 2).sum()).cpu().numpy()
+    # 轨迹矩阵是 41 × 660 万，直接 SVD 太宽：改用 41 × 41 的格拉姆矩阵求主成分
+    gram = (traj @ traj.T).double()
+    lam, vec = torch.linalg.eigh(gram)
+    lam, vec = lam.flip(0).clamp_min(0), vec.flip(1)
+    d1 = (traj.T @ vec[:, 0].float()) / lam[0].sqrt().float()
+    d2 = (traj.T @ vec[:, 1].float()) / lam[1].sqrt().float()
+    evr = (lam[:2] / lam.sum()).cpu().numpy()
     coords = torch.stack([traj @ d1, traj @ d2], 1).cpu().numpy()
     lo, hi = coords.min(0), coords.max(0)
     span = hi - lo
