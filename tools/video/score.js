@@ -6,6 +6,7 @@ import { THREE } from './lib/engine.js';
 import { path, blendCam, orbit, handheld, clamp, lerp, seg, smooth, smoother, easeOut, easeIn, easeInOut, v3, pchip } from './lib/cam.js';
 import { viewOf } from '/public/js/timeline.js';
 import { tokPlain, shortSpecial, fmtPct, esc } from '/public/js/ui.js';
+import { bf16Bits, bf16Value } from '/public/js/num.js';
 
 export const BPM = 96, BEAT = 60 / BPM, BAR = 4 * BEAT;
 const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
@@ -17,6 +18,10 @@ const pct = (p) => fmtPct(p);
 const f2 = (v, d = 2) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
 const V = (a) => v3(a[0], a[1], a[2]);
 const cam = (p, l, fov = 32) => ({ pos: V(p), look: V(l), fov });
+// 机位沿视线方向推远 / 拉近 k 倍
+const farther = (c, k) => ({ ...c, pos: c.look.clone().add(c.pos.clone().sub(c.look).multiplyScalar(k)) });
+// 角色配色（和网站算式板一致）：输入蓝、权重紫、乘积橙、结果青
+const cx = (s) => `<span class="cx">${s}</span>`, cw = (s) => `<span class="cw">${s}</span>`, cp = (s) => `<span class="cp">${s}</span>`, cy = (s) => `<span class="cy">${s}</span>`;
 
 function mst(depth, g, step, p, o = {}) {
   const s = { g, ...step };
@@ -266,8 +271,8 @@ export function buildScore(Q) {
   sub(Dk('softmax').t0 + 0.1, Dk('heads').t0 - 0.1, 'softmax：打分变成权重，每一行加起来等于 1。');
   sub(Dk('heads').t0 + 0.1, Dk('heads').t0 + 2.4, `16 个头各看各的：${m(sinkHeads)} 个头把最多的注意力放在开头的标记上（注意力汇）。`);
   sub(Dk('heads').t0 + 2.6, Dk('dmul').t0 - 0.1, `${m(keyHeads)} 个头在看问题里的${q(keyTok)}——第 ${m(dot.head)} 头给了它 ${m(pct(attD[0].w))}。`);
-  sub(Dk('dmul').t0 + 0.1, Dk('dsum').t0 - 0.1, '放大这一次打分：两个 128 维向量，逐项相乘。');
-  sub(Dk('dsum').t0 + 0.05, Dk('mix').t0 - 0.1, `加起来 q·k = ${m(f2(dot.sum))}，÷ √128 = ${m(f2(dot.score))}，softmax 之后 ${m(pct(dot.w))}。`);
+  sub(Dk('dmul').t0 + 0.1, Dk('dsum').t0 - 0.1, `放大这一次打分：${cx('q')} 和 ${cw('k')} 两个 128 维向量，逐项相乘。`);
+  sub(Dk('dsum').t0 + 0.05, Dk('mix').t0 - 0.1, `加起来 ${cy('q·k = ' + f2(dot.sum))}，÷ √128 = ${cy(f2(dot.score))}，softmax 之后 ${cy(pct(dot.w))}。`);
   sub(Dk('mix').t0 + 0.1, Dk('add1').t0 - 0.1, `按权重把 V 加起来：${q(keyTok)}的信息被搬到了最后一个位置。`);
   sub(Dk('add1').t0 + 0.1, Dk('up').t0 - 0.1, `再乘 W_o 回到 1024 维，加回残差流。这一层之后，透镜读到的就是${q(lensTop(0, LX)[2])}。`);
   sub(Dk('up').t0 + 0.1, Dk('act').t0 - 0.1, '前馈网络 SwiGLU：先把 1024 维扩成 3072 维，得到 g 和 u。');
@@ -275,14 +280,21 @@ export function buildScore(Q) {
   sub(Dk('act').t0 + 2.6, Dk('down').t0 - 0.1, `明显激活的有 ${m(Q.mlpCount(G0, LX))} 个神经元（这里画出最亮的 16 个），最亮的是 #${m(neu.j)}。`);
   sub(Dk('down').t0 + 0.1, Dk('pick').t0 - 0.1, '再用 W_down 压回 1024 维，加回残差流。');
   sub(Dk('pick').t0 + 0.1, Dk('mul').t0 + 0.6, `放大到一个神经元：#${m(neu.j)}。`);
-  sub(Dk('mul').t0 + 0.8, Dk('sum').t0 - 0.1, `1024 个输入，和 W_gate 第 ${m(neu.j)} 列逐项相乘……`);
-  sub(Dk('sum').t0 + 0.1, Dk('silu').t0 - 0.1, `……再全部加起来：g = ${m(neu.gz.toFixed(3))}。同一列在 W_up 里得到 u = ${m(neu.uz.toFixed(3))}。`);
-  sub(Dk('silu').t0 + 0.1, Dk('gate').t0 - 0.1, `SiLU(g) = g · σ(g) = ${m(neu.silu.toFixed(3))}。`);
-  sub(Dk('gate').t0 + 0.1, Dk('bits').t0 - 0.1, `${m(neu.silu.toFixed(3))} × ${m(neu.uz.toFixed(3))} = ${m((neu.silu * neu.uz).toFixed(2))}：这就是神经元 #${m(neu.j)} 的输出。`);
+  sub(Dk('mul').t0 + 0.8, Dk('sum').t0 - 0.1, `${cx('1024 个输入 h')}，和 ${cw('W_gate 第 ' + neu.j + ' 列')}逐项相乘，${cp('乘积')}飞进累加器……`);
+  sub(Dk('sum').t0 + 0.1, Dk('silu').t0 - 0.1, `……全部加起来：${cy('g = ' + neu.gz.toFixed(3))}。同一个神经元在 W_up 里得到 u = ${m(neu.uz.toFixed(3))}。`);
+  sub(Dk('silu').t0 + 0.1, Dk('gate').t0 - 0.1, `SiLU(g) = g · σ(g) = ${m(neu.silu.toFixed(3))}：负数被压到接近 0，正数几乎原样通过。`);
+  sub(Dk('gate').t0 + 0.1, Dk('bits').t0 - 0.1, `${m(neu.silu.toFixed(3))} × ${m(neu.uz.toFixed(3))} = ${cy((neu.silu * neu.uz).toFixed(2))}：这就是神经元 #${m(neu.j)} 的输出。`);
   const wb = neu.wg[0];
   const e2 = Math.floor(Math.log2(Math.abs(wb))), mant = Math.abs(wb) / 2 ** e2;
-  sub(Dk('bits').t0 + 0.2, Dk('bits').t0 + 3.6, `再放大：权重 W_gate[${m(neu.dims[0])}, ${m(neu.j)}] = ${m(wb.toFixed(4))}，在内存里只是 16 个比特。`);
-  sub(Dk('bits').t0 + 3.8, Dk('out').t0 - 0.1, `1 位符号、8 位指数、7 位尾数：${m(`${wb < 0 ? '−' : ''}2<sup>${e2}</sup> × ${mant.toFixed(4)}`)}。`);
+  const FLIP = 1; // 最高的指数位
+  const fb = bf16Bits(wb); fb[FLIP] ^= 1;
+  const wFlip = bf16Value(fb).value, gFlip = neu.gz + neu.x[0] * (wFlip - wb);
+  const sci = (v) => { const e = Math.floor(Math.log10(Math.abs(v))); return `${(v / 10 ** e).toFixed(1)} × 10<sup>${e}</sup>`; };
+  const flipT0 = Dk('bits').t0 + 4.4, flipT1 = Dk('bits').t1 - 0.2;
+  ev(flipT0, 'flip');
+  sub(Dk('bits').t0 + 0.2, Dk('bits').t0 + 2.4, `再放大：权重 ${cw(`W_gate[${neu.dims[0]}, ${neu.j}] = ${wb.toFixed(4)}`)}，在显存里只是 16 个比特。`);
+  sub(Dk('bits').t0 + 2.6, flipT0 - 0.1, `1 位符号、8 位指数、7 位尾数：${m(`2<sup>${e2}</sup> × ${mant.toFixed(4)}`)}。`);
+  sub(flipT0 + 0.1, flipT1, `假如翻转最高的指数位：权重变成 ${m(sci(wFlip))}，g 跟着变成 ${m(sci(gFlip))}。一位都错不得。`);
   sub(Dk('out').t0 + 0.1, Dk('out').t1 - 0.1, `${m('596,049,920')} 个这样的数，一起算出了下一个词。`);
   const L = (M) => ({ xf: M.x(row0), y: M.yL(LX), e: M.e });
   const dCam = {
@@ -291,17 +303,20 @@ export function buildScore(Q) {
     qkv: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.3, y + 1.85, 4.95], [xf + 1.8, y + 1.35, 0.62]), cam([xf + 3.2, y + 1.9, 4.6], [xf + 2.6, y + 1.4, 0.62]), smooth(p)); },
     score: (M, p) => { const { xf, y } = L(M); const kx = M.x(dot.key); return blendCam(cam([(kx + xf) / 2 - 0.6, y + 1.9, 8.4], [(kx + xf) / 2, y + 0.95, 0]), cam([(kx + xf) / 2 + 0.2, y + 1.6, 7.2], [(kx + xf) / 2 + 0.1, y + 0.95, 0]), smooth(p)); },
     heads: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 0.3, y + 2.6, 14.2], [xf + 0.5, y + 0.9, 0]), cam([xf + 0.6, y + 2.3, 13.2], [xf + 0.55, y + 0.9, 0]), smooth(p)); },
-    dot: (M, p) => { const c = M.detail.dotCenter || v3(L(M).xf - 1, L(M).y + 1.6, 0.7); return blendCam(cam([c.x + 0.35, c.y + 0.3, c.z + 3.3], [c.x + 0.05, c.y + 0.02, c.z]), cam([c.x + 0.1, c.y + 0.18, c.z + 2.75], [c.x + 0.05, c.y + 0.02, c.z]), smooth(p)); },
+    dot: (M, p) => { const c = M.detail.dotCenter || v3(L(M).xf - 1, L(M).y + 1.6, 0.7); return farther(blendCam(cam([c.x + 0.35, c.y + 0.3, c.z + 3.3], [c.x + 0.05, c.y + 0.02, c.z]), cam([c.x + 0.1, c.y + 0.18, c.z + 2.75], [c.x + 0.05, c.y + 0.02, c.z]), smooth(p)), 1.45); },
     mix: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 0.8, y + 1.85, 4.3], [xf + 1.3, y + 1.55, 0.62]), cam([xf + 1.8, y + 1.85, 4.0], [xf + 1.4, y + 1.55, 0.62]), smooth(p)); },
     add1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.4, y + 1.6, 2.9], [xf + 0.45, y + 1.1, 0.1]), cam([xf - 0.2, y + 1.7, 4.2], [xf + 0.6, y + 1.15, 0.1]), smooth(p)); },
     mlp: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.6, y + 3.6, 7.6], [xf + 1.2, y + 2.85, -0.2]), cam([xf + 1.25, y + 3.4, 6.3], [xf + 1.2, y + 2.85, -0.2]), smooth(p)); },
-    mm: (M, p, st) => { const c = M.micro.camera(st); if (c) endCam.set('mm', c); const b = endCam.get('mm') || dCam.mlp(M, 1); return orbit({ ...b, fov: 32 }, lerp(-5, 4, smooth(p)), 0, lerp(1.08, 0.96, smooth(p))); },
-    neuron: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-6, 5, smooth(p)), 0, lerp(1.05, 0.95, smooth(p))); },
-    bits: (M, p, st) => { const c = M.detail.camera(st); const d = c.pos.distanceTo(c.look); const k = lerp(2.6, 1.15, easeInOut(p)); return orbit({ pos: c.look.clone().add(c.pos.clone().sub(c.look).normalize().multiplyScalar(d * k)), look: c.look, fov: 32 }, lerp(-12, 6, smooth(p)), lerp(8, 0, smooth(p)), 1); },
+    mm: (M, p, st) => { const c = M.micro.camera(st); if (c) endCam.set('mm', c); const b = endCam.get('mm') || dCam.mlp(M, 1); return orbit({ ...b, fov: 32 }, lerp(-6, 4, smooth(p)), 0, lerp(1.6, 1.4, smooth(p))); },
+    neuron: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-6, 5, smooth(p)), 0, lerp(1.55, 1.4, smooth(p))); },
+    bits: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-14, 4, smooth(p)), lerp(10, 2, smooth(p)), lerp(3.2, 1.5, easeInOut(seg(p, 0, 0.7)))); },
   };
   const camKey = { over: 'over', ln1: 'ln1', qkv: 'qkv', score: 'score', softmax: 'score', heads: 'heads', dmul: 'dot', dsum: 'dot', dscale: 'dot', mix: 'mix', add1: 'add1', up: 'mlp', act: 'mlp', down: 'mlp', pick: 'mm', mul: 'mm', sum: 'mm', silu: 'neuron', gate: 'neuron', bits: 'bits' };
   const camSpan = {}; // 同一个机位 key 跨越的时间段
   D.forEach((x) => { const k = camKey[x.key]; if (!k) return; camSpan[k] ||= { t0: x.t0, t1: x.t1 }; camSpan[k].t1 = x.t1; });
+  // 算式板出现的几段：画面往左让出位置
+  const BOARD = ['dot', 'mm', 'neuron', 'bits'];
+  const boardShift = (t) => Math.max(...[[camSpan.dot.t0, camSpan.dot.t1], [camSpan.mm.t0, camSpan.bits.t1]].map(([a, b]) => smoother(seg(t, a - 0.2, a + 0.9)) * (1 - smoother(seg(t, b - 0.7, b + 0.4)))));
   const BLEND = { over: 2.8, ln1: 1.3, qkv: 1.5, score: 1.4, heads: 1.6, dot: 1.4, mix: 1.3, add1: 1.1, mlp: 1.5, mm: 1.5, neuron: 1.4, bits: 1.6 };
   const headCam = (M, st, o = {}) => {
     const hx = M.headX(st);
@@ -345,7 +360,9 @@ export function buildScore(Q) {
         return out;
       },
       hide: [...(['score', 'heads', 'dot'].includes(ck) ? ['attnMats'] : []), ...(ck === 'bits' ? ['exDeco'] : [])],
-      bitsFx: ck === 'bits' ? `g[${neu.j}] = … + x × 这个权重 + …（x = ${neu.x[0].toFixed(3)}）` : null,
+      flipBit: t >= flipT0 && t < flipT1 ? FLIP : null,
+      boardA: BOARD.includes(ck) ? smooth(seg(t, span.t0 + 0.05, span.t0 + 0.45)) * (1 - smooth(seg(t, span.t1 - 0.35, span.t1 - 0.02))) : 1,
+      shiftX: 430 * boardShift(t),
       dof: ck === 'bits' ? { range: 0.5, blur: 6 } : ['dot', 'mm', 'neuron'].includes(ck) ? { range: 1.6, blur: 3.5 } : null,
       ov: {
         att: { a: smooth(seg(t, hk.t0 + 0.1, hk.t0 + 0.8)) * (1 - smooth(seg(t, hk.t1 - 0.3, hk.t1 + 0.3))), L: LX, g: G0, head: s.key === 'heads' ? head : dot.head, reveal: seg(t, hk.t0 + 0.1, hk.t0 + 1.2), side: 'right' },
@@ -403,11 +420,13 @@ export function buildScore(Q) {
             const mc = M.micro.camera({ ...st, step: s.s.mi ? st.step : { g, ph: 'head', sub: 'unembed', mi: 'sum' } });
             if (mc) endCam.set(`${name}-mm`, { ...mc, fov: 32 });
             const mcc = endCam.get(`${name}-mm`);
-            if (mcc) live = blendCam(head, orbit(mcc, lerp(-6, 6, seg(t, mmA.t0, mmZ.t0)), 0, 1.02), mmK);
+            if (mcc) live = blendCam(head, orbit(mcc, lerp(-6, 6, seg(t, mmA.t0, mmZ.t0)), 0, 1.5), mmK);
           }
         }
         return blendCam(prevCam(prevName, live), live, smoother(seg(lt, 0, blendIn)));
       },
+      shiftX: mmA ? 430 * smoother(seg(t, mmA.t0 - 0.2, mmA.t0 + 0.9)) * (1 - smoother(seg(t, mmZ.t0 - 0.7, mmZ.t0 + 0.4))) : 0,
+      boardA: mmA ? smooth(seg(t, mmA.t0 + 0.05, mmA.t0 + 0.45)) * (1 - smooth(seg(t, mmZ.t0 - 0.35, mmZ.t0 - 0.02))) : 1,
       ov: { corner: { g, what: s.s.ph === 'sample' ? '采样' : '输出头' }, cornerA: 1 },
     };
   });

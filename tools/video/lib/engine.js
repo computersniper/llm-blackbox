@@ -107,18 +107,22 @@ export class FilmEngine {
     this.css.setSize(width, height);
     host.append(this.css.domElement);
 
-    // 字幕区留白：投影中心往上挪一点，让主体落在字幕上方
+    // 字幕区留白：投影中心往上挪一点，让主体落在字幕上方；算式板出现时再往左挪（shiftX）
     this.shiftY = 0;
+    this.shiftX = 0;
     this.applyOffset();
   }
 
   applyOffset() {
     const { w, h } = this;
     this.camera.aspect = w / h;
-    if (this.shiftY) this.camera.setViewOffset(w, h, 0, this.shiftY, w, h);
+    if (this.shiftY || this.shiftX) this.camera.setViewOffset(w, h, this.shiftX, this.shiftY, w, h);
     else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
   }
+
+  // 网站的算式板会告诉 Engine 它挡住了哪块画面；片子里的机位是手写的，这里只记下来
+  setOverlay(top = 0, bottom = 0) { this.ov = [top, bottom]; }
 
   // 让宽 width、高 height 的区域刚好装进画面所需的距离（和站点 Engine 同名同义，给机器的取景用）
   fitDistance(width, height, margin = 1.15) {

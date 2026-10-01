@@ -74,6 +74,9 @@ async function boot() {
   M.brightness = 0.82;
   M.mats.setThumbs(thumbs, MAN.thumbs.index);
   M.load(Q);
+  // 算式板（网站 D6 / D7 的 HTML 浮层）：放到字幕层下面；飞行的乘积用的是实时动画，逐帧渲染时关掉
+  $('#frame').insertBefore(M.board.el, $('#ov'));
+  M.board.fly = () => {};
   tameScene();
   buildExtras();
   buildOverlays();
@@ -427,6 +430,23 @@ function updateEnd(D) {
   }
 }
 
+/* ================================================================ 算式板 */
+
+// 网站上的算式板有一些操作提示（点一行、点键帽……），片子里用不上：去掉
+const STRIP = [/<span class="dim">点一行[^<]*<\/span>/g, /<b>点任意一位<\/b>把它翻过来，看看会发生什么。/g, /试试看：/g];
+function cleanBoard(a) {
+  const el = M.board.el;
+  if (el.hidden) return;
+  el.style.opacity = a.toFixed(3);
+  for (const n of el.querySelectorAll('.bd-cap, .bd-eff p')) {
+    if (n._c === n.innerHTML) continue;
+    let h = n.innerHTML;
+    for (const r of STRIP) h = h.replace(r, '');
+    if (h !== n.innerHTML) n.innerHTML = h;
+    n._c = n.innerHTML;
+  }
+}
+
 /* ================================================================ 颗粒 */
 
 const grainCtx = () => $('#grain').getContext('2d');
@@ -461,7 +481,11 @@ function renderAt(t, { render = true } = {}) {
   lastT = t;
   const f = (lastF = SC.frame(t, { M, E, Q }));
   if (f.st) {
+    // 比特：脚本里演示翻转某一位（网站上是点键帽），算式板会按真实公式重算后果
+    const D = M.detail;
+    if (f.flipBit != null && D.baseBits && D.bitsKey) { const cur = D.baseBits.slice(); cur[f.flipBit] ^= 1; D.flips.set(D.bitsKey, cur); } else if (D.flips.size) D.flips.clear();
     M.update(f.st, dt, t);
+    cleanBoard(f.boardA ?? 1);
     if (f.after) f.after(M);
     isolate(f.iso ?? 0, f.st);
     // 层板右端的逻辑透镜读数：机器太宽（78 个位置），挪到当前词元的光柱旁边
@@ -472,7 +496,6 @@ function renderAt(t, { render = true } = {}) {
     if (hide.has('attnMats')) M.mats.attn.visible = false;
     if (hide.has('mlpMats')) M.mats.mlp.visible = false;
     for (const o of [M.exAdd1, M.exAdd2, M.exRing1, M.exRing2, M.exUnit]) o.visible = !hide.has('exDeco');
-    if (f.bitsFx != null) M.detail.bitsFx.el.innerHTML = f.bitsFx;
     if (f.lensWin != null && f.st.step.L != null) M.slabs.forEach((sl, L) => { if (L < f.st.step.L - f.lensWin || L > f.st.step.L) sl.lbl.visible = false; });
     if (f.slabDim) M.slabs.forEach((sl) => { sl.material.opacity *= 1 - f.slabDim; sl.edge.material.opacity *= 1 - f.slabDim; sl.lbl.visible = false; });
     // 神经元阵列点亮的先后顺序原来用 Math.random：换成确定的哈希
@@ -483,6 +506,8 @@ function renderAt(t, { render = true } = {}) {
     }
   }
   updateExtras(t, f);
+  const sx = f.shiftX ?? 0;
+  if (Math.abs(sx - E.shiftX) > 0.01) { E.shiftX = sx; E.applyOffset(); }
   const cam = typeof f.cam === 'function' ? f.cam() : f.cam;
   E.setCamera(cam.pos, cam.look, cam.fov ?? 34, cam.roll ?? 0);
   if (f.dof) E.setDof(f.dof.focus ?? cam.pos.distanceTo(cam.look), f.dof.range ?? 3, f.dof.blur ?? 0); else E.setDof(0, 1, 0);
