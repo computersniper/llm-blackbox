@@ -73,7 +73,9 @@ export class Engine {
     this.ndc = new THREE.Vector2();
     this.bindInput();
 
-    new ResizeObserver(() => this.resize()).observe(host);
+    // 尺寸变了先记下，到下一帧渲染之前再真正 resize：ResizeObserver 在 rAF 之后才回调，
+    // 在回调里直接改画布尺寸会把这一帧已经画好的画面清空（拖动面板宽度时舞台会一直闪黑）
+    new ResizeObserver(() => { this.sized = false; }).observe(host);
     this.resize();
     this.last = performance.now();
     this.clock = 0;
@@ -83,6 +85,7 @@ export class Engine {
   resize() {
     const w = Math.max(1, this.host.clientWidth), h = Math.max(1, this.host.clientHeight);
     this.w = w; this.h = h;
+    this.sized = true;
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
     this.bloom.resolution.set(w / 2, h / 2);
@@ -265,6 +268,7 @@ export class Engine {
   }
 
   loop(t) {
+    if (!this.sized) this.resize();
     const dt = Math.min(0.05, (t - this.last) / 1000);
     this.last = t;
     this.clock += dt;
