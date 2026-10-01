@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>智能体 · 看一个编程 agent 怎么在终端里干活</title>
+  <meta name="description" content="一个真实的开源模型 Qwen3-4B 在真实的 Linux 沙箱里修 bug、统计日志、写脚本、重命名函数。全过程离线录制：每一轮的完整上下文、每个词元的候选概率、每条命令的真实输出。点 ＋ 一层层揭开：屏幕、agent 循环、上下文窗口、逐词元生成、模型内部。">
+  <meta name="theme-color" content="#060d1a">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="agent.css">
+</head>
+<body class="mode-watch idle chat-open">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="揭开黑箱 · 智能体">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">BLACK&nbsp;BOX</span>
+      <span class="brand-zh">智能体</span>
+    </a>
+    <nav class="site-nav" aria-label="站点">
+      <a href="../">推理</a>
+      <a href="../train/">训练</a>
+      <a href="../multimodal/">多模态</a>
+      <a href="./" aria-current="page">智能体</a>
+    </nav>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
+    <div class="top-actions">
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
+      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="ag-app">
+    <section class="side" id="side" aria-label="对话">
+      <div class="side-head">
+        <span class="avatar" id="avatar" aria-hidden="true"><i></i></span>
+        <div class="chat-title">
+          <b id="modelName">Qwen3-4B-Instruct-2507</b>
+          <span>开源模型 · 真实沙箱 · 离线录制</span>
+        </div>
+        <button class="chat-close" id="btnSideClose" type="button" title="收起对话">‹</button>
+      </div>
+      <div class="side-log" id="log" aria-live="polite"></div>
+      <div class="composer" id="composer">
+        <div class="cmp-row">
+          <button class="cmp-plus" id="btnPlus" type="button" title="揭开：看下一层（单步进入）" disabled>＋</button>
+          <div class="cmp-input" id="cmpInput" role="textbox" aria-label="用词元拼出的任务" aria-readonly="true"></div>
+          <button class="cmp-icon" id="btnBack" type="button" title="删掉最后一个词元">⌫</button>
+          <button class="cmp-send" id="btnSend" type="button" title="交给 agent" disabled>↑</button>
+        </div>
+        <div class="cmp-cands" id="cands" aria-label="候选词元"></div>
+      </div>
+    </section>
+
+    <section class="stage" id="stage" aria-label="agent 的工作现场">
+      <div class="stage-top">
+        <button class="stage-strip" id="strip" type="button" aria-label="打开对话"></button>
+      </div>
+
+      <div class="views" id="views">
+        <!-- D2 循环：模型 ⇄ harness ⇄ 沙箱 -->
+        <div class="v-loop" id="vLoop" aria-hidden="true">
+          <div class="laps" id="laps"></div>
+          <div class="loop-row">
+            <div class="node n-model" id="nModel">
+              <div class="node-k">模型</div>
+              <div class="node-t" id="nModelName">Qwen3-4B</div>
+              <div class="node-s" id="nModelSpec"></div>
+              <div class="node-out mono" id="nModelOut"></div>
+            </div>
+            <div class="node n-harness" id="nHarness">
+              <div class="node-k">harness · 外面的程序</div>
+              <div class="node-t">循环、解析、执行</div>
+              <ol class="h-ops" id="hOps">
+                <li data-op="prompt">拼出整段上下文</li>
+                <li data-op="gen">等模型说完</li>
+                <li data-op="parse">找 &lt;tool_call&gt;</li>
+                <li data-op="exec">在沙箱里执行</li>
+                <li data-op="append">结果接回对话</li>
+                <li data-op="done">没有工具调用 → 结束</li>
+              </ol>
+            </div>
+            <div class="node n-sbx" id="nSbx">
+              <div class="node-k">沙箱 · /work</div>
+              <div class="sbx-slot" id="sbxSlot"></div>
+              <div class="node-out mono" id="nSbxOut"></div>
+            </div>
+          </div>
+          <svg class="edges" id="edges" aria-hidden="true"></svg>
+        </div>
+
+        <!-- D3 上下文窗口 -->
+        <div class="v-ctx" id="vCtx" aria-hidden="true">
+          <div class="ctx-head" id="ctxHead"></div>
+          <div class="ctx-bar" id="ctxBar"></div>
+          <div class="ctx-legend" id="ctxLegend"></div>
+          <div class="ctx-split">
+            <div class="ctx-stairs" id="ctxStairs"></div>
+            <pre class="ctx-raw" id="ctxRaw"></pre>
+          </div>
+        </div>
+
+        <!-- D4 逐词元生成 -->
+        <div class="v-tok" id="vTok" aria-hidden="true">
+          <div class="tok-head" id="tokHead"></div>
+          <div class="tok-stream" id="tokStream"></div>
+          <div class="tok-cands" id="tokCands"></div>
+        </div>
+
+        <!-- D5 模型内部 -->
+        <div class="v-fwd" id="vFwd" aria-hidden="true">
+          <div class="fwd-col" id="fwdCol"></div>
+          <div class="fwd-info" id="fwdInfo"></div>
+        </div>
+
+        <!-- D1 屏幕：编辑器 + 终端（揭开时缩进沙箱里） -->
+        <div class="desk" id="desk">
+          <div class="win">
+            <div class="win-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="win-title mono">agent@sandbox:/work</span>
+              <span class="win-badge" title="命令在 bubblewrap 沙箱里执行：系统目录只读、只能写 /work、没有网络、10 秒超时">沙箱 · 无网络</span>
+            </div>
+            <div class="win-body">
+              <nav class="tree" id="tree" aria-label="文件"></nav>
+              <div class="ed">
+                <div class="tabs" id="tabs"></div>
+                <div class="ed-body" id="edBody"></div>
+              </div>
+              <div class="term">
+                <div class="term-h"><span>终端</span><span class="term-st" id="termSt"></span></div>
+                <div class="term-body mono" id="termBody"></div>
+              </div>
+            </div>
+            <div class="win-status mono" id="winStatus"></div>
+          </div>
+          <div class="desk-done" id="deskDone" hidden></div>
+        </div>
+      </div>
+
+      <aside class="dbg" id="dbg" aria-label="调试器">
+        <header class="dbg-h">
+          <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono">run_agent()</span>
+          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
+        </header>
+        <div class="dbg-body">
+          <pre class="code" id="code"></pre>
+          <div class="dbg-explain" id="explain"></div>
+          <div class="dbg-watch" id="watch"></div>
+        </div>
+      </aside>
+
+      <div class="ctl" id="ctl">
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-bar">
+          <div class="ctl-depth">
+            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+            <span class="ctl-dname" id="dname"></span>
+            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
+          </div>
+          <div class="ctl-play">
+            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
+          </div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+          <div class="ctl-pos mono" id="pos"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tooltip" role="tooltip"></div>
+
+  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴">
+    <div class="cx-panel">
+      <header class="cx-head">
+        <div>
+          <div class="eyebrow">CODEX · 知识碎片图鉴</div>
+          <h2>你在 agent 里的发现</h2>
+        </div>
+        <div class="cx-progress"><b>0</b><span class="cx-bar"><i></i></span></div>
+        <button class="cx-close" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="cx-grid"></div>
+      <footer class="cx-foot">
+        <p id="cxFoot"></p>
+        <button class="linkish" id="btnReset" type="button">重置进度</button>
+      </footer>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
