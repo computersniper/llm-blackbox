@@ -241,8 +241,8 @@ function plan() {
       if (view === 'layer') p.want.push(ck(k));
       if (view === 'adam' || view === 'bits') p.want.push(D.key('feat'));
       p.hold.push(...p.need);
-      p.soon.push(stp(k), stp(k + 1), stp(k - 1), ck(k));
-      if (tl.step.ph === 'upd') p.soon.push(D.key('feat'));
+      // ck(k)：D4 层视图的梯度局部、退回 D1；feat：D3 更新的权重轨迹（一步之内的 5 个环节之一，提前取）
+      p.soon.push(stp(k), stp(k + 1), stp(k - 1), ck(k), D.key('feat'));
     }
   } else {
     if (tl.depth >= 2) { p.need.push(stp(k)); p.hold.push(stp(k)); }

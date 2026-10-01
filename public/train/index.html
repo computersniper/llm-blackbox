@@ -9,6 +9,34 @@
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/train.css">
+  <!-- 首屏数据（约 90 KB gzip）不必等脚本跑起来再取：和脚本一起开始下载，js/data.js 的 fetch 会直接用上 -->
+  <link rel="preload" href="data/tiny.json.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/tiny.bin.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/qwen.json.gz" as="fetch" crossorigin>
+  <!-- 模块依赖有三层（main → 各个视图 → 绘图工具），预先声明，浏览器一开始就并行取完，不用一层层等 -->
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="modulepreload" href="js/data.js">
+  <link rel="modulepreload" href="js/run.js">
+  <link rel="modulepreload" href="js/timeline.js">
+  <link rel="modulepreload" href="js/controls.js">
+  <link rel="modulepreload" href="js/explain.js">
+  <link rel="modulepreload" href="js/stage.js">
+  <link rel="modulepreload" href="js/draw.js">
+  <link rel="modulepreload" href="js/insights.js">
+  <link rel="modulepreload" href="js/scenes/pipeline.js">
+  <link rel="modulepreload" href="js/scenes/overview.js">
+  <link rel="modulepreload" href="js/scenes/overviewQ.js">
+  <link rel="modulepreload" href="js/scenes/loop.js">
+  <link rel="modulepreload" href="js/scenes/row.js">
+  <link rel="modulepreload" href="js/scenes/tokens.js">
+  <link rel="modulepreload" href="js/scenes/grid.js">
+  <link rel="modulepreload" href="js/scenes/loss.js">
+  <link rel="modulepreload" href="js/scenes/layer.js">
+  <link rel="modulepreload" href="js/scenes/adam.js">
+  <link rel="modulepreload" href="../js/bg.js">
+  <link rel="modulepreload" href="../js/audio.js">
+  <link rel="modulepreload" href="../js/ui.js">
+  <link rel="modulepreload" href="../js/resize.js">
 </head>
 <body>
   <canvas id="bg" aria-hidden="true"></canvas>
