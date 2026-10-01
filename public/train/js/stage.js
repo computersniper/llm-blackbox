@@ -1,6 +1,6 @@
 // 2D 舞台：一块可以平移缩放的画布。跟随镜头自动对准当前步骤；拖动 / 滚轮 / 双指 / WASD 进入自由视角。
 // 每个视图（scene）在自己的“世界坐标”里画，舞台负责相机、换场过渡（快照淡出 + 缩放）和拾取。
-// 数据分块还没到：st.blocked 时画载入占位代替视图；st.stale 时视图先画最近一个已到的检查点，底部标注一行。
+// 数据分块还没到：st.blocked 时画载入占位代替视图；st.stale 时视图先画最近一个已到的检查点，调暗并在顶部标注一行。
 import { COL, rr, text, measure, waitBox, waitFade } from './draw.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -304,14 +304,16 @@ export class Stage {
     if (st.stale) this.drawStale(st.stale);
   }
 
-  // 屏幕底部一行：这一步的数据还在路上，先显示的是哪一步
+  // 顶替的画面调暗一些，可视区顶部一行：这一步的数据还在路上，先显示的是哪一步
   drawStale({ since, label }) {
     const a = waitFade(this.clock - since);
     if (a <= 0) return;
     const g = this.g, v = this.view;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.fillStyle = `rgba(6,13,26,${0.45 * a})`;
+    g.fillRect(0, 0, this.W, this.H);
     g.globalAlpha = a;
-    const w = measure(g, label, 11.5) + 40, h = 26, x = v.cx - w / 2, y = v.y + v.h - h - 10;
+    const w = measure(g, label, 11.5) + 40, h = 26, x = v.cx - w / 2, y = v.y + 6;
     rr(g, x, y, w, h, h / 2);
     g.fillStyle = 'rgba(10,17,31,0.92)';
     g.fill();

@@ -64,13 +64,20 @@ export class Controls {
     }
     const ex = $('#explain'), wt = $('#watch');
     const head = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, R, tl.depth))}</div>`;
+    let stale = false;
     if (ready) {
       const shape = shapeOf(s, R, tl.depth);
       ex.innerHTML = `${head}${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, R, ctx, tl.depth)}`;
       wt.innerHTML = watch(s, R, ctx, tl.depth).map(([k, v]) => (k === 'wh' ? `<div class="wh">${esc(v)}</div>` : `<span class="k">${esc(k)}</span><span class="v" title="${esc(String(v))}">${esc(String(v))}</span>`)).join('');
-    } else if (!ex.textContent.trim()) ex.innerHTML = `${head}<span class="dimmed">正在载入这一步的真实记录…</span>`;
-    ex.classList.toggle('stale', !ready);
-    wt.classList.toggle('stale', !ready);
+      this.shown = `${tl.depth}:${R.kind}`;
+    } else if (this.shown !== `${tl.depth}:${R.kind}`) {
+      // 上一次显示的是别的深度 / 别的训练，留着没意义：直接说正在载入
+      ex.innerHTML = `${head}<span class="dimmed">正在载入这一步的真实记录…</span>`;
+      wt.innerHTML = '';
+      this.shown = '';
+    } else stale = true;
+    ex.classList.toggle('stale', stale);
+    wt.classList.toggle('stale', stale);
     this.renderTrack(tl, R);
     this.updatePlay(tl);
   }

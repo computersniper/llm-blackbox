@@ -61,11 +61,21 @@ export class Overview {
     return s.stale ? () => {} : env.hit;
   }
 
-  // 卡片右上角标注顶替的是第几步
+  // 卡片中间标注顶替的是第几步
   staleEnd(g, C, s) {
     if (!s.stale) return;
     g.globalAlpha = s.f;
-    if (s.f > 0) badge(g, C.x + C.w - 12, C.y + 9, `载入中 · 先显示第 ${fmtInt(this.D.meta.ckpts[s.k].t)} 步`, COL.amber, 'right', 9);
+    if (s.f > 0) {
+      const lab = `载入中 · 先显示第 ${fmtInt(this.D.meta.ckpts[s.k].t)} 步`;
+      const w = measure(g, lab, 10) + 22, h = 22, x = C.x + (C.w - w) / 2, y = C.y + C.h / 2 - h / 2;
+      rr(g, x, y, w, h, h / 2);
+      g.fillStyle = 'rgba(10,17,31,0.92)';
+      g.fill();
+      g.strokeStyle = 'rgba(255,182,92,0.45)';
+      g.lineWidth = 1;
+      g.stroke();
+      text(g, lab, C.x + C.w / 2, y + 15, { size: 10, color: COL.amber, align: 'center' });
+    }
     g.globalAlpha = 1;
   }
 
