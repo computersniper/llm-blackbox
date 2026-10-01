@@ -47,7 +47,10 @@ IMAGES = [
                 "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"}},
 ]
 VIT_ATTN_LAYERS = [0, 5, 11, 17, 23]   # 导出完整注意力图（合并到词元分辨率）的 ViT 层
-FOCUS_LAYERS = [14, 20]                 # 导出每个头各自看图位置的 LLM 层
+FOCUS_LAYERS = [17, 20]                 # 导出每个头各自看图位置的 LLM 层
+# “对准”层：tools/multimodal/grounding.py 用几张图上手工标的物体区域打分，第 16–26 层生成某个词时
+# 注意力落在对应物体上的比例是均匀分布的 3–5 倍，更浅的层基本不看物体。网页的总览热力图默认用这几层平均。
+GROUND_LAYERS = [16, 26]
 TOPN = 8                                # 每步的候选词元个数
 
 
@@ -300,7 +303,7 @@ def export_image(ii, spec, proc, model, tok):
     vattn_self = np.zeros((len(VIT_ATTN_LAYERS), Nv), np.float16)
     for li, blk in enumerate(vis.blocks):
         a, o = vit_attention(blk, cap["attn_in"][li], cap["attn_pe"][li])
-        vit_err = max(vit_err, float((o - cap["attn_out"][li]).abs().max() / cap["attn_out"][li].abs().max()))
+        vit_err = max(vit_err, float((o - cap["attn_out"][li]).abs().mean() / cap["attn_out"][li].abs().mean()))
         vit_dist.append([round(float(v), 3) for v in (a * dist).sum(-1).mean(-1).tolist()])
         x_in = cap["blk_in"][li]
         vit_stats.append([round(float(x_in.norm(dim=-1).mean()), 2), round(float(cap["attn_out"][li].norm(dim=-1).mean()), 2),
@@ -314,7 +317,7 @@ def export_image(ii, spec, proc, model, tok):
             vattn[k] = np.stack([q8(A[r], mx[r]) for r in range(Nv)])
             vattn_max[k] = mx.astype(np.float16)
             vattn_self[k] = np.diag(A).astype(np.float16)
-    print(f"  ViT 注意力复现误差（相对）max={vit_err:.2e}")
+    print(f"  ViT 注意力复现误差（平均相对误差，各层最大）={vit_err:.2e}")
 
     merged = cap["merged"]                                      # [Nv, 2048]，LLM 看到的视觉词元
     mcol, _, mvar = pca_rgb(merged)
@@ -536,6 +539,7 @@ def main():
         "pixels": {"min": MIN_PIXELS, "max": MAX_PIXELS, "mean": 0.5, "std": 0.5},
         "vitAttnLayers": VIT_ATTN_LAYERS,
         "focusLayers": FOCUS_LAYERS,
+        "groundLayers": GROUND_LAYERS,
         "images": images,
     }
     if args.only:
