@@ -687,7 +687,7 @@ def compose(ev, out_wav, stems_dir=None):
         bus.x *= duck
 
     # 段落音量：冷开场、拆层段落更安静，28 层和最后的自回归最满
-    LEVEL = {'cold': 0.75, 'title': 0.8, 'tokenize': 0.72, 'embed': 0.78, 'layers1': 1.0, 'dissect': 0.66, 'sample1': 0.72,
+    LEVEL = {'cold': 0.75, 'title': 0.8, 'tokenize': 0.72, 'embed': 0.78, 'layers1': 1.0, 'dissect': 0.8, 'sample1': 0.76,
              'loop1': 0.9, 'layersK': 1.0, 'sampleK': 0.74, 'loop2': 1.0, 'end': 0.7}
     lvl = np.ones(pad.n)
     for s_ in sections:
