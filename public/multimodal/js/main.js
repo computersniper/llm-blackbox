@@ -7,6 +7,7 @@ import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc, tokPlain, fmtPct, sleep } from '../../js/ui.js';
+import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from '../../js/prefetch.js';
 
 const KEY = 'blackbox:mm:v1';
 const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记', img: '视觉词元' };
@@ -51,11 +52,13 @@ async function boot() {
     onPickToken: (m) => { ctx.vq = m; if (tl) controls.update(tl, ctx); },
     onChange: () => { if (tl) { controls.update(tl, ctx); if (monitor.mode.lens) discover('lens'); } },
   });
-  chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus, heatFor });
+  chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus, heatFor, onPickImage });
   $('#cxFoot').textContent = footText();
   bindKeys();
   bindChrome();
   renderCodexCount();
+  // 聊天页可以用了：趁空闲把舞台的模块取回来（失败了没关系，点 ＋ 时会重试并报错）
+  whenIdle(() => loadStage().catch(() => {}));
 }
 
 function footText() {
@@ -71,6 +74,11 @@ async function heatFor(q, i) {
   const [a, b] = manifest.groundLayers;
   discover('hover');
   return { img: QQ.V.img, values: QQ.attAvg(i, [a, b]), rows: QQ.V.mh, cols: QQ.V.mw, label: `第 ${a}–${b} 层 · 16 头平均` };
+}
+
+// 选了一张图：这张图的视觉侧数据（和问题无关）先取回来，发问题、点 ＋ 时就只差语言侧那一份
+function onPickImage(im) {
+  if (!saveData()) loadVision(im).catch(() => { /* 揭开时再报错 */ });
 }
 
 function onSend(q, im) {
@@ -119,10 +127,24 @@ function onPlus() {
 
 /* ---------------------------------------------------------------- 揭开 */
 
+// 舞台的整张模块图：共享的引擎（Three.js 和 addons）+ 本页的 scene.js（它的其余依赖首屏已经载入）。import 改了要同步这里
+const STAGE_GRAPH = [...ENGINE_GRAPH, '../multimodal/js/scene.js'];
+let stageMods = null;
+// 载入舞台模块：先一次性挂上整张图的 modulepreload（并行取，没有瀑布），再 import。空闲预取和点 ＋ 共用同一个 promise
+function loadStage() {
+  if (!stageMods) {
+    modulePreload(STAGE_GRAPH.map(jsURL));
+    stageMods = Promise.all([import('../../js/stage/engine.js'), import('./scene.js')]);
+    stageMods.catch(() => { stageMods = null; });
+  }
+  return stageMods;
+}
+
 async function ensureEngine() {
   if (engine) return;
-  const eng = await import('../../js/stage/engine.js');
-  const sc = await import('./scene.js');
+  const [eng, sc] = await loadStage();
+  if (engine) return;
+  const t0 = performance.now();
   engine = new eng.Engine($('#gl'), { onFrame, onHover, onPick, onFreeChange: (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); } });
   // 只让真正亮的东西泛一点光，不要“背景光源”似的辉光
   engine.bloom.strength = 0.22;
@@ -143,6 +165,7 @@ async function ensureEngine() {
     return Math.max((height * margin) / 2 / tv, (width * margin) / 2 / th);
   };
   scene = new sc.Scene(engine);
+  measure('揭开·new Engine + Scene', t0);
 }
 
 async function enterInspect(msg) {
@@ -151,7 +174,10 @@ async function enterInspect(msg) {
     mode = 'inspect';
     document.body.classList.replace('mode-chat', 'mode-inspect');
     $('#loading').hidden = false;
-    try { await ensureEngine(); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    const t0 = performance.now();
+    // 模块和这条回复的数据并行载入；数据失败由 attach 报错、重试
+    try { await Promise.all([ensureEngine(), loadQuestion(msg.q, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    measure('揭开·模块和数据', t0);
     engine.active = true;
     if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
     if (matchMedia('(max-width: 900px)').matches) {
@@ -189,8 +215,10 @@ async function attach(msg, from = null) {
   engine.exitFree();
   if (fresh) {
     ctx.vq = null;
+    const t0 = performance.now();
     scene.load(Q);
     monitor.set(Q);
+    measure('揭开·scene.load + monitor.set', t0);
     const far = scene.camera({ view: 'box', step: tl.step, g: tl.g });
     engine.setView(far.pos.clone().multiplyScalar(1.6), far.look, { snap: true });
     dAnim = tl.depth;

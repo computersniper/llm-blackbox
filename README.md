@@ -156,6 +156,8 @@ python tools/train/qwen_step.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6
 
 左上角的监视器是 2D 画布，显示这张图在模型里“此刻的样子”；右侧是伪代码、讲解和变量监视，全部用真实数值。
 
+载入：选图时就在后台取这张图的视觉侧数据，发出问题时取语言侧数据；聊天页空闲时预取 3D 舞台的模块（和推理页共用 `js/prefetch.js`），点 ＋ 时模块和数据并行等待，一般都已经在缓存里。
+
 ### 数据
 
 `tools/multimodal/export_qwen3vl.py` 在本地 GPU 上运行模型（bf16，eager 注意力，显存约 5 GB），贪心解码，导出到 `public/multimodal/data/`：

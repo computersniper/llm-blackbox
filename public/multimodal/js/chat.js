@@ -5,9 +5,10 @@ import { $, $$, esc, tokHTML, tokInner, sleep } from '../../js/ui.js';
 import { drawHeat } from './paint.js';
 
 export class Chat {
-  constructor(manifest, { onSend, onPeek, onPlus, heatFor }) {
+  constructor(manifest, { onSend, onPeek, onPlus, heatFor, onPickImage }) {
     this.M = manifest;
     this.onSend = onSend;
+    this.onPickImage = onPickImage;
     this.onPeek = onPeek;
     this.onPlus = onPlus;
     this.heatFor = heatFor;
@@ -69,6 +70,7 @@ export class Chat {
       this.img = im;
       this.buildTrie();
       if (!keep) { this.chosen = []; this.node = this.trie; }
+      this.onPickImage?.(im);
     }
     this.attachBtn.innerHTML = `<img src="data/${im.file}" alt="">`;
     this.attachBtn.classList.add('has');
