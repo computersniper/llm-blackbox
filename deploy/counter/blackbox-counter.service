@@ -1,0 +1,16 @@
+[Unit]
+Description=Black Box (caijiechao.com/blackbox/) visit counter
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+ExecStart=/usr/bin/python3 /srv/blackbox/counter/counter.py
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/blackbox/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
