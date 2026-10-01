@@ -60,7 +60,7 @@ export class Sim {
 
   truncate() {
     if (this.idx < this.hist.length - 1) this.hist.length = this.idx + 1;
-    if (this.cur) this.cur.rec = null;
+    if (this.cur) { this.cur.rec = null; this.cur._detail = null; }
   }
 
   // 这一帧的真实画面编码（缓存）

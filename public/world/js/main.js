@@ -256,10 +256,10 @@ function bindPlayUi() {
     renderUi();
     sfx.click();
     if (b.dataset.auto !== 'off' && !tl.playing && tl.depth === 1) tl.play();
-    refresh();
+    afterSimChange();
   });
-  $('#tau').addEventListener('input', (e) => { sim.setTau(Number(e.target.value)); renderUi(); discover('tau'); });
-  $('#btnSync').addEventListener('click', () => { sim.sync(); sfx.click(); refresh(); });
+  $('#tau').addEventListener('input', (e) => { sim.setTau(Number(e.target.value)); renderUi(); discover('tau'); afterSimChange(); });
+  $('#btnSync').addEventListener('click', () => { sim.sync(); sfx.click(); afterSimChange(); });
   $('#btnNew').addEventListener('click', () => { sim.newGame(); tl.rebuild(false); refresh(); });
   // 触屏方向键：按住转向；停着的时候按一下就开始跑
   for (const b of $$('#pad button')) {
@@ -285,6 +285,12 @@ function setEye(m) {
   sim.setMode(m);
   sfx.click();
   app.renderUi?.();
+  afterSimChange();
+}
+
+// 在 D2 以下改了开关（睁眼 / 闭眼、温度、谁来开、同步）：这一帧要重新算，步骤表跟着换（比如闭眼时编码器那几步就没了）
+function afterSimChange() {
+  if (tl.depth >= 2) { tl.rebuild(true); mac = null; macKey = ''; }
   refresh();
 }
 
