@@ -127,6 +127,21 @@ async function ensureEngine() {
   // 只让真正亮的东西泛一点光，不要“背景光源”似的辉光
   engine.bloom.strength = 0.22;
   engine.bloom.threshold = 0.8;
+  // 左边还有监视器：共享的 Engine 只考虑右侧和底部的遮挡，这里在实例上补上左侧
+  engine.insetL = 0;
+  engine.applyInsets = function applyInsets() {
+    const w = this.w, h = this.h;
+    if (!w) return;
+    this.camera.setViewOffset(w, h, ((this.insetR || 0) - (this.insetL || 0)) / 2, (this.insetB || 0) / 2, w, h);
+    this.camera.updateProjectionMatrix();
+  };
+  engine.fitDistance = function fitDistance(width, height, margin = 1.15) {
+    const vw = Math.max(200, this.w - (this.insetR || 0) - (this.insetL || 0)), vh = Math.max(200, this.h - (this.insetB || 0));
+    const vf = (this.camera.fov * Math.PI) / 180;
+    const tv = Math.tan(vf / 2) * (vh / this.h);
+    const th = Math.tan(vf / 2) * (vw / this.h);
+    return Math.max((height * margin) / 2 / tv, (width * margin) / 2 / th);
+  };
   scene = new sc.Scene(engine);
 }
 
@@ -243,8 +258,8 @@ function updateInsets() {
   const dbg = $('#dbg');
   const folded = dbg.classList.contains('folded');
   const mon = $('#mon');
-  const left = small ? 0 : mon.classList.contains('folded') ? 0 : mon.offsetWidth + 14;
-  engine.setInsets(small || folded ? 0 : dbg.offsetWidth + 28 - left, small ? (folded ? 120 : 200) : 90);
+  engine.insetL = small || mon.classList.contains('folded') ? 0 : mon.offsetWidth + 14;
+  engine.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? (folded ? 120 : 200) : 90);
 }
 addEventListener('resize', () => updateInsets());
 

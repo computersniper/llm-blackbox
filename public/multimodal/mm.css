@@ -2,7 +2,9 @@
    揭开黑箱 · 多模态（在 ../css/app.css 的基础上）
    ============================================================ */
 
-:root { --mon-w: 300px; --vis: #b39dff; }
+:root { --mon-w: 272px; --vis: #b39dff; }
+/* 揭开时聊天栏窄一点：舞台上还要放监视器 */
+body.mode-inspect { --chat-w: 320px; }
 
 /* ---------------- 站点导航 ---------------- */
 
@@ -85,7 +87,7 @@ body.mode-inspect .site-nav { display: none; }
 
 /* ---------------- 窄屏 ---------------- */
 
-@media (max-width: 1180px) { :root { --mon-w: 260px; } }
+@media (max-width: 1180px) { :root { --mon-w: 240px; } body.mode-inspect { --chat-w: 290px; } }
 @media (max-width: 900px) {
   :root { --mon-w: min(46vw, 210px); }
   .site-nav { margin-left: auto; }

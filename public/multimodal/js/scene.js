@@ -312,22 +312,81 @@ export class Scene {
     this.dsLbl.position.set((VX + this.bx) / 2 + 0.6, LY0 + 1.6, 0);
     root.add(this.dsLbl);
 
-    // 黑箱外壳（深度 1）
+    // 黑箱外壳（深度 1）：前面板左边开着一个“取景窗”，照片从这里塞进去；打开时前面板绕底边倒下
     const x0 = PX - this.pw / 2 - 0.6, x1 = this.xEnd + 0.7;
     const y1 = Math.max(MY, LY0 + Q.NL * LG) + 0.5;
     const z0 = Math.max(this.bd, this.ph) / 2 + 0.6;
-    const cg = new THREE.BoxGeometry(x1 - x0, y1 + 0.2, z0 * 2);
-    this.casing = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ color: 0x0a1222, metalness: 0.7, roughness: 0.35, transparent: true, opacity: 1 }));
-    this.casing.position.set((x0 + x1) / 2, y1 / 2 - 0.1, 0);
-    root.add(this.casing);
-    this.casingEdge = new THREE.LineSegments(new THREE.EdgesGeometry(cg), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.5 }));
-    this.casingEdge.position.copy(this.casing.position);
-    root.add(this.casingEdge);
     this.box = { x0, x1, y1, z0, cx: (x0 + x1) / 2 };
-    this.boxLbl = label('Qwen3-VL-2B', 'lbl title');
-    this.boxLbl.position.set(this.box.cx, y1 + 0.1, z0);
-    root.add(this.boxLbl);
+    this.buildCasing(root, Q);
     this.lastTiles = -1;
+  }
+
+  buildCasing(root, Q) {
+    const { x0, x1, y1, z0, cx } = this.box;
+    const W = x1 - x0, H = y1 + 0.2, D = z0 * 2;
+    const g = (this.casing = new THREE.Group());
+    root.add(g);
+    const mat = () => new THREE.MeshStandardMaterial({ color: 0x08101f, metalness: 0.7, roughness: 0.24, transparent: true, opacity: 0.95 });
+    const edge = () => new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.8 });
+    const panel = (w, h, d) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat());
+      m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), edge()));
+      return m;
+    };
+    this.cPanels = [];
+    const back = panel(W, H, 0.06); back.position.set(cx, H / 2 - 0.1, -z0); g.add(back);
+    const top = panel(W, 0.06, D); top.position.set(cx, H - 0.1, 0); g.add(top);
+    const left = panel(0.06, H, D); left.position.set(x0, H / 2 - 0.1, 0); g.add(left);
+    const right = panel(0.06, H, D); right.position.set(x1, H / 2 - 0.1, 0); g.add(right);
+    this.cTop = top;
+    this.cPanels.push(back, top, left, right);
+    // 前面板：绕底边的铰链
+    this.cPivot = new THREE.Group();
+    this.cPivot.position.set(cx, -0.1, z0);
+    g.add(this.cPivot);
+    const front = panel(W, H, 0.06);
+    front.position.set(0, H / 2, 0);
+    this.cPivot.add(front);
+    this.cFront = front;
+    this.cPanels.push(front);
+    // 取景窗：照片从这里进去
+    const winW = this.pw + 0.3, winH = this.ph + 0.3;
+    const win = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(winW, winH)), new THREE.LineBasicMaterial({ color: 0xffb65c, transparent: true, opacity: 0.7 }));
+    win.position.set(PX - cx, PY + 0.1, 0.04);
+    front.add(win);
+    const winBg = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), new THREE.MeshBasicMaterial({ color: 0x02050c, transparent: true, opacity: 0.85 }));
+    winBg.position.set(PX - cx, PY + 0.1, 0.035);
+    front.add(winBg);
+    this.cWin = win;
+    const winLbl = new THREE.Mesh(new THREE.PlaneGeometry(winW, winW * 0.12), new THREE.MeshBasicMaterial({ map: textTexture('图片从这里进去', { color: '#c9a36b', font: '500 56px "PingFang SC","Microsoft YaHei",sans-serif', w: 900, h: 108 }), transparent: true }));
+    winLbl.position.set(PX - cx, PY + 0.1 - winH / 2 - 0.16, 0.035);
+    front.add(winLbl);
+    const lw = Math.min(W * 0.45, 7);
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.22), new THREE.MeshBasicMaterial({ map: textTexture('Qwen3-VL-2B', { color: '#5ef0d4', font: '700 110px "JetBrains Mono",monospace', w: 1200, h: 264 }), transparent: true }));
+    logo.position.set((PX + this.pw / 2 + x1) / 2 - cx, H * 0.58, 0.035);
+    front.add(logo);
+    const m = Q.manifest.model;
+    const sub = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.07), new THREE.MeshBasicMaterial({ map: textTexture(`视觉 ${m.vision.depth} 层 + 语言 ${m.text.layers} 层 · ${(m.params.total / 1e8).toFixed(1)} 亿参数`, { color: '#7a859e', font: '500 60px "PingFang SC","Microsoft YaHei",sans-serif', w: 1400, h: 98 }), transparent: true }));
+    sub.position.set(logo.position.x, H * 0.4, 0.035);
+    front.add(sub);
+    this.cLight = new THREE.Mesh(new THREE.CircleGeometry(0.16, 32), new THREE.MeshBasicMaterial({ color: 0x5ef0d4 }));
+    this.cLight.position.set(logo.position.x, H * 0.24, 0.035);
+    front.add(this.cLight);
+    this.cAll = [];
+    g.traverse((o) => { if (o.material) this.cAll.push({ m: o.material, op: o.material.opacity }); });
+  }
+
+  updateCasing(open, st, t) {
+    const e = easeInOut(open);
+    this.cPivot.rotation.x = e * Math.PI * 0.5;
+    this.cTop.position.y = this.box.y1 + 0.1 + e * 1.2;
+    const fade = 1 - Math.min(1, open * 1.4);
+    this.casing.visible = fade > 0.01;
+    for (const { m, op } of this.cAll) m.opacity = op * fade;
+    // 指示灯：在“想”的时候闪
+    const busy = st.step.ph === 'pass' || st.step.ph === 'see';
+    this.cLight.material.color.setHex(busy && Math.sin(t * 9) > 0 ? 0xffb65c : 0x5ef0d4);
+    this.cWin.material.opacity = 0.7 * fade * (st.step.ph === 'see' ? 0.6 + 0.4 * Math.sin(t * 6) : 0.6);
   }
 
   /* ------------------------------------------------------------ 每帧 */
@@ -340,10 +399,7 @@ export class Scene {
     this.dust.rotation.y += dt * 0.004;
 
     // 外壳
-    this.casing.material.opacity = 0.97 * (1 - open);
-    this.casing.visible = open < 0.995;
-    this.casingEdge.material.opacity = 0.5 * (1 - open);
-    this.boxLbl.el.classList.toggle('hide', open > 0.3);
+    this.updateCasing(open, st, t);
 
     // 视觉阶段的进度（0..1）：决定照片、塔、合并器、序列里图片的状态
     const vis = this.visState(st);
@@ -412,9 +468,10 @@ export class Scene {
       const sl = this.slabs[L];
       const on = L === lit.L;
       const passed = lit.upTo >= L;
-      sl.material.opacity = (on ? 0.2 : passed ? 0.08 : 0.04) * open;
+      const dimV = vis.text ? 1 : 0.35;   // 还在看图的时候，语言模型那边先暗着
+      sl.material.opacity = (on ? 0.2 : passed ? 0.08 : 0.04) * open * dimV;
       sl.material.emissiveIntensity = on ? 0.35 : passed ? 0.06 : 0;
-      sl.edge.material.opacity = (on ? 0.6 : 0.14) * open;
+      sl.edge.material.opacity = (on ? 0.6 : 0.14) * open * dimV;
       sl.visible = open > 0.02;
     }
     this.llmLbl.el.classList.toggle('hide', open < 0.5);
@@ -440,12 +497,13 @@ export class Scene {
       this.layerLbl.el.classList.remove('hide');
     } else this.layerLbl.el.classList.add('hide');
     // 输出
-    const outOn = (s.ph === 'head' || (s.ph === 'pass' && p > 0.6)) && open > 0.5;
+    const outOn = (s.ph === 'head' && open > 0.5) || (s.ph === 'pass' && p > 0.55);
     if (outOn) {
       const st2 = Q.steps[g];
       const html = `${esc(tokPlain(st2.chosenS))}<small style="margin-left:6px;color:var(--amber)">${fmtPct(st2.p)}</small>`;
       if (this.outLbl.el.innerHTML !== html) this.outLbl.el.innerHTML = html;
-      this.outLbl.position.set(this.tx[Math.min(row + 1, Q.T - 1)] ?? qx + S, top + 0.35 + 0.25 * easeOut(s.ph === 'head' ? p : 1), 0);
+      if (open < 0.5) this.outLbl.position.set(this.box.x1 - 2, this.box.y1 + 0.2 + 0.6 * easeOut((p - 0.55) / 0.45), 0);
+      else this.outLbl.position.set(this.tx[Math.min(row + 1, Q.T - 1)] ?? qx + S, top + 0.35 + 0.25 * easeOut(s.ph === 'head' ? p : 1), 0);
     }
     this.outLbl.el.classList.toggle('hide', !outOn);
     // DeepStack 管道
@@ -631,8 +689,7 @@ export class Scene {
     switch (view) {
       case 'box': {
         const b = this.box;
-        if (s.ph === 'see') return fromFront(v3(PX + 1.5, PY, 1.2), 7, 4.4, 0.15, -0.2);
-        return fromFront(v3(b.cx, b.y1 / 2, 0), b.x1 - b.x0, b.y1 + 0.6, 0.3, 0.1, 1.08);
+        return fromFront(v3(b.cx, b.y1 / 2, b.z0), b.x1 - b.x0, b.y1 + 1.2, 0.42, s.ph === 'see' ? -0.18 : 0.1, 1.08);
       }
       case 'image': return fromFront(v3(PX, PY, 0), this.pw + 0.6, this.ph + 0.8, 0.08, 0, 1.25);
       case 'embed':
