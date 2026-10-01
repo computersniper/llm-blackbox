@@ -147,13 +147,13 @@ python tools/multimodal/grounding.py
 
 ## 推理视频
 
-`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 35 秒的片子：「天空为什么是蓝色的？」从分词、嵌入、穿过 28 层（逻辑透镜在第 21 层说「因为」、第 24 层改口成「天空」），到拆开第 24 层（RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特），再到输出头、采样和自回归写完整句回答。配乐由 `compose.py` 用 numpy / scipy 现场合成。
+`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 52 秒的片子：「天空为什么是蓝色的？」从对话框里点选词元提问、按下发送，词元穿过界面飞进黑箱落到托盘（一个连续跟随镜头），再到嵌入、穿过 28 层（逻辑透镜在第 21 层说「因为」、第 24 层改口成「天空」），到拆开第 24 层（RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特），再到输出头、采样和自回归写完整句回答。配乐由 `compose.py` 用 numpy / scipy 现场合成。
 
 | 文件 | 作用 |
 | --- | --- |
 | `film.html` / `film.js` / `film.css` / `board.css` | 电影模式页面：复用 `public/js/stage/` 的机器和算式板，`__film.renderAt(t)` 确定地渲染第 t 秒 |
 | `score.js` | 分镜表：每个镜头的机器状态、机位（样条 + 单调三次插值）、字幕、数据条、配乐事件（96 BPM，段落卡在小节线上） |
-| `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层 |
+| `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层、开场对话框（`opening.js`：界面词元换成 3D 方块后的飞行与落位） |
 | `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面 |
 | `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −1 dBTP |
 | `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
@@ -169,8 +169,8 @@ node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # �
 node tools/video/render.mjs events --out tools/video/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events.json --out $O/score.wav
 bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference.mp4 60
-node tools/video/render.mjs poster --t 60.4 --out $O/poster.png
+node tools/video/render.mjs poster --t 52.9 --out $O/poster.png
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
 
-浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=60>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
+浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=0>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
