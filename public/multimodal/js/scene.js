@@ -699,7 +699,7 @@ export class Scene {
     switch (view) {
       case 'box': {
         const b = this.box;
-        const w = (b.x1 - b.x0) * 0.6;
+        const w = (b.x1 - b.x0) * (E.w < 700 ? 1 : 0.6);   // 窄屏上整个机箱都放进画面
         return fromFront(v3(b.x0 + w / 2, b.y1 / 2, b.z0), w, b.y1 + 1.4, 0.4, s.ph === 'see' ? -0.22 : 0.1, 1.05);
       }
       case 'image': return fromFront(v3(PX, PY, 0), this.pw + 0.6, this.ph + 0.8, 0.08, 0, 1.25);
