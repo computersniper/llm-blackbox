@@ -34,7 +34,7 @@ export class Micro {
     if (s.ph === 'head' && s.sub === 'unembed' && s.mi) {
       const e = Q.headMMAt(st.g);
       if (!e) return null;
-      const tok = tokPlain(e.token);
+      const tok = esc(tokPlain(e.token));
       return {
         kind: 'head', e, sum: sums(e, 1024), panel: this.headPanel(st), inX: -0.14,
         where: '输出头 · 给候选词元打分',
