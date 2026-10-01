@@ -93,16 +93,20 @@ export class Engine {
 
   // 右侧调试面板、底部控制条会挡住一部分画面：把投影中心挪到空出来的区域
   setInsets(right, bottom) { this.insetR = right; this.insetB = bottom; this.applyInsets(); }
+  // 算式板之类的浮层再额外挡住上 / 下一块（像素）。边距在每帧里慢慢过渡，画面不会跳
+  setOverlay(top = 0, bottom = 0) { this.ovGoal = [top, bottom]; }
+  get padT() { return this.ov?.[0] || 0; }
+  get padB() { return Math.max(this.insetB || 0, this.ov?.[1] || 0); }
   applyInsets() {
     const w = this.w, h = this.h;
     if (!w) return;
-    this.camera.setViewOffset(w, h, (this.insetR || 0) / 2, (this.insetB || 0) / 2, w, h);
+    this.camera.setViewOffset(w, h, (this.insetR || 0) / 2, (this.padB - this.padT) / 2, w, h);
     this.camera.updateProjectionMatrix();
   }
 
   // 让宽 width、高 height 的区域刚好装进画面所需的距离（只按没被面板挡住的那块区域来算）
   fitDistance(width, height, margin = 1.15) {
-    const vw = Math.max(200, this.w - (this.insetR || 0)), vh = Math.max(200, this.h - (this.insetB || 0));
+    const vw = Math.max(160, this.w - (this.insetR || 0)), vh = Math.max(140, this.h - this.padB - this.padT);
     const vf = (this.camera.fov * Math.PI) / 180;
     const tv = Math.tan(vf / 2) * (vh / this.h);
     const th = Math.tan(vf / 2) * (vw / this.h);
@@ -264,6 +268,15 @@ export class Engine {
     const dt = Math.min(0.05, (t - this.last) / 1000);
     this.last = t;
     this.clock += dt;
+    if (this.ovGoal) {
+      const ov = (this.ov ||= [0, 0]), k = 1 - Math.exp(-dt * 5);
+      let moved = false;
+      for (let i = 0; i < 2; i++) {
+        const d = this.ovGoal[i] - ov[i];
+        if (Math.abs(d) > 0.5) { ov[i] += d * k; moved = true; } else if (d) { ov[i] = this.ovGoal[i]; moved = true; }
+      }
+      if (moved) this.applyInsets();
+    }
     if (this.active) {
       this.onFrame?.(dt, this.clock);
       const moveKeys = ['w', 'a', 's', 'd', 'q', 'e'].filter((k) => this.keys.has(k));

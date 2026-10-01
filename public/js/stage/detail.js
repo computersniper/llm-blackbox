@@ -1,12 +1,18 @@
 // 最深的几层：SwiGLU 的 3072 个神经元、单个神经元的真实乘加、一次 Q·K 打分、权重的 bf16 比特。
 import { THREE, label, textTexture, easeOut, seg } from './engine.js';
 import { RoundedBoxGeometry } from '../vendor/three/addons/geometries/RoundedBoxGeometry.js';
-import { esc, fmtPct } from '../ui.js';
-import { bf16Bits, bf16Value, fmtSci } from '../num.js';
+import { esc } from '../ui.js';
+import { bf16Bits } from '../num.js';
+import { neuronId } from './fields.js';
+import { termAt, ROLE } from './micro.js';
 
 const COLS = 64, ROWS = 48, CELL = 0.05;
 const AMBER = new THREE.Color(0xffb65c), BLUE = new THREE.Color(0x6b9bff), CYAN = new THREE.Color(0x5ef0d4), VIOLET = new THREE.Color(0xb39dff);
 const DIM = new THREE.Color(0x0d1424);
+const ROLE_X = new THREE.Color(ROLE.x), ROLE_W = new THREE.Color(ROLE.w);
+// 比特的三组：符号（玫红）/ 指数（琥珀）/ 尾数（青），和算式板一致
+const BIT_C = [new THREE.Color(0xff6b93), AMBER, CYAN];
+const WHITE = new THREE.Color(0xffffff);
 const tmpM = new THREE.Matrix4();
 const tmpC = new THREE.Color();
 const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -87,11 +93,11 @@ export class Detail {
 
   update(st, dt, t) {
     const v = st.view, s = st.step;
-    const inMlp = s.ph === 'layer' && s.op === 'mlp' && (v === 'mlp' || v === 'neuron' || v === 'bits');
+    const inMlp = s.ph === 'layer' && s.op === 'mlp' && (v === 'mlp' || v === 'neuron');
     this.updatePanel(st, inMlp, t);
     this.updateRig(st, v === 'neuron', t);
     this.updateDot(st, v === 'dot' || (v === 'bits' && s.sub === 'score'), t);
-    this.updateBits(st, v === 'bits', t);
+    this.updateBits(st, v === 'bits');
   }
 
   updatePanel(st, show, t) {
@@ -124,7 +130,7 @@ export class Detail {
     if (sub === 'up') { lit = 0; fan = easeOut(p); }
     else if (sub === 'act') lit = s.mi ? 1 : easeOut(seg(p, 0.05, 0.85));
     else if (sub === 'down') { lit = 1 - 0.7 * easeOut(p); fan = 1 - easeOut(p); }
-    const dimK = st.view === 'mlp' ? 1 : 0.18;
+    const dimK = st.view === 'mlp' ? 1 : 0.08;
     const litKey = Math.round(lit * 60) + (dimK < 1 ? 1000 : 0);
     this.dimK = dimK;
     if (litKey !== this.litState) {
@@ -173,10 +179,7 @@ export class Detail {
       pin.userData.pick = { type: 'pin', k, dim: n.dims[k], x, wg: n.wg[k], wu: n.wu[k], click: true };
       this.E.pickables.push(pin);
       R.add(pin);
-      const lb = label(`x<sub>${n.dims[k]}</sub> ${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(3)}`, 'lbl num');
-      lb.position.set(-2.25, y, 0);
-      lb.center.set(1, 0.5);
-      R.add(lb);
+      pin.visible = false;
       const wire = (to, w, c) => {
         const prod = x * w;
         const curve = new THREE.QuadraticBezierCurve3(v3(-2.0, y, 0), v3(-1.0, (y + to.y) / 2, 0.15), to);
@@ -190,9 +193,6 @@ export class Detail {
       this.wires.push({ g: wire(gateP, n.wg[k], 'gate'), u: wire(upP, n.wu[k], 'up'), k });
       this.pins.push(pin);
     });
-    const rest = label(`… 其余 ${1024 - n.x.length} 项`, 'lbl hint');
-    rest.position.set(-2.1, 1.65 - 12 * 0.3, 0);
-    R.add(rest);
     const node = (p, c, txt) => {
       const m = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 16), new THREE.MeshStandardMaterial({ color: 0x0b1222, emissive: c, emissiveIntensity: 0.6 }));
       m.position.copy(p);
@@ -202,8 +202,8 @@ export class Detail {
       R.add(lb);
       return m;
     };
-    this.gateNode = node(gateP, CYAN, 'Σ x·w<sub>gate</sub>');
-    this.upNode = node(upP, VIOLET, 'Σ x·w<sub>up</sub>');
+    this.gateNode = node(gateP, ROLE_X, '<span class="cx">g</span> = Σ h·w<sub>gate</sub>');
+    this.upNode = node(upP, ROLE_W, '<span class="cw">u</span> = Σ h·w<sub>up</sub>');
     // 两个“水箱”：累加的结果有多大，就灌多满
     const tank = (p, c) => {
       const glass = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.1, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x88aaff, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
@@ -218,8 +218,8 @@ export class Detail {
       R.add(glass, fill, lb);
       return { glass, fill, lb };
     };
-    this.tG = tank(v3(0.95, 0.8, 0), CYAN);
-    this.tU = tank(v3(0.95, -0.8, 0), VIOLET);
+    this.tG = tank(v3(0.95, 0.8, 0), ROLE_X);
+    this.tU = tank(v3(0.95, -0.8, 0), ROLE_W);
     // SiLU 曲线：真实的 x·σ(x)
     const px = (x) => 1.75 + ((x + 5) / 10) * 1.4, py = (y) => 0.35 + (y / 5) * 1.2 + 0.18;
     const pts = [];
@@ -252,8 +252,8 @@ export class Detail {
     this.linkS = link(v3(3.2, 1.2, 0), v3(3.5, 0.15, 0));
     this.linkU = link(v3(1.15, -0.8, 0), v3(3.45, -0.1, 0));
     R.add(this.linkS, this.linkU);
-    const title = label(`神经元 #${n.j}`, 'lbl title');
-    title.position.set(-2.1, 2.05, 0);
+    const title = label(`神经元 #${neuronId(n)}`, 'lbl title');
+    title.position.set(-0.3, 2.05, 0);
     title.center.set(0, 0.5);
     R.add(title);
   }
@@ -266,23 +266,20 @@ export class Detail {
     if (!n) { this.rig.visible = false; return; }
     const key = `${st.g}|${s.L}`;
     if (key !== this.rigKey) { this.rigKey = key; this.buildRig(n); this.bitsIndex = 0; this.flips.clear(); }
-    const bp = this.bulbPos(st, n.j);
+    const bp = this.bulbPos(st, neuronId(n));
     this.rig.position.copy(bp).add(v3(0.35, 0.05, 0.55));
     this.rig.scale.setScalar(0.3);
-    this.rigCenter = this.rig.position.clone().add(v3(0.7 * 0.3, 0.05, 0));
+    this.rigCenter = this.rig.position.clone().add(v3(1.8 * 0.3, 0.3 * 0.3, 0));
     if (st.view === 'bits') this.rig.visible = false; // 看比特时，把神经元装置藏起来，只留键帽
     const mi = s.mi || 'gate', p = st.p;
     const done = (m) => ['mul', 'sum', 'silu', 'gate'].indexOf(mi) > ['mul', 'sum', 'silu', 'gate'].indexOf(m);
-    const wireP = mi === 'mul' ? p * 1.15 : 1;
-    this.wires.forEach(({ g, u, k }) => {
-      const on = k / 12 < wireP;
-      g.visible = u.visible = on;
-    });
+    // 输入的 12 根引线属于上一步（升维），这里收起来，只看 g、u、SiLU 和阀门
+    this.wires.forEach(({ g, u }) => { g.visible = u.visible = false; });
     const fillP = mi === 'sum' ? easeOut(p) : done('sum') ? 1 : 0;
     const mx = Math.max(Math.abs(n.gz), Math.abs(n.uz), 3);
     const fill = (tk, v) => {
       tk.fill.scale.y = Math.max(0.001, (Math.abs(v) / mx) * 1.1 * fillP);
-      tk.fill.material.emissive.copy(v >= 0 ? (tk === this.tG ? CYAN : VIOLET) : BLUE);
+      tk.fill.material.emissive.copy(tk === this.tG ? ROLE_X : ROLE_W);
       tk.lb.el.textContent = fillP > 0 ? `${tk === this.tG ? 'g' : 'u'} = ${(v * fillP).toFixed(3)}` : '';
       tk.lb.visible = fillP > 0;
     };
@@ -323,27 +320,19 @@ export class Detail {
         R.add(m);
         return m;
       };
-      const qb = bar(q, 0.95, CYAN, mxv), kb = bar(d.k[i], -0.95, AMBER, mxv);
-      const pb = bar(prods[i], 0, prods[i] >= 0 ? AMBER : BLUE, mxp);
-      const lb = label(`${prods[i] >= 0 ? '+' : '−'}${Math.abs(prods[i]).toFixed(1)}`, `lbl num ${prods[i] >= 0 ? 'pos' : 'neg'}`);
-      lb.position.set(x, -0.08, 0.15);
-      lb.center.set(0.5, 1);
-      R.add(lb);
-      this.dotBars.push({ pb, lb, i });
+      const qb = bar(q, 0.95, ROLE_X, mxv), kb = bar(d.k[i], -0.95, ROLE_W, mxv);
+      const pb = bar(prods[i], 0, AMBER, mxp);
+      this.dotBars.push({ pb, qb, kb, i });
     });
-    const L = (html, x, y, cls = 'lbl part') => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); return o; };
-    L(`Q · 第 ${d.head} 头`, -2.15, 1.35);
-    L(`K · 第 ${d.kv} 组（${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}）`, -2.15, -1.35);
-    L('q<sub>i</sub>·k<sub>i</sub>', -2.15, 0);
-    this.dotSum = label('', 'lbl big');
-    this.dotSum.position.set(2.45, 0.3, 0);
-    R.add(this.dotSum);
-    this.dotScore = label('', 'lbl big');
-    this.dotScore.position.set(2.45, -0.3, 0);
-    R.add(this.dotScore);
-    const hint = label(`只画出了 128 维里乘积最大的 12 维`, 'lbl hint');
+    const L = (html, x, y, cls) => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); this.dotTags.push(o); return o; };
+    this.dotTags = [];
+    L(`<span class="cx">q</span> · 第 ${d.head} 号头`, -2.15, 0.95, 'lbl tag x');
+    L(`<span class="cw">k</span> · 「${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}」`, -2.15, -0.95, 'lbl tag w');
+    L('<span class="cp">q × k</span>', -2.15, 0, 'lbl tag p');
+    const hint = label(`128 维里乘积最大的 12 维`, 'lbl hint');
     hint.position.set(0, 1.85, 0);
     R.add(hint);
+    this.dotTags.push(hint);
   }
 
   updateDot(st, show) {
@@ -358,28 +347,34 @@ export class Detail {
     this.dot.position.set(xf - 1.1, this.base() + 0.62 * this.M.e + 0.95, 0.7);
     this.dot.scale.setScalar(0.3);
     this.dotCenter = this.dot.position.clone().add(v3(0.4 * 0.3, 0, 0));
+    // 乘法：12 维轮流出场（和算式板同一个节拍），乘积柱从中间长出来
     const mi = s.mi || 'scale', p = st.p;
-    const mulP = mi === 'mul' ? p * 1.15 : 1;
-    this.dotBars.forEach(({ pb, lb, i }) => { pb.visible = i / 12 < mulP; lb.visible = pb.visible; });
-    const sumP = mi === 'sum' ? easeOut(p) : mi === 'scale' ? 1 : 0;
-    this.dotSum.visible = sumP > 0;
-    this.dotSum.el.textContent = `Σ = ${(d.sum * sumP).toFixed(2)}`;
-    const scP = mi === 'scale' ? easeOut(p) : 0;
-    this.dotScore.visible = scP > 0.2;
-    this.dotScore.el.innerHTML = `÷ √128 = ${d.score.toFixed(3)} → 权重 ${fmtPct(d.w)}`;
+    for (const o of this.dotTags) o.visible = st.view !== 'bits';
+    const sel = this.dotSel ?? 0;
+    this.dotBars.forEach(({ pb, qb, kb, i }) => {
+      const ph = mi === 'mul' ? termAt(p, i, 12) : 1;
+      pb.visible = ph > 0.3;
+      const hot = mi === 'mul' && ph > 0 && ph < 0.7;
+      const bits = st.view === 'bits';
+      qb.material.emissiveIntensity = hot ? 0.75 : bits ? (i === sel ? 0.6 : 0.05) : 0.22;
+      kb.material.emissiveIntensity = hot ? 0.75 : bits ? 0.05 : 0.22;
+      pb.material.emissiveIntensity = hot ? 0.8 : bits ? 0.05 : 0.3;
+    });
   }
 
   /* ------------------------------------------------------------ 比特 */
 
+  // 16 个键帽：符号 1 位 / 指数 8 位 / 尾数 7 位，三组之间留缝，正面朝向镜头
   buildBits() {
     dispose(this.bits);
     this.bits.clear();
     const R = this.bits;
     this.keys = [];
+    const kx = (i) => (i - 7.5) * 0.25 + (i > 0 ? 0.14 : 0) + (i > 8 ? 0.14 : 0) - 0.14;
     for (let i = 0; i < 16; i++) {
-      const c = i === 0 ? new THREE.Color(0xff6b93) : i <= 8 ? AMBER : CYAN;
+      const c = BIT_C[i === 0 ? 0 : i <= 8 ? 1 : 2];
       const m = new THREE.Mesh(new RoundedBoxGeometry(0.21, 0.12, 0.21, 3, 0.035), new THREE.MeshStandardMaterial({ color: 0x0b1222, emissive: c, emissiveIntensity: 0.1, roughness: 0.3, metalness: 0.2 }));
-      m.position.set((i - 7.5) * 0.25, 0, 0);
+      m.position.set(kx(i), 0, 0);
       const face = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.16), new THREE.MeshBasicMaterial({ transparent: true }));
       face.rotation.x = -Math.PI / 2;
       face.position.y = 0.061;
@@ -391,26 +386,21 @@ export class Detail {
       R.add(m);
       this.keys.push(m);
     }
-    const grp = (txt, a, b, cls) => { const o = label(txt, `lbl ${cls}`); o.position.set(((a + b) / 2 - 7.5) * 0.25, -0.2, 0.1); o.center.set(0.5, 0); R.add(o); };
-    grp('符号', 0, 0, 'num neg');
-    grp('指数 · 8 位', 1, 8, 'num pos');
-    grp('尾数 · 7 位', 9, 15, 'num');
-    this.bitsVal = label('', 'lbl big');
-    this.bitsVal.position.set(0, 0.42, 0);
-    this.bitsVal.center.set(0.5, 1);
-    R.add(this.bitsVal);
-    this.bitsFx = label('', 'lbl hint');
-    this.bitsFx.position.set(0, 0.2, 0);
-    this.bitsFx.center.set(0.5, 1);
-    R.add(this.bitsFx);
+    const grp = (txt, a, b, cls) => { const o = label(txt, `lbl tag ${cls}`); o.position.set((kx(a) + kx(b)) / 2, 0, 0.2); o.center.set(0.5, 0); R.add(o); };
+    grp('符号', 0, 0, 's');
+    grp('指数 · 8 位', 1, 8, 'e');
+    grp('尾数 · 7 位', 9, 15, 'm');
+    this.bits.rotation.x = 1.2; // 键帽顶面大致朝向镜头，0 / 1 才看得清
   }
 
-  // 当前要看的那个数：神经元里某个输入的 gate 权重，或者打分里 Q 的某一维
+  // 当前要看的那个数：矩阵里被选中的权重，或者打分里 q 的某一维（都可以在算式板上点选）
   bitsTarget(st) {
     const s = st.step;
     if (s.sub === 'score') {
       const d = this.Q.dotAt(s.L, st.g);
-      return d ? { kind: 'q', v: d.q[0], k: 0, d, anchor: this.dotBars?.[0]?.pb } : null;
+      if (!d) return null;
+      const k = Math.min(d.q.length - 1, this.dotSel ?? 0);
+      return { kind: 'q', v: d.q[k], k, d, anchor: this.dotBars?.[k]?.qb };
     }
     const b = this.M.micro.bitsSource(st);
     return b ? { kind: 'mm', ...b } : null;
@@ -418,6 +408,7 @@ export class Detail {
 
   flip(i) {
     const key = this.bitsKey;
+    if (!this.baseBits) return;
     const cur = this.flips.get(key) || this.baseBits.slice();
     cur[i] ^= 1;
     this.flips.set(key, cur);
@@ -425,7 +416,8 @@ export class Detail {
 
   selectPin(k) { this.bitsIndex = k; }
 
-  updateBits(st, show, t) {
+  // 数值、公式和翻转的后果都写在算式板上；这里只管键帽本身
+  updateBits(st, show) {
     this.bits.visible = show;
     if (!show) return;
     const tg = this.bitsTarget(st);
@@ -437,29 +429,16 @@ export class Detail {
       this.baseBits = bf16Bits(tg.v);
     }
     const bits = this.flips.get(key) || this.baseBits;
-    const val = bf16Value(bits);
     this.keys.forEach((m, i) => {
-      const on = bits[i] === 1;
+      const on = bits[i] === 1, changed = bits[i] !== this.baseBits[i];
       m.position.y += ((on ? -0.035 : 0) - m.position.y) * 0.3;
-      m.material.emissiveIntensity = on ? 0.75 : 0.06;
-      const tex = textTexture(on ? '1' : '0', { color: on ? '#ffffff' : '#4b5572', font: '700 120px "JetBrains Mono",monospace', w: 128, h: 128 });
+      m.material.emissiveIntensity = on ? 0.7 : 0.06;
+      m.material.emissive.copy(changed ? WHITE : m.col);
+      const tex = textTexture(on ? '1' : '0', { color: on ? '#ffffff' : '#7a859e', font: '700 120px "JetBrains Mono",monospace', w: 128, h: 128 });
       if (m.face.material.map !== tex) { m.face.material.map = tex; m.face.material.needsUpdate = true; }
     });
-    const E = val.e - 127, frac = 1 + val.m / 128;
-    const what = tg.kind === 'mm' ? tg.label : 'q[0]';
-    this.bitsVal.el.innerHTML = `${what} = ${fmtSci(val.value)}<br><small style="font-size:11px;color:var(--dim)">(−1)<sup>${val.s}</sup> × 2<sup>${val.e}−127</sup> × (1 + ${val.m}/128) = ${val.s ? '−' : ''}2<sup>${E}</sup> × ${frac.toFixed(4)}</small>`;
-    if (tg.kind === 'mm') {
-      const t2 = tg.total + tg.x * (val.value - tg.v);
-      const fmt = (v) => (Number.isFinite(v) ? v.toFixed(3) : fmtSci(v));
-      let extra = '';
-      if (tg.kind2 === 'gate' || tg.e2) {
-        const u = tg.e2.total;
-        extra = `，神经元输出 silu(g)·u ${fmt((tg.total / (1 + Math.exp(-tg.total))) * u)} → <b>${fmt((t2 / (1 + Math.exp(-t2))) * u)}</b>`;
-      }
-      this.bitsFx.el.innerHTML = this.flips.has(key) ? `翻转之后：${tg.out} ${fmt(tg.total)} → <b>${fmt(t2)}</b>${extra}` : `${tg.out} = … + x × 这个权重 + …（x = ${tg.x.toFixed(3)}）· 点击任意一个键帽翻转`;
-    } else this.bitsFx.el.innerHTML = this.flips.has(key) ? '激活值也是 bf16：翻转指数位，数值会成倍地变' : '点击任意一个键帽，翻转这个比特';
     const anchor = tg.anchor ? tg.anchor.getWorldPosition(v3(0, 0, 0)) : (this.rigCenter || this.dotCenter || v3(0, 0, 0));
-    this.bits.position.copy(anchor).add(v3(0.02, 0.09, 0.2));
+    this.bits.position.copy(anchor).add(v3(0, tg.kind === 'q' ? 0.12 : 0.06, 0.16));
     this.bits.scale.setScalar(0.11);
     this.bitsCenter = this.bits.position.clone();
   }
@@ -476,9 +455,9 @@ export class Detail {
         const look = v3((x0 + x1) / 2, pp.y - 0.3, -0.2);
         return { pos: look.clone().add(v3(0.4, 0.5, d)), look };
       }
-      case 'neuron': { const look = (this.rigCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(2.05, 1.45, 1.12); return { pos: look.clone().add(v3(0.1, 0.12, d)), look }; }
+      case 'neuron': { const look = (this.rigCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(1.4, 1.15, 1.1); return { pos: look.clone().add(v3(0.06, 0.08, d)), look }; }
       case 'dot': { const look = (this.dotCenter || this.panelPos(st)).clone(); const d = this.E.fitDistance(1.9, 1.35, 1.12); return { pos: look.clone().add(v3(0.08, 0.12, d)), look }; }
-      case 'bits': { const look = (this.bitsCenter || this.panelPos(st)).clone().add(v3(0, 0.02, 0)); const d = this.E.fitDistance(0.5, 0.25, 1.1); return { pos: look.clone().add(v3(0, d * 0.3, d)), look }; }
+      case 'bits': { const look = (this.bitsCenter || this.panelPos(st)).clone().add(v3(0, -0.005, 0)); const d = this.E.fitDistance(0.56, 0.2, 1.08); return { pos: look.clone().add(v3(0, d * 0.12, d)), look }; }
     }
     return { pos: v3(10, 8, 20), look: v3(0, 4, 0) };
   }
