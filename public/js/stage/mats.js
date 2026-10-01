@@ -196,7 +196,8 @@ export class Mats {
     const inLayer = s.ph === 'layer' && M.e > 0.6 && (v === 'layer' || v === 'attn' || v === 'mlp' || micro);
     if (inLayer) this.applyThumbs(M.explodeL);
     // 微观视图里输入 / 输出另有带颜色的标签（micro.js），这些尺寸标签先收起来，免得叠在一起
-    for (const l of [A.xl, A.qo.lbl, A.oo.lbl, A.oinL, P.xl, P.x2l, P.go.lbl, P.uo.lbl, P.dinL, P.dout.lbl, P.u.lb]) if (l) l.visible = !micro;
+    // 矩阵的标题也收起：名字和形状写在算式板上，舞台上只留“第 j 列”的标签
+    for (const l of [A.xl, A.qo.lbl, A.oo.lbl, A.oinL, P.xl, P.x2l, P.go.lbl, P.uo.lbl, P.dinL, P.dout.lbl, A.q.lb, A.o.lb, P.g.lb, P.u.lb, P.d.lb]) if (l) l.visible = !micro;
     for (const pn of [A.q, A.o, P.g, P.u, P.d]) pn.edge.material.opacity = micro ? 0.35 : 0.7;
     const xf = M.xFocus(st);
     const base = 0.95 + M.explodeL * 0.26;

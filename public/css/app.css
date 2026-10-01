@@ -471,6 +471,8 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .bd-reset:hover { color: var(--ink); }
 body.has-board.mode-inspect #toasts { top: calc(var(--top) + 60px); bottom: auto; flex-direction: column; }
 body.has-board .heads { display: none; }
+/* 算式板出现时，知识碎片的提示只留最新的一条，免得挡住舞台 */
+body.has-board #toasts .toast:nth-child(n+2) { display: none; }
 
 /* ---------------- 提示、图鉴 ---------------- */
 
@@ -542,14 +544,24 @@ body.mode-inspect .toast { padding: 9px 12px; }
   .ctl-speed button { min-width: 32px; padding: 0 3px; }
   .ctl-pos { display: none; }
   .heads { top: auto; bottom: 200px; left: 10px; transform: scale(.85); transform-origin: left bottom; }
-  .board { top: 76px; bottom: auto; left: 8px; right: 8px; max-height: min(52vh, 440px); }
+  .board { top: 64px; bottom: auto; left: 8px; right: 8px; max-height: min(36vh, 330px); border-radius: 14px; }
   .dbg.folded ~ .board { right: 8px; }
   .bd-h { flex-wrap: wrap; row-gap: 6px; padding: 7px 8px 7px 12px; }
   .bd-where { flex: 1 1 0; }
   .bd-steps { order: 3; width: 100%; margin: 0; overflow-x: auto; scrollbar-width: none; }
   .bd-steps li { font-size: 10.5px; }
   .bd-scroll { padding: 8px 10px 10px; }
-  .bd-cap { font-size: 13px; margin-bottom: 6px; }
+  .bd-cap { font-size: 13px; line-height: 1.55; margin-bottom: 6px; }
+  /* 手机上先看累加器和结果落点，清单在下面，往下滑 */
+  .bd-body { display: flex; flex-direction: column; gap: 8px; }
+  .bd-side { order: -1; }
+  .bd-acc { padding: 6px 10px 7px; }
+  .bd-acc-k { font-size: 11px; }
+  .bd-dest { margin-top: 6px; padding-top: 6px; }
+  .bd-fx small { display: none; }
+  .bd-tbl { font-size: 12px; }
+  .bd-tr { grid-template-columns: 2.9em minmax(4.2em, 1fr) .8em minmax(4.6em, 1fr) .8em minmax(4.2em, 1fr) 24px; padding: 0 2px; }
+  .bd-silu svg { height: 84px; }
   .bd-chart { display: none; }
   .bd-fx { font-size: 15px; }
   .bd-acc-v { font-size: 18px; }

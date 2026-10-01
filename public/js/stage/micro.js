@@ -117,8 +117,8 @@ export class Micro {
       edge.position.copy(m.position);
       g.add(edge);
       const lb = label('E<sup>T</sup><small>1024 × 151936 · 只画了其中一段</small>', 'lbl part');
-      lb.position.set(0, h + 0.02, 0);
-      lb.center.set(0, 1.15);
+      lb.position.set(0, -0.02, 0);
+      lb.center.set(0, -0.2);
       g.add(lb);
       const vec = new THREE.Mesh(new THREE.BoxGeometry(0.05, h, 0.05), new THREE.MeshStandardMaterial({ color: 0x223, emissive: ROLE.x, emissiveIntensity: 0.4 }));
       vec.position.set(-0.14, h / 2, 0);
