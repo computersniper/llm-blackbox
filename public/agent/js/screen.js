@@ -15,7 +15,7 @@ export function splitExit(result) {
 
 // 一行 shell 输出的颜色
 function outCls(line) {
-  if (/^(OK|\.+)$|^OK |passed|^Ran \d+ tests?/.test(line)) return 'o-ok';
+  if (/^(OK|\.+)$|^OK |passed/.test(line)) return 'o-ok';
   if (/Error|FAIL|Traceback|not found|^error|^E+\.?$|^\.?F|×/.test(line)) return 'o-bad';
   return '';
 }
@@ -56,8 +56,8 @@ export function lineDiff(a, b) {
   let i = 0, j = 0;
   while (i < n || j < m) {
     if (i < n && j < m && A[i] === B[j]) { ops.push({ op: 'eq', text: A[i], na: i + 1, nb: j + 1 }); i++; j++; }
-    else if (j < m && (i >= n || L[i][j + 1] >= L[i + 1][j])) { ops.push({ op: 'add', text: B[j], nb: j + 1 }); j++; }
-    else { ops.push({ op: 'del', text: A[i], na: i + 1 }); i++; }
+    else if (i < n && (j >= m || L[i + 1][j] >= L[i][j + 1])) { ops.push({ op: 'del', text: A[i], na: i + 1 }); i++; }
+    else { ops.push({ op: 'add', text: B[j], nb: j + 1 }); j++; }
   }
   return ops;
 }

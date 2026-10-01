@@ -40,6 +40,7 @@ export class Controls {
     if (!tl) { el.innerHTML = ''; return; }
     const list = crumbs(tl.depth, tl.step, tl.R);
     el.innerHTML = list.map((c, k) => `${k ? '<span class="sep">›</span>' : ''}<button type="button" data-d="${c.d}" class="${c.d === tl.depth ? 'on' : ''}"><span class="d">D${c.d}</span>${esc(c.label)}</button>`).join('');
+    el.scrollLeft = el.scrollWidth;   // 窄屏放不下时，露出最深的那一级
   }
 
   // 每换一步调用一次

@@ -200,7 +200,7 @@ function frame(now) {
     if (view !== lastView) {
       views.dataset.view = view;
       lastView = view;
-      if (view !== 'loop') $('#desk').style.transform = '';
+      if (view !== 'loop') resetDesk();
     }
     const cur = cursorOf();
     chat.render(cur);
@@ -221,17 +221,28 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// 揭开到“循环”时，屏幕缩小，落进沙箱那个节点里
+// 揭开到“循环”时，屏幕缩小，落进沙箱那个节点里（按节点的长宽比重新排版，再整体缩小）
 let deskT = '';
 function placeDesk() {
   const desk = $('#desk');
   const slot = loopV.slotRect();
-  const w = desk.offsetWidth, h = desk.offsetHeight;
-  if (!w || !slot.w) return;
-  const sc = Math.min(slot.w / w, slot.h / h);
-  const x = slot.x + (slot.w - w * sc) / 2 - desk.offsetLeft, y = slot.y + (slot.h - h * sc) / 2 - desk.offsetTop;
-  const tr = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${sc.toFixed(4)})`;
-  if (tr !== deskT || desk.style.transform !== tr) { deskT = tr; desk.style.transform = tr; }
+  if (!slot.w || !slot.h) return;
+  const sc = small() ? 0.5 : 0.62;
+  const w = slot.w / sc, h = slot.h / sc;
+  const tr = `translate(${(slot.x - desk.offsetLeft).toFixed(1)}px, ${(slot.y - desk.offsetTop).toFixed(1)}px) scale(${sc})`;
+  const key = `${tr}|${w | 0}|${h | 0}`;
+  if (key !== deskT) {
+    deskT = key;
+    desk.style.width = `${w.toFixed(1)}px`;
+    desk.style.height = `${h.toFixed(1)}px`;
+    desk.style.transform = tr;
+  }
+}
+
+function resetDesk() {
+  const desk = $('#desk');
+  desk.style.transform = desk.style.width = desk.style.height = '';
+  deskT = '';
 }
 
 function renderStrip(cur) {
@@ -320,6 +331,7 @@ function bindChrome() {
   renderSound();
   $('#btnSideClose').addEventListener('click', () => document.body.classList.remove('chat-open'));
   $('#strip').addEventListener('click', () => document.body.classList.add('chat-open'));
+  $('#btnFab').addEventListener('click', () => into());
 }
 
 function bindKeys() {

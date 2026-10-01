@@ -85,8 +85,9 @@ function durOf(depth, s, R) {
     case 'gen': {
       if (s.j === undefined) return depth === 2 ? clamp(1.2 + T.gen.text.length / 70, 1.8, 6) : 2.4;
       const tk = T.gen.toks[s.j];
-      if (s.f) return s.f === 'fwd' ? 1.7 : 1.5;
-      return isDecision(tk, s.j) ? 1.7 : 0.14;
+      const dec = isDecision(tk, s.j);
+      if (s.f) return s.f === 'fwd' ? (dec ? 1.7 : 0.55) : (dec ? 1.5 : 0.35);
+      return dec ? 1.7 : 0.14;
     }
     case 'parse': return depth >= 4 ? 2.2 : 1.6;
     case 'exec': return depth === 2 ? actDur(T, s.c, 0) : 1.8;
