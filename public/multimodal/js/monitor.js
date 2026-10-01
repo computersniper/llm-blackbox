@@ -224,7 +224,7 @@ export class Monitor {
       tools = heatTools(layerOK);
       this.cellInfo = (c) => {
         let h = `<span class="k">视觉词元 (${c.row}, ${c.col})</span>注意力 <span class="v">${fmtPct(vals[c.m])}</span>`;
-        if (layerOK) { const w = V.ilens(s.L + 1, c.m); h += `<br>第 ${s.L} 层读数：<b>${esc(w.s.replace(/\n/g, '↵'))}</b> ${fmtPct(w.p)}`; }
+        if (layerOK) { const w = V.ilens(s.L, c.m); h += `<br>第 ${s.L} 层读数：<b>${esc(w.s.replace(/\n/g, '↵'))}</b> ${fmtPct(w.p)}`; }
         return h;
       };
     }
@@ -373,7 +373,7 @@ export class Monitor {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     for (let m = 0; m < V.Nv; m++) {
-      const { s, p } = V.ilens(L + 1, m);
+      const { s, p } = V.ilens(L, m);
       const w = s.trim().replace(/\n/g, '');
       if (!w || p < 0.05 || /<\|/.test(w)) continue;
       const r = Math.floor(m / V.mw), c = m % V.mw;

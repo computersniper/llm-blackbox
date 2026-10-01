@@ -104,7 +104,7 @@ export function argmax(a) { let b = 0; for (let i = 1; i < a.length; i++) if (a[
 export function lensWords(V, L, top = 4) {
   const cnt = new Map();
   for (let m = 0; m < V.Nv; m++) {
-    const { s, p } = V.ilens(L + 1, m);
+    const { s, p } = V.ilens(L, m);
     const w = s.trim();
     if (p < 0.05 || !w || /^[\p{P}\p{S}\d\s]+$/u.test(w) || /<\|/.test(w)) continue;
     cnt.set(w, (cnt.get(w) || 0) + 1);

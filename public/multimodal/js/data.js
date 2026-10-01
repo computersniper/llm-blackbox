@@ -96,7 +96,8 @@ export async function loadVision(spec) {
       vattnSelf: (li, q) => arr.vattnSelf[meta.vitAttnLayers.indexOf(li) * Nv + q],
       vnorm: (L, m) => arr.vnorm[L * Nv + m],             // L = 0 是合并器输出，L = 1..28 是第 L-1 层之后
       dsNorm: (d, m) => arr.dsNorm[d * Nv + m],
-      ilens: (L, m) => ({ s: meta.lensTab[arr.ilensId[L * Nv + m]], p: arr.ilensP[L * Nv + m] / 255 }),
+      // 图片词元在第 L 层之后（L = 0..27，前 3 层已含 DeepStack）的逻辑透镜读数
+      ilens: (L, m) => ({ s: meta.lensTab[arr.ilensId[L * Nv + m]] ?? '', p: arr.ilensP[L * Nv + m] / 255 }),
       pix: arr.pix, px: arr.px, w: arr.w, kern: arr.kern, bank: arr.bank,
       // 光栅位置 → 所属的合并词元
       tokOfPatch: (r, c) => Math.floor(r / 2) * mw + Math.floor(c / 2),
