@@ -9,48 +9,48 @@ const cm = (s) => `<span class="cm">${s}</span>`;
 const nu = (s) => `<span class="nu">${s}</span>`;
 
 export const CODE = [
-  cm('# 世界模型（Ha &amp; Schmidhuber 2018）：V 看，M 记住并想象'),
-  `h, c = ${fn('zeros')}(${nu(256)}), ${fn('zeros')}(${nu(256)})       ${cm('# M 的记忆')}`,
-  `obs = env.${fn('reset')}()                   ${cm('# 64×64×3 的画面')}`,
+  cm('# V 看，M 记住并想象（Ha &amp; Schmidhuber 2018）'),
+  `h, c = ${fn('zeros')}(${nu(256)}), ${fn('zeros')}(${nu(256)})`,
+  `obs = env.${fn('reset')}()          ${cm('# 64×64×3')}`,
   `${kw('while')} True:`,
-  `    ${kw('if')} 睁眼:  z = V.${fn('encode')}(obs).μ     ${cm('# 32 个数')}`,
-  `    ${kw('else')}:    z = ẑ                   ${cm('# 闭眼：用梦上一步的')}`,
-  `    a = 方向键 ${kw('or')} 自动驾驶 ${kw('or')} C([z, h])`,
-  `    π, μ, σ, done, (h, c) = ${fn('M')}(z, a, h, c)`,
-  `    ẑ = ${fn('sample')}(π, μ, σ, τ)          ${cm('# 下一帧的 z')}`,
-  `    ô = V.${fn('decode')}(ẑ)                 ${cm('# 梦见的下一帧')}`,
-  `    obs = env.${fn('step')}(a)               ${cm('# 真实世界走一步')}`,
-  `    误差 = ${fn('mean')}((obs − ô)²)`,
+  `  ${kw('if')} 睁眼: z = V.${fn('encode')}(obs).μ`,
+  `  ${kw('else')}:   z = ẑ           ${cm('# 闭眼')}`,
+  `  a = 方向键 ${kw('or')} 自动驾驶 ${kw('or')} ${fn('C')}(z, h)`,
+  `  π, μ, σ, done, h, c = ${fn('M')}(z, a, h, c)`,
+  `  ẑ = ${fn('sample')}(π, μ, σ, τ)   ${cm('# 下一帧的 z')}`,
+  `  ô = V.${fn('decode')}(ẑ)         ${cm('# 梦见的下一帧')}`,
+  `  obs = env.${fn('step')}(a)       ${cm('# 真实的下一帧')}`,
+  `  误差 = ${fn('mean')}((obs − ô)²)`,
   '',
-  `${kw('def')} V.${fn('encode')}(obs):               ${cm('# 卷积 VAE 的编码器')}`,
-  `    x = ${fn('relu')}(${fn('conv')}(obs, ${nu(16)}, k=${nu(4)}, s=${nu(2)}))  ${cm('# 31×31×16')}`,
-  `    x = ${fn('relu')}(${fn('conv')}(x, ${nu(32)}, k=${nu(4)}, s=${nu(2)}))    ${cm('# 14×14×32')}`,
-  `    x = ${fn('relu')}(${fn('conv')}(x, ${nu(64)}, k=${nu(4)}, s=${nu(2)}))    ${cm('# 6×6×64')}`,
-  `    x = ${fn('relu')}(${fn('conv')}(x, ${nu(128)}, k=${nu(4)}, s=${nu(2)}))   ${cm('# 2×2×128')}`,
-  `    μ, logσ² = W<sub>μ</sub>·x + b, W<sub>σ</sub>·x + b   ${cm('# 512 → 32, 32')}`,
-  `    ${kw('return')} μ                    ${cm('# 训练时 z = μ + σ·ε')}`,
+  `${kw('def')} V.${fn('encode')}(obs):         ${cm('# 卷积 VAE')}`,
+  `  x = ${fn('relu')}(${fn('conv')}(obs, ${nu(16)}, ${nu(4)}, ${nu(2)})) ${cm('# 31²×16')}`,
+  `  x = ${fn('relu')}(${fn('conv')}(x, ${nu(32)}, ${nu(4)}, ${nu(2)}))   ${cm('# 14²×32')}`,
+  `  x = ${fn('relu')}(${fn('conv')}(x, ${nu(64)}, ${nu(4)}, ${nu(2)}))   ${cm('# 6²×64')}`,
+  `  x = ${fn('relu')}(${fn('conv')}(x, ${nu(128)}, ${nu(4)}, ${nu(2)}))  ${cm('# 2²×128')}`,
+  `  μ, logσ² = W<sub>μ</sub>·x+b, W<sub>σ</sub>·x+b ${cm('# 32, 32')}`,
+  `  ${kw('return')} μ             ${cm('# 训练时 μ+σ·ε')}`,
   '',
   `${kw('def')} V.${fn('decode')}(z):`,
-  `    x = W·z + b                     ${cm('# 32 → 1×1×512')}`,
-  `    x = ${fn('relu')}(${fn('deconv')}(x, ${nu(64)}, k=${nu(5)}, s=${nu(2)}))  ${cm('# 5×5×64')}`,
-  `    x = ${fn('relu')}(${fn('deconv')}(x, ${nu(32)}, k=${nu(5)}, s=${nu(2)}))  ${cm('# 13×13×32')}`,
-  `    x = ${fn('relu')}(${fn('deconv')}(x, ${nu(16)}, k=${nu(6)}, s=${nu(2)}))  ${cm('# 30×30×16')}`,
-  `    ${kw('return')} ${fn('sigmoid')}(${fn('deconv')}(x, ${nu(3)}, k=${nu(6)}, s=${nu(2)}))  ${cm('# 64×64×3')}`,
+  `  x = W·z + b               ${cm('# 1×1×512')}`,
+  `  x = ${fn('relu')}(${fn('deconv')}(x, ${nu(64)}, ${nu(5)}, ${nu(2)})) ${cm('# 5²×64')}`,
+  `  x = ${fn('relu')}(${fn('deconv')}(x, ${nu(32)}, ${nu(5)}, ${nu(2)})) ${cm('# 13²×32')}`,
+  `  x = ${fn('relu')}(${fn('deconv')}(x, ${nu(16)}, ${nu(6)}, ${nu(2)})) ${cm('# 30²×16')}`,
+  `  ${kw('return')} σ(${fn('deconv')}(x, ${nu(3)}, ${nu(6)}, ${nu(2)}))  ${cm('# 64²×3')}`,
   '',
-  `${kw('def')} M(z, a, h, c):                 ${cm('# LSTM + 混合密度网络')}`,
-  `    x = ${fn('concat')}(z, ${fn('onehot')}(a))       ${cm('# 35')}`,
-  `    i = σ(W<sub>i</sub>·[x, h] + b<sub>i</sub>)            ${cm('# 输入门')}`,
-  `    f = σ(W<sub>f</sub>·[x, h] + b<sub>f</sub>)            ${cm('# 遗忘门')}`,
-  `    g = ${fn('tanh')}(W<sub>g</sub>·[x, h] + b<sub>g</sub>)         ${cm('# 候选记忆')}`,
-  `    o = σ(W<sub>o</sub>·[x, h] + b<sub>o</sub>)            ${cm('# 输出门')}`,
-  `    c = f*c + i*g`,
-  `    h = o*${fn('tanh')}(c)`,
-  `    π, μ, logσ = W<sub>head</sub>·h + b      ${cm('# 32 维 × 5 个高斯')}`,
-  `    done = σ(w<sub>done</sub>·h + b)          ${cm('# 这一步撞车了吗')}`,
+  `${kw('def')} M(z, a, h, c):         ${cm('# LSTM + MDN')}`,
+  `  x = ${fn('concat')}(z, ${fn('onehot')}(a))  ${cm('# 35')}`,
+  `  i = σ(W<sub>i</sub>·[x, h] + b<sub>i</sub>)     ${cm('# 输入门')}`,
+  `  f = σ(W<sub>f</sub>·[x, h] + b<sub>f</sub>)     ${cm('# 遗忘门')}`,
+  `  g = ${fn('tanh')}(W<sub>g</sub>·[x, h] + b<sub>g</sub>)  ${cm('# 候选记忆')}`,
+  `  o = σ(W<sub>o</sub>·[x, h] + b<sub>o</sub>)     ${cm('# 输出门')}`,
+  `  c = f*c + i*g`,
+  `  h = o*${fn('tanh')}(c)`,
+  `  π, μ, logσ = W<sub>head</sub>·h + b ${cm('# 各 32×5')}`,
+  `  done = σ(w<sub>done</sub>·h + b)   ${cm('# 撞车了吗')}`,
   '',
-  `${kw('def')} ${fn('sample')}(π, μ, σ, τ):           ${cm('# 每一维单独采样')}`,
-  `    k ~ ${fn('softmax')}(log π / τ)         ${cm('# 先挑一个高斯')}`,
-  `    ${kw('return')} μ[k] + σ[k]·√τ·ε,  ε ~ N(0, 1)`,
+  `${kw('def')} ${fn('sample')}(π, μ, σ, τ):     ${cm('# 每一维')}`,
+  `  k ~ ${fn('softmax')}(log π / τ)    ${cm('# 挑一个高斯')}`,
+  `  ${kw('return')} μ[k] + σ[k]·√τ·ε  ${cm('# ε~N(0,1)')}`,
 ];
 
 export function renderCode(el) {
@@ -107,10 +107,19 @@ export function dimOrder(meta) {
   if (!ORDER) ORDER = meta.dims.map((d, i) => i).sort((a, b) => meta.dims[b].kl - meta.dims[a].kl);
   return ORDER;
 }
-const SHORT = { car_x: '车位', road_near: '近处路', road_mid: '中段路', road_far: '远处路', bend: '弯道', car_off: '偏离', n_obs: '车数', ob_y: '障碍↕', ob_x: '障碍↔', dash: '虚线' };
+// 一维“有没有用上”：KL（和标准正态的距离）大于 0.05
+export const used = (meta, d) => meta.dims[d].kl > 0.05;
+// 一维的含义：导出时把这一维从数据里的 1% 分位扫到 99% 分位、其余不动，解码出来量的（小车、三段路、抛锚车）
+const SHORT = { car_x: '车位', road_near: '近路', road_mid: '中路', road_far: '远路', ob_x: '障碍↔', ob_y: '障碍↕', ob_amt: '有车' };
 export function dimShort(meta, d) {
-  const x = meta.dims[d];
-  return x.kl > 0.02 && Math.abs(x.corr) >= 0.3 ? SHORT[x.feat] || '' : '';
+  const sw = meta.dims[d].sweep;
+  return used(meta, d) && sw && (sw.feat === 'ob_amt' ? sw.px >= 0.5 : sw.px >= 2) ? SHORT[sw.feat] || '' : '';
+}
+export function dimMeaning(meta, d) {
+  const sw = meta.dims[d].sweep;
+  if (!used(meta, d) || !sw) return '没用上';
+  if (sw.feat === 'ob_amt') return sw.px >= 0.5 ? `抛锚车出现 / 消失（约 ${sw.px.toFixed(1)} 辆）` : '几乎看不出变化';
+  return sw.px >= 2 ? `${sw.label}，移动约 ${Math.round(sw.px)} 个像素` : '变化很小';
 }
 
 function stats(a) {
@@ -208,12 +217,13 @@ function explainEnc(op, { det, meta, sim, F }) {
   }
   if (op === 'mu') {
     const mu = det.enc.mu, lv = det.enc.lv;
-    const used = meta.dims.filter((d) => d.kl > 0.02).length;
-    return `<p>两个全连接层把 512 个数各自变成 32 个：<b>μ</b>（这一维“最可能”是多少）和 <b>logσ²</b>（有多不确定）。</p><p>训练时还要让它们接近标准正态分布（KL 项）：没什么用的维度会被压成 μ≈0、σ≈1，等于没用上。这个模型 32 维里用上了 <b>${used}</b> 维。</p><p class="dimmed">这一帧 |μ| = ${f3(norm(mu))}，平均 σ = ${f3(lv.reduce((s, v) => s + Math.exp(v / 2), 0) / Z)}</p>`;
+    const nUsed = meta.dims.filter((d, i) => used(meta, i)).length;
+    return `<p>两个全连接层把 512 个数各自变成 32 个：<b>μ</b>（这一维“最可能”是多少）和 <b>logσ²</b>（有多不确定）。</p><p>训练时还要让它们接近标准正态分布（KL 项）：没什么用的维度会被压成 μ≈0、σ≈1，等于没用上。这个模型 32 维里用上了 <b>${nUsed}</b> 维。</p><p class="dimmed">这一帧 |μ| = ${f3(norm(mu))}，平均 σ = ${f3(lv.reduce((s, v) => s + Math.exp(v / 2), 0) / Z)}</p>`;
   }
   if (op === 'z') {
     const order = dimOrder(meta).slice(0, 4);
-    return `<p>这 32 个数就是 V 眼里的整个世界。舞台下方把用得最多的几维各自<b>扫了一遍</b>：只改这一维、其他不动，解码出来的画面怎么变——有的维管小车左右，有的管路往哪弯，有的管抛锚车在哪。</p><p>${order.map((d) => `z<sub>${d}</sub>：${esc(meta.feats[meta.dims[d].feat] || '')}（相关 ${meta.dims[d].corr.toFixed(2)}）`).join('<br>')}</p><p class="dimmed">“含义”是导出时统计的：每一维和游戏状态（小车位置、路的走向、抛锚车的位置……）在 ${meta.train.collect.frames.toLocaleString()} 帧上的相关系数，取最大的那个。</p>`;
+    const pr = meta.probes;
+    return `<p>这 32 个数就是 V 眼里的整个世界。舞台下方把用得最多的几维各自<b>扫了一遍</b>：只改这一维、其他不动，解码出来的画面怎么变——有的维管小车左右，有的管路往哪弯，有的管抛锚车在哪。</p><p>${order.map((d) => `z<sub>${d}</sub>：${esc(dimMeaning(meta, d))}`).join('<br>')}</p><p class="dimmed">“含义”是导出时量的：以 32 帧的 μ 为底，把这一维从数据里的 1% 分位扫到 99% 分位，在解码出来的画面上量小车、三段路的中心、抛锚车跟着动了多少，取动得最多的那样。一维往往不只管一件事（同时动了好几样），这里只写最明显的。</p><p class="dimmed">反过来，从 32 个数用一个线性层读游戏状态（测试集 R²）：小车位置 ${pr.car_x}，车旁的路 ${pr.road_near}，远处的路 ${pr.road_far}，抛锚车左右 ${pr.ob_x}。</p>`;
   }
   return '';
 }
@@ -238,7 +248,7 @@ function topIdx(a, k = 3, off = 0, n = a.length) {
   return idx.slice(0, k);
 }
 
-function explainM(op, { rec, F }) {
+function explainM(op, { rec, F, meta }) {
   const L = rec.L, H = 256;
   switch (op) {
     case 'cat': return `<p>把这一帧的 z（32 个数）和动作「${actName(rec.a)}」的 one-hot（[${[0, 1, 2].map((i) => (i === rec.a ? 1 : 0)).join(', ')}]）拼成 35 个数，作为 LSTM 这一步的输入。动作就是这样“告诉”模型的：同一个 z，按不同的键，M 会预测出不同的下一帧。</p>`;
@@ -249,7 +259,9 @@ function explainM(op, { rec, F }) {
     case 'cell': return `<p><b>细胞状态</b> c' = f ⊙ c + i ⊙ g：先按遗忘门留下一部分旧记忆，再按输入门加上新内容。c 是 LSTM 能把信息带过很多步的关键——比如“刚才那辆抛锚车已经开过去了”。</p><p class="dimmed">|c| 从 ${f3(norm(F.c))} 变成 ${f3(norm(L.c))}</p>`;
     case 'hid': return `<p><b>隐状态</b> h' = o ⊙ tanh(c')：256 个数，是 M 对“现在世界处在什么状态、接下来会怎样”的全部理解。下一帧的分布、撞车概率都从它算出来；控制器 C 也看它。</p>`;
     case 'mdn': {
-      const d = topIdx(spreadOf(rec), 1)[0];
+      const sp = spreadOf(rec);
+      let d = 0;
+      for (let k = 0; k < Z; k++) if (used(meta, k) && (!used(meta, d) || sp[k] > sp[d])) d = k;
       return `<p><b>混合密度网络</b>：一个全连接层把 h 变成 481 个数——32 维 × 5 个高斯 ×（权重 π、中心 μ、宽度 σ）+ 1 个撞车 logit。</p><p>每一维单独一个“5 个山峰”的分布。大多数维度只有一个峰很高（模型很确定）；不确定的维度会有好几个峰，比如 z<sub>${d}</sub>——前面会不会刷出车、刷在哪，本来就说不准。</p>`;
     }
     case 'done': return `<p>撞车概率：sigmoid(w·h + b) = <b>${pct(rec.M.done)}</b>。训练时只有每局最后一步是 1，所以模型学会了在“快撞上”的时候把它调高。闭眼时它超过 50%，这一段梦就到此为止，下一步重新睁眼。</p>`;

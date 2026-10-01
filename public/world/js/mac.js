@@ -2,7 +2,7 @@
 // 加完和前向算出来的值比一比（float32 的前向 vs 这里用双精度重新加一遍，差在 1e-6 量级）。
 import { ENC, DEC, Z, KMIX, HID } from './nn.js';
 import { CAR_Y } from './game.js';
-import { dimOrder, OP_LABEL } from './explain.js';
+import { dimOrder, dimMeaning, OP_LABEL } from './explain.js';
 import { esc } from '../../js/ui.js';
 
 const GATE = { gi: [0, 'i', 'σ'], gf: [1, 'f', 'σ'], gg: [2, 'g', 'tanh'], go: [3, 'o', 'σ'] };
@@ -80,7 +80,7 @@ export function buildMac(op, sel, sim, model, meta) {
     for (let i = 0; i < 512; i++) terms.push({ lab: `x${i}`, x: det.enc.e4[i], w: W[d * 512 + i], g: 0 });
     bias = T['mu.bias'][d];
     stored = det.enc.mu[d];
-    where = `μ 的第 ${d} 维（${meta.feats[meta.dims[d].feat] || ''}）`;
+    where = `μ 的第 ${d} 维（${dimMeaning(meta, d)}）`;
     ctxNote = '卷积 4 的 512 个输出（2×2×128 摊平）';
   } else if (op === 'dfc') {
     const j = sel.j, W = T['dfc.weight'];

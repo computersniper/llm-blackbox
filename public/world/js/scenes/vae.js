@@ -3,7 +3,7 @@
 // 点任意一格选中它，按 ＋ 看它的一次乘加。走到 z 时，下面把用得最多的几维各扫一遍。
 import { COL, rr, text, card, hexA, line, ease, seg } from '../../../train/js/draw.js';
 import { Pix, featGrid } from '../pix.js';
-import { dimOrder, OP_LABEL, fmtMSE } from '../explain.js';
+import { dimOrder, dimMeaning, used as isUsed, OP_LABEL, fmtMSE } from '../explain.js';
 import { ENC, DEC } from '../nn.js';
 
 const LAYERS = {
@@ -229,7 +229,7 @@ export class VaeView {
     const order = dimOrder(meta), pad = 6, bw = (r.w - pad * 2) / 32, mid = r.y + r.h / 2, R = 3.2;
     line(g, [[r.x + pad, mid], [r.x + r.w - pad, mid]], COL.line2, 1);
     order.forEach((d, i) => {
-      const used = meta.dims[d].kl > 0.02;
+      const used = isUsed(meta, d);
       const x = r.x + pad + i * bw;
       const m = enc.mu[d], s = Math.exp(enc.lv[d] / 2);
       const y = (v) => mid - Math.max(-1, Math.min(1, v / R)) * (r.h / 2 - pad);
@@ -248,7 +248,7 @@ export class VaeView {
     const order = dimOrder(meta), pad = 6, bw = (r.w - pad * 2) / 32, mid = r.y + r.h / 2, R = 3.2;
     line(g, [[r.x + pad, mid], [r.x + r.w - pad, mid]], COL.line2, 1);
     order.forEach((d, i) => {
-      const used = meta.dims[d].kl > 0.02;
+      const used = isUsed(meta, d);
       const v = Math.max(-1, Math.min(1, z[d] / R)) * (r.h / 2 - pad);
       g.fillStyle = used ? hexA(COL.amber, 0.85) : 'rgba(122,133,158,0.4)';
       g.fillRect(r.x + pad + i * bw + 1, Math.min(mid, mid - v), Math.max(1, bw - 2), Math.max(0.8, Math.abs(v)));
@@ -273,7 +273,7 @@ export class VaeView {
   // 潜变量每一维扫一遍：以这一帧的 μ 为底，只改一维（从数据里的 1% 分位到 99% 分位），其余不动，解码
   sweepPanel(g, r, det, env, active) {
     const { meta, model } = this.app;
-    const dims = dimOrder(meta).filter((d) => meta.dims[d].kl > 0.02).slice(0, this.portrait ? 6 : 8);
+    const dims = dimOrder(meta).filter((d) => isUsed(meta, d)).slice(0, this.portrait ? 6 : 8);
     const key = det;
     const sw = this.sweep;
     if (sw.key !== key) { sw.key = key; sw.pix = dims.map(() => SWEEP.map(() => null)); sw.done = 0; }
@@ -301,15 +301,16 @@ export class VaeView {
       const info = meta.dims[d];
       const lw = pt ? 108 : 150;
       text(g, `z${d}`, cx, cy + th / 2 - 3, { size: 11, kind: 'mono', color: COL.amber });
-      text(g, meta.feats[info.feat] || '', cx + 28, cy + th / 2 - 3, { size: pt ? 9.5 : 10.5, color: COL.ink2, max: lw - 28 });
-      text(g, `相关 ${info.corr.toFixed(2)} · KL ${info.kl.toFixed(2)}`, cx + 28, cy + th / 2 + 11, { size: 9, kind: 'mono', color: COL.dim });
+      const mean = dimMeaning(meta, d), cut = mean.indexOf('，');
+      text(g, cut > 0 ? mean.slice(0, cut) : mean, cx + 28, cy + th / 2 - 3, { size: pt ? 9.5 : 10.5, color: COL.ink2, max: lw - 28 });
+      text(g, `${cut > 0 ? mean.slice(cut + 1) + ' · ' : ''}KL ${info.kl.toFixed(2)}`, cx + 28, cy + th / 2 + 11, { size: 9, color: COL.dim, max: lw - 28 });
       SWEEP.forEach((v, j) => {
         const x = cx + lw + j * (th + 4);
         rr(g, x - 1, cy - 1, th + 2, th + 2, 3); g.fillStyle = 'rgba(4,8,16,0.9)'; g.fill();
         const px = sw.pix[i]?.[j];
         if (px) px.draw(g, x, cy, th, th);
       });
-      env.hit(cx, cy, cw - 10, th, { tip: `<span class="k">z<sub>${d}</sub> 扫一遍</span>从左到右：${info.lo.toFixed(2)} → ${info.hi.toFixed(2)}（数据里 1% 到 99% 的范围），其余 31 维固定为这一帧的 μ。<br>和「${meta.feats[info.feat]}」的相关系数 <span class="v">${info.corr.toFixed(2)}</span>` });
+      env.hit(cx, cy, cw - 10, th, { tip: `<span class="k">z<sub>${d}</sub> 扫一遍</span>从左到右：${info.lo.toFixed(2)} → ${info.hi.toFixed(2)}（数据里 1% 到 99% 的范围），其余 31 维固定为这一帧的 μ。<br>导出时在 32 帧上量的：<span class="v">${dimMeaning(meta, d)}</span>` });
     });
   }
 }

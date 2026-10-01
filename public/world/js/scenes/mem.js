@@ -3,7 +3,7 @@
 import { COL, rr, text, card, hexA, line, ease, clamp } from '../../../train/js/draw.js';
 import { vecGrid } from '../pix.js';
 import { ACTIONS } from '../game.js';
-import { dimOrder } from '../explain.js';
+import { dimOrder, dimMeaning, used as isUsed } from '../explain.js';
 import { Z, KMIX } from '../nn.js';
 
 const GATES = [['gi', 'i', '输入门', 'σ'], ['gf', 'f', '遗忘门', 'σ'], ['gg', 'g', '候选记忆', 'tanh'], ['go', 'o', '输出门', 'σ']];
@@ -112,7 +112,7 @@ export class MemView {
     const order = dimOrder(meta), pad = 4, bw = (r.w - pad * 2) / 32, mid = r.y + r.h / 2;
     order.forEach((d, i) => {
       const v = clamp(z[d] / 3.2, -1, 1) * (r.h / 2 - pad);
-      g.fillStyle = meta.dims[d].kl > 0.02 ? hexA(COL.violet, 0.85) : 'rgba(122,133,158,0.4)';
+      g.fillStyle = isUsed(meta, d) ? hexA(COL.violet, 0.85) : 'rgba(122,133,158,0.4)';
       g.fillRect(r.x + pad + i * bw + 0.5, Math.min(mid, mid - v), Math.max(1, bw - 1), Math.max(0.8, Math.abs(v)));
     });
     env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">输入 x 的前 32 个数</span>这一帧的 z（按 KL 排序显示）' });
@@ -162,11 +162,11 @@ export class MemView {
     const selD = this.selDim(rec);
     order.forEach((d, i) => {
       const x = r.x + pad + (i % cols) * cw, y = r.y + pad + Math.floor(i / cols) * ch;
-      const used = meta.dims[d].kl > 0.02;
+      const used = isUsed(meta, d);
       if (d === selD) { rr(g, x + 1, y + 1, cw - 2, ch - 2, 3); g.strokeStyle = hexA(COL.amber, 0.8); g.lineWidth = 1; g.stroke(); }
       this.density(g, { x: x + 3, y: y + 3, w: cw - 6, h: ch - 8 }, rec, d, used ? 1 : 0.35, false);
       text(g, `${d}`, x + 4, y + 10, { size: 7.5, kind: 'mono', color: COL.faint });
-      env.hit(x, y, cw, ch, { tip: `<span class="k">z<sub>${d}</sub> 的下一帧分布</span>${meta.feats[meta.dims[d].feat] || ''}<br>采样到 <span class="v">${rec.S.z[d].toFixed(3)}</span>（第 ${rec.S.k[d]} 个高斯）<br><span class="v">点一下放大</span>`, click: true, act: () => { this.app.sel.mdnDim = d; } });
+      env.hit(x, y, cw, ch, { tip: `<span class="k">z<sub>${d}</sub> 的下一帧分布</span>${dimMeaning(meta, d)}<br>采样到 <span class="v">${rec.S.z[d].toFixed(3)}</span>（第 ${rec.S.k[d]} 个高斯）<br><span class="v">点一下放大</span>`, click: true, act: () => { this.app.sel.mdnDim = d; } });
     });
   }
 
@@ -176,7 +176,7 @@ export class MemView {
     // 默认挑用得上的维度里分布最“散”的（模型最拿不准的）
     let best = dimOrder(meta)[0], bv = -1;
     for (const d of dimOrder(meta)) {
-      if (meta.dims[d].kl < 0.3) continue;
+      if (!isUsed(meta, d)) continue;
       let m = 0, v = 0;
       for (let k = 0; k < KMIX; k++) m += Math.exp(rec.M.logpi[d * KMIX + k]) * rec.M.mu[d * KMIX + k];
       for (let k = 0; k < KMIX; k++) { const pk = Math.exp(rec.M.logpi[d * KMIX + k]); v += pk * ((rec.M.mu[d * KMIX + k] - m) ** 2 + Math.exp(2 * rec.M.logsig[d * KMIX + k])); }
@@ -250,7 +250,7 @@ export class MemView {
     const d = this.selDim(rec);
     const on = op === 'mdn' || op === 'pick' || op === 'draw';
     const shown = ['mdn', 'done', 'pick', 'draw'].includes(op);
-    text(g, `放大：z${d}（${meta.feats[meta.dims[d].feat] || ''}）`, r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, `放大：z${d}（${dimMeaning(meta, d)}）`, r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     card(g, r.x, r.y, r.w, r.h, { r: 8, active: on });
     if (!shown) { text(g, '算到“混合密度”这一步才有', r.x + r.w / 2, r.y + r.h / 2, { size: 11, color: COL.faint, align: 'center' }); return; }
     // 睁眼时，下一帧真实画面的编码作参照（白色虚线）

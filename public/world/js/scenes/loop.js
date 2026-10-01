@@ -4,7 +4,7 @@
 import { COL, rr, text, card, hexA, line, clamp, ease, seg } from '../../../train/js/draw.js';
 import { Pix, vecGrid } from '../pix.js';
 import { ACTIONS } from '../game.js';
-import { dimOrder, fmtMSE } from '../explain.js';
+import { dimOrder, used as isUsed, fmtMSE } from '../explain.js';
 
 const ORDER_STAGE = ['obs', 'enc', 'rnn', 'sample', 'dec', 'cmp'];
 
@@ -53,7 +53,7 @@ export class LoopView {
 
     // ---- 真实画面
     this.obs.palette(F.o, F.o);
-    this.screen(g, L.O, this.obs, pt ? '真实画面 obs' : '真实画面 obs<sub>t</sub>', COL.cyan, on('obs'), env);
+    this.screen(g, L.O, this.obs, pt ? '真实画面 obs' : '真实画面 obsₜ', COL.cyan, on('obs'), env);
     // ---- 编码
     const encLive = !closed;
     this.trap(g, L.VE, 'V', '编码', pt ? 'down' : 'right', on('enc') && encLive, encLive ? 1 : 0.3, env);
@@ -62,7 +62,7 @@ export class LoopView {
     if (!encLive) text(g, '闭眼：不看', L.VE.x + L.VE.w / 2, L.VE.y - 8, { size: 10, color: COL.amber, align: 'center' });
     // ---- z_t
     const zFill = on('enc') ? ease(p) : done('enc') || on('obs') === false ? 1 : 0;
-    this.bars(g, L.ZT, rec.z, pt ? 'z（32）' : 'z<sub>t</sub> · 32 个数', closed ? COL.amber : COL.violet, k >= 1 ? zFill : 0, on('enc'), env, closed ? '来自上一步的 ẑ' : 'V 编码出来的 μ');
+    this.bars(g, L.ZT, rec.z, pt ? 'z（32）' : 'zₜ · 32 个数', closed ? COL.amber : COL.violet, k >= 1 ? zFill : 0, on('enc'), env, closed ? '来自上一步的 ẑ' : 'V 编码出来的 μ');
     // ---- 动作
     const ax = L.M.x + L.M.w / 2, ay = pt ? L.M.y - 10 : L.M.y - 22;
     const aTxt = `a = ${ACTIONS[rec.a]}${rec.by === 'key' ? '（你按的）' : rec.by === 'heur' ? '（自动驾驶）' : rec.by === 'ctrl' ? '（C）' : ''}`;
@@ -73,7 +73,7 @@ export class LoopView {
     // ---- 采样 ẑ_{t+1}
     const zn = on('sample') ? ease(p) : done('sample') ? 1 : 0;
     this.flow(g, pt ? [[L.M.x + 46, L.M.y + L.M.h + 4], [L.ZN.x + L.ZN.w / 2, L.ZN.y - 4]] : [[L.M.x + L.M.w + 4, L.ZN.y + L.ZN.h / 2], [L.ZN.x - 4, L.ZN.y + L.ZN.h / 2]], COL.amber, on('sample') ? p : done('sample') ? 1 : 0, 1);
-    this.bars(g, L.ZN, rec.S.z, pt ? 'ẑ（采样）' : `ẑ<sub>t+1</sub> · 采样 τ=${rec.tau.toFixed(2)}`, COL.amber, zn, on('sample'), env, '从 M 给的分布里抽出来的');
+    this.bars(g, L.ZN, rec.S.z, pt ? 'ẑ（采样）' : `ẑₜ₊₁ · 采样 τ=${rec.tau.toFixed(2)}`, COL.amber, zn, on('sample'), env, '从 M 给的分布里抽出来的');
     // ---- 解码
     this.trap(g, L.VD, 'V', '解码', pt ? 'right-open' : 'left', on('dec'), 1, env);
     this.flow(g, [[L.ZN.x + L.ZN.w + 4, L.ZN.y + L.ZN.h / 2], [L.VD.x - 4, L.VD.y + L.VD.h / 2]], COL.amber, on('dec') ? Math.min(1, p * 2) : done('dec') ? 1 : 0, 1);
@@ -83,11 +83,11 @@ export class LoopView {
       const y = sim.dreamOf(G);
       this.dream.chw(y, y);
       const rev = on('dec') ? ease(seg(p, 0.35, 1)) : done('dec') ? 1 : 0;
-      this.screen(g, L.D, this.dream, pt ? '梦见的下一帧 ô' : '梦见的下一帧 ô<sub>t+1</sub>', COL.amber, on('dec') || on('cmp'), env, rev);
+      this.screen(g, L.D, this.dream, pt ? '梦见的下一帧 ô' : '梦见的下一帧 ôₜ₊₁', COL.amber, on('dec') || on('cmp'), env, rev);
       // 真实世界的下一帧
       this.real1.palette(G.o, G.o);
       const realRev = on('cmp') ? 1 : done('cmp') ? 1 : 0.0;
-      this.screen(g, L.R1, this.real1, pt ? '真实下一帧' : '真实世界的下一帧 obs<sub>t+1</sub>', COL.cyan, on('cmp'), env, realRev, !realRev ? '对照时揭晓' : '');
+      this.screen(g, L.R1, this.real1, pt ? '真实下一帧' : '真实世界的下一帧 obsₜ₊₁', COL.cyan, on('cmp'), env, realRev, !realRev ? '对照时揭晓' : '');
       if (on('cmp')) {
         const a = ease(p);
         const mx = pt ? L.R1.x + L.R1.w / 2 : L.D.x + L.D.w / 2, my = pt ? L.R1.y + L.R1.h + 16 : L.R1.y + L.R1.h + 16;
@@ -177,7 +177,7 @@ export class LoopView {
     g.strokeStyle = COL.line2; g.lineWidth = 1;
     g.beginPath(); g.moveTo(r.x + pad, mid); g.lineTo(r.x + r.w - pad, mid); g.stroke();
     order.forEach((d, i) => {
-      const used = meta.dims[d].kl > 0.02;
+      const used = isUsed(meta, d);
       const R = Math.max(1.2, Math.abs(meta.dims[d].lo), Math.abs(meta.dims[d].hi)) * 1.15;
       const v = clamp(z[d] / R, -1, 1) * fill;
       const h = v * (r.h / 2 - pad);

@@ -3,7 +3,7 @@
 import { COL, rr, text, card, hexA, line, clamp } from '../../../train/js/draw.js';
 import { Pix } from '../pix.js';
 import { toCHW } from '../game.js';
-import { dimOrder, dimShort, fmtMSE } from '../explain.js';
+import { dimOrder, dimShort, dimMeaning, used as isUsed, fmtMSE } from '../explain.js';
 
 export class PlayView {
   constructor(app) {
@@ -22,9 +22,9 @@ export class PlayView {
       this.R = { x: 0, y: 30, w: s, h: s };
       this.D = { x: 188, y: 30, w: s, h: s };
       this.HM = null;
-      this.CH = { x: 0, y: 232, w: 360, h: 92 };
-      this.EQ = { x: 0, y: 346, w: 360, h: 128 };
-      this.box = { x: -6, y: 0, w: 372, h: 480 };
+      this.CH = { x: 0, y: 244, w: 360, h: 92 };
+      this.EQ = { x: 0, y: 358, w: 360, h: 128 };
+      this.box = { x: -6, y: 0, w: 372, h: 492 };
     } else {
       this.R = { x: 0, y: 34, w: 300, h: 300 };
       this.D = { x: 330, y: 34, w: 300, h: 300 };
@@ -109,19 +109,22 @@ export class PlayView {
     text(g, small, r.x + r.w / 2, r.y + r.h / 2 + (pt ? 16 : 22), { size: pt ? 9 : 11, color: '#ffb3c2', align: 'center' });
   }
 
+  // 竖屏时排成一行放在两块屏幕下面，横屏时竖着放在两块屏幕中间
   actionChip(g, x, y, a, pt) {
-    const s = pt ? 11 : 13;
+    const s = pt ? 10 : 13;
     const items = [['◀', 1], ['▲', 0], ['▶', 2]];
+    if (pt) y = this.R.y + this.R.h + 16;
     items.forEach(([ch, v], k) => {
-      const yy = y + (k - 1) * (s + 10);
+      const cx = pt ? x + (k - 1) * (s * 2 + 6) : x, cy = pt ? y : y + (k - 1) * (s + 10);
       const on = a === v;
-      rr(g, x - s, yy - s * 0.8, s * 2, s * 1.6, 5);
+      rr(g, cx - s, cy - s * 0.8, s * 2, s * 1.6, 5);
       g.fillStyle = on ? hexA(COL.amber, 0.22) : 'rgba(255,255,255,0.03)';
       g.fill();
       g.strokeStyle = on ? hexA(COL.amber, 0.7) : COL.line2; g.lineWidth = 1; g.stroke();
-      text(g, ch, x, yy + s * 0.32, { size: s * 0.8, color: on ? COL.amber : COL.faint, align: 'center' });
+      text(g, ch, cx, cy + s * 0.32, { size: s * 0.8, color: on ? COL.amber : COL.faint, align: 'center' });
     });
-    text(g, '同一个动作', x, y + (s + 10) * 1.5 + s * 0.6, { size: pt ? 8 : 9.5, color: COL.dim, align: 'center' });
+    if (pt) text(g, '两边同一个动作', x + s * 3 + 18, y + 3.5, { size: 9, color: COL.dim });
+    else text(g, '同一个动作', x, y + (s + 10) * 1.5 + s * 0.6, { size: 9.5, color: COL.dim, align: 'center' });
   }
 
   // 差异曲线：最近 120 帧；闭眼时叠上“平均来说会涨成这样”（测试集上的离线统计）
@@ -134,9 +137,9 @@ export class PlayView {
     const P = { x: r.x + 10, y: r.y + 26, w: r.w - 20, h: r.h - 36 };
     const frames = sim.recent(120);
     const ref = meta.drift;
-    let mx = 0.02;
-    for (const f of frames) if (f.mse != null) mx = Math.max(mx, f.mse);
-    mx = Math.min(0.08, mx * 1.15);
+    let mx = 0.006;
+    for (const f of frames) if (f.mse != null) mx = Math.max(mx, f.mse * 1.2);
+    mx = Math.min(0.08, mx);
     const X = (i) => P.x + (i / 119) * P.w, Y = (v) => P.y + P.h - Math.min(1, v / mx) * P.h;
     g.strokeStyle = COL.line; g.lineWidth = 1;
     for (const q of [0.25, 0.5, 0.75]) { g.beginPath(); g.moveTo(P.x, P.y + P.h * q); g.lineTo(P.x + P.w, P.y + P.h * q); g.stroke(); }
@@ -170,8 +173,8 @@ export class PlayView {
     const last = frames[frames.length - 1];
     if (last?.mse != null) { g.beginPath(); g.arc(X(119), Y(last.mse), 3, 0, Math.PI * 2); g.fillStyle = last.dreamAge > 0 ? COL.amber : COL.cyan; g.fill(); }
     if (!pt) {
-      text(g, '— 睁眼', P.x + P.w - 112, P.y + P.h - 6, { size: 9, color: COL.cyan });
-      text(g, '— 闭眼', P.x + P.w - 66, P.y + P.h - 6, { size: 9, color: COL.amber });
+      text(g, '— 睁眼', P.x + 60, P.y + 9, { size: 9, color: COL.cyan });
+      text(g, '— 闭眼', P.x + 104, P.y + 9, { size: 9, color: COL.amber });
     }
     env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">梦和真实的差异</span>青色：睁眼（每一步都看一眼真实画面再预测下一帧）；琥珀色：闭眼（梦用自己上一步想出来的 z 往下想）。<br>虚线是测试集上 ${ref.episodes} 局的平均：闭眼 10 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][9])}</span>，30 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][29])}</span>。` });
   }
@@ -191,7 +194,7 @@ export class PlayView {
     order.forEach((d, k) => {
       const info = meta.dims[d];
       const x = r.x + k * (bw + gap);
-      const used = info.kl > 0.02;
+      const used = isUsed(meta, d);
       const R = Math.max(1.2, Math.abs(info.lo), Math.abs(info.hi)) * 1.15;
       const Yv = (v) => mid - clamp(v / R, -1, 1) * (bh / 2);
       rr(g, x, top, bw, bh, 3);
@@ -213,7 +216,7 @@ export class PlayView {
       if (!pt && used && k < 12) text(g, dimShort(meta, d), x + bw / 2, top + bh + 24, { size: 9.5, color: COL.ink2, align: 'center', max: bw + gap });
       env.hit(x, top, bw, bh, {
         dim: d,
-        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${used ? `和「${meta.feats[info.feat] || info.feat}」最相关（相关系数 <span class="v">${info.corr.toFixed(2)}</span>）` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${enc[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`,
+        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${used ? `扫一遍：${dimMeaning(meta, d)}` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${enc[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`,
         drag: (wx, wy, phase) => {
           if (phase === 'start') { this.drag = { d }; this.app.dragStart?.(); }
           if (phase === 'end') { this.drag = null; this.app.dragEnd?.(); return; }

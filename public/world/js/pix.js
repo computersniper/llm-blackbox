@@ -73,7 +73,7 @@ export function divRGB(t) {
 }
 
 // 一层的特征图（C 个 h×w）排成 cols 列的网格，每格之间留 gap 个像素。返回画布和几何信息，供点选、高亮
-export function featGrid(act, C, h, w, cols, { gap = 1, signed = false, scale = 0 } = {}) {
+export function featGrid(act, C, h, w, cols, { gap = 1, signed = false, scale = 0, perChannel = true } = {}) {
   const rows = Math.ceil(C / cols);
   const cw = cols * (w + gap) - gap, ch = rows * (h + gap) - gap;
   const p = new Pix(cw, ch);
@@ -84,8 +84,16 @@ export function featGrid(act, C, h, w, cols, { gap = 1, signed = false, scale = 
   mx = mx || 1;
   for (let c = 0; c < C; c++) {
     const ox = (c % cols) * (w + gap), oy = Math.floor(c / cols) * (h + gap);
+    // 每个通道按自己的最大值归一化（但不低于全层最大值的 15%，全黑的通道就留黑）
+    let cm = mx;
+    if (perChannel && h * w > 1) {
+      cm = 0;
+      for (let i = c * h * w; i < (c + 1) * h * w; i++) cm = Math.max(cm, Math.abs(act[i]));
+      cm = Math.max(cm, mx * 0.15);
+    }
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const v = act[(c * h + y) * w + x] / mx;
+      const raw = act[(c * h + y) * w + x] / cm;
+      const v = signed ? raw : Math.sqrt(Math.max(0, raw));
       const rgb = signed ? divRGB(v) : seqRGB(v);
       const k = ((oy + y) * cw + ox + x) * 4;
       d[k] = rgb[0]; d[k + 1] = rgb[1]; d[k + 2] = rgb[2];

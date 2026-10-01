@@ -2,7 +2,7 @@
 // 中间三块方格是全部 n 项的输入 x、权重 w、乘积 x·w（颜色：琥珀 = 正，蓝 = 负），绝对值最大的 12 项描了边。
 // 具体数字在下方的算式板上（DOM，和推理页的算式板同一套样式）。
 import { COL, rr, text, hexA, ease, clamp } from '../../../train/js/draw.js';
-import { Pix, featGrid, divRGB } from '../pix.js';
+import { Pix, featGrid, divRGB, vecGrid } from '../pix.js';
 import { ENC, DEC } from '../nn.js';
 import { OP_LABEL } from '../explain.js';
 
@@ -36,7 +36,7 @@ export class MacView {
   // 输入 / 输出张量的网格图（按这一帧缓存）
   grids(mac, det) {
     const op = mac.op;
-    const k = `${op}`;
+    const k = `${op}:${JSON.stringify(mac.sel)}`;
     if (this.key === det && this.gk === k) return this.G;
     this.key = det; this.gk = k;
     const G = {};
@@ -48,6 +48,21 @@ export class MacView {
     }
     if (OUT[op]) { const [C, H, cols] = OUT[op]; G.out = featGrid(op[0] === 'e' ? det.enc[op] : det.dec[op], C, H, H, cols); }
     if (op === 'd4') { const p = new Pix(); p.chw(det.dec.y); G.out = { pix: p, cols: 1, w: 64, h: 64, gap: 0, cw: 64, ch: 64 }; }
+    // 全连接、LSTM 的门、MDN 头：输入输出都是向量，排成方格
+    const vec = (v, cols, idx = -1) => { const rows = Math.ceil(v.length / cols); let m = 0; for (const x of v) m = Math.max(m, Math.abs(x)); return { pix: vecGrid(v, cols, { scale: m || 1 }), cols, w: 1, h: 1, gap: 0, cw: cols, ch: rows, vec: true, idx }; };
+    const rec = this.app.sim.cur.rec;
+    if (!SHAPE[op]) {
+      if (op === 'mu') { G.inp = vec(det.enc.e4, 32); G.out = vec(det.enc.mu, 8, mac.sel.j); }
+      else if (op === 'dfc') { G.inp = vec(det.dec.z, 8); G.out = vec(det.dec.dfc, 32, mac.sel.j); }
+      else if (/^g[ifgo]$/.test(op)) {
+        const xh = new Float32Array(35 + 256); xh.set(rec.L.x); xh.set(this.app.sim.cur.h, 35);
+        const gate = { gi: rec.L.i, gf: rec.L.f, gg: rec.L.g, go: rec.L.o }[op];
+        G.inp = vec(xh, 17); G.out = vec(gate, 16, mac.sel.j);
+      } else if (op === 'mdn' || op === 'done') {
+        G.inp = vec(rec.L.h, 16);
+        G.out = vec(rec.M.raw, 22, op === 'done' ? 480 : 160 + mac.sel.d * 5 + mac.sel.k);
+      }
+    }
     this.G = G;
     return G;
   }
@@ -122,6 +137,11 @@ export class MacView {
     const sel = mac.sel;
     const cell = (c, y, x) => [ox + ((c % Gr.cols) * (Gr.w + Gr.gap) + x) * sc, oy + (Math.floor(c / Gr.cols) * (Gr.h + Gr.gap) + y) * sc];
     g.strokeStyle = COL.amber; g.lineWidth = 1.2;
+    if (Gr.vec) {
+      if (which === 'out' && Gr.idx >= 0) { const [x, y] = cell(0, Math.floor(Gr.idx / Gr.cols), Gr.idx % Gr.cols); g.strokeStyle = COL.amber; g.lineWidth = 1.4; g.strokeRect(x - 1, y - 1, sc + 2, sc + 2); }
+      if (which === 'in') text(g, `全部 ${mac.n} 个都参与`, r.x + r.w / 2, r.y + r.h + 14, { size: 9.5, color: COL.dim, align: 'center' });
+      return;
+    }
     if (which === 'out') {
       const [x, y] = cell(mac.op === 'd4' ? 0 : sel.c, sel.y, sel.x);
       g.strokeRect(x - 1, y - 1, sc + 2, sc + 2);

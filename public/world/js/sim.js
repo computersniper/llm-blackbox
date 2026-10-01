@@ -18,7 +18,7 @@ export class Sim {
     this.m = model;
     this.mode = 'open';
     this.tau = 1;
-    this.auto = 'off';
+    this.auto = 'heur';
     this.rand = mulberry(dreamSeed);
     this.game = new Game(seed);
     this.hist = [];

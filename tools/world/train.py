@@ -327,7 +327,7 @@ def dream_rollouts(rnn, Wc, z0, steps, tau, dev, gen):
         a = torch.einsum('bi,bia->ba', feat, Wr).argmax(-1)
         (logpi, m, ls, dl), (h, c) = rnn(z[:, None], a[:, None], (h, c))
         logpi, m, ls, dl = logpi[:, 0], m[:, 0], ls[:, 0], dl[:, 0]
-        died = torch.rand(P * N, device=dev, generator=gen) < torch.sigmoid(dl)
+        died = dl > 0          # 撞车概率超过 50% 就算这一局梦结束（和网页里的梦一致）
         life += alive
         alive = alive * (~died).float()
         k = torch.distributions.Categorical(logits=logpi / tau).sample()
@@ -448,8 +448,8 @@ def main():
     ap.add_argument('--vae-wob', type=float, default=6.0)
     ap.add_argument('--vae-wcar', type=float, default=2.0)
     ap.add_argument('--tag', default='')
-    ap.add_argument('--rnn-iters', type=int, default=6000)
-    ap.add_argument('--ctrl-gens', type=int, default=120)
+    ap.add_argument('--rnn-iters', type=int, default=20000)
+    ap.add_argument('--ctrl-gens', type=int, default=200)
     args = ap.parse_args()
     os.makedirs(args.work, exist_ok=True)
     dev = 'cuda'
@@ -463,7 +463,7 @@ def main():
     if st in ('all', 'rnn'):
         train_rnn(args.work, dev, args.rnn_iters, 256, 96)
     if st in ('all', 'ctrl'):
-        train_ctrl(args.work, dev, args.ctrl_gens, 48, 16, 300, 1.0)
+        train_ctrl(args.work, dev, args.ctrl_gens, 64, 16, 300, 1.15)
     if st in ('all', 'export'):
         export(args.work, args.out, dev)
     print(f'共 {time.time() - t0:.0f} 秒，显存峰值 {torch.cuda.max_memory_allocated() / 2**30:.2f} GB')

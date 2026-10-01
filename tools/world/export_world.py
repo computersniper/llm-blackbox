@@ -1,7 +1,7 @@
 """把训练好的世界模型导出给网页（train.py --stage export 调用）。
 
 public/world/data/
-  model.bin(.gz)   全部权重，float16 连续存放（V 编码器 / 解码器、M 的 LSTM 和 MDN 头、C）
+  model.bin        全部权重，float16 连续存放（V 编码器 / 解码器、M 的 LSTM 和 MDN 头、C；gzip 只能压 7%，不另存 .gz）
   model.json(.gz)  每个张量的形状和偏移；训练记录（采集、V、M、C 的设置、耗时、损失曲线）；
                    潜变量每一维的统计和“含义”（和游戏状态的相关）；测试集样例；梦与现实的平均差异曲线
 tools/world/ref/   给 check_nn.mjs 用的参考输出：用存成 float16 再读回来的权重，在 CPU 上 float32 前向
@@ -20,7 +20,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from game import PALETTE, Game  # noqa: E402
+from game import PALETTE, Game, heuristic  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 Z, NA, HID, KMIX = 32, 3, 256, 5
@@ -61,6 +61,7 @@ def corr(a, b):
 
 def export_all(work, out_dir, dev, VAE, MDNRNN, to_rgb):
     t0 = time.time()
+    torch.manual_seed(0)
     os.makedirs(out_dir, exist_ok=True)
     vae = VAE(); vae.load_state_dict(torch.load(os.path.join(work, 'vae.pt'), map_location='cpu'))
     rnn = MDNRNN(); rnn.load_state_dict(torch.load(os.path.join(work, 'rnn.pt'), map_location='cpu'))
@@ -88,7 +89,11 @@ def export_all(work, out_dir, dev, VAE, MDNRNN, to_rgb):
             pad = 4 - off % 4
             chunks.append(b'\0' * pad)
             off += pad
-    gz_write(os.path.join(out_dir, 'model.bin'), b''.join(chunks))
+    # float16 权重几乎压不动（gzip 只小 7%），只存一份原始文件
+    with open(os.path.join(out_dir, 'model.bin'), 'wb') as f:
+        f.write(b''.join(chunks))
+    if os.path.exists(os.path.join(out_dir, 'model.bin.gz')):
+        os.remove(os.path.join(out_dir, 'model.bin.gz'))
     n_params = int(sum(np.prod(t['shape']) for t in tensors.values()))
 
     D = np.load(os.path.join(work, 'data.npz'))
@@ -127,6 +132,59 @@ def export_all(work, out_dir, dev, VAE, MDNRNN, to_rgb):
         dims.append({'kl': round(float(kl[d]), 4), 'mean': round(float(mu_all[:, d].mean()), 4), 'std': round(float(mu_all[:, d].std()), 4),
                      'lo': round(float(np.percentile(mu_all[:, d], 1)), 3), 'hi': round(float(np.percentile(mu_all[:, d], 99)), 3),
                      'feat': best[1], 'corr': round(best[0], 3)})
+    # ---------------- 每一维“扫一遍”：只改这一维（数据里 1%–99% 分位），其余固定为某一帧的 μ，解码，
+    # 在解码出来的画面上量：小车在哪、三段路的中心在哪、抛锚车有多少 / 在哪。取 32 帧做底，看哪样东西跟着变得最多
+    rngs = np.random.default_rng(11)
+    bases = torch.from_numpy(mu_all[rngs.choice(len(mu_all), 32, replace=False)]).float().to(dev)
+    xs = torch.arange(64, device=dev).float()
+
+    def centroid(w, axis):
+        m = w.sum((1, 2))
+        pos = (w * (xs[None, None, :] if axis == 'x' else xs[None, :, None])).sum((1, 2)) / m.clamp(min=1e-6)
+        return pos, m
+
+    def props(y):
+        r, gg, b = y[:, 0], y[:, 1], y[:, 2]
+        car = F.relu(gg - r - 0.3)
+        car[:, :44] = 0; car[:, 61:] = 0
+        road = F.relu(b - gg - 0.015)
+        ob = F.relu(r - gg - 0.2)
+        out = {}
+        out['car_x'], _ = centroid(car, 'x')
+        for name, (a, z_) in {'road_far': (0, 16), 'road_mid': (24, 40), 'road_near': (48, 64)}.items():
+            w = road.clone(); w[:, :a] = 0; w[:, z_:] = 0
+            out[name], _ = centroid(w, 'x')
+        out['ob_x'], mob = centroid(ob, 'x')
+        out['ob_y'], _ = centroid(ob, 'y')
+        out['ob_amt'] = mob / 6.0     # 一辆抛锚车解码出来大约是这么多
+        return out, mob
+
+    SWEEP_N = 9
+    sweep_lab = {'car_x': '小车左右', 'road_far': '远处的路左右', 'road_mid': '中段的路左右', 'road_near': '车旁的路左右', 'ob_x': '抛锚车左右', 'ob_y': '抛锚车上下', 'ob_amt': '抛锚车有没有'}
+    with torch.no_grad():
+        for d in range(Z):
+            info = dims[d]
+            if info['kl'] < 0.02:
+                info['sweep'] = None
+                continue
+            vals = torch.linspace(info['lo'], info['hi'], SWEEP_N, device=dev)
+            zz = bases[:, None, :].repeat(1, SWEEP_N, 1)
+            zz[:, :, d] = vals[None]
+            y = vg.decode(zz.view(-1, Z))
+            pr, mob = props(y)
+            eff = {}
+            for k, v in pr.items():
+                v = v.view(32, SWEEP_N)
+                if k in ('ob_x', 'ob_y'):
+                    ok = (mob.view(32, SWEEP_N) > 3).all(1)    # 整条扫描里都看得见抛锚车的底，才量它的位置
+                    eff[k] = float((v[ok].max(1).values - v[ok].min(1).values).mean()) if ok.sum() >= 4 else 0.0
+                elif k == 'ob_amt':
+                    eff[k] = float((v.max(1).values - v.min(1).values).mean()) * 8   # 一辆车的出现 / 消失算 8 个像素的变化
+                else:
+                    eff[k] = float((v.max(1).values - v.min(1).values).mean())
+            best = max(eff, key=eff.get)
+            info['sweep'] = {'feat': best, 'label': sweep_lab[best], 'px': round(eff[best] / (8 if best == 'ob_amt' else 1), 2), 'all': {k: round(v, 2) for k, v in eff.items()}}
+
     # 从 32 个数线性读出各个游戏状态（最小二乘，留出最后 2% 的局检验）
     split = int(starts[n_ep - n_test])
     X = np.concatenate([mu_all, np.ones((len(mu_all), 1))], 1)
@@ -227,48 +285,58 @@ def export_all(work, out_dir, dev, VAE, MDNRNN, to_rgb):
     gz_write(os.path.join(out_dir, 'model.json'), js)
 
     # ---------------- 参考输出（CPU float32 + float64）
+    # 输入是现场重新玩出来的一局（种子 + 启发式司机的动作），JS 那边用 game.js 重放出同样的画面，不用存画面本身。
+    # 大的张量只存等间隔抽出来的约 3000 个元素（文件小，照样能逐元素核对）
     ref_dir = os.path.join(HERE, 'ref')
     os.makedirs(ref_dir, exist_ok=True)
-    e0 = n_ep - 3
-    s = int(starts[e0])
-    T_SEQ = min(30, int(starts[e0 + 1] - starts[e0] - 1))
-    ids = [s, s + T_SEQ // 2, s + T_SEQ]
-    arrays, refmeta = [], {'frames': [], 'acts': acts[s:s + T_SEQ].astype(int).tolist(), 'T': T_SEQ, 'arrays': {}}
+    REF_SEED, T_SEQ = 424242, 16
+    g = Game(REF_SEED)
+    seq_frames, seq_acts = [g.render()], []
+    for _t in range(T_SEQ):
+        a = heuristic(g)
+        seq_acts.append(a)
+        g.step(a)
+        seq_frames.append(g.render())
+    seq_frames = np.stack(seq_frames)
+    ids = [0, T_SEQ // 2, T_SEQ]
+    arrays, refmeta = [], {'seed': REF_SEED, 'acts': seq_acts, 'T': T_SEQ, 'ids': ids, 'arrays': {}}
     off2 = 0
 
     def put(name, t):
         nonlocal off2
-        a = np.asarray(t, dtype=np.float32).ravel()
-        refmeta['arrays'][name] = {'offset': off2, 'n': int(a.size)}
-        arrays.append(a.tobytes()); off2 += a.nbytes
+        a = np.asarray(t.detach().cpu().double().numpy() if torch.is_tensor(t) else t, dtype=np.float64).ravel()
+        step = max(1, int(math.ceil(a.size / 3000)))
+        sub = a[::step].astype(np.float32)
+        refmeta['arrays'][name] = {'offset': off2, 'n': int(sub.size), 'size': int(a.size), 'step': step}
+        arrays.append(sub.tobytes()); off2 += sub.nbytes
 
-    def run(model_v, model_m, dtype, tag):
+    def run(model_v, model_m, dtype, tag, full):
         with torch.no_grad():
-            x = to_rgb(torch.from_numpy(frames[ids]), pal).to(dtype)
+            x = to_rgb(torch.from_numpy(seq_frames[ids]), pal).to(dtype)
             keep = {}
             mu, lv = model_v.encode(x, keep)
             put(f'{tag}mu', mu); put(f'{tag}lv', lv)
-            put(f'{tag}e1_0', keep['e1'][0]); put(f'{tag}e2_0', keep['e2'][0]); put(f'{tag}e3_0', keep['e3'][0]); put(f'{tag}e4_0', keep['e4'][0])
+            if full:
+                put(f'{tag}e1_0', keep['e1'][0]); put(f'{tag}e2_0', keep['e2'][0]); put(f'{tag}e3_0', keep['e3'][0]); put(f'{tag}e4_0', keep['e4'][0])
             keep = {}
             y = model_v.decode(mu[:2], keep)
-            put(f'{tag}dfc_0', keep['dfc'][0]); put(f'{tag}d1_0', keep['d1'][0]); put(f'{tag}d2_0', keep['d2'][0]); put(f'{tag}d3_0', keep['d3'][0])
+            if full:
+                put(f'{tag}dfc_0', keep['dfc'][0]); put(f'{tag}d1_0', keep['d1'][0]); put(f'{tag}d2_0', keep['d2'][0]); put(f'{tag}d3_0', keep['d3'][0])
             put(f'{tag}y', y)
-            xs = to_rgb(torch.from_numpy(frames[s:s + T_SEQ]), pal).to(dtype)
+            xs = to_rgb(torch.from_numpy(seq_frames[:T_SEQ]), pal).to(dtype)
             zs, _ = model_v.encode(xs)
-            a = torch.from_numpy(acts[s:s + T_SEQ].astype(np.int64))
+            a = torch.tensor(seq_acts, dtype=torch.int64)
             (logpi, m, ls, dl), (h, c) = model_m(zs[None], a[None])
             out, _ = model_m.lstm(torch.cat([zs, F.one_hot(a, NA).to(dtype)], -1)[None])
             put(f'{tag}seq_z', zs); put(f'{tag}seq_h', out[0]); put(f'{tag}seq_c', c[0, 0])
-            raw = model_m.head(out[0])
-            put(f'{tag}seq_head', raw); put(f'{tag}seq_logpi', logpi[0])
-            return y
+            put(f'{tag}seq_head', model_m.head(out[0]))
+            if full:
+                put(f'{tag}seq_logpi', logpi[0])
 
-    refmeta['frames'] = [base64.b64encode(frames[i].tobytes()).decode() for i in ids]
-    refmeta['seq'] = base64.b64encode(frames[s:s + T_SEQ].tobytes()).decode()
-    run(vae, rnn, torch.float32, '')
+    run(vae, rnn, torch.float32, '', True)
     vae64 = VAE().double(); vae64.load_state_dict(vae.state_dict()); vae64.eval()
     rnn64 = MDNRNN().double(); rnn64.load_state_dict(rnn.state_dict()); rnn64.eval()
-    run(vae64, rnn64, torch.float64, 'f64_')
+    run(vae64, rnn64, torch.float64, 'f64_', False)
     with gzip.open(os.path.join(ref_dir, 'ref.bin.gz'), 'wb', compresslevel=9) as f:
         f.write(b''.join(arrays))
     json.dump(refmeta, open(os.path.join(ref_dir, 'ref.json'), 'w'))
@@ -278,3 +346,7 @@ def export_all(work, out_dir, dev, VAE, MDNRNN, to_rgb):
     print('线性读出 R²：', probes)
     print('梦与现实（每像素均方误差）：', {k: (v[:1] + v[9::10] if isinstance(v, list) else v) for k, v in curves.items()})
     print('活跃维度（KL > 0.05）：', sum(d['kl'] > 0.05 for d in dims))
+    for d in sorted(range(Z), key=lambda i: -dims[i]['kl']):
+        if dims[d].get('sweep'):
+            sw = dims[d]['sweep']
+            print(f"  z{d:<2} KL {dims[d]['kl']:.2f}  扫一遍：{sw['label']} {sw['px']}  （{sw['all']}）  相关最大：{dims[d]['feat']} {dims[d]['corr']}")
