@@ -169,7 +169,7 @@ node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # �
 node tools/video/render.mjs events --out tools/video/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events.json --out $O/score.wav
 bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference.mp4 60
-node tools/video/render.mjs poster --t 58.4 --out $O/poster.png
+node tools/video/render.mjs poster --t 60.4 --out $O/poster.png
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
 

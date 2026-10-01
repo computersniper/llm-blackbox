@@ -551,7 +551,7 @@ function seek(t, pre = 8) {
 /* ================================================================ 封面 */
 
 // 封面：渲染第 t 秒的画面，去掉字幕和数据条，叠上片名
-function poster(t = 58.4) {
+function poster(t = 60.4) {
   seek(t);
   for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid', '.band']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
   // 左侧压一层渐变，片名靠左放在上面；右边留给 28 层的逻辑透镜读数

@@ -442,31 +442,36 @@ P1 = ['Dm9', 'Bbmaj7', 'Fmaj7', 'Csus2']
 P2 = ['Dmadd9', 'Gm9', 'Bbmaj7', 'A7sus4']
 
 
-def chord_plan(nbars):
-    """每小节一个和弦（和分镜的段落对齐）"""
+# 每段的和弦进行（按段内的第几小节取；比段落长就循环）
+SEC_CHORDS = {
+    'cold': [None],
+    'title': ['Dm9', 'Dm9', 'Bbmaj7'],
+    'tokenize': P1, 'embed': P1, 'layers1': P1,
+    'dissect': P2,
+    'sample1': ['Bbmaj7', 'Bbmaj7', 'Gm9', 'Gm9', 'A7sus4', 'A'],
+    'loop1': P1,
+    'layersK': ['Bbmaj7', 'C', 'Dm9', 'Bbmaj7', 'C', 'A7sus4'],
+    'sampleK': ['Gm9', 'Gm9', 'A7sus4', 'A'],
+    'loop2': P1,
+    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Dsus2', 'D'],
+}
+
+
+def bar_info(sections):
+    """每一小节：(段名, 段内第几小节, 这段一共几小节)"""
+    out = []
+    for s_ in sections:
+        nb = int(round((s_['t1'] - s_['t0']) / BAR))
+        for k in range(nb):
+            out.append((s_['name'], k, nb))
+    return out
+
+
+def chord_plan(sections):
     plan = []
-    for b in range(nbars):
-        if b < 5:
-            c = None  # 冷开场：只有嗡鸣
-        elif b < 8:
-            c = ['Dm9', 'Dm9', 'Bbmaj7'][b - 5]
-        elif b < 24:
-            c = P1[(b - 8) % 4]
-        elif b < 52:
-            c = P2[(b - 24) % 4]
-        elif b < 57:
-            c = ['Bbmaj7', 'Bbmaj7', 'Gm9', 'A7sus4', 'A'][b - 52]
-        elif b < 63:
-            c = P1[(b - 57) % 4]
-        elif b < 69:
-            c = ['Bbmaj7', 'C', 'Dm9', 'Bbmaj7', 'C', 'A7sus4'][b - 63]
-        elif b < 72:
-            c = ['Gm9', 'A7sus4', 'A'][b - 69]
-        elif b < 79:
-            c = P1[(b - 72) % 4]
-        else:
-            c = ['Bbmaj9', 'Bbmaj9', 'FmajA', 'FmajA', 'Gm9', 'Dsus2', 'D'][min(6, b - 79)]
-        plan.append(c)
+    for name, k, nb in bar_info(sections):
+        seq = SEC_CHORDS.get(name, P1)
+        plan.append(seq[min(k, len(seq) - 1)] if name in ('end', 'sample1', 'sampleK', 'layersK', 'title') else seq[k % len(seq)])
     return plan
 
 
@@ -482,8 +487,10 @@ def section_at(sections, t):
 def compose(ev, out_wav, stems_dir=None):
     sections = ev['score']['sections']
     dur = ev['duration']
-    nbars = int(math.ceil(dur / BAR))
-    plan = chord_plan(nbars)
+    plan = chord_plan(sections)
+    binfo = bar_info(sections)
+    nbars = len(plan)
+    title_t0 = next(s_['t0'] for s_ in sections if s_['name'] == 'title')
     events = ev['events']
     sec = lambda t: section_at(sections, t)['name']
     energy = lambda t: section_at(sections, t)['energy']
@@ -506,7 +513,7 @@ def compose(ev, out_wav, stems_dir=None):
     e = np.clip(t / 4.0, 0, 1) ** 2 * (1 + 0.8 * np.clip((t - 9.5) / 3.0, 0, 1) ** 2)
     e *= np.clip((12.55 - t) / 0.08, 0, 1)
     pad.add(0, (hum + air * 1.6 + shimmer * 1.5) * e * 0.4)
-    fx.add(B(5) - 1.2, reverse_swell(1.2, 0.9))
+    fx.add(title_t0 - 1.2, reverse_swell(1.2, 0.9))
 
     # 2. 铺底和弦：每小节一个，按段落能量调亮度和音量
     for b, c in enumerate(plan):
@@ -585,13 +592,14 @@ def compose(ev, out_wav, stems_dir=None):
         nm = sec(t0 + 0.1)
         kind = {'cold': 'none', 'title': 'none', 'tokenize': 'none', 'embed': 'heart', 'layers1': 'groove', 'dissect': 'half',
                 'sample1': 'heart', 'loop1': 'groove', 'layersK': 'four', 'sampleK': 'heart', 'loop2': 'full', 'end': 'none'}[nm]
-        if nm == 'dissect' and b in (24, 25, 51):
-            kind = 'none'
-        if nm == 'layers1' and b == 15:
+        sname, k_in, nb_in = binfo[b]
+        if nm == 'dissect' and (k_in < 2 or k_in == nb_in - 1):
+            kind = 'none'   # 拆开的头两小节和最后一小节留白
+        if nm == 'layers1' and k_in == 0:
             kind = 'heart'
         drum_bar(b, kind)
         # 进入下一段前一小节：军鼓滚奏
-        if b in (22, 67, 77):
+        if (sname in ('embed', 'layersK') and k_in == nb_in - 1) or (sname == 'loop2' and k_in == 4):
             for k in range(16):
                 drums.add(t0 + k * BEAT / 4, snare(0.15 + 0.5 * k / 16, clap=False), pan=0.05)
         if c and nm not in ('cold', 'title', 'tokenize', 'end'):
@@ -602,7 +610,7 @@ def compose(ev, out_wav, stems_dir=None):
             else:
                 bass.add(t0, bass_note(root, BAR * 0.95, 0.5 if nm == 'dissect' else 0.65))
     # 片尾最后一个低音
-    bass.add(B(84), bass_note(38, 4.5, 0.6))
+    bass.add((nbars - 1) * BAR, bass_note(38, 4.5, 0.6))
 
     # 5. 画面事件 → 音效 / 铃声
     penta = [62, 65, 67, 69, 72, 74, 77, 79, 81, 84, 86, 89]
@@ -664,7 +672,7 @@ def compose(ev, out_wav, stems_dir=None):
 
     # 片尾：最后的大和弦 + 钟
     for i, m in enumerate([62, 69, 74, 78, 81]):
-        bells.add(B(84) + 0.05 * i, bell(m, 6.0, 0.22), pan=-0.4 + 0.2 * i)
+        bells.add((nbars - 1) * BAR + 0.05 * i, bell(m, 6.0, 0.22), pan=-0.4 + 0.2 * i)
 
     # 6. 侧链：底鼓响的时候，铺底 / 贝斯 / 琶音让一让
     duck = np.ones(pad.n)
