@@ -10,45 +10,45 @@ const N_ = (s) => `<span class="nu">${s}</span>`;
 
 export function codeFor(key, R) {
   if (key === 'pipe') return [
-    `base  = ${F_('pretrain')}(随机初始化, 海量文本)  ${C_('每个词元都算损失')}`,
-    `chat  = ${F_('sft')}(base, 对话数据)          ${C_('只对回答算损失')}`,
-    `final = ${F_('align')}(chat, 偏好或奖励)      ${C_('DPO / RLHF / GRPO')}`,
+    `base = ${F_('pretrain')}(随机初始化, 海量文本)`,
+    `chat = ${F_('sft')}(base, 对话)    ${C_('只算回答')}`,
+    `final = ${F_('align')}(chat, 偏好) ${C_('DPO / RL')}`,
   ];
   if (key === 'tiny') {
     const m = R.D.meta;
     return [
-      `model = ${F_('Qwen3ForCausalLM')}(cfg)   ${C_(`${m.model.layers} 层 · ${m.model.hidden} 维 · ${(m.model.params / 1e4).toFixed(0)} 万参数`)}`,
-      `opt = ${F_('AdamW')}(lr=${N_('3e-3')}, betas=(${N_('0.9')}, ${N_('0.95')}), wd=${N_('0.1')})`,
+      `model = ${F_('Qwen3ForCausalLM')}(cfg) ${C_(`${(m.model.params / 1e4).toFixed(0)} 万参数`)}`,
+      `opt = ${F_('AdamW')}(lr=${N_('3e-3')}, wd=${N_('0.1')})`,
       `${K_('for')} step ${K_('in')} ${F_('range')}(${N_(m.train.steps)}):`,
-      `    x = ${F_('next_batch')}()              ${C_(`${m.train.batch} 行 × ${m.train.seq + 1} 字`)}`,
-      `    inp, tgt = x[:, :${N_('-1')}], x[:, ${N_('1')}:]  ${C_('错开一位')}`,
-      `    logits = ${F_('model')}(inp)          ${C_('前向：所有位置一起算')}`,
+      `    x = ${F_('next_batch')}()     ${C_(`${m.train.batch}×${m.train.seq + 1} 字`)}`,
+      `    inp, tgt = x[:, :${N_('-1')}], x[:, ${N_('1')}:]`,
+      `    logits = ${F_('model')}(inp)  ${C_('前向')}`,
       `    loss = ${F_('cross_entropy')}(logits, tgt)`,
-      `    loss.${F_('backward')}()               ${C_('反向传播')}`,
-      `    ${F_('clip_grad_norm_')}(params, ${N_('1.0')})  ${C_('梯度裁剪')}`,
-      `    lr = ${F_('warmup_cosine')}(step)      ${C_('预热 + 余弦退火')}`,
-      `    ${K_('for')} w, g ${K_('in')} params:          ${C_('AdamW：每个权重各算各的')}`,
+      `    loss.${F_('backward')}()      ${C_('反向')}`,
+      `    ${F_('clip_grad_norm_')}(params, ${N_('1.0')})`,
+      `    lr = ${F_('warmup_cosine')}(step)`,
+      `    ${K_('for')} w, g ${K_('in')} params: ${C_('AdamW')}`,
       `        m = β1·m + (${N_('1')}−β1)·g`,
       `        v = β2·v + (${N_('1')}−β2)·g²`,
-      `        m̂ = m/(${N_('1')}−β1ᵗ);  v̂ = v/(${N_('1')}−β2ᵗ)  ${C_('偏差校正')}`,
-      `        w = w − lr·(m̂/(√v̂+ε) + λ·w)  ${C_('更新 + 权重衰减')}`,
+      `        m̂, v̂ = m/(${N_('1')}−β1ᵗ), v/(${N_('1')}−β2ᵗ)`,
+      `        w −= lr·(m̂/(√v̂+ε) + λ·w)`,
     ];
   }
   const m = R.D.meta;
   return [
-    `model = ${F_('from_pretrained')}(<span class="nu">"Qwen3-0.6B"</span>)  ${C_('28 层 · 5.96 亿参数 · fp32')}`,
-    `ids = ${F_('apply_chat_template')}([user, assistant])  ${C_(`${m.ids.length} 个词元`)}`,
-    `labels = ids.${F_('copy')}(); labels[:${N_(m.nPrompt)}] = ${N_('-100')}  ${C_('提示不算损失')}`,
-    `${K_('for')} step ${K_('in')} ${F_('range')}(${N_(m.steps.length)}):          ${C_('同一条对话连走 3 步')}`,
-    `    logits = ${F_('model')}(ids[:${N_('-1')}])     ${C_('前向')}`,
+    `model = ${F_('from_pretrained')}(<span class="nu">"Qwen3-0.6B"</span>)`,
+    `ids = ${F_('apply_chat_template')}(对话) ${C_(`${m.ids.length} 个`)}`,
+    `labels = ${F_('mask_prompt')}(ids)  ${C_('提示 → −100')}`,
+    `${K_('for')} step ${K_('in')} ${F_('range')}(${N_(m.steps.length)}):  ${C_('同一条对话')}`,
+    `    logits = ${F_('model')}(ids[:${N_('-1')}])  ${C_('前向')}`,
     `    loss = ${F_('cross_entropy')}(logits, labels[${N_('1')}:])`,
-    `    loss.${F_('backward')}()               ${C_('反向传播')}`,
-    `    ${F_('clip_grad_norm_')}(params, ${N_('1.0')})  ${C_('梯度裁剪')}`,
-    `    ${K_('for')} w, g ${K_('in')} params:          ${C_('AdamW，lr = 1e-5')}`,
+    `    loss.${F_('backward')}()      ${C_('反向')}`,
+    `    ${F_('clip_grad_norm_')}(params, ${N_('1.0')})`,
+    `    ${K_('for')} w, g ${K_('in')} params: ${C_('lr = 1e-5')}`,
     `        m = β1·m + (${N_('1')}−β1)·g`,
     `        v = β2·v + (${N_('1')}−β2)·g²`,
-    `        m̂ = m/(${N_('1')}−β1ᵗ);  v̂ = v/(${N_('1')}−β2ᵗ)`,
-    `        w = w − lr·(m̂/(√v̂+ε) + λ·w)`,
+    `        m̂, v̂ = m/(${N_('1')}−β1ᵗ), v/(${N_('1')}−β2ᵗ)`,
+    `        w −= lr·(m̂/(√v̂+ε) + λ·w)`,
   ];
 }
 

@@ -23,16 +23,16 @@ export class AdamView {
       this.W = 1160;
     } else {
       this.chips = { x: 0, y: 64, w: 380 };
-      this.form = { x: 0, y: 150, w: 380, h: 560 };
-      this.hist = { x: 0, y: 724, w: 380, h: 470 };
-      this.bits = { x: 0, y: 1208, w: 380, h: 600 };
+      this.form = { x: 0, y: 150, w: 380, h: 500 };
+      this.hist = { x: 0, y: 664, w: 380, h: 470 };
+      this.bits = { x: 0, y: 1148, w: 380, h: 600 };
       this.W = 380;
     }
   }
 
   focus(st) {
     if (st.step.mi) { const b = this.bits; return { x: b.x - 12, y: b.y - 12, w: b.w + 24, h: b.h + 24 }; }
-    return this.portrait ? { x: -6, y: 0, w: 392, h: 720 } : { x: -12, y: 0, w: 1184, h: 640 };
+    return this.portrait ? { x: -6, y: 50, w: 392, h: 606 } : { x: -12, y: 0, w: 1184, h: 640 };
   }
 
   draw(g, st, env) {
@@ -72,7 +72,7 @@ export class AdamView {
       { sub: 'dw', k: 'Δw', l: `−lr·m̂/(√v̂+ε) − lr·λ·w = ${sciSup(adamPart, 3)} ${decay >= 0 ? '+' : '−'} ${sciSup(Math.abs(decay), 3)}`, r: `Δw = ${sciSup(adamPart + decay, 4)}` },
       { sub: 'write', k: '写回', l: `w′ = ${num(a.w0, 8)} + (${sciSup(a.w1 - a.w0, 3)})`, r: `= ${num(a.w1, 8)}` },
     ];
-    const x0 = C.x + 16, lh = P ? 64 : 58;
+    const x0 = C.x + 16, lh = P ? 56 : 58;
     let y = C.y + 76;
     text(g, `lr = ${sciSup(lr, 3)}　β₁ = 0.9　β₂ = 0.95　ε = 10⁻⁸　λ = ${a.wd}　t = ${t}`, x0, y - 8, { size: 10.5, kind: 'mono', color: COL.dim, max: C.w - 32 });
     y += 10;

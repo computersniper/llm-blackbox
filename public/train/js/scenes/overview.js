@@ -76,7 +76,7 @@ export class Overview {
   }
 
   focus() {
-    return this.portrait ? { x: -6, y: -6, w: 392, h: 830 } : { x: -12, y: -12, w: 1264, h: 822 };
+    return this.portrait ? { x: -6, y: -6, w: 392, h: 606 } : { x: -12, y: -12, w: 1264, h: 822 };
   }
 
   // 播放头所在的“连续”步数：两个检查点之间按进度插值
@@ -169,7 +169,7 @@ export class Overview {
     for (const [tt, s] of marks) {
       g.strokeStyle = 'rgba(255,182,92,0.25)';
       g.beginPath(); g.moveTo(X(tt), ly0); g.lineTo(X(tt), ly1); g.stroke();
-      text(g, s, X(tt) + 4, ly0 + 10, { size: 9, color: 'rgba(255,182,92,0.6)' });
+      text(g, s, X(tt) + 4, ly1 - 6, { size: 9, color: 'rgba(255,182,92,0.6)' });
     }
     g.setLineDash([]);
     // 起点：均匀猜 = ln(词表大小)
@@ -178,7 +178,7 @@ export class Overview {
     g.setLineDash([2, 3]);
     g.beginPath(); g.moveTo(px, Y(lnV)); g.lineTo(px + pw, Y(lnV)); g.stroke();
     g.setLineDash([]);
-    text(g, `瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, px + pw, Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)', align: 'right' });
+    text(g, `瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, X(this.S * 0.5), Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)' });
 
     const tEnd = Math.max(1, Math.round(t));
     // 原始损失（每一步，淡）+ 平滑损失（亮）
@@ -404,7 +404,7 @@ export class Overview {
       const ch = D.pcaChars[n] === '<|endoftext|>' ? '⏎' : D.pcaChars[n];
       const gi = this.groupOf.get(ch);
       if (gi != null) labels.push([px, py, ch, GROUPS[gi].color]);
-      else if (n <= 24) labels.push([px, py, ch, COL.ink2]);
+      else if (n <= 12) labels.push([px, py, ch, COL.ink2]);
       else dot(g, px, py, 1.3, 'rgba(180,190,210,0.35)');
     }
     for (const [px, py, ch, c] of labels) text(g, ch, px, py + 4, { size: 11, color: c, align: 'center', weight: 600 });

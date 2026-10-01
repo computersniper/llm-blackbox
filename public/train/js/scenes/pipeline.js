@@ -23,7 +23,7 @@ export class Pipeline {
   focus(st) {
     if (!this.portrait) return { x: -16, y: -6, w: this.W + 32, h: 604 };
     const c = this.cards[st.step.st];
-    return { x: -8, y: Math.min(0, c.y - 110), w: 396, h: c.y + c.h + 12 - Math.min(0, c.y - 110) };
+    return { x: -8, y: c.y - 10, w: 396, h: c.h + 20 };
   }
 
   draw(g, st, env) {

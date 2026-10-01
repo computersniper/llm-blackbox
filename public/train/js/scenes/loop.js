@@ -21,9 +21,9 @@ export class Loop {
       this.panel = { x: 600, y: 40, w: 600, h: 560 };
       this.bounds = { x: 0, y: 20, w: 1210, h: 600 };
     } else {
-      this.ring = { cx: 190, cy: 200, rx: 140, ry: 140, r: 40 };
-      this.panel = { x: 0, y: 400, w: 380, h: 640 };
-      this.bounds = { x: -6, y: 20, w: 392, h: 1030 };
+      this.ring = { cx: 190, cy: 150, rx: 128, ry: 112, r: 34 };
+      this.panel = { x: 0, y: 290, w: 380, h: 560 };
+      this.bounds = { x: -6, y: 14, w: 392, h: 640 };
     }
   }
 
@@ -122,7 +122,7 @@ export class Loop {
     const R = this.R, k = st.k, C = this.panel, T = R.kind === 'tiny';
     const titles = { batch: '这一步的数据', fwd: '前向：每个位置同时预测下一个', loss: '损失：猜中正确答案的概率', bwd: '反向：梯度流回到每个输入位置', upd: '更新：每个权重挪一小步', check: '重新前向：同一批数据，更新前后' };
     card(g, C.x, C.y, C.w, C.h, { eyebrow: T ? `BATCH ROW 0 · 第 0 行的前 ${R.rowLen} 个位置` : `CONVERSATION · ${R.rowLen + 1} 个词元`, title: titles[ph] || '', accent: COL.cyan, demo: ph === 'check' });
-    const rows = rowLayout(g, R, k, C.x + 16, C.y + 64, C.w - 32, T ? { tile: this.portrait ? 34 : 38, th: 42, gap: 4, lineGap: 18 } : { tile: 34, th: 42, gap: 5, lineGap: 22 });
+    const rows = rowLayout(g, R, k, C.x + 16, C.y + 64, C.w - 32, T ? { tile: this.portrait ? 30 : 38, th: this.portrait ? 36 : 42, gap: this.portrait ? 3 : 4, lineGap: this.portrait ? 14 : 18 } : { tile: 34, th: this.portrait ? 36 : 42, gap: 5, lineGap: this.portrait ? 18 : 22 });
     // 反向用：嵌入处每个位置的梯度（对数刻度）
     let gmax = 1e-30;
     if (ph === 'bwd') for (let i = 0; i < R.rowLen; i++) gmax = Math.max(gmax, R.residGrad(k, 0, i));

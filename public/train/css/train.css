@@ -101,7 +101,7 @@ button { font: inherit; color: inherit; }
 .follow:hover, .hint-btn:hover { color: var(--ink); border-color: var(--line3); }
 .hint-btn { margin-left: auto; }
 kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; border-radius: 5px; border: 1px solid var(--line3); border-bottom-width: 2px; font-family: var(--mono); font-size: 10.5px; line-height: 17px; text-align: center; color: var(--ink); background: rgba(255, 255, 255, .04); }
-.stage-hint { position: absolute; z-index: 7; left: 50%; top: 64px; transform: translate(calc(-50% - var(--dbg-w) / 2), -8px); width: min(560px, calc(100% - var(--dbg-w) - 60px)); display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 12px 16px; border-radius: 14px; background: rgba(8, 14, 28, .94); border: 1px solid var(--line2); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); font-size: 12.5px; color: var(--ink2); opacity: 0; pointer-events: none; transition: opacity .35s, transform .45s var(--ease); }
+.stage-hint { position: absolute; z-index: 7; left: 50%; bottom: 128px; transform: translate(calc(-50% - var(--dbg-w) / 2), -8px); width: min(560px, calc(100% - var(--dbg-w) - 60px)); display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 12px 16px; border-radius: 14px; background: rgba(8, 14, 28, .94); border: 1px solid var(--line2); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); font-size: 12.5px; color: var(--ink2); opacity: 0; pointer-events: none; transition: opacity .35s, transform .45s var(--ease); }
 .stage-hint.on { opacity: 1; transform: translate(calc(-50% - var(--dbg-w) / 2), 0); }
 .stage-hint b { width: 100%; font-family: var(--serif); font-weight: 600; font-size: 14px; color: var(--ink); }
 .stage-hint .sep { width: 100%; height: 0; }
@@ -240,14 +240,24 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
   .runs button { padding: 4px 9px; }
   .stage-hint { transform: translate(-50%, -8px); width: calc(100% - 24px); top: 64px; }
   .stage-hint.on { transform: translate(-50%, 0); }
-  .dbg { top: auto; left: 10px; right: 10px; width: auto; bottom: 128px; max-height: 42vh; }
-  .dbg.folded { bottom: 128px; }
+  .dbg { top: auto; left: 10px; right: 10px; width: auto; bottom: 100px; max-height: 42vh; }
+  .dbg.folded { bottom: 100px; }
+  .dbg-h { padding: 8px 12px; }
   .ctl { left: 8px; right: 8px; bottom: 8px; }
   .ctl-bar { flex-wrap: wrap; justify-content: center; gap: 6px 10px; padding: 7px; }
   .ctl-depth, .ctl-play { padding-right: 8px; }
-  .ctl-speed button { min-width: 32px; padding: 0 3px; }
+  .ctl-speed button { min-width: 44px; padding: 0 3px; }
+  .ctl-speed button:not(.on) { display: none; }
+  .ctl-speed button.on::after { content: " ›"; opacity: .6; }
+  .ctl-bar { flex-wrap: nowrap; gap: 6px; }
+  .ctl-depth, .ctl-play { padding-right: 6px; }
+  .ctl-dname { min-width: 70px; font-size: 11.5px; }
+  .ctl-btn { width: 32px; height: 32px; }
+  .ctl-btn.big { width: 40px; height: 40px; }
   .ctl-pos { display: none; }
-  #toasts { left: 10px; bottom: auto; top: calc(var(--top) + 64px); flex-direction: column; }
+  #toasts { left: 10px; right: 10px; width: auto; top: auto; bottom: 160px; flex-direction: column; }
+  .toast { padding: 7px 10px; }
+  .t-title { font-size: 14px; }
 }
 @media (max-width: 420px) {
   .site-nav a { padding: 3px 6px; font-size: 11.5px; }

@@ -90,7 +90,7 @@ async function boot() {
   tl.toPipeline(0);
   renderRuns();
   $('#loading').hidden = true;
-  if (!store.hinted) { store.hinted = true; save(); setTimeout(() => showHint(true), 2200); }
+  if (!store.hinted && !matchMedia('(max-width: 900px)').matches) { store.hinted = true; save(); setTimeout(() => showHint(true), 2200); }
   if (new URLSearchParams(location.search).has('autoplay')) tl.play();
 }
 
@@ -285,7 +285,8 @@ function discover(id) {
   t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
-  while (box.children.length > 3) box.lastElementChild.remove();
+  const maxToasts = matchMedia('(max-width: 900px)').matches ? 1 : 3;
+  while (box.children.length > maxToasts) box.lastElementChild.remove();
   setTimeout(() => t.classList.add('out'), 5000);
   setTimeout(() => t.remove(), 5700);
   renderCodexCount();
@@ -324,7 +325,7 @@ function updateInsets() {
   const dbg = $('#dbg');
   const folded = dbg.classList.contains('folded');
   const ctlH = $('#ctl').offsetHeight + 22;
-  stage.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? (folded ? ctlH + 44 : dbg.offsetHeight + ctlH + 16) : ctlH, 56);
+  stage.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH, 56);
 }
 addEventListener('resize', () => updateInsets());
 

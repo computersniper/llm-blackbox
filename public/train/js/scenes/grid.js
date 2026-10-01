@@ -41,7 +41,7 @@ export class Grid {
   }
 
   focus() {
-    if (this.portrait) return { x: -6, y: -6, w: Math.max(392, this.W + 12), h: Math.min(this.H + 12, 900) };
+    if (this.portrait) return { x: -6, y: -6, w: Math.max(392, this.W + 12), h: Math.min(this.H + 12, 600) };
     return { x: -12, y: -12, w: this.W + 24, h: this.H + 24 };
   }
 

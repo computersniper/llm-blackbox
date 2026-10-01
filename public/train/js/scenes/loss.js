@@ -13,8 +13,12 @@ export class LossView {
 
   focus(st) {
     const P = this.portrait;
-    if (st.step.mi) return P ? { x: -6, y: this.detailY - 10, w: 392, h: 1040 } : { x: -12, y: this.detailY - 16, w: 1124, h: 400 };
-    return P ? { x: -6, y: -6, w: 392, h: (this.detailY || 500) + 420 } : { x: -12, y: -12, w: 1124, h: (this.detailY || 400) + 400 };
+    if (st.step.mi) {
+      if (!P) return { x: -12, y: this.detailY - 16, w: 1124, h: 400 };
+      const j = ['softmax', 'pick', 'log'].indexOf(st.step.mi);
+      return { x: -6, y: this.detailY + j * 334 - 10, w: 392, h: 340 };
+    }
+    return P ? { x: -6, y: -6, w: 392, h: (this.detailY || 500) + 20 } : { x: -12, y: -12, w: 1124, h: (this.detailY || 400) + 400 };
   }
 
   draw(g, st, env) {

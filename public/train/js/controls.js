@@ -23,7 +23,14 @@ export class Controls {
     });
     const sp = $('#speeds');
     sp.innerHTML = SPEEDS.map((s) => `<button type="button" data-s="${s}" role="radio">${s}×</button>`).join('');
-    sp.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) h.speed(Number(b.dataset.s)); });
+    sp.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      const s = Number(b.dataset.s);
+      // 窄屏只露出当前倍速：点它就换到下一档
+      if (b.classList.contains('on') && matchMedia('(max-width: 900px)').matches) h.speed(SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length]);
+      else h.speed(s);
+    });
     $('#track').addEventListener('click', (e) => { const i = e.target.closest('i'); if (i) h.seek(Number(i.dataset.i), i.dataset.kind); });
     $('#track').addEventListener('pointerover', (e) => { const i = e.target.closest('i'); if (i) i.title = i.dataset.l; });
     $('#crumbs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) h.depth(Number(b.dataset.d)); });
