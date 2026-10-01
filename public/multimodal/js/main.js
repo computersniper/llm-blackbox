@@ -7,6 +7,7 @@ import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc, tokPlain, fmtPct, sleep } from '../../js/ui.js';
+import { initPanes } from '../../js/resize.js';
 
 const KEY = 'blackbox:mm:v1';
 const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记', img: '视觉词元' };
@@ -416,6 +417,7 @@ function bindChrome() {
   $('#btnFollow').addEventListener('click', () => { engine?.exitFree(); sfx.click(); });
   $('#btnHint').addEventListener('click', () => showHint(!$('#stageHint').classList.contains('on')));
   $('#btnMonFold').addEventListener('click', () => updateInsets());
+  initPanes('mm', { left: { el: '#chat', v: '--chat-w', name: '聊天栏' }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 600, onChange: updateInsets });
 }
 
 function bindKeys() {
