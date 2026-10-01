@@ -124,7 +124,8 @@ def main():
         vocab_size=V, hidden_size=a.hidden, intermediate_size=a.hidden * 3, num_hidden_layers=a.layers,
         num_attention_heads=4, num_key_value_heads=2, head_dim=a.hidden // 4, max_position_embeddings=256,
         rope_theta=10000.0, rms_norm_eps=1e-6, tie_word_embeddings=True, attention_bias=False, attention_dropout=0.0,
-        bos_token_id=0, eos_token_id=0, pad_token_id=0, initializer_range=0.02, use_cache=False,
+        # 和 Qwen3-0.6B 一样不设 pad：设了的话 0 号（<|endoftext|>）的嵌入会被初始化成 0 且永远不更新
+        bos_token_id=0, eos_token_id=0, pad_token_id=None, initializer_range=0.02, use_cache=False,
     )
     model = Qwen3ForCausalLM(cfg).to(dev)
     model.set_attn_implementation('eager')   # 要拿到注意力权重
@@ -503,7 +504,7 @@ def main():
         'kind': 'tiny',
         'model': {
             'arch': 'Qwen3ForCausalLM', 'layers': NL, 'hidden': cfg.hidden_size, 'heads': H, 'kvHeads': cfg.num_key_value_heads,
-            'headDim': cfg.head_dim, 'ffn': cfg.intermediate_size, 'vocab': V, 'ropeTheta': cfg.rope_theta, 'eps': cfg.rms_norm_eps,
+            'headDim': cfg.head_dim, 'ffn': cfg.intermediate_size, 'vocab': V, 'ropeTheta': cfg.rope_parameters['rope_theta'], 'eps': cfg.rms_norm_eps,
             'tied': True, 'params': n_params, 'embedParams': n_embed, 'init': 'normal(0, 0.02)',
         },
         'train': {
