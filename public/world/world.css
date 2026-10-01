@@ -1,0 +1,102 @@
+/* ============================================================
+   揭开黑箱 · 世界模型：真实世界和模型的梦并排跑，再一层层揭开
+   复用 ../css/app.css 的配色、顶栏、调试器、控制条、算式板、图鉴；舞台是可以平移缩放的 2D 画布（同训练页）
+   ============================================================ */
+
+:root { --dbg-w: 340px; }
+
+/* ---------------- 布局 ---------------- */
+
+.w-app { position: fixed; z-index: 5; top: var(--top); left: 0; right: 0; bottom: 0; }
+.w-app .stage { position: absolute; inset: 0; opacity: 1; pointer-events: auto; background: transparent; }
+.w-app .gl canvas { touch-action: none; }
+.gl.grabbing canvas { cursor: grabbing; }
+.w-app .stage-top { z-index: 6; }
+.w-app .stage-top > * { pointer-events: auto; }
+.w-app .hint-btn { margin-left: auto; }
+
+/* 章节切换（样式同训练页的两段训练切换） */
+.chap { display: flex; gap: 3px; padding: 3px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.chap button { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; padding: 5px 11px; border-radius: 11px; border: 1px solid transparent; background: none; cursor: pointer; color: var(--dim); text-align: left; transition: color .2s, background .2s, border-color .2s; }
+.chap button b { font-size: 12.5px; font-weight: 600; }
+.chap button span { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; }
+.chap button:hover { color: var(--ink); }
+.chap button.on { color: var(--ink); background: rgba(94, 240, 212, .08); border-color: rgba(94, 240, 212, .4); }
+.chap button.on span { color: var(--acc); }
+
+/* ---------------- D1 的开关 ---------------- */
+
+.play-ui { position: absolute; z-index: 6; top: 64px; left: 14px; right: calc(var(--dbg-w) + 28px); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; pointer-events: none; }
+.play-ui > * { pointer-events: auto; }
+body:not(.w-play) .play-ui, body:not(.w-play) .pad, body.w-probe .play-ui, body.w-probe .pad { display: none; }
+.seg { display: inline-flex; padding: 2px; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.seg button { height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: none; color: var(--dim); font-size: 12.5px; cursor: pointer; transition: color .2s, background .2s; white-space: nowrap; }
+.seg button:hover { color: var(--ink); }
+.seg button.on { color: #04121a; background: var(--acc); font-weight: 600; }
+#segEye button[data-eye="closed"].on { background: var(--amber); color: #1d1306; }
+.pbtn { height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink2); font-size: 12.5px; cursor: pointer; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: border-color .2s, color .2s; white-space: nowrap; }
+.pbtn:hover { color: var(--ink); border-color: var(--line3); }
+.tau { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink2); font-size: 12.5px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.tau input { width: 96px; accent-color: var(--amber); }
+.tau b { font-weight: 400; color: var(--amber); min-width: 2.6em; }
+
+/* 方向键：桌面上是左下角两个小按钮，手机上是两侧的大按钮 */
+.pad { position: absolute; z-index: 6; left: 14px; bottom: 112px; display: flex; gap: 8px; }
+.pad button { width: 48px; height: 40px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink2); font-size: 16px; cursor: pointer; touch-action: none; user-select: none; -webkit-user-select: none; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); transition: background .15s, border-color .15s, color .15s; }
+.pad button:hover { color: var(--ink); border-color: var(--line3); }
+.pad button.on { background: rgba(255, 182, 92, .2); border-color: rgba(255, 182, 92, .7); color: var(--amber); }
+
+/* ---------------- 第二章 ---------------- */
+
+.probe-host { position: absolute; z-index: 3; top: 64px; left: 14px; right: calc(var(--dbg-w) + 28px); bottom: 104px; }
+body.dbg-folded .probe-host { right: 14px; }
+body.w-probe .gl, body.w-probe .ctl-play, body.w-probe .ctl-speed, body.w-probe .ctl-pos, body.w-probe .ctl-track, body.w-probe #btnFollow { visibility: hidden; }
+body.w-probe .ctl-depth { border-right: 0; padding-right: 0; }
+.probe-soon { height: 100%; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 24px; text-align: center; border-radius: 16px; border: 1px dashed var(--line2); background: rgba(5, 11, 23, .7); }
+.probe-soon h2 { margin: 2px 0 6px; font-family: var(--serif); font-weight: 900; font-size: 26px; letter-spacing: .04em; color: var(--ink); }
+.probe-soon p { max-width: 520px; margin: 0; font-size: 14px; line-height: 1.75; color: var(--ink2); }
+.probe-soon .soon { margin-top: 12px; padding: 4px 14px; border-radius: 999px; border: 1px dashed rgba(255, 182, 92, .6); color: var(--amber); font-size: 13px; }
+
+/* ---------------- 提示、算式板 ---------------- */
+
+.w-app .stage-hint { top: auto; bottom: 120px; }
+#toasts { left: 16px; right: auto; top: auto; bottom: 120px; flex-direction: column-reverse; }
+.toast { padding: 9px 12px; }
+.toast .t-text { display: none; }
+@keyframes toastin { from { opacity: 0; transform: translateX(-40px) scale(.96); } }
+@keyframes toastout { to { opacity: 0; transform: translateX(-40px); } }
+.w-app .board { bottom: 104px; max-height: min(400px, calc(100% - 360px)); }
+body.has-board .pad { display: none; }
+.board .bd-big { font-size: 13.5px; }
+.board .bd-tr .i { font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------------- 窄屏 ---------------- */
+
+@media (max-width: 1180px) {
+  .chap button span { display: none; }
+  .tau input { width: 72px; }
+}
+@media (max-width: 900px) {
+  .w-app .stage-top { right: 10px; left: 10px; top: 8px; }
+  .chap { width: 100%; }
+  .chap button { flex: 1; align-items: center; padding: 5px 6px; }
+  .chap button b { font-size: 12px; }
+  .play-ui { top: 52px; left: 8px; right: 8px; gap: 6px; }
+  .seg button { height: 26px; padding: 0 9px; font-size: 12px; }
+  .pbtn { height: 30px; padding: 0 10px; font-size: 12px; }
+  .tau { height: 30px; padding: 0 10px; gap: 6px; font-size: 12px; }
+  .tau span { display: none; }
+  .tau input { width: 64px; }
+  .pad { left: 8px; right: 8px; bottom: 112px; justify-content: space-between; pointer-events: none; }
+  .pad button { pointer-events: auto; width: 76px; height: 54px; border-radius: 16px; font-size: 20px; background: rgba(10, 17, 31, .86); }
+  .probe-host { top: 52px; left: 8px; right: 8px; bottom: 150px; }
+  .w-app .dbg { bottom: 100px; }
+  .w-app .dbg.folded { bottom: 100px; }
+  .w-app .stage-hint { bottom: 170px; top: auto; }
+  #toasts { left: 10px; right: 10px; width: auto; bottom: 160px; }
+  .w-app .board { top: 52px; bottom: auto; max-height: min(42vh, 340px); }
+}
+@media (max-width: 420px) {
+  .seg button { padding: 0 7px; }
+  #segAuto button { padding: 0 6px; }
+}
