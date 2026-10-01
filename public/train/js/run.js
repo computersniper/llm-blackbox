@@ -56,7 +56,7 @@ export function wrapQwen(D) {
   const m = D.meta;
   const N = D.N;
   return {
-    kind: 'qwen', D, K: D.K, NL: D.NL, NB: D.NB, R: N - 1,
+    kind: 'qwen', D, K: D.K, NL: D.NL, NB: D.NB, R: N - 1, sftPos: D.sftPos,
     model: { ...m.model, headDim: 128 },
     name: 'Qwen3-0.6B',
     rowLen: N - 1,

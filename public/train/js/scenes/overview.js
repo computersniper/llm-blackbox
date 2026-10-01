@@ -91,6 +91,8 @@ export class Overview {
     const k = st.k;
     if (this.reveal.k !== k) this.reveal = { k, t0: env.t };
     const t = this.tNow(st);
+    // 点卡片的空白处：镜头飞过去放大（里面的按钮、图表有自己的交互）
+    for (const [, r] of this.cards()) env.hit(r.x, r.y, r.w, r.h, { click: true, fly: { x: r.x - 8, y: r.y - 8, w: r.w + 16, h: r.h + 16 } });
     this.drawHud(g, st, env, t);
     this.drawChart(g, st, env, t);
     this.drawSamples(g, st, env);
