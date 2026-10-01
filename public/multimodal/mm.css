@@ -8,11 +8,6 @@ body.mode-inspect { --chat-w: 320px; }
 
 /* ---------------- 站点导航 ---------------- */
 
-.site-nav { display: flex; align-items: center; gap: 2px; flex: none; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
-.site-nav a { padding: 4px 11px; border-radius: 999px; color: var(--dim); text-decoration: none; font-size: 13px; transition: color .2s, background .2s; }
-.site-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
-.site-nav a[aria-current="page"] { color: #04121a; background: var(--acc); font-weight: 600; }
-body.mode-inspect .site-nav { display: none; }
 
 /* ---------------- 聊天：头像（一只眼睛） ---------------- */
 
@@ -96,7 +91,6 @@ body.mode-inspect .site-nav { display: none; }
 @media (max-width: 900px) {
   :root { --mon-w: min(46vw, 210px); }
   .site-nav { margin-left: auto; }
-  .site-nav a { padding: 3px 8px; font-size: 12px; }
   .stage-top { left: 14px; }
   .mon { top: 62px; left: 10px; max-height: calc(100% - 330px); }
   .mon-cap { font-size: 11px; padding: 6px 9px 8px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }

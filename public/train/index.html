@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>大模型训练 · 揭开黑箱</title>
+  <meta name="description" content="看一个大模型是怎么被训练出来的：在 GPU 上从零训练一个 Qwen3 同构的唐诗小模型，再在真实的 Qwen3-0.6B 上走一步监督微调，细到单个权重的 AdamW 更新。所有数据都来自真实运行。">
+  <meta name="theme-color" content="#060d1a">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/train.css">
+  <!-- 首屏数据（约 90 KB gzip）不必等脚本跑起来再取：和脚本一起开始下载，js/data.js 的 fetch 会直接用上 -->
+  <link rel="preload" href="data/tiny.json.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/tiny.bin.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/qwen.json.gz" as="fetch" crossorigin>
+  <!-- 模块依赖有三层（main → 各个视图 → 绘图工具），预先声明，浏览器一开始就并行取完，不用一层层等 -->
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="modulepreload" href="js/data.js">
+  <link rel="modulepreload" href="js/run.js">
+  <link rel="modulepreload" href="js/timeline.js">
+  <link rel="modulepreload" href="js/controls.js">
+  <link rel="modulepreload" href="js/explain.js">
+  <link rel="modulepreload" href="js/stage.js">
+  <link rel="modulepreload" href="js/draw.js">
+  <link rel="modulepreload" href="js/insights.js">
+  <link rel="modulepreload" href="js/scenes/pipeline.js">
+  <link rel="modulepreload" href="js/scenes/overview.js">
+  <link rel="modulepreload" href="js/scenes/overviewQ.js">
+  <link rel="modulepreload" href="js/scenes/loop.js">
+  <link rel="modulepreload" href="js/scenes/row.js">
+  <link rel="modulepreload" href="js/scenes/tokens.js">
+  <link rel="modulepreload" href="js/scenes/grid.js">
+  <link rel="modulepreload" href="js/scenes/loss.js">
+  <link rel="modulepreload" href="js/scenes/layer.js">
+  <link rel="modulepreload" href="js/scenes/adam.js">
+  <link rel="modulepreload" href="../js/bg.js">
+  <link rel="modulepreload" href="../js/audio.js">
+  <link rel="modulepreload" href="../js/ui.js">
+  <link rel="modulepreload" href="../js/resize.js">
+</head>
+<body>
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="大模型训练">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">TRAINING</span>
+      <span class="brand-zh">大模型训练</span>
+    </a>
+    <nav class="site-nav" aria-label="站点">
+      <a href="../">推理</a>
+      <a href="./" aria-current="page">训练</a>
+      <a href="../multimodal/">多模态</a>
+      <a href="../agent/">智能体</a>
+    </nav>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
+    <div class="top-actions">
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
+      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" aria-label="训练过程">
+    <div class="gl" id="gl"><canvas id="cv"></canvas></div>
+    <div class="stage-top">
+      <div class="runs" id="runs" role="tablist" aria-label="选择一段真实训练">
+        <button type="button" role="tab" data-run="tiny"><b>从零预训练</b><span>唐宋诗小模型</span></button>
+        <button type="button" role="tab" data-run="qwen"><b>监督微调</b><span>Qwen3-0.6B</span></button>
+      </div>
+      <button class="follow" id="btnFollow" type="button" hidden>◎ 回到跟随视角 <kbd>F</kbd></button>
+      <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）">操作说明</button>
+    </div>
+    <div class="stage-hint" id="stageHint">
+      <b>在训练现场自由走动</b>
+      <span><kbd>拖动</kbd>平移</span><span><kbd>滚轮</kbd>/双指 缩放</span><span><kbd>双击</kbd>放大那一处</span>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>Q</kbd>/<kbd>E</kbd> 缩小 / 放大</span><span><kbd>F</kbd> 回到跟随</span>
+      <span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> 或 <kbd>↓</kbd>/<kbd>↑</kbd> 换层</span><span><kbd>空格</kbd> 播放</span><span><kbd>←</kbd>/<kbd>→</kbd> 单步</span><span><kbd>1</kbd>–<kbd>6</kbd> 倍速</span>
+    </div>
+    <div class="stage-loading" id="loading"><span class="spin"></span><span>正在载入真实训练记录…</span></div>
+
+    <aside class="dbg" id="dbg" aria-label="调试器">
+      <header class="dbg-h">
+        <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono" id="dbgSub">train()</span>
+        <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
+      </header>
+      <div class="dbg-body">
+        <pre class="code" id="code"></pre>
+        <div class="dbg-explain" id="explain"></div>
+        <div class="dbg-watch" id="watch"></div>
+      </div>
+    </aside>
+
+    <div class="ctl" id="ctl">
+      <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+      <div class="ctl-bar">
+        <div class="ctl-depth">
+          <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+          <span class="ctl-dname" id="dname"></span>
+          <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
+        </div>
+        <div class="ctl-play">
+          <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+          <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+          <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
+        </div>
+        <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+        <div class="ctl-pos mono" id="pos"></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tooltip" role="tooltip"></div>
+
+  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴">
+    <div class="cx-panel">
+      <header class="cx-head">
+        <div>
+          <div class="eyebrow">CODEX · 训练现场的知识碎片</div>
+          <h2>你在训练现场的发现</h2>
+        </div>
+        <div class="cx-progress"><b>0</b><span class="cx-bar"><i></i></span></div>
+        <button class="cx-close" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="cx-grid"></div>
+      <footer class="cx-foot">
+        <p id="cxFoot">两段训练都是真实运行的记录：唐宋诗小模型在一块 RTX 5090 上从零训练了 4000 步；Qwen3-0.6B 在同一块显卡上做了 3 步全参数监督微调。凡是标“示意”的内容不是实测。</p>
+        <button class="linkish" id="btnReset" type="button">重置进度</button>
+      </footer>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

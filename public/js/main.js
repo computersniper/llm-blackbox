@@ -7,6 +7,9 @@ import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Background } from './bg.js';
 import { sfx, setSound, soundOn } from './audio.js';
 import { $, esc, tokPlain, tokHTML, fmtPct, fmtNum, sleep } from './ui.js';
+import { initPanes } from './resize.js';
+import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from './prefetch.js';
+import { countVisit, showVisits } from './visits.js';
 
 const KEY = 'blackbox:v2';
 const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记' };
@@ -49,9 +52,12 @@ async function boot() {
     head: (h) => { ctx.head = h; if (tl) { if (tl.ready(tl.step)) controls.update(tl, ctx); checkSink(); } },
   });
   chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus });
+  countVisit().then(showVisits);
   bindKeys();
   bindChrome();
   renderCodexCount();
+  // 聊天页可以用了：趁空闲把舞台的模块取回来（失败了没关系，点 ＋ 时会重试并报错）
+  whenIdle(() => loadStage().catch(() => {}));
 }
 
 /* ---------------------------------------------------------------- 聊天 */
@@ -59,6 +65,8 @@ async function boot() {
 function onSend(q) {
   chat.addUser(q);
   const msg = chat.addBot(q);
+  // 回答开始流式输出时，就在后台取这条回复的数据、建好引擎，点 ＋ 时多半都已经好了
+  if (!saveData()) { loadQuestion(q.id, manifest).catch(() => { /* 揭开时再报错 */ }); warmEngine(); }
   if (mode === 'inspect') attach(msg);
   else streamNormal(msg, 0);
   if (q.id === 'q03' || q.id === 'q04') setTimeout(() => discover('wrong'), 2500);
@@ -102,14 +110,50 @@ function onPlus() {
 
 /* ---------------------------------------------------------------- 揭开 */
 
+// 舞台的整张模块图：引擎（Three.js 和 addons）+ 机器本体和它拆出去的几个文件。machine.js 等的 import 改了要同步这里
+const STAGE_GRAPH = [
+  ...ENGINE_GRAPH,
+  'stage/machine.js', 'stage/detail.js', 'stage/mats.js', 'stage/micro.js', 'stage/board.js', 'stage/fields.js', 'num.js',
+  'vendor/three/addons/geometries/RoundedBoxGeometry.js',
+];
+let stageMods = null;
+// 载入舞台模块：先一次性挂上整张图的 modulepreload（并行取，没有瀑布），再 import。空闲预取和点 ＋ 共用同一个 promise
+function loadStage() {
+  if (!stageMods) {
+    modulePreload(STAGE_GRAPH.map(jsURL));
+    stageMods = Promise.all([import('./stage/engine.js'), import('./stage/machine.js')]);
+    stageMods.catch(() => { stageMods = null; });
+  }
+  return stageMods;
+}
+
 async function ensureEngine() {
   if (engine) return;
-  const eng = await import('./stage/engine.js');
-  const mach = await import('./stage/machine.js');
+  const [eng, mach] = await loadStage();
+  if (engine) return;
   THREE = eng.THREE;
-  loadThumbs().then((b) => machine?.mats.setThumbs(b, manifest.thumbs.index)).catch(() => { /* 没有缩略图时用装饰纹理 */ });
+  const t0 = performance.now();
   engine = new eng.Engine($('#gl'), { onFrame, onHover, onPick, onFreeChange: (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); } });
+  const t1 = performance.now();
   machine = new mach.Machine(engine);
+  measure('揭开·new Engine', t0, t1);
+  measure('揭开·new Machine', t1);
+}
+
+// 权重缩略图（weights.bin，约 380 KB）只有拆开一层（D4）时才用得到：深度 ≥ 3 时才开始取，不挡在揭开的路上。
+// 没到之前权重面板用装饰纹理，到了再贴上真实的分布（mats.setThumbs 会让下一帧重新贴图）。失败了 15 秒后才重试
+let thumbsAsked = false, thumbsRetry = 0;
+function wantThumbs() {
+  if (thumbsAsked || !machine || !tl || tl.depth < 3 || performance.now() < thumbsRetry) return;
+  thumbsAsked = true;
+  loadThumbs().then((b) => machine.mats.setThumbs(b, manifest.thumbs.index), () => { thumbsAsked = false; thumbsRetry = performance.now() + 15000; });
+}
+
+// 用户发出了问题（多半接着会点 ＋）：提前建好引擎（WebGL 上下文、环境贴图），在聊天模式下空跑一帧，
+// 让后期处理（泛光、输出）这些和问题无关的着色器先编译好；机器本身的材质点 ＋ 之后再编译。
+// 失败了不提示，点 ＋ 时会重试并报错
+function warmEngine() {
+  ensureEngine().then(() => { if (mode === 'chat') engine.composer.render(); }).catch(() => {});
 }
 
 async function enterInspect(msg) {
@@ -118,7 +162,10 @@ async function enterInspect(msg) {
     mode = 'inspect';
     document.body.classList.replace('mode-chat', 'mode-inspect');
     $('#loading').hidden = false;
-    try { await ensureEngine(); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    const t0 = performance.now();
+    // 模块和这条回复的数据并行载入；数据失败由 attach 报错、重试
+    try { await Promise.all([ensureEngine(), loadQuestion(msg.q.id, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    measure('揭开·模块和数据', t0);
     engine.active = true;
     if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
     if (matchMedia('(max-width: 900px)').matches && !$('#dbg').classList.contains('folded')) { $('#dbg').classList.add('folded'); $('#btnDbgFold').textContent = '+'; }
@@ -147,6 +194,7 @@ async function attach(msg, from = null) {
   if (prevDepth > 1) tl.setDepth(prevDepth);
   if (from != null && from > 0) tl.seekToken(Math.min(from, Q.G - 1));
   tl.on((type) => {
+    if (type === 'step') wantThumbs();
     if (type === 'step' && syncMicro()) { controls.update(tl, ctx); discoverFor(); }
     if (type === 'token') { cur.render(tl.g, { cur: true, fresh: true }); renderStrip(); }
     if (type === 'play') controls.updatePlay(tl);
@@ -158,7 +206,9 @@ async function attach(msg, from = null) {
   });
   engine.exitFree();
   if (fresh) {
+    const t0 = performance.now();
     machine.load(Q);
+    measure('揭开·machine.load', t0);
     const far = machine.camera({ view: 'box', step: tl.step, g: tl.g });
     engine.setView(far.pos.clone().multiplyScalar(2.2), far.look, { snap: true });
     dAnim = tl.depth;
@@ -166,6 +216,7 @@ async function attach(msg, from = null) {
   msg.render(tl.g, { cur: true });
   if (msg.done) { msg.done = false; }
   renderStrip();
+  wantThumbs();
   syncMicro();
   controls.update(tl, ctx);
   tl.play();
@@ -459,6 +510,7 @@ function bindChrome() {
   $('#strip').addEventListener('click', () => document.body.classList.add('chat-open'));
   $('#btnFollow').addEventListener('click', () => { engine?.exitFree(); sfx.click(); });
   $('#btnHint').addEventListener('click', () => showHint(!$('#stageHint').classList.contains('on')));
+  initPanes('infer', { left: { el: '#chat', v: '--chat-w', name: '聊天栏' }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, onChange: updateInsets });
 }
 
 function bindKeys() {
