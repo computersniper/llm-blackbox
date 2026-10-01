@@ -6,6 +6,13 @@ import { Pix, featGrid, divRGB, vecGrid } from '../pix.js';
 import { ENC, DEC } from '../nn.js';
 import { OP_LABEL } from '../explain.js';
 
+// 要拆的那个输出：深色外框 + 琥珀色框，格子再小也看得见
+function mark(g, x, y, sc) {
+  const s = Math.max(sc + 4, 8), cx = x + sc / 2, cy = y + sc / 2;
+  g.lineWidth = 3.5; g.strokeStyle = 'rgba(0,0,0,0.85)'; g.strokeRect(cx - s / 2, cy - s / 2, s, s);
+  g.lineWidth = 1.6; g.strokeStyle = COL.amber; g.strokeRect(cx - s / 2, cy - s / 2, s, s);
+}
+
 const SHAPE = {
   e1: [3, 64, 3], e2: [16, 31, 4], e3: [32, 14, 8], e4: [64, 6, 8],
   d1: [512, 1, 32], d2: [64, 5, 8], d3: [32, 13, 8], d4: [16, 30, 4],
@@ -138,13 +145,13 @@ export class MacView {
     const cell = (c, y, x) => [ox + ((c % Gr.cols) * (Gr.w + Gr.gap) + x) * sc, oy + (Math.floor(c / Gr.cols) * (Gr.h + Gr.gap) + y) * sc];
     g.strokeStyle = COL.amber; g.lineWidth = 1.2;
     if (Gr.vec) {
-      if (which === 'out' && Gr.idx >= 0) { const [x, y] = cell(0, Math.floor(Gr.idx / Gr.cols), Gr.idx % Gr.cols); g.strokeStyle = COL.amber; g.lineWidth = 1.4; g.strokeRect(x - 1, y - 1, sc + 2, sc + 2); }
+      if (which === 'out' && Gr.idx >= 0) { const [x, y] = cell(0, Math.floor(Gr.idx / Gr.cols), Gr.idx % Gr.cols); mark(g, x, y, sc); }
       if (which === 'in') text(g, `全部 ${mac.n} 个都参与`, r.x + r.w / 2, r.y + r.h + 14, { size: 9.5, color: COL.dim, align: 'center' });
       return;
     }
     if (which === 'out') {
       const [x, y] = cell(mac.op === 'd4' ? 0 : sel.c, sel.y, sel.x);
-      g.strokeRect(x - 1, y - 1, sc + 2, sc + 2);
+      mark(g, x, y, sc);
       return;
     }
     if (!L) return;

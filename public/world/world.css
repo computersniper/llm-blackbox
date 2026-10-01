@@ -69,6 +69,8 @@ body.dbg-folded #toasts { right: 18px; }
 body.has-board .pad { display: none; }
 .board .bd-big { font-size: 13.5px; }
 .board .bd-tr .i { font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; }
+/* 项的名字比推理页长（c7·25,23 这样），第一列放宽 */
+.w-app .bd-tr { grid-template-columns: 5.6em minmax(4.6em, 1fr) .9em minmax(5em, 1fr) .9em minmax(4.6em, 1fr) minmax(34px, .8fr); }
 
 /* ---------------- 窄屏 ---------------- */
 
@@ -95,6 +97,7 @@ body.has-board .pad { display: none; }
   .w-app .stage-hint { bottom: 170px; top: auto; }
   #toasts { left: 10px; right: 10px; width: auto; top: auto; bottom: 200px; }
   .w-app .board { top: 52px; bottom: auto; max-height: min(42vh, 340px); }
+  .w-app .bd-tr { grid-template-columns: 4.8em minmax(4.2em, 1fr) .8em minmax(4.6em, 1fr) .8em minmax(4.2em, 1fr) 24px; }
 }
 @media (max-width: 560px) {
   .crumbs { display: none; }
