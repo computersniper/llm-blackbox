@@ -1,5 +1,6 @@
 // Qwen2-VL recording viewer. Only schema 2 model captures are accepted.
 import { Lab, fetchJSON } from '../../js/lab/core.js';
+import { TraceStage } from '../../js/lab/stage3d.js';
 import { $, esc } from '../../js/ui.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 
@@ -16,6 +17,7 @@ const CODE = [
   'answer_token = greedy_decode(sequence)',
 ];
 let lab;
+let stage;
 
 function assertCapture(d) {
   if (d.schema !== 2 || d.source !== 'model' || !Array.isArray(d.tokens) || !d.tokens.length) throw new Error('需要 schema 2 真实模型记录');
@@ -50,6 +52,96 @@ function chosenPatch(path) {
   return null;
 }
 
+// Every glowing value below comes from this capture. Architecture-only boxes
+// are labelled as such; the recording has no intermediate ViT activations.
+function stageSpec(n, path, tree) {
+  const d = get(n), depth = tree.depth;
+  const photo = (id = 'photo') => ({ id, label: d.name, detail: `${d.originalSize.join('×')} px · 真实照片`, kind: 'matrix', imageUrl: d.image, imageAspect: d.originalSize[0] / d.originalSize[1] });
+  const patch = (i) => {
+    const p = d.patches[i];
+    return { id: `patch:${i}`, label: `视觉 #${i}`, detail: `${p.row},${p.col} · ‖v‖ ${p.norm.toFixed(1)}`, kind: 'matrix', values: p.head };
+  };
+  const tokenNode = (i) => {
+    const t = d.tokens[i];
+    return { id: `token:${i}`, label: t.text || '空白', detail: `输出词元 ${i + 1} · ID ${t.id}`, kind: 'token', values: t.weights };
+  };
+  const samples = (count) => Array.from({ length: Math.min(count, d.patches.length) }, (_, i) => Math.floor(i * d.patches.length / Math.min(count, d.patches.length)));
+  const tokenIndex = focus(path), current = d.tokens[tokenIndex];
+  let nodes = [], edges = [], active = '', layout = 'flow', title = n.label;
+  if (depth <= 2) {
+    nodes = [photo('phase:photo'),
+      { id: 'phase:pixels', label: '动态切块', detail: `${d.grid.rawRows}×${d.grid.rawCols} 原始块`, kind: 'matrix', values: d.patches.map(p => p.norm) },
+      { id: 'phase:vision', label: '视觉编码器', detail: `${d.patches.length} 个最终输出`, kind: 'box', values: d.patches.map(p => p.norm) },
+      { id: 'phase:fusion', label: '图文词元', detail: '共用语言自注意力', kind: 'box' },
+      { id: 'phase:self', label: '语言层塔', detail: '28 层模型架构', kind: 'tower', layers: 28 },
+      { id: 'phase:answer', label: '生成回答', detail: `${d.tokens.length} 个实测词元`, kind: 'token', values: current.weights }];
+    nodes.forEach((node, i) => { node.position = [(i % 3 - 1) * 5.2, 1.3, Math.floor(i / 3) * 4.2]; });
+    edges = nodes.slice(1).map((node, i) => [nodes[i].id, node.id]);
+    active = depth === 1 ? 'phase:photo' : `phase:${n.t}`;
+    title = depth === 1 ? `${d.name} · 一张照片如何变成回答` : `${d.name} · 从照片到回答的模型流程`;
+  } else if (['pixels', 'raw', 'grid'].includes(n.t)) {
+    nodes = [photo(), ...samples(9).map(patch)]; layout = 'grid';
+    active = 'photo'; title = `${d.name} · ${d.grid.rawRows}×${d.grid.rawCols} 原始块 → ${d.grid.rows}×${d.grid.cols} 视觉词元（抽样展示）`;
+  } else if (['vision', 'patch'].includes(n.t)) {
+    const selected = chosenPatch(path);
+    const indexes = selected == null ? samples(12) : [...new Set(Array.from({ length: 9 }, (_, k) => {
+      const row = Math.max(0, Math.min(d.grid.rows - 1, Math.floor(selected / d.grid.cols) + Math.floor(k / 3) - 1));
+      const col = Math.max(0, Math.min(d.grid.cols - 1, selected % d.grid.cols + k % 3 - 1));
+      return row * d.grid.cols + col;
+    }))];
+    nodes = indexes.map(patch); layout = 'grid'; active = selected == null ? nodes[0].id : `patch:${selected}`;
+    title = `${d.patches.length} 个视觉最终向量 · ${selected == null ? '均匀抽样' : '邻近词元'}`;
+  } else if (['fusion', 'sequence'].includes(n.t)) {
+    nodes = [photo(), { id: 'phase:vision', label: '视觉词元', detail: `${d.patches.length}×${d.grid.featureDim}`, kind: 'matrix', values: d.patches.map(p => p.norm) },
+      { id: 'phase:sequence', label: '文字 + 图像', detail: '同一序列', kind: 'token' },
+      { id: 'phase:self', label: '语言自注意力', detail: '28 层结构', kind: 'layer' },
+      { id: 'phase:answer', label: '回答词元', detail: `${d.tokens.length} 个`, kind: 'token', values: current.weights }];
+    nodes.forEach((node, i) => { node.position = [(i % 3 - 1) * 5.2, 1.3, Math.floor(i / 3) * 4.2]; });
+    edges = nodes.slice(1).map((node, i) => [nodes[i].id, node.id]); active = n.t === 'sequence' ? 'phase:sequence' : 'phase:vision';
+    title = '视觉词元与文字词元进入同一个语言序列';
+  } else if (n.t === 'self') {
+    nodes = Array.from({ length: 7 }, (_, i) => ({ id: `layer:${i}`, label: `语言层 ${i * 4}–${i * 4 + 3}`, detail: '架构示意 · 未录中间激活', kind: 'layer' }));
+    layout = 'tower'; active = 'layer:6'; title = '28 层语言模型 · 图文共用自注意力';
+  } else if (n.t === 'answer') {
+    nodes = d.tokens.slice(0, 12).map((_, i) => tokenNode(i));
+    edges = nodes.slice(1).map((node, i) => [nodes[i].id, node.id]); active = 'token:0'; layout = 'grid';
+    title = `回答前 ${nodes.length} / ${d.tokens.length} 个真实输出词元`;
+  } else if (n.t === 'token') {
+    const nearby = [tokenIndex - 2, tokenIndex - 1, tokenIndex, tokenIndex + 1, tokenIndex + 2].filter(i => i >= 0 && i < d.tokens.length);
+    const top = current.weights.map((w, i) => [i, w]).sort((a, b) => b[1] - a[1]).slice(0, 4);
+    nodes = [photo(), ...top.map(([i]) => patch(i)), ...nearby.map(tokenNode)];
+    edges = top.map(([i]) => [`patch:${i}`, `token:${tokenIndex}`]); active = `token:${tokenIndex}`; layout = 'grid';
+    title = `输出词元 ${tokenIndex + 1} · 图像注意力最高的 4 个区域`;
+  } else if (n.t === 'heat' || n.t === 'head') {
+    const mobile = matchMedia('(max-width: 700px)').matches;
+    const start = mobile ? Math.max(0, Math.min(current.heads.length - 5, (n.head ?? 0) - 2)) : 0;
+    const visibleHeads = mobile ? current.heads.slice(start, start + 5) : current.heads;
+    nodes = [{ id: 'mean', label: '12 头平均', detail: `图像注意力占比 ${(current.imageAttentionMass * 100).toFixed(1)}%`, kind: 'matrix', values: current.weights },
+      ...visibleHeads.map((h, offset) => ({ id: `head:${start + offset}`, label: `注意力头 ${start + offset}`, detail: `图像注意力占比 ${(h.imageAttentionMass * 100).toFixed(1)}%`, kind: 'head', values: h.weights }))];
+    active = n.t === 'head' ? `head:${n.head}` : 'mean'; layout = 'grid';
+    title = `词元「${current.text}」 · 最后语言层 12 个实测注意力头${mobile ? '（逐步浏览）' : ''}`;
+  } else if (n.t === 'vector') {
+    const i = current.weights.indexOf(Math.max(...current.weights)), p = d.patches[i];
+    nodes = [patch(i), ...p.head.map((value, j) => ({ id: `dim:${j}`, label: `维 ${j}`, detail: value.toFixed(3), kind: 'weight', values: [value] }))];
+    active = `patch:${i}`; layout = 'grid'; title = `视觉词元 #${i} · 1536 维最终向量的前 12 维`;
+  }
+  return { title, depth, layout, nodes, edges, active };
+}
+
+function pickStageNode(id) {
+  if (!lab) return;
+  const tree = lab.tree;
+  tree.pause();
+  const [type, raw] = id.split(':');
+  if (type === 'photo') tree.seekWhere(node => node.t === 'raw');
+  else if (type === 'phase') tree.seekWhere(node => node.t === (raw === 'photo' ? 'raw' : raw === 'vision' ? 'vision' : raw === 'fusion' ? 'fusion' : raw === 'sequence' ? 'sequence' : raw === 'self' ? 'self' : raw === 'answer' ? 'answer' : 'pixels'));
+  else if (type === 'patch') tree.seekWhere(node => node.t === 'patch' && node.patch === Number(raw));
+  else if (type === 'token') tree.seekWhere(node => node.t === 'token' && node.token === Number(raw));
+  else if (type === 'head') tree.seekWhere(node => node.t === 'head' && node.token === focus(tree.path) && node.head === Number(raw));
+  else if (id === 'mean') tree.seekWhere(node => node.t === 'heat' && node.token === focus(tree.path));
+  else if (type === 'layer') tree.seekWhere(node => node.t === 'self');
+}
+
 function side(d, node, path) {
   const idx = focus(path);
   const shown = node.t === 'answer' ? 0 : ['token', 'heat', 'head', 'vector'].includes(node.t) ? idx + 1 : 0;
@@ -77,9 +169,10 @@ function feature(d, patchIndex) {
   return `<div class="mm-feature"><b>视觉词元 #${p.id}</b><span>网格 ${p.row}, ${p.col}</span><span>向量维度 ${d.grid.featureDim}</span><span>范数 ${p.norm.toFixed(3)}</span><small>前 12 个实测分量</small><code>${p.head.map(x => x.toFixed(3)).join('  ')}</code></div>`;
 }
 
-function render(n, path) {
+function render(n, path, tree) {
   const d = get(n);
   if (!d) return;
+  stage?.update(stageSpec(n, path, tree));
   side(d, n, path);
   const tokenIndex = focus(path), token = d.tokens[tokenIndex];
   const heat = ['token', 'heat', 'head', 'vector'].includes(n.t);
@@ -126,8 +219,16 @@ async function boot() {
     $('#spec').innerHTML = `<span>视觉块 <b>14 px</b></span><span>空间融合 <b>2×2</b></span><span>语言层 <b>28</b></span><span>照片 <b>${examples.length} 张</b></span>`;
     $('#cards').innerHTML = examples.map(ex => `<button class="card" type="button" data-id="${esc(ex.id)}"><span class="tag">真实照片 · ${ex.grid.rows}×${ex.grid.cols} 视觉词元</span><img src="${esc(ex.image)}" alt="${esc(ex.name)}"><h3>${esc(ex.name)}</h3><p>${esc(ex.question)}</p><span class="go">打开模型运行 →</span></button>`).join('');
     $('#credit').textContent = '来源：tools/export_multimodal.py 录制；照片 SHA-256、模型输出、视觉向量与最后一层语言注意力保存在每个示例 JSON 中。';
-    lab = new Lab({ roots: roots(examples), maxDepth: 4, depthNames: ['', '照片', '处理流程', '视觉 / 生成词元', '词元细节'], code: CODE, explain, render, onExit: () => document.body.classList.replace('mode-inspect', 'mode-pick') });
-    $('#cards').addEventListener('click', e => { const card = e.target.closest('[data-id]'); if (!card) return; document.body.classList.replace('mode-pick', 'mode-inspect'); document.body.classList.remove('side-open'); lab.tree.seekRoot(examples.findIndex(x => x.id === card.dataset.id), 1); });
+    stage = new TraceStage($('#stage'), { onPick: pickStageNode });
+    lab = new Lab({ roots: roots(examples), maxDepth: 4, depthNames: ['', '照片', '处理流程', '视觉 / 生成词元', '词元细节'], code: CODE, explain, render,
+      frame: (_node, progress) => stage?.frame(progress), onExit: () => document.body.classList.replace('mode-inspect', 'mode-pick') });
+    $('#cards').addEventListener('click', e => {
+      const card = e.target.closest('[data-id]'); if (!card) return;
+      document.body.classList.replace('mode-pick', 'mode-inspect');
+      document.body.classList.remove('side-open');
+      if (matchMedia('(max-width: 900px)').matches && !$('#dbg').classList.contains('folded')) $('#btnDbgFold').click();
+      lab.tree.seekRoot(examples.findIndex(x => x.id === card.dataset.id), 1);
+    });
   } catch (error) {
     $('#lead').textContent = `真实模型记录暂不可用：${error.message}`;
     $('#spec').textContent = '当前数据不会作为真实注意力展示。';

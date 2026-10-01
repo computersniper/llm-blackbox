@@ -27,6 +27,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import tempfile
 import time
 
 import torch
@@ -40,12 +41,12 @@ TEMP, TOP_K, TOP_P = 0.6, 20, 0.95
 MAX_TURNS, MAX_NEW = 12, 2048
 TOPN = 8
 
-SYSTEM = "你是一个编程助手，当前目录是临时任务目录。bash 工具只接受 ls、ls -la、cat 文件名、python test_*.py、python report.py；修改文件请用 write_file。可以连续调用多个工具，执行结果会逐条返回。完成后用一两句话总结，并在回答前运行测试确认。"
+SYSTEM = "你是一个编程助手，当前目录是临时任务目录。bash 工具只接受 ls、ls -la、cat 文件名、python test_*.py、python -m pytest test_*.py -q、python report.py；修改文件请用 write_file。可以连续调用多个工具，执行结果会逐条返回。完成后用一两句话总结，并在回答前运行测试确认。"
 
 TOOLS = [
     {"type": "function", "function": {
         "name": "bash",
-        "description": "在临时任务目录执行受限命令，只支持 ls、ls -la、cat 文件名、python test_*.py、python report.py。返回 stdout、stderr 和退出码。",
+        "description": "在临时任务目录执行受限命令，只支持 ls、ls -la、cat 文件名、python test_*.py、python -m pytest test_*.py -q、python report.py。返回 stdout、stderr 和退出码。",
         "parameters": {"type": "object", "properties": {"command": {"type": "string", "description": "要执行的命令"}}, "required": ["command"]},
     }},
     {"type": "function", "function": {
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     {
         "id": "add-feature",
         "title": "添加一个功能",
-        "prompt": "math_ops.py 已有 square(x)。请保留这个函数，新加 sum_of_squares(a, b)，返回两个数的平方和。在 test_math_ops.py 中补一个新函数的测试，运行 python test_math_ops.py 确认原函数和新函数都通过。write_file 会覆盖整个文件，写入时请包含原有内容。",
+        "prompt": "math_ops.py 已有 square(x)，请保留它，新增 sum_of_squares(a, b) 返回两个数的平方和。test_math_ops.py 已有固定测试，不需要修改测试文件。先运行 python -m pytest test_math_ops.py -q 观察失败，再修改 math_ops.py，最后用同一命令确认全部通过。write_file 会覆盖整个文件，写入时请包含原有内容。",
         "files": {
             "math_ops.py": '''"""简单的数学工具。"""
 
@@ -108,7 +109,7 @@ if __name__ == "__main__":
 def square(x):
     return x * x
 ''',
-            "test_math_ops.py": '''from math_ops import square
+            "test_math_ops.py": '''from math_ops import square, sum_of_squares
 
 
 def test_square():
@@ -116,9 +117,9 @@ def test_square():
     assert square(-3) == 9
 
 
-if __name__ == "__main__":
-    test_square()
-    print("全部测试通过")
+def test_sum_of_squares():
+    assert sum_of_squares(3, 4) == 25
+    assert sum_of_squares(-2, 5) == 29
 ''',
         },
         "seed": 22,
@@ -126,32 +127,25 @@ if __name__ == "__main__":
     {
         "id": "refactor",
         "title": "重构一段代码",
-        "prompt": "formatter.py 的 format_users 能运行，但名字清理逻辑重复了。请在保持输出行为不变的前提下，将名字清理提取为 normalize_name(name)，让 format_users 使用它；在 test_formatter.py 中补一个包含空白名字的边界用例，再运行 python test_formatter.py 确认通过。",
+        "prompt": "formatter.py 的 full_name(first, last) 对两个名字重复做 strip().title()。请提取 normalize_name(name)，让 full_name 调用它两次，输出保持不变。test_formatter.py 已有固定测试，不需要修改测试文件。先运行 python -m pytest test_formatter.py -q，修改 formatter.py 后再运行一次确认通过。write_file 会覆盖整个文件，写入时请包含原有内容。",
         "files": {
-            "formatter.py": '''"""把用户姓名整理成可显示的列表。"""
+            "formatter.py": '''"""把姓名整理成可显示的格式。"""
 
 
-def format_users(users):
-    result = []
-    for user in users:
-        first = user["first"].strip().title()
-        last = user["last"].strip().title()
-        name = (first + " " + last).strip()
-        if name:
-            result.append(name)
-    return result
+def full_name(first, last):
+    first = first.strip().title()
+    last = last.strip().title()
+    return first + " " + last
 ''',
-            "test_formatter.py": '''from formatter import format_users
+            "test_formatter.py": '''from formatter import full_name
 
 
-def test_format_users():
-    users = [{"first": " ada ", "last": " lovelace "}, {"first": "ALAN", "last": "turing"}]
-    assert format_users(users) == ["Ada Lovelace", "Alan Turing"]
+def test_full_name():
+    assert full_name(" ada ", " LOVELACE ") == "Ada Lovelace"
 
 
-if __name__ == "__main__":
-    test_format_users()
-    print("全部测试通过")
+def test_blank_first_name():
+    assert full_name("", " turing ") == " Turing"
 ''',
         },
         "seed": 33,
@@ -211,14 +205,16 @@ def run_bash(cmd, cwd):
         p = pathlib.Path(cwd) / words[1]
         if p.is_file() and not p.is_symlink():
             return {"stdout": p.read_text(encoding="utf-8")[-4000:], "stderr": "", "code": 0, "ms": 0}
-    if not (len(words) == 2 and words[0] == "python" and
-            (re.fullmatch(r"test_[A-Za-z0-9_]+\.py", words[1]) or words[1] == "report.py") and
-            (pathlib.Path(cwd) / words[1]).is_file() and not (pathlib.Path(cwd) / words[1]).is_symlink()):
-        return {"stdout": "", "stderr": "受限执行拒绝：仅支持 ls、ls -la、cat 文件名、python test_*.py、python report.py", "code": 126, "ms": 0, "denied": True}
+    direct = len(words) == 2 and words[0] == "python" and (re.fullmatch(r"test_[A-Za-z0-9_]+\.py", words[1]) or words[1] == "report.py")
+    pytest = len(words) == 5 and words[:3] == ["python", "-m", "pytest"] and bool(re.fullmatch(r"test_[A-Za-z0-9_]+\.py", words[3])) and words[4] == "-q"
+    target = words[1] if direct else words[3] if pytest else ""
+    if not (target and (pathlib.Path(cwd) / target).is_file() and not (pathlib.Path(cwd) / target).is_symlink()):
+        return {"stdout": "", "stderr": "受限执行拒绝：仅支持 ls、ls -la、cat 文件名、python test_*.py、python -m pytest test_*.py -q、python report.py", "code": 126, "ms": 0, "denied": True}
     env = minimal_env()
     t0 = time.time()
     try:
-        p = subprocess.run([os.sys.executable, words[1]], cwd=cwd, capture_output=True, timeout=30, env=env)
+        argv = [os.sys.executable, target] if direct else [os.sys.executable, "-m", "pytest", target, "-q"]
+        p = subprocess.run(argv, cwd=cwd, capture_output=True, timeout=30, env=env)
         out, err, code = p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), p.returncode
     except subprocess.TimeoutExpired:
         out, err, code = "", "超时（30 秒）", 124
@@ -358,7 +354,8 @@ def run_task(task, model, tok, sandbox_root):
             feedback = (f"自动验收未通过，请继续修改文件并重新运行测试，不要提前总结。\n"
                         f"公开测试：退出码 {check['code']}；{check['stderr'][-800:] or check['stdout'][-400:]}\n"
                         f"录制器持有的独立用例：{'通过' if check['oracle']['passed'] else '失败'}；"
-                        f"{check['oracle']['stderr'][-800:]}")
+                        f"{check['oracle']['stderr'][-800:]}\n"
+                        f"测试有效性：{'通过' if check.get('mutation', {}).get('passed', True) else '失败，测试脚本未能检出故意注入的目标函数错误；请确保脚本真正执行断言'}")
             rec["autoFeedback"] = feedback
             messages.append({"role": "user", "content": feedback})
             print(f"    自动验收未通过，继续一轮（公开测试 {check['code']}，独立用例 {check['oracle']['passed']}）", flush=True)
@@ -396,12 +393,12 @@ def run_task(task, model, tok, sandbox_root):
 
 
 def verify_task(task, final, box):
-    check_cmd = {"fix-bug": "python test_stats.py", "add-feature": "python test_math_ops.py", "refactor": "python test_formatter.py", "analyze-data": "python report.py"}[task["id"]]
+    check_cmd = {"fix-bug": "python test_stats.py", "add-feature": "python -m pytest test_math_ops.py -q", "refactor": "python -m pytest test_formatter.py -q", "analyze-data": "python report.py"}[task["id"]]
     verification = {"command": check_cmd, **run_bash(check_cmd, box)}
     oracle = {
         "fix-bug": "ns=runpy.run_path('stats.py'); assert ns['mean']([1,2,3])==2; assert ns['moving_average']([1,2,3,4],2)==[1.5,2.5,3.5]; assert ns['moving_average']([5,5,5],3)==[5.0]",
         "add-feature": "ns=runpy.run_path('math_ops.py'); assert ns['square'](4)==16; assert ns['square'](-3)==9; assert ns['sum_of_squares'](3,4)==25; assert ns['sum_of_squares'](-2,5)==29",
-        "refactor": "ns=runpy.run_path('formatter.py'); assert ns['normalize_name'](' aDA ')== 'Ada'; assert ns['format_users']([{'first':' ada ','last':' lovelace '},{'first':' ','last':' '},{'first':'ALAN','last':'turing'}])==['Ada Lovelace','Alan Turing']",
+        "refactor": "ns=runpy.run_path('formatter.py'); assert ns['normalize_name'](' aDA ')=='Ada'; assert ns['full_name'](' ada ',' lovelace ')=='Ada Lovelace'; assert ns['full_name']('',' turing ')==' Turing'",
     }
     if task["id"] in oracle:
         code = "import runpy; " + oracle[task["id"]]
@@ -416,14 +413,47 @@ def verify_task(task, final, box):
     else:
         verification["oracle"] = {"passed": "北京" in verification["stdout"] and "2915" in verification["stdout"], "stdout": "", "stderr": "", "code": verification["code"], "ms": 0}
     if task["id"] == "add-feature":
-        verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"] and "def sum_of_squares(" in final.get("math_ops.py", "") and "sum_of_squares" in final.get("test_math_ops.py", "")
+        verification["mutation"] = mutation_check(final, "math_ops.py", "test_math_ops.py", "sum_of_squares", -999999)
+        verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"] and verification["mutation"]["passed"] and "def sum_of_squares(" in final.get("math_ops.py", "") and "sum_of_squares" in final.get("test_math_ops.py", "")
     elif task["id"] == "refactor":
-        verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"] and "def normalize_name(" in final.get("formatter.py", "") and "normalize_name(" in final.get("formatter.py", "").split("def format_users", 1)[-1] and final.get("test_formatter.py") != task["files"]["test_formatter.py"]
+        verification["mutation"] = mutation_check(final, "formatter.py", "test_formatter.py", "normalize_name", "WRONG")
+        verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"] and verification["mutation"]["passed"] and "def normalize_name(" in final.get("formatter.py", "") and "normalize_name(" in final.get("formatter.py", "").split("def full_name", 1)[-1]
     elif task["id"] == "analyze-data":
         verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"]
     else:
         verification["passed"] = verification["code"] == 0 and verification["oracle"]["passed"]
     return verification
+
+
+def mutation_check(final, source_file, test_file, function_name, wrong_value):
+    """公开测试必须在隔离副本中检出目标函数被故意改错。"""
+    try:
+        with tempfile.TemporaryDirectory(prefix="blackbox-agent-mutant-") as tmp:
+            path = pathlib.Path(tmp)
+            (path / source_file).write_text(final[source_file], encoding="utf-8")
+            (path / test_file).write_text(final[test_file], encoding="utf-8")
+            argv = [os.sys.executable, "-m", "pytest", test_file, "-q"]
+            baseline = subprocess.run(argv, cwd=path, capture_output=True,
+                                      timeout=30, env=minimal_env())
+            if baseline.returncode != 0:
+                return {"passed": False, "baselineCode": baseline.returncode, "code": baseline.returncode,
+                        "stdout": baseline.stdout.decode("utf-8", "replace")[-2000:],
+                        "stderr": baseline.stderr.decode("utf-8", "replace")[-2000:]}
+            tree = ast.parse(final[source_file])
+            target = next(n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == function_name)
+            target.body = [ast.Return(value=ast.Constant(value=wrong_value))]
+            ast.fix_missing_locations(tree)
+            (path / source_file).write_text(ast.unparse(tree), encoding="utf-8")
+            cache = path / "__pycache__"
+            if cache.exists():
+                shutil.rmtree(cache)
+            mutant = subprocess.run(argv, cwd=path, capture_output=True,
+                                    timeout=30, env=minimal_env())
+            return {"passed": mutant.returncode != 0, "baselineCode": 0, "code": mutant.returncode,
+                    "stdout": mutant.stdout.decode("utf-8", "replace")[-2000:],
+                    "stderr": mutant.stderr.decode("utf-8", "replace")[-2000:]}
+    except (KeyError, SyntaxError, StopIteration, subprocess.TimeoutExpired) as exc:
+        return {"passed": False, "code": 124, "stdout": "", "stderr": str(exc)}
 
 
 def main():

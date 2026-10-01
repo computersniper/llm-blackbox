@@ -7,11 +7,14 @@
 //   D5 头 / 神经元 4 个注意力头各自的注意力矩阵；SwiGLU 的升维 / 门控 / 降维及活跃神经元摘要
 
 import { Lab, fetchJSON, fmt, fmtP, heat, linePath } from '../js/lab/core.js';
+import { TraceStage } from '../js/lab/stage3d.js';
 import { $, esc } from '../js/ui.js';
 
 const ctx = { pos: 11, head: null };
 let run = null;
 const steps = new Map();
+let traceStage;
+let scenePicks = new Map();
 
 // ---------------------------------------------------------------- 数据
 
@@ -207,10 +210,119 @@ function drawAttn(canvas, rows, T) {
 
 const view = () => $('#view');
 
+// The spatial stage uses measured values only. The numerical panels below retain the full recorded detail.
+const traceNumber = (x, digits = 3) => Number.isFinite(x) ? Number(x).toFixed(digits) : '—';
+const sampleLoss = (s) => run.log.loss.slice(Math.max(0, s - 64), s);
+
+function traceValues(n, d) {
+  const i = Math.min(ctx.pos, (d?.T || 1) - 1), L = n.L;
+  if (n.t === 'ck') return sampleLoss(n.s);
+  if (!d) return [];
+  if (n.t === 'batch' || n.t === 'tok' || n.t === 'shift') return d.ids.slice(0, d.T);
+  if (n.t === 'fwd') return d.fwd.res.at(-1);
+  if (n.t === 'emb') return d.fwd.res[0];
+  if (n.t === 'layer') return d.fwd.res[L + 1];
+  if (n.t === 'op') {
+    if (n.op === 'attn') return d.fwd.attn[L][0][i].map((x) => x / 255);
+    if (n.op === 'mlp') return d.fwd.mlp[L][i].map((x) => x[1]);
+    return d.fwd.res[L + (n.op === 'add2' ? 1 : 0)];
+  }
+  if (n.t === 'head') return n.isHead ? d.out.pTarget : d.fwd.attn[L][n.h][i].map((x) => x / 255);
+  if (n.t === 'act') return d.fwd.mlp[L][i].map((x) => x[1]);
+  if (n.t === 'down') return d.fwd.mlpOut[L];
+  if (n.t === 'loss' || n.t === 'nll' || n.t === 'mean') return d.out.lossPos;
+  if (n.t === 'probs') return d.out.pTarget;
+  if (n.t === 'bwd' || n.t === 'demb') return d.bwd.res[0];
+  if (n.t === 'blayer') return d.bwd.res[L + 1];
+  if (n.t === 'bmlp') return d.bwd.mlpOut[L];
+  if (n.t === 'battn') return d.bwd.attnOut[L];
+  if (n.t === 'clip') return run.log.gnorm.slice(Math.max(0, n.s - 64), n.s);
+  if (n.t === 'upd' || n.t === 'apick') return d.adam.row8;
+  if (n.t === 'am') return [d.adam.m0, d.adam.g, d.adam.m1];
+  if (n.t === 'av') return [d.adam.v0, d.adam.g ** 2, d.adam.v1];
+  if (n.t === 'ahat') return [d.adam.m1, d.adam.v1];
+  if (n.t === 'astep' || n.t === 'abits') return [d.adam.w, d.adam.w1];
+  return [];
+}
+
+function traceDetail(n, d) {
+  if (n.t === 'ck') return `训练损失 ${traceNumber(run.log.loss[n.s - 1])} · 近 64 步实测`;
+  if (!d) return '载入这一步的实测数值…';
+  const i = Math.min(ctx.pos, d.T - 1), L = n.L;
+  if (n.t === 'batch') return `${d.batch} 首 · ${d.tokensInBatch} 个目标字`;
+  if (n.t === 'fwd') return `末层残差范数 ${traceNumber(d.fwd.res[4][i])}`;
+  if (n.t === 'emb') return `${d.T} 个位置 · 256 维字向量`;
+  if (n.t === 'layer') return `位置 ${i} · ‖h‖ ${traceNumber(d.fwd.res[L + 1][i])}`;
+  if (n.t === 'op') return `第 ${L} 层 · 位置 ${i} · 实测摘要`;
+  if (n.t === 'head') return n.isHead ? `目标字概率 ${fmtP(d.out.pTarget[i])}` : `位置 ${i} · K/V 组 ${n.h >> 1} · 实测注意力`;
+  if (n.t === 'loss' || n.t === 'nll') return `本批损失 ${traceNumber(d.loss)}`;
+  if (n.t === 'bwd') return `裁剪前梯度范数 ${traceNumber(d.gradNorm)}`;
+  if (n.t === 'blayer') return `位置 ${i} · ‖∂h‖ ${d.bwd.res[L + 1][i].toExponential(2)}`;
+  if (n.t === 'bmlp') return `位置 ${i} · ‖∂m‖ ${d.bwd.mlpOut[L][i].toExponential(2)}`;
+  if (n.t === 'battn') return `位置 ${i} · ‖∂a‖ ${d.bwd.attnOut[L][i].toExponential(2)}`;
+  if (n.t === 'clip') return `‖g‖ ${traceNumber(d.gradNorm)} → ×${traceNumber(d.clip)}`;
+  if (n.t === 'upd' || n.t === 'apick') return `embed[${d.adam.row},${d.adam.col}] · ${traceNumber(d.adam.w, 6)} → ${traceNumber(d.adam.w1, 6)}`;
+  if (n.t === 'am') return `m: ${traceNumber(d.adam.m0, 6)} → ${traceNumber(d.adam.m1, 6)}`;
+  if (n.t === 'av') return `v: ${traceNumber(d.adam.v0, 6)} → ${traceNumber(d.adam.v1, 6)}`;
+  if (n.t === 'astep' || n.t === 'abits') return `w: ${traceNumber(d.adam.w, 6)} → ${traceNumber(d.adam.w1, 6)}`;
+  if (n.t === 'act') return '录下最活跃的 8 个神经元';
+  if (n.t === 'down') return `位置 ${i} · ‖m‖ ${traceNumber(d.fwd.mlpOut[L][i])}`;
+  return n.t === 'up' ? 'W_gate / W_up · 768 维' : '实测训练步骤';
+}
+
+function traceKind(n) {
+  if (n.t === 'layer' || n.t === 'blayer') return 'layer';
+  if (n.t === 'head') return n.isHead ? 'matrix' : 'head';
+  if (['op', 'emb', 'up', 'act', 'down', 'bmlp', 'battn', 'dhead'].includes(n.t)) return 'matrix';
+  if (['upd', 'apick', 'am', 'av', 'ahat', 'astep', 'abits'].includes(n.t)) return 'weight';
+  if (['tok', 'shift', 'probs', 'nll'].includes(n.t)) return 'token';
+  return 'box';
+}
+
+function traceScene(n, path, tree, d) {
+  scenePicks = new Map();
+  let nodes, layout = 'flow';
+  if (tree.depth === 1) {
+    nodes = [{ id: 'current', label: `第 ${n.s} 步`, detail: `训练损失 ${traceNumber(run.log.loss[n.s - 1])}`, kind: 'box', values: sampleLoss(n.s) }];
+    scenePicks.set('current', () => tree.into());
+    nodes.push({ id: 'loop', label: '一步训练', detail: '取数据 → 前向 → 损失 → 反向 → AdamW', kind: 'box', values: run.log.gnorm.slice(Math.max(0, n.s - 64), n.s) });
+    nodes.push({ id: 'model', label: '4 层 Qwen3 架构', detail: '256 维 · 4 头 / 2 组 KV', kind: 'tower', layers: run.model.layers });
+    scenePicks.set('loop', () => tree.into());
+    scenePicks.set('model', () => tree.seekWhere((x) => x.t === 'fwd'));
+  } else if (n.t === 'abits' && d) {
+    const a = d.adam;
+    nodes = [
+      { id: 'before', label: '更新前 · float32', detail: `${a.w.toPrecision(9)} · 32 个实测比特`, kind: 'weight', values: [...a.bitsBefore].map(Number) },
+      { id: 'changed', label: '更新改变的位', detail: `${[...a.bitsBefore].filter((b, k) => b !== a.bitsAfter[k]).length} / 32 位改变`, kind: 'weight', values: [...a.bitsBefore].map((b, k) => Number(b !== a.bitsAfter[k])) },
+      { id: 'after', label: '更新后 · float32', detail: `${a.w1.toPrecision(9)} · 32 个实测比特`, kind: 'weight', values: [...a.bitsAfter].map(Number) },
+    ];
+    for (const bit of nodes) scenePicks.set(bit.id, () => { if (!$('#stage').classList.contains('trace-data-open')) $('#stage .trace-data-button')?.click(); });
+  } else {
+    const anchorDepth = Math.min(tree.depth - 2, path.length - 1);
+    const anchor = path[anchorDepth];
+    let candidates = tree.list.map((p, i) => ({ p, i })).filter(({ p }) => p[anchorDepth] === anchor);
+    if (tree.depth >= 4 && candidates.length > 12) {
+      const selected = candidates.findIndex(({ i }) => i === tree.i);
+      const start = Math.max(0, Math.min(candidates.length - 12, selected - 5));
+      candidates = candidates.slice(start, start + 12);
+    }
+    nodes = candidates.map(({ p, i }) => {
+      const x = p.at(-1), id = `step-${i}`;
+      scenePicks.set(id, () => { if (i === tree.i && tree.canInto()) tree.into(); else tree.seekIndex(i); });
+      return { id, label: x.label, detail: i === tree.i ? traceDetail(x, d) : '', kind: traceKind(x), values: traceValues(x, d) };
+    });
+    if (tree.depth === 3 && ['fwd', 'bwd'].includes(path[1]?.t)) layout = 'tower';
+    else if (tree.depth === 5 && path[3]?.op === 'attn') layout = 'grid';
+  }
+  const active = tree.depth === 1 ? 'current' : n.t === 'abits' && d ? 'changed' : `step-${tree.i}`;
+  return { title: tree.depth === 1 ? `训练全程 · 第 ${path[0].s} 步` : `第 ${path[0].s} 步 · ${n.label}`, depth: tree.depth, layout, nodes, active };
+}
+
 function render(n, path, tree, kind) {
   const s = path[0].s;
   const d = stepData(s);
   sideRender(s);
+  traceStage?.update(traceScene(n, path, tree, d));
   if (n.t !== 'ck' && !d) { view().innerHTML = '<div class="panel">正在载入这一步的录像…</div>'; loadStep(s).then(() => tree.emit('step')); return; }
   const f = R[n.t] || R[n.op] || R.ck;
   view().innerHTML = f(n, d, s);
@@ -582,6 +694,12 @@ async function boot() {
   }).join('');
   $('#credit').innerHTML = `语料：<a href="https://github.com/chinese-poetry/chinese-poetry" target="_blank" rel="noopener">chinese-poetry</a> 全唐诗（MIT），繁转简后只保留五言绝句 / 律诗。训练脚本 tools/train_poet.py，数据全部来自这一次运行。`;
 
+  traceStage = new TraceStage($('#stage'), {
+    onPick: (id) => {
+      lab?.tree.pause();
+      scenePicks.get(id)?.();
+    },
+  });
   lab = new Lab({
     roots: run.detail.map((s) => ({ t: 'ck', s, label: `第 ${s} 步`, crumb: `第 ${s} 步`, dur: 2.4, kids: () => phases(s) })),
     maxDepth: 5,
@@ -589,6 +707,7 @@ async function boot() {
     code: CODE,
     explain,
     render,
+    frame: (_node, progress) => traceStage?.frame(progress),
     posText: (t) => `第 <b>${t.root.s}</b> 步 · ${t.r + 1}/${t.roots.length}<br>步骤 <b>${t.i + 1}</b>/${t.list.length}`,
     onExit: () => document.body.classList.replace('mode-inspect', 'mode-pick'),
   });

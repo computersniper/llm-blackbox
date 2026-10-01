@@ -378,3 +378,20 @@ body.mode-inspect .toast { padding: 9px 12px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+@media (max-width: 600px) {
+  .topbar { gap: 8px; padding: 9px 10px 0; align-items: flex-start; }
+  .brand { height: 34px; }
+  .brand-en { display: none; }
+  .top-nav, .nav-tabs { gap: 2px; flex: 1 1 auto; }
+  .top-nav a, .nav-tabs a { flex: none; white-space: nowrap; padding: 0 8px; font-size: 12px; }
+  .top-actions { gap: 5px; margin-left: auto; }
+  .top-actions a.hud-btn { display: none; }
+  .top-actions .hud-btn { padding: 0 8px; }
+  .crumbs { position: absolute; top: 51px; left: 10px; right: 10px; height: 24px; }
+  body.mode-inspect { --top: 82px; }
+}
+@media (max-width: 380px) {
+  #codexCount { display: none; }
+  .top-nav a, .nav-tabs a { padding: 0 6px; }
+}

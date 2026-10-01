@@ -7,9 +7,10 @@
 //   D5 采样        这个词元是怎么抽出来的：原始概率 → 温度 + top-k → top-p → 抽签
 
 import { Lab, fetchJSON, fmtP } from '../js/lab/core.js';
+import { TraceStage } from '../js/lab/stage3d.js';
 import { $, esc } from '../js/ui.js';
 
-let manifest = null, task = null, lab = null;
+let manifest = null, task = null, lab = null, trace = null;
 const cache = new Map();
 
 // ---------------------------------------------------------------- 把一轮生成切成段
@@ -100,6 +101,64 @@ function turnLabel(turn, k) {
 const vis = (s) => (s === '\n' ? '↵' : s === '\n\n' ? '↵↵' : /^\s+$/.test(s) ? '␣' : s.replace(/\n/g, '↵'));
 const view = () => $('#view');
 
+function stagePick(id) {
+  const index = Number(id.slice(5));
+  if (!id.startsWith('step-') || !Number.isInteger(index) || !lab) return;
+  const tree = lab.tree;
+  tree.pause();
+  if (index === tree.i && tree.canInto()) tree.into();
+  else tree.seekIndex(index);
+}
+
+function traceSpec(tree) {
+  const depth = tree.depth;
+  const turn = task.turns[tree.r];
+  const list = tree.list;
+  if (tree.node.t === 'samp') {
+    const tok = turn.tokens[tree.node.i];
+    const mode = tree.node.st;
+    let data = mode === 'cands' ? tok.top.map(([s, p]) => [s, p]) : (tok.samplePool || []).map(([s, , q]) => [s, q]);
+    if (mode === 'temp') {
+      const powered = tok.top.map(([s, p]) => [s, p ** (1 / manifest.sampling.temperature)]);
+      const sum = powered.reduce((total, [, p]) => total + p, 0);
+      data = powered.map(([s, p]) => [s, sum ? p / sum : 0]);
+    }
+    const selected = data.findIndex(([s]) => s === tok.s);
+    return {
+      title: `词元 “${vis(tok.s)}” · ${tree.node.label}${mode === 'temp' ? '（前 8 名内归一化示意）' : ''}`,
+      depth, layout: 'grid',
+      nodes: data.map(([s, p], i) => ({ id: `prob-${i}`, label: vis(s),
+        detail: `${mode === 'temp' ? '8 名内归一化' : mode === 'cands' ? '原始概率' : '实际采样概率'} ${fmtP(p)}${s === tok.s ? ' · 本次抽中' : ''}`, kind: 'bar', value: p,
+        color: s === tok.s ? 0xffb65c : 0x5ef0d4 })),
+      edges: [], active: selected >= 0 ? `prob-${selected}` : null,
+    };
+  }
+  const radius = depth <= 2 ? list.length : depth === 3 ? 9 : 14;
+  const start = depth <= 2 ? 0 : Math.max(0, Math.min(list.length - radius * 2 - 1, tree.i - radius));
+  const end = depth <= 2 ? list.length : Math.min(list.length, start + radius * 2 + 1);
+  const nodes = list.slice(start, end).map((path, offset) => {
+    const n = path.at(-1), k = path[0].k, t = task.turns[k], i = start + offset;
+    const tok = n.t === 'tok' ? t.tokens[n.i] : null;
+    const values = n.t === 'turn' ? t.tokens.filter((_, j) => j % Math.max(1, Math.floor(t.tokens.length / 64)) === 0).slice(0, 64).map((x) => x.p)
+      : tok ? tok.top.map(([, p]) => p)
+      : n.idx ? n.idx.slice(0, 64).map((j) => t.tokens[j].p)
+      : undefined;
+    const kind = n.t === 'turn' || n.t === 'ctx' ? 'layer'
+      : n.t === 'tok' ? 'token'
+      : n.t === 'think' ? 'head'
+      : n.t === 'call' || n.t === 'diff' ? 'matrix'
+      : n.t === 'samp' || n.t === 'check' ? 'weight' : 'box';
+    const detail = n.t === 'turn' ? `${t.tokens.length} 词元 · ${t.calls.length} 次工具调用`
+      : tok ? `原始概率 ${fmtP(tok.p)} · 熵 ${tok.H.toFixed(2)}`
+      : n.t === 'exec' ? `${t.calls[n.ci].name} · 退出码 ${t.calls[n.ci].result.code}`
+      : n.t === 'check' ? `独立复核 ${t.autoCheck?.passed ? '通过' : '失败'}`
+      : n.idx ? `${n.idx.length} 词元` : '';
+    return { id: `step-${i}`, label: n.t === 'tok' ? vis(tok.s) : n.label, detail, kind, values };
+  });
+  return { title: `${task.title} · D${depth} ${['', '每一轮', '一轮之内', '句 / 词元 / 终端', '每个词元', '采样'][depth]}`,
+    depth, layout: depth === 1 ? 'tower' : 'flow', nodes, active: `step-${tree.i}` };
+}
+
 function probCls(p) { return p > 0.9 ? 'p9' : p > 0.6 ? 'p6' : p > 0.3 ? 'p3' : 'p0'; }
 
 // 一段词元：每个词元一个小块，下划线颜色 = 模型对它有多确定
@@ -162,8 +221,8 @@ function diffHTML(changes) {
 
 function checkHTML(check) {
   return `<div class="panel"><h3>自动复核 <small>${check.passed ? '通过' : '未通过，错误会反馈给模型继续修复'}</small></h3>
-    <p class="note">任务测试：退出码 <b>${check.code}</b>；录制器持有的独立用例：<b>${check.oracle?.passed ? '通过' : '未通过'}</b>。</p>
-    <pre class="obs">${esc((check.stdout || '') + (check.stderr || '') + (check.oracle?.stderr || ''))}</pre></div>`;
+    <p class="note">任务测试：退出码 <b>${check.code}</b>；独立用例：<b>${check.oracle?.passed ? '通过' : '未通过'}</b>${check.mutation ? `；错误实现检出：<b>${check.mutation.passed ? '通过' : '未通过'}</b>` : ''}。</p>
+    <pre class="obs">${esc((check.stdout || '') + (check.stderr || '') + (check.oracle?.stderr || '') + (!check.mutation?.passed ? check.mutation?.stderr || '' : ''))}</pre></div>`;
 }
 
 function ctxHTML(k) {
@@ -255,6 +314,7 @@ function render(n, path, tree) {
     default: break;
   }
   view().innerHTML = head + body;
+  trace?.update(traceSpec(tree));
   view().querySelectorAll('.tk[data-i]').forEach((el) => el.addEventListener('click', () => {
     const i = Number(el.dataset.i);
     tree.pause();
@@ -276,6 +336,7 @@ function tokStrip(turn, idx, cur) {
 let liveStart = 0;
 function frame(n, p) {
   if (!task) return;
+  trace?.frame(p);
   const live = $('#termLive');
   if (live) {
     const k = Number(live.dataset.k), c = task.turns[k].calls[Number(live.dataset.ci)], mode = live.dataset.mode;
@@ -379,6 +440,7 @@ async function loadTask(id) {
 
 function makeLab() {
   const roots = task.turns.map((t, k) => ({ t: 'turn', k, label: turnLabel(t, k), crumb: `第 ${k + 1} 轮`, dur: 3.2, kids: () => phases(k) }));
+  if (!trace) trace = new TraceStage($('#stage'), { onPick: stagePick });
   if (!lab) {
     lab = new Lab({
       roots, maxDepth: 5,
