@@ -282,7 +282,7 @@ body.pane-drag { cursor: ew-resize; user-select: none; -webkit-user-select: none
 body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
 .dbg.folded > .pane-grip { display: none; }
 @media (max-width: 900px) { .pane-grip { display: none; } }
-/* 调试器拖宽以后：控制条按自己能用的宽度先收紧，再藏起位置读数，还放不下就折成两行（窄屏另有一套，不受影响） */
+/* 调试器拖宽以后：控制条按自己能用的宽度先收紧，再藏起位置读数、深度名，还放不下才折成两行（窄屏另有一套，不受影响） */
 @media (min-width: 901px) {
   .ctl { container-type: inline-size; }
   @container (max-width: 760px) {
@@ -291,5 +291,6 @@ body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
     .ctl-speed button { min-width: 32px; padding: 0 3px; }
   }
   @container (max-width: 680px) { .ctl-pos { display: none; } }
-  @container (max-width: 570px) { .ctl-bar { flex-wrap: wrap; justify-content: center; } }
+  @container (max-width: 570px) { .ctl-dname { display: none; } }
+  @container (max-width: 470px) { .ctl-bar { flex-wrap: wrap; justify-content: center; } }
 }

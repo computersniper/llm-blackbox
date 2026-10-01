@@ -31,7 +31,7 @@ const small = () => matchMedia('(max-width: 900px)').matches;
 
 async function boot() {
   new Background($('#bg'));
-  initPanes('agent', { left: { el: '#side', v: '--side-w', name: '对话栏', min: 300 }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 480 });
+  initPanes('agent', { left: { el: '#side', v: '--side-w', name: '对话栏', min: 300 }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 520 });
   try {
     M = await loadManifest();
   } catch (e) {
