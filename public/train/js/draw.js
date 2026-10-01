@@ -209,3 +209,41 @@ export function sciSup(v, d = 3) {
   return `${v < 0 ? '−' : ''}${m.toFixed(d - 1)}×10${String(e).split('').map((c) => SUP[c]).join('')}`;
 }
 export const fmtInt = (n) => Math.round(n).toLocaleString('zh-CN');
+
+/* ---------------------------------------------------------------- 数据分块还没到时 */
+
+// 等了 age 秒以后提示该有多明显：前 0.25 秒什么都不显示（分块通常已经到了，免得一闪而过），之后 0.3 秒淡入
+export const waitFade = (age) => clamp((age - 0.25) / 0.3, 0, 1);
+
+// 占位：可选的卡片底 + 居中的转圈和一行小字。wait = { since, err }（since 是开始等待时舞台的时钟，err 是载入失败的原因）
+export function waitBox(g, x, y, w, h, env, wait, { label = '正在载入这部分真实记录…', withCard = false, size = 12 } = {}) {
+  if (withCard) {
+    rr(g, x, y, w, h, 14);
+    g.fillStyle = COL.panel;
+    g.fill();
+    g.strokeStyle = COL.line2;
+    g.lineWidth = 1;
+    g.stroke();
+  }
+  const err = wait?.err;
+  const a = err ? 1 : waitFade(env.t - (wait?.since ?? env.t));
+  if (a <= 0) return;
+  const cx = x + w / 2, cy = y + h / 2;
+  const prev = g.globalAlpha;
+  g.globalAlpha = prev * a;
+  if (err) {
+    const tw = Math.min(w - 32, 280);
+    wrap(g, err.unsupported ? err.message : '这部分数据没有载入成功，稍后会自动重试…', cx, cy, tw, size + 6, { size, color: COL.rose, align: 'center' });
+  } else {
+    const r = size * 0.62, tw = measure(g, label, size);
+    const sx = cx - (tw + r * 2 + 10) / 2 + r, sy = cy - size * 0.33;
+    g.lineWidth = 1.6;
+    g.strokeStyle = COL.line2;
+    g.beginPath(); g.arc(sx, sy, r, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = COL.cyan;
+    const a0 = env.t * 5.5;
+    g.beginPath(); g.arc(sx, sy, r, a0, a0 + 1.4); g.stroke();
+    text(g, label, sx + r + 10, cy, { size, color: COL.ink2 });
+  }
+  g.globalAlpha = prev;
+}

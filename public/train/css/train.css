@@ -139,12 +139,15 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .dbg-explain .shape b { color: var(--cyan); font-weight: 400; }
 .dbg-explain .demo { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 6px; border: 1px dashed rgba(255, 182, 92, .55); color: var(--amber); font-size: 11px; line-height: 18px; }
 .dbg-explain .dimmed { color: var(--dim); }
+.dbg-explain .err { color: var(--rose); }
 .dbg-explain .tok { font-size: 12.5px; padding: 0 5px; }
 .dbg-explain .f { font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: nowrap; }
 .dbg-watch { padding: 10px 14px 14px; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: var(--mono); font-size: 11.5px; }
 .dbg-watch .k { color: var(--dim); }
 .dbg-watch .v { color: var(--cyan); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dbg-watch .wh { grid-column: 1 / -1; font-size: 10px; letter-spacing: .14em; color: var(--faint); margin-bottom: 2px; }
+/* 这一步的数据分块还没到：先留着上一步的讲解并调暗（延迟一点再暗，分块很快到时不会闪） */
+.dbg-explain.stale, .dbg-watch.stale { opacity: .4; transition: opacity .3s ease .25s; }
 
 /* 词元小块（和主页面一致） */
 .tok { --h: 180; display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 6px; background: hsla(var(--h), 70%, 60%, .13); border: 1px solid hsla(var(--h), 75%, 66%, .38); color: hsl(var(--h), 85%, 86%); font-family: var(--sans); font-size: 14px; line-height: 1.4; white-space: pre; }

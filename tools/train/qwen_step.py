@@ -13,7 +13,6 @@
 - 走完 3 步后，用原模型和微调后的模型对“新回答”和“原回答”算对数概率，代入 DPO 公式算一次偏好损失（只是算，没有做偏好训练）。
 """
 import argparse
-import gzip
 import json
 import math
 import pathlib
@@ -23,6 +22,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+import split_data
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'public' / 'train' / 'data'
@@ -294,11 +295,12 @@ def main():
                 'policy': pol, 'ref': ref, 'margin': margin, 'loss': dpo_loss},
         'vocab': vocab,
     }
+    # 拆成首屏用的 qwen.json + 每一步的分块 qwen/stN.json（见 split_data.py），写完读回来核对
     OUT.mkdir(parents=True, exist_ok=True)
-    js = json.dumps(meta, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    (OUT / 'qwen.json').write_bytes(js)
-    (OUT / 'qwen.json.gz').write_bytes(gzip.compress(js, 9, mtime=0))
-    print(f'qwen.json {len(js) / 1024:.0f} KB（gz {len(gzip.compress(js, 9)) / 1024:.0f} KB）')
+    meta = json.loads(json.dumps(meta, ensure_ascii=False))
+    split_data.report(split_data.split_qwen(meta, OUT))
+    split_data.verify_qwen(meta, OUT)
+    print('核对通过')
 
 
 if __name__ == '__main__':

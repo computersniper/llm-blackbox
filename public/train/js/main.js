@@ -1,5 +1,6 @@
 // 训练页面入口：载入两段真实训练记录，调试器式地一层层揭开。
-import { loadTiny, loadQwen } from './data.js';
+// 首屏只取几十 KB 的元数据和曲线；各层要用的数据分块在进入视图、播放、拖动时按需取，空闲时后台预取（见 data.js）。
+import { Loader, loadTiny, loadQwen } from './data.js';
 import { wrapTiny, wrapQwen } from './run.js';
 import { Timeline } from './timeline.js';
 import { Controls, SPEEDS } from './controls.js';
@@ -31,6 +32,9 @@ let runs = {}, tls = {}, run = 'tiny', tl = null;
 const ctx = { feat: 0 };
 const scenes = {};
 let lastView = '', lastDepth = 0, lastStepKey = '';
+const loader = new Loader();
+// 数据分块的等待状态：since = 这一轮开始等的时刻（舞台时钟），waiting = 当前画面还有分块没到（给测量脚本看）
+const wait = { since: 0, waiting: false };
 
 const app = {
   get tiny() { return runs.tiny; },
@@ -40,7 +44,7 @@ const app = {
   sfx: (n) => sfx[n]?.(),
   discover: (id) => discover(id),
   scrub: (k) => { if (!tl) return; tl.pause(); if (k !== tl.k) { tl.seekCk(k); sfx.tick(); } },
-  setFeat: (f) => { ctx.feat = f; controls.update(tl, app.R, ctx); },
+  setFeat: (f) => { ctx.feat = f; updateControls(); },
   enterRun: (r) => enterRun(r),
   seek: (pred) => { tl.pause(); tl.seek(pred); },
   into: () => into(),
@@ -52,7 +56,7 @@ const app = {
 async function boot() {
   bg = new Background($('#bg'));
   try {
-    const [t, q] = await Promise.all([loadTiny(), loadQwen()]);
+    const [t, q] = await Promise.all([loadTiny(loader), loadQwen(loader)]);
     runs = { tiny: wrapTiny(t), qwen: wrapQwen(q) };
   } catch (e) {
     console.error(e);
@@ -61,6 +65,7 @@ async function boot() {
   }
   ctx.tiny = runs.tiny;
   ctx.qwen = runs.qwen;
+  loader.on((key) => onChunk(key));
   for (const r of ['tiny', 'qwen']) {
     tls[r] = new Timeline(runs[r]);
     tls[r].speed = store.speed;
@@ -91,6 +96,7 @@ async function boot() {
   tl.toPipeline(0);
   renderRuns();
   $('#loading').hidden = true;
+  startBackground();
   if (!store.hinted && !matchMedia('(max-width: 900px)').matches) { store.hinted = true; save(); setTimeout(() => showHint(true), 2200); }
   if (new URLSearchParams(location.search).has('autoplay')) tl.play();
 }
@@ -117,7 +123,7 @@ function sceneFor(view) {
 
 function onTl(type, t) {
   if (t !== tl) return;
-  if (type === 'step' || type === 'ck') { controls.update(tl, app.R, ctx); discoverFor(); }
+  if (type === 'step' || type === 'ck') { updateControls(); discoverFor(); }
   if (type === 'play') controls.updatePlay(tl);
   if (type === 'end') controls.updatePlay(tl);
 }
@@ -134,12 +140,12 @@ function enterRun(r) {
   tl.speed = store.speed;
   if (prevDepth === 0) {
     if (tl.depth === 0 || tl.depth > 1) { tl.depth = 0; tl.setDepth(1); }
-    else controls.update(tl, app.R, ctx);
+    else updateControls();
     tl.play();
   } else {
     // 两段训练之间切换：保持同样的深度（从头开始那一段）
     if (tl.depth !== prevDepth) { if (tl.depth === 0) { tl.depth = 0; } tl.setDepth(prevDepth); }
-    else controls.update(tl, app.R, ctx);
+    else updateControls();
   }
   ctx.feat = 0;
   renderRuns();
@@ -205,11 +211,114 @@ function setSpeed(s) {
   controls.updatePlay(tl);
 }
 
+/* ---------------------------------------------------------------- 数据分块 */
+
+const STEP_VIEWS = new Set(['loop', 'fwd', 'bwd', 'loss', 'ce', 'layer', 'adam', 'bits']);
+
+// 当前画面用到的数据分块：
+//   need —— 这一屏离不开它：没到时整屏先画最近一个已到的检查点（底部标注），一个都没有就画载入占位；
+//   want —— 画面里的某一块要用：缺了那一块单独占位，或者先拿最近的检查点顶上（D1 的几张卡片）；
+//   hold —— 播放时要等它到了才往下走（D1 的嵌入地图在相邻两个检查点之间插值，要用到下一个）；
+//   soon —— 很可能马上要用：播放方向上后面几个检查点、相邻检查点、往下一层要用的，立刻排队预取。
+function plan() {
+  const p = { need: [], want: [], hold: [], soon: [] };
+  if (!tl) return p;
+  const T = runs.tiny.D;
+  if (tl.depth === 0) { p.soon.push(T.key('ck', 0), T.key('ck', T.K - 1), T.key('ck', 1)); return p; }
+  const R = app.R, D = R.D, K = R.K, k = tl.k, view = tl.view;
+  const ck = (j) => (j >= 0 && j < K ? D.key('ck', j) : null);
+  const stp = (j) => (j >= 0 && j < K ? D.key('st', j) : null);
+  if (R.kind === 'tiny') {
+    if (tl.depth === 1) {
+      // 默认的注意力头、ΔW 的色标要用第一个和最后一个检查点
+      p.want.push(ck(0), ck(K - 1), ck(k));
+      p.hold.push(ck(0), ck(K - 1), ck(k), ck(k + 1));
+      const ahead = tl.playing ? Math.min(6, 1 + Math.ceil(tl.speed)) : 1;
+      for (let j = 2; j <= ahead; j++) p.soon.push(ck(k + j));
+      p.soon.push(ck(k - 1), stp(k));
+    } else {
+      if (STEP_VIEWS.has(view)) p.need.push(stp(k));
+      if (view === 'layer') p.want.push(ck(k));
+      if (view === 'adam' || view === 'bits') p.want.push(D.key('feat'));
+      p.hold.push(...p.need);
+      // ck(k)：D4 层视图的梯度局部、退回 D1；feat：D3 更新的权重轨迹（一步之内的 5 个环节之一，提前取）
+      p.soon.push(stp(k), stp(k + 1), stp(k - 1), ck(k), D.key('feat'));
+    }
+  } else {
+    if (tl.depth >= 2) { p.need.push(stp(k)); p.hold.push(stp(k)); }
+    for (let j = 0; j < K; j++) p.soon.push(stp(j));
+  }
+  for (const key of ['need', 'want', 'hold', 'soon']) p[key] = p[key].filter(Boolean);
+  return p;
+}
+
+function request(p) {
+  for (const key of p.need) loader.want(key, 3);
+  for (const key of p.want) loader.want(key, 3);
+  for (const key of p.hold) loader.want(key, 2);
+  for (const key of p.soon) loader.want(key, 1);
+  loader.pump();
+}
+
+// 调试器里的讲解 / 变量要用的分块（D1 小模型的讲解要用这个检查点的逐字概率）
+function controlsNeed() {
+  if (!tl || tl.depth === 0) return [];
+  const p = plan();
+  return tl.depth === 1 && app.R.kind === 'tiny' ? [...p.need, app.R.D.key('ck', tl.k)] : p.need;
+}
+
+function updateControls() {
+  if (!controls || !tl) return;
+  const need = controlsNeed();
+  const ready = need.every((key) => loader.has(key));
+  const err = ready ? null : need.map((key) => loader.error(key)).find(Boolean) || null;
+  controls.update(tl, app.R, ctx, ready, err);
+}
+
+// 一块数据到了（或者失败了）：如果当前画面在等它，刷新调试器
+function onChunk(key) {
+  if (!tl) return;
+  const p = plan();
+  if (p.need.includes(key) || p.want.includes(key)) { updateControls(); discoverFor(); }
+}
+
+// 首屏画好以后开始后台预取：先 D1 的检查点（按播放顺序），再一步之内的、Qwen3 的、权重轨迹。
+// 等首屏的字体先下完（最多等 3 秒），别跟它抢带宽；省流量模式 / 2G 网络不预取，只按需取
+function startBackground() {
+  const T = runs.tiny.D, Q = runs.qwen.D, K = T.K;
+  const order = [T.key('ck', 0), T.key('ck', K - 1)];
+  for (let k = 1; k < K - 1; k++) order.push(T.key('ck', k));
+  for (let k = 0; k < K; k++) order.push(T.key('st', k));
+  for (let k = 0; k < Q.K; k++) order.push(Q.key('st', k));
+  order.push(T.key('feat'));
+  const fontsReady = document.fonts?.ready ?? Promise.resolve();
+  Promise.race([fontsReady, new Promise((r) => setTimeout(r, 3000))]).then(() => loader.startBackground(order));
+}
+
+// 离 k 最近的、一步之内的数据已经到了的检查点
+function nearestStep(R, k) {
+  for (let d = 1; d < R.K; d++) {
+    if (k - d >= 0 && R.stepReady(k - d)) return k - d;
+    if (k + d < R.K && R.stepReady(k + d)) return k + d;
+  }
+  return -1;
+}
+
 /* ---------------------------------------------------------------- 每帧 */
 
-function onFrame(dt) {
+function onFrame(dt, clock) {
   if (!tl) return null;
+  // 播放中，这一屏（或下一个检查点）要等的分块还在路上：原地停一下，到了再走
+  if (tl.playing && plan().hold.some((key) => loader.pending(key))) dt = 0;
   tl.tick(dt);
+  const p = plan();
+  request(p);
+  const needMiss = p.need.filter((key) => !loader.has(key));
+  const wantMiss = p.want.filter((key) => !loader.has(key));
+  const waiting = needMiss.length + wantMiss.length > 0;
+  if (waiting && !wait.waiting) wait.since = clock;
+  wait.waiting = waiting;
+  const err = [...needMiss, ...wantMiss].map((key) => loader.error(key)).find(Boolean) || null;
   const view = tl.view;
   const sc = sceneFor(view);
   if (view !== lastView || sc !== stage.scene) {
@@ -220,7 +329,19 @@ function onFrame(dt) {
     lastDepth = tl.depth;
   }
   lastDepth = tl.depth;
-  return { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view, speed: tl.speed, playing: tl.playing, R: app.R, i: tl.i };
+  const R = app.R;
+  const st = { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view, speed: tl.speed, playing: tl.playing, R, i: tl.i, wait: { since: wait.since, err } };
+  // 整屏要用的分块还没到：先画最近一个已到的检查点的同一步，并在底部标注；一个都没有就画占位
+  if (needMiss.length) {
+    const kd = err ? -1 : nearestStep(R, tl.k);
+    if (kd < 0) st.blocked = true;
+    else {
+      st.k = kd;
+      st.step = { ...tl.step, k: kd };
+      st.stale = { since: wait.since, label: `第 ${R.stepNo(tl.k)} 步的数据还在路上，先显示第 ${R.stepNo(kd)} 步` };
+    }
+  }
+  return st;
 }
 
 /* ---------------------------------------------------------------- 悬停 / 点击 */
@@ -243,7 +364,7 @@ function onHover(h, e) {
 function onPick(info) {
   tip.classList.remove('on');
   if (!info) return;
-  if (info.act) { info.act(); controls.update(tl, app.R, ctx); return; }
+  if (info.act) { info.act(); updateControls(); return; }
   if (info.fly) { stage.flyTo(info.fly); sfx.click(); }
 }
 
@@ -265,7 +386,7 @@ function discoverFor() {
   if (s.ph === 'bwd' && s.sub) discover('backprop');
   if (s.ph === 'bwd' && s.mi) discover('outer');
   if (s.ph === 'upd' && s.sub === 'clip') discover('clip');
-  if (s.ph === 'upd' && s.sub === 'bc') discover(R.adam(s.k, ctx.feat).t === 1 ? 'sign' : 'bias');
+  if (s.ph === 'upd' && s.sub === 'bc' && R.stepReady(s.k)) discover(R.adam(s.k, ctx.feat).t === 1 ? 'sign' : 'bias');
   if (s.ph === 'upd' && s.sub === 'dw') discover('decay');
   if (s.ph === 'upd' && s.mi === 'bf16') discover('fp32');
   if (s.ph === 'batch' && s.sub === 'mask') discover('sftmask');
@@ -370,5 +491,5 @@ function bindKeys() {
   });
 }
 
-window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, app, into, out, enterRun, ctx, setSpeed };
+window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, get waiting() { return wait.waiting; }, loader, app, into, out, enterRun, ctx, setSpeed };
 boot();

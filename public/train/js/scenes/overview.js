@@ -1,7 +1,8 @@
 // D1 · 训练全程（小模型）：一块“训练延时”仪表盘。
 // 损失曲线 + 学习率 + 梯度范数随播放头一起长出来；此刻生成的诗；留出的那首诗每个字的概率；
 // 注意力头、嵌入地图、权重局部、损失地形——全部是 41 个检查点上的真实记录。
-import { COL, text, rr, card, pill, seqColor, divColor, line, dot, clamp, lerp, fmtP, sciSup, fmtInt, measure, hexA, wrap, badge } from '../draw.js';
+// 曲线、诗、地形在首屏数据里；逐字概率、注意力、嵌入、权重局部按检查点分块，没到的卡片先占位或先拿最近的检查点顶上。
+import { COL, text, rr, card, pill, seqColor, divColor, line, dot, clamp, lerp, fmtP, sciSup, fmtInt, measure, hexA, wrap, badge, waitBox, waitFade } from '../draw.js';
 import { esc } from '../../../js/ui.js';
 
 const GROUPS = [
@@ -29,12 +30,57 @@ export class Overview {
     this.cache = new Map();
     this.wmode = 'w';
     this.reveal = { k: -1, t0: 0 };
-    // 默认的注意力头：最终检查点上“看上一句同一位置”最强的那个头（唐诗的对仗）
+    this.headStats = null;
+    this.head = null;
+  }
+
+  // 默认的注意力头：最终检查点上“看上一句同一位置”最强的那个头（唐诗的对仗）。最后一个检查点的分块到了才算得出来
+  initHeads() {
+    if (this.headStats || !this.D.has('ck', this.D.K - 1)) return !!this.headStats;
     this.headStats = this.computeHeadStats();
     let best = [0, 0], bv = -1;
     for (let l = 0; l < this.D.NL; l++) for (let h = 0; h < this.D.H; h++) { const v = this.headStats[l][h].back6; if (v > bv) { bv = v; best = [l, h]; } }
     this.head = best;
+    return true;
   }
+
+  // 这张卡用哪个检查点的数据：当前这个到了就用它；没到就先拿最近的、已经到了的顶上（等一会儿再调暗并标注）；
+  // base = 还要用到第一个和最后一个检查点（默认的注意力头、ΔW 的色标）。一个都没有时在 area 里画占位，返回 null
+  src(g, area, st, env, base = false) {
+    const D = this.D;
+    const ok = !base || (D.has('ck', 0) && D.has('ck', D.K - 1));
+    if (ok && D.has('ck', st.k)) return { k: st.k, stale: false };
+    const k = ok ? D.nearestCk(st.k) : -1;
+    if (k < 0) { waitBox(g, area.x, area.y, area.w, area.h, env, st.wait, { label: '正在载入这个检查点…', size: 11.5 }); return null; }
+    return { k, stale: true, f: waitFade(env.t - st.wait.since) };
+  }
+
+  // 顶替用的数据画淡一点；顶替时不弹数值提示（返回给卡片用的 hit）
+  staleBegin(g, s, env) {
+    if (s.stale) g.globalAlpha = 1 - 0.6 * s.f;
+    return s.stale ? () => {} : env.hit;
+  }
+
+  // 卡片中间标注顶替的是第几步
+  staleEnd(g, C, s) {
+    if (!s.stale) return;
+    g.globalAlpha = s.f;
+    if (s.f > 0) {
+      const lab = `载入中 · 先显示第 ${fmtInt(this.D.meta.ckpts[s.k].t)} 步`;
+      const w = measure(g, lab, 10) + 22, h = 22, x = C.x + (C.w - w) / 2, y = C.y + C.h / 2 - h / 2;
+      rr(g, x, y, w, h, h / 2);
+      g.fillStyle = 'rgba(10,17,31,0.92)';
+      g.fill();
+      g.strokeStyle = 'rgba(255,182,92,0.45)';
+      g.lineWidth = 1;
+      g.stroke();
+      text(g, lab, C.x + C.w / 2, y + 15, { size: 10, color: COL.amber, align: 'center' });
+    }
+    g.globalAlpha = 1;
+  }
+
+  // 卡片标题以下的区域（占位画在这里）
+  body(C, top = 50, bottom = 14) { return { x: C.x + 14, y: C.y + top, w: C.w - 28, h: C.h - top - bottom }; }
 
   computeHeadStats(k = this.D.K - 1) {
     const D = this.D, Lv = D.Lv, out = [];
@@ -290,8 +336,11 @@ export class Overview {
   /* ---------------------------------------------------------------- 留出的一首诗 */
 
   drawVal(g, st, env) {
-    const C = this.val, D = this.D, k = st.k, m = D.meta;
+    const C = this.val, D = this.D, m = D.meta;
     card(g, C.x, C.y, C.w, C.h, { eyebrow: 'HELD-OUT · 训练时从没见过', title: '《登鹳雀楼》每个字的概率', accent: COL.cyan });
+    const s = this.src(g, this.body(C), st, env);
+    if (!s) return;
+    const k = s.k, hit = this.staleBegin(g, s, env);
     const textS = m.held.text + '⏎';
     const cols = 6, tw = Math.min(34, (C.w - 28) / cols - 4), th = tw + 12;
     const x0 = C.x + (C.w - cols * (tw + 4)) / 2, y0 = C.y + 58;
@@ -308,7 +357,7 @@ export class Overview {
       g.stroke();
       text(g, textS[i], x + tw / 2, y + tw / 2 + 5, { size: tw * 0.5, color: p > 0.5 ? '#04121a' : COL.ink, align: 'center', weight: 600 });
       text(g, fmtP(p), x + tw / 2, y + th - 4, { size: 8.5, kind: 'mono', color: p > 0.5 ? '#04121a' : COL.dim, align: 'center' });
-      env.hit(x, y, tw, th, { tip: () => {
+      hit(x, y, tw, th, { tip: () => {
         const top = D.valTop(k, i).map((tt) => `<tr><td class="${tt.id === m.held.ids[i + 1] ? 'tg' : ''}">${esc(tt.id === 0 ? '⏎' : D.ch(tt.id))}</td><td>${fmtP(tt.p)}</td></tr>`).join('');
         const ctxs = m.held.text.slice(0, i) || '（只有开头标记）';
         return `<span class="k">看到「${esc(ctxs.slice(-8))}」之后</span>正确答案「<b>${esc(textS[i])}</b>」的概率 <span class="v">${fmtP(p)}</span><table>${top}</table>`;
@@ -316,14 +365,19 @@ export class Overview {
     }
     const n = D.Lv;
     text(g, `平均损失 ${(mean / n).toFixed(2)}（每个字 −ln p 的平均）`, C.x + 14, C.y + C.h - 14, { size: 10, color: COL.dim });
+    this.staleEnd(g, C, s);
   }
 
   /* ---------------------------------------------------------------- 注意力头 */
 
   drawAttn(g, st, env) {
-    const C = this.attnC, D = this.D, k = st.k, m = D.meta;
+    const C = this.attnC, D = this.D, m = D.meta;
+    this.initHeads();
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: this.head ? `ATTENTION · 第 ${this.head[0]} 层第 ${this.head[1]} 头` : 'ATTENTION', title: '一个注意力头的样子', accent: COL.violet });
+    const s = this.src(g, this.body(C), st, env, true);
+    if (!s) return;
+    const k = s.k, hit = this.staleBegin(g, s, env);
     const [l, h] = this.head;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: `ATTENTION · 第 ${l} 层第 ${h} 头`, title: '一个注意力头的样子', accent: COL.violet });
     const Lv = D.Lv;
     const side = Math.min(C.w - 100, C.h - 120);
     const cs = side / Lv;
@@ -339,7 +393,7 @@ export class Overview {
     g.strokeStyle = COL.line2;
     g.strokeRect(x0, y0, side, side);
     if (cs > 6) for (let i = 0; i < Lv; i++) text(g, chars[i], x0 - 3, y0 + i * cs + cs * 0.75, { size: Math.min(9, cs * 0.9), color: COL.dim, align: 'right' });
-    env.hit(x0, y0, side, side, { tipAt: (wx, wy) => {
+    hit(x0, y0, side, side, { tipAt: (wx, wy) => {
       const i = clamp(Math.floor((wy - y0) / cs), 0, Lv - 1), j = clamp(Math.floor((wx - x0) / cs), 0, Lv - 1);
       if (j > i) return '<span class="k">因果遮罩</span>只能看前面的字，不能偷看后面';
       return `<span class="k">第 ${i} 行 · 第 ${j} 列</span>「${esc(chars[i])}」看「${esc(chars[j])}」　<span class="v">${fmtP(D.attn(k, l, h, i, j))}</span>`;
@@ -363,8 +417,8 @@ export class Overview {
       text(g, `L${ll}`, gx + D.H * (bw + 3) + 2, gy + ll * (bw + 5) + bw - 3, { size: 8, kind: 'mono', color: COL.faint });
     }
     // 这个头此刻在干什么（真实统计）
-    const s = this.computeOne(k, l, h);
-    const desc = [['看前一个字', s.prev], ['看上一句同位置', s.back6], ['看自己', s.self], ['看开头', s.first]].sort((a, b) => b[1] - a[1]);
+    const one = this.computeOne(k, l, h);
+    const desc = [['看前一个字', one.prev], ['看上一句同位置', one.back6], ['看自己', one.self], ['看开头', one.first]].sort((a, b) => b[1] - a[1]);
     const ty = y0 + side + 18;
     desc.slice(0, 3).forEach(([n, v], i) => {
       const yy = ty + i * 16;
@@ -374,6 +428,7 @@ export class Overview {
       g.fill();
       text(g, fmtP(v), C.x + C.w - 14, yy, { size: 10, kind: 'mono', color: COL.dim, align: 'right' });
     });
+    this.staleEnd(g, C, s);
   }
 
   computeOne(k, l, h) {
@@ -387,12 +442,17 @@ export class Overview {
 
   drawEmb(g, st, env) {
     const C = this.emb, D = this.D, m = D.meta;
-    const k = st.k, k2 = st.depth === 1 ? Math.min(D.K - 1, k + 1) : k, f = st.depth === 1 ? st.p : 0;
     card(g, C.x, C.y, C.w, C.h, { eyebrow: 'EMBEDDING · PCA 前两维', title: '字的地图', accent: COL.green });
     const bx = C.x + 14, by = C.y + 54, bw = C.w - 28, bh = C.h - 100;
     rr(g, bx, by, bw, bh, 8);
     g.fillStyle = 'rgba(255,255,255,0.015)';
     g.fill();
+    this.drawLegend(g, C);
+    const s = this.src(g, { x: bx, y: by, w: bw, h: bh }, st, env);
+    if (!s) return;
+    const hit = this.staleBegin(g, s, env);
+    // 播放时在这个检查点和下一个之间插值（播放前已经等到了下一个的分块）
+    const k = s.k, k2 = !s.stale && st.depth === 1 && k + 1 < D.K && D.has('ck', k + 1) ? k + 1 : k, f = k2 !== k ? st.p : 0;
     const sc = Math.min(bw, bh) / 5.2;
     const cx = bx + bw / 2, cy = by + bh / 2;
     const N = D.NP;
@@ -408,7 +468,7 @@ export class Overview {
       else dot(g, px, py, 1.3, 'rgba(180,190,210,0.35)');
     }
     for (const [px, py, ch, c] of labels) text(g, ch, px, py + 4, { size: 11, color: c, align: 'center', weight: 600 });
-    env.hit(bx, by, bw, bh, { tipAt: (wx, wy) => {
+    hit(bx, by, bw, bh, { tipAt: (wx, wy) => {
       let best = -1, bd = 1e9;
       for (let n = 0; n < N; n++) {
         const [ax, ay] = D.pca(k, n);
@@ -419,7 +479,12 @@ export class Overview {
       const ch = D.pcaChars[best] === '<|endoftext|>' ? '⏎（诗与诗之间的分隔）' : D.pcaChars[best];
       return `<span class="k">嵌入向量 · ${m.model.hidden} 维投影到 2 维</span><b>${esc(ch)}</b>　训练集里排第 ${m.pcaIds[best]} 常见`;
     } });
-    // 图例
+    this.staleEnd(g, C, s);
+  }
+
+  // 图例
+  drawLegend(g, C) {
+    const N = this.D.NP;
     let lx = C.x + 14;
     const ly = C.y + C.h - 32;
     for (const gp of GROUPS) {
@@ -451,8 +516,12 @@ export class Overview {
   }
 
   drawWeights(g, st, env) {
-    const C = this.wts, D = this.D, k = st.k, m = D.meta;
+    const C = this.wts, D = this.D, m = D.meta;
     card(g, C.x, C.y, C.w, C.h, { eyebrow: 'WEIGHTS · 48×48 个真实数值', title: '权重在变', accent: COL.amber });
+    this.drawModes(g, C, env);
+    const s = this.src(g, this.body(C, 50, 46), st, env, true);
+    if (!s) return;
+    const k = s.k, hit = this.staleBegin(g, s, env);
     const names = ['嵌入（最常见 48 字）', `第 2 层 W_q`, `第 4 层 W_down`];
     const n = 3, gap = 10;
     const sz = Math.min((C.w - 28 - gap * (n - 1)) / n, C.h - 130);
@@ -470,13 +539,18 @@ export class Overview {
       g.strokeStyle = COL.line2;
       g.strokeRect(x0, y0, sz, sz);
       text(g, names[c], x0, y0 + sz + 14, { size: 9.5, color: COL.dim, max: sz });
-      env.hit(x0, y0, sz, sz, { tipAt: (wx, wy) => {
+      hit(x0, y0, sz, sz, { tipAt: (wx, wy) => {
         const i = clamp(Math.floor(((wy - y0) / sz) * D.C), 0, D.C - 1), j = clamp(Math.floor(((wx - x0) / sz) * D.C), 0, D.C - 1);
         const w = D.wcrop(k, c, i, j), w0 = D.wcrop(0, c, i, j), gr = D.gcrop(k, c, i, j);
         const row = c === 0 ? `「${D.ch(i + 1)}」第 ${j} 维` : `[${i}, ${j}]`;
         return `<span class="k">${names[c]} ${row}</span>w = <span class="v">${w.toFixed(4)}</span>（开始时 ${w0.toFixed(4)}）<br>这一步的梯度 ${sciSup(gr, 2)}<br><span style="color:var(--dim)">按 int8 量化存储，误差约 1%</span>`;
       } });
     }
+    this.staleEnd(g, C, s);
+  }
+
+  // 权重 / 变化 / 梯度 三个按钮
+  drawModes(g, C, env) {
     const modes = [['w', '权重 W'], ['d', '变化 ΔW'], ['g', '梯度 ∇W']];
     const pw = (C.w - 28 - 12) / 3;
     modes.forEach(([id, s], i) => {

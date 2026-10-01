@@ -45,8 +45,10 @@ export function wrapTiny(D) {
       return D.tgrad(k, tIdx.get(name));
     },
     feats: m.feats,
-    adam: (k, f) => m.ckpts[k].adam[f],
+    adam: (k, f) => D.adam(k, f),
     featHist: (f) => D.feat(f),
+    // 一步之内（D2–D4）的数据分块到了没有
+    stepReady: (k) => D.has('st', k),
     batchShape: `${m.train.batch} 行 × ${m.train.seq + 1} 字`,
     tokensSeen: (k) => m.ckpts[k].t * m.train.tokensPerStep,
   };
@@ -85,6 +87,7 @@ export function wrapQwen(D) {
     feats: m.feats,
     adam: (k, f) => ({ t: k + 1, ...m.steps[k].feats[f] }),
     featHist: null,
+    stepReady: (k) => D.has('st', k),
     batchShape: `1 条对话 × ${N} 个词元`,
     tokensSeen: (k) => k * N,
   };

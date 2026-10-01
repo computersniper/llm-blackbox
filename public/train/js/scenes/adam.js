@@ -1,6 +1,6 @@
 // D3 · 更新：一个具体权重的 AdamW 算式（全是真实数字）+ 它在整段训练里的轨迹；
 // D4 · 写回的比特：更新前后的 fp32，以及如果只用 bf16 存会怎样。
-import { COL, text, rr, card, hexA, clamp, ease, seg, sciSup, fmtInt, line, dot, pill, wrap, measure } from '../draw.js';
+import { COL, text, rr, card, hexA, clamp, ease, seg, sciSup, fmtInt, line, dot, pill, wrap, measure, waitBox } from '../draw.js';
 import { f32Bits, bf16Round } from '../explain.js';
 import { UPD_SUBS } from '../timeline.js';
 import { esc } from '../../../js/ui.js';
@@ -97,7 +97,10 @@ export class AdamView {
     const x0 = C.x + 16, w = C.w - 32;
     const ch = (C.h - 80) / 4;
     const tNow = a.t;
-    if (T) {
+    if (T && !R.D.has('feat')) {
+      // 4 个权重的完整轨迹单独一块，还没到时先占位
+      waitBox(g, C.x + 14, C.y + 50, C.w - 28, C.h - 64, env, st.wait, { label: '正在载入这个权重的轨迹…' });
+    } else if (T) {
       const H = R.featHist(f);
       const n = H.n, stride = H.stride;
       series.forEach(([key, lab, col], j) => {
