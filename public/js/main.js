@@ -9,6 +9,7 @@ import { sfx, setSound, soundOn } from './audio.js';
 import { $, esc, tokPlain, tokHTML, fmtPct, fmtNum, sleep } from './ui.js';
 import { initPanes } from './resize.js';
 import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from './prefetch.js';
+import { countVisit, showVisits } from './visits.js';
 
 const KEY = 'blackbox:v2';
 const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记' };
@@ -51,6 +52,7 @@ async function boot() {
     head: (h) => { ctx.head = h; if (tl) { if (tl.ready(tl.step)) controls.update(tl, ctx); checkSink(); } },
   });
   chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus });
+  countVisit().then(showVisits);
   bindKeys();
   bindChrome();
   renderCodexCount();

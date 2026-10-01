@@ -1,5 +1,6 @@
 // 聊天面板 + 点选输入法。输入法的候选就是问题的真实分词结果（Qwen3 的词元），
 // 按前缀一块块弹进输入框，所以只能拼出模型真的回答过的问题。
+import { REPO } from './visits.js';
 import { $, $$, esc, tokHTML, tokInner, sleep } from './ui.js';
 
 export class Chat {
@@ -53,7 +54,8 @@ export class Chat {
       <h1>揭开黑箱</h1>
       这是阿里开源的 <b>Qwen3-0.6B</b>。下面的每个回答、每个数字，都来自这个真实模型的一次运行（离线录制，所以不会卡，也不花钱）。它只有 6 亿参数，偶尔会一本正经地说错话，这也是真实的一部分。<br>
       用下方的<b>词元</b>拼出一个问题发给它。想看它是怎么想出每一个字的，就点消息旁的 <span class="key">＋</span>：每按一次，往黑箱里钻一层，像调试程序一样单步执行。
-      <div class="spec"><span><b>${m.layers}</b> 层</span><span>隐藏维度 <b>${m.hidden}</b></span><span><b>${m.heads}</b> Q 头 / <b>${m.kvHeads}</b> KV 头</span><span>SwiGLU <b>${m.ffn}</b></span><span>词表 <b>${m.vocab.toLocaleString('zh-CN')}</b></span><span><b>${(m.params / 1e8).toFixed(2)}</b> 亿参数</span></div>`;
+      <div class="spec"><span><b>${m.layers}</b> 层</span><span>隐藏维度 <b>${m.hidden}</b></span><span><b>${m.heads}</b> Q 头 / <b>${m.kvHeads}</b> KV 头</span><span>SwiGLU <b>${m.ffn}</b></span><span>词表 <b>${m.vocab.toLocaleString('zh-CN')}</b></span><span><b>${(m.params / 1e8).toFixed(2)}</b> 亿参数</span></div>
+      <div class="intro-foot"><a href="${REPO}" target="_blank" rel="noopener">GitHub 仓库 ↗</a><span data-visits hidden></span></div>`;
     this.log.append(el);
   }
 
