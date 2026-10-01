@@ -630,6 +630,7 @@ export function buildScore(Q) {
         const live = loopCam(M, M.x(Q.row(Q.G - 1)), t, { yaw: 30, dz: 28, back: 6 });
         return blendCam(prevCam('loop2', live), far, smoother(seg(lt, 0, 10)));
       },
+      hide: ['bars'],
       dof: { focus: 14, range: 24, blur: 6 * smooth(seg(lt, 2.5, 5)) },
       fade: lerp(0, 0.86, smooth(seg(lt, 0.6, 2.0))) + 0.14 * smooth(seg(t, T1 - 1.2, T1 - 0.05)),
       ov: {
