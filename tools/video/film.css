@@ -212,7 +212,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
    顶部章节进度条 + 字幕上方的小号术语标签 + 注意力公式板 + 6 个头的小图 + 指示环 */
 
 /* 章节进度：很小、低调；当前一章亮，讲过的半亮，没到的暗 */
-.prog { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; white-space: nowrap; font-size: 21px; font-weight: 600; letter-spacing: .06em; }
+.prog { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 7px 22px; border-radius: 999px; background: rgba(3, 7, 15, .62); backdrop-filter: blur(6px); white-space: nowrap; font-size: 22px; font-weight: 600; letter-spacing: .06em; }
 .prog .it { display: flex; align-items: center; gap: 8px; color: rgba(150, 165, 195, .38); }
 .prog .it i { font-style: normal; font-family: var(--mono); font-weight: 400; font-size: 15px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(150, 180, 230, .22); }
 .prog .it.done { color: rgba(176, 186, 205, .62); }
@@ -222,7 +222,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .prog .ln { width: 30px; height: 1px; background: rgba(150, 180, 230, .2); }
 
 /* 术语标签：字幕正上方，一次最多一个 */
-.term { position: absolute; left: 50%; bottom: 128px; padding: 5px 16px 6px; border-radius: 999px; border: 1px solid rgba(94, 240, 212, .45); background: rgba(3, 10, 16, .72); color: #9ff3e2; font-size: 21px; font-weight: 600; letter-spacing: .05em; white-space: nowrap; }
+.term { position: absolute; left: 50%; bottom: 128px; padding: 5px 16px 6px; border-radius: 999px; border: 1px solid rgba(94, 240, 212, .45); background: rgba(3, 10, 16, .72); color: #9ff3e2; font-size: 23px; font-weight: 600; letter-spacing: .05em; white-space: nowrap; }
 .term .m { color: #d8fff6; }
 .term sub, .term sup { font-size: .7em; }
 .term q { quotes: "「" "」"; color: var(--amber); }

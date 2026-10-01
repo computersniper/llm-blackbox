@@ -750,7 +750,7 @@ export function buildScore(Q) {
   {
     const T0 = SEC.end.t0, T1 = SEC.end.t1;
     // 0–9 s 完整回答；9.6 s 起「继续探索」：一句引子 → 站内另外几页各一行 → 延伸学习 + 二维码；配乐在这里收尾
-    const E1 = 9.6, E2 = 13.6, E3 = 19.6;
+    const E1 = 8.6, E2 = 12.4, E3 = 17.6; // 二维码那一屏留 7 秒多，够手机对准扫
     ev(T0 + 1.6, 'hit', { k: 0.5 });
     ev(T0 + E1, 'reveal', { k: 0.5 });
     ev(T0 + E2, 'step', { k: 0.4 });
