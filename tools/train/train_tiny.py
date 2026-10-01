@@ -2,7 +2,7 @@
 
 用法：
     python tools/train/prep_corpus.py          # 先准备语料
-    python tools/train/train_tiny.py           # 训练 + 导出到 public/train/data/tiny.*
+    python tools/train/train_tiny.py           # 训练 + 导出到 public/train/data/tiny.*、tiny/（首屏文件 + 按需分块，见 split_data.py）
 
 模型用的是 transformers 里真正的 Qwen3ForCausalLM，只是把尺寸改小：
 保留 GQA（4 个查询头共用 2 组键值头）、每个头的 q_norm / k_norm、RMSNorm、RoPE、SwiGLU、输入输出共享嵌入。
@@ -20,7 +20,6 @@
 - 训练结束后，在检查点轨迹的前两个主成分张成的平面上真实计算一张损失地形。
 """
 import argparse
-import gzip
 import json
 import math
 import pathlib
@@ -32,6 +31,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from transformers import Qwen3Config, Qwen3ForCausalLM
+
+import split_data
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / 'public' / 'train' / 'data'
@@ -535,13 +536,13 @@ def main():
                  'pathLoss': [round(v, 4) for v in path_loss], 'evr': [float(e) for e in evr], 'batchRows': int(lb.shape[0])},
         'bin': rec.spec,
     }
+    # 拆成首屏小文件 + 按检查点的分块（见 split_data.py），写完读回来逐字节核对
     OUT.mkdir(parents=True, exist_ok=True)
-    js = json.dumps(meta, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-    bn = rec.bytes()
-    for name, blob in (('tiny.json', js), ('tiny.bin', bn)):
-        (OUT / name).write_bytes(blob)
-        (OUT / (name + '.gz')).write_bytes(gzip.compress(blob, 9, mtime=0))
-        print(f'  {name}: {len(blob) / 1024:.0f} KB（gz {len(gzip.compress(blob, 9)) / 1024:.0f} KB）')
+    meta = json.loads(json.dumps(meta, ensure_ascii=False))   # 和网页读到的一样（元组变列表等）
+    A = split_data.arrays(meta, rec.bytes())
+    split_data.report(split_data.split_tiny(meta, A, OUT))
+    split_data.verify_tiny(meta, A, OUT)
+    print('  核对通过')
 
 
 if __name__ == '__main__':
