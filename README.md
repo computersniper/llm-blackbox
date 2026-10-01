@@ -490,26 +490,29 @@ git push deploy main                                               # 发布（�
 
 ## 推理视频
 
-`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 55 秒的片子《AI 的一个字是怎么思考出来的——走进大模型推理的“黑箱”》。问题是「天空为什么是蓝色的？」。
+`tools/video/` 用网站的 3D 舞台和真实数据做了一支 5 分 05 秒的片子《AI 的一个字是怎么思考出来的——走进大模型推理的“黑箱”》。问题是「天空为什么是蓝色的？」。
 
 片子从一个干净的聊天页开始：用拼音一个字一个字打出问题，按发送，问题变成消息气泡，助手显示“正在思考…”。接着镜头推近气泡，文字按真实分词裂成词元块，变成 3D 方块飞进黑箱、落到托盘上（一个连续跟随镜头），片名落在黑箱正面。之后依次是：
 
-- 嵌入；
+- 查表：嵌入；
 - 穿过 28 层：逻辑透镜在第 21 层说「因为」，第 24 层改口成「天空」；
-- 拆开第 24 层：RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特；
-- 输出头、采样，自回归写完整句回答。
+- 注意力：拆开第 24 层，用“在图书馆查资料”讲 Q / K / V，公式 softmax(QKᵀ/√d)·V 随画面一项一项搭出来，每一项都配真实数字，再并排看 6 个头；
+- 前馈：3072 个小开关、门控、一次乘加、bf16 比特；
+- 选字：输出头、温度 / top-k / top-p、按概率抽签，自回归写完整句回答；
+- 继续探索：站内另外几页，延伸学习页，二维码。
 
-配乐由 `compose.py` 用 numpy / scipy 现场合成。
+讲解的写法是一次只讲一件事：顶部有一条很小的章节进度条；任何时刻最多一行白话字幕，加一个小号术语标签；正在讲的东西用高亮或指示环点出来，其他压暗。配乐由 `compose.py` 用 numpy / scipy 现场合成，讲解段落更安静。
 
 | 文件 | 作用 |
 | --- | --- |
-| `film.html` / `film.js` / `film.css` / `board.css` | 电影模式页面：复用 `public/js/stage/` 的机器和算式板，`__film.renderAt(t)` 确定地渲染第 t 秒 |
-| `score.js` | 分镜表：每个镜头的机器状态、机位（样条 + 单调三次插值）、字幕、数据条、配乐事件（96 BPM，段落卡在小节线上） |
+| `film.html` / `film.js` / `film.css` / `board.css` | 电影模式页面：复用 `public/js/stage/` 的机器和算式板，`__film.renderAt(t)` 确定地渲染第 t 秒；讲解层（进度条、术语标签、注意力公式板、6 个头的小图、指示环）也在这里 |
+| `score.js` | 分镜表：每个镜头的机器状态、机位（样条 + 单调三次插值）、字幕、术语标签、章节进度、配乐事件（96 BPM，段落卡在小节线上） |
 | `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层；`opening.js` 是开场：聊天页（打字、输入法候选、气泡、推近、裂成词元），以及词元交给 3D 方块以后的飞行与落位 |
 | `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面；WebGL 上下文丢失（GPU 进程崩溃）时自动重开浏览器重渲 |
-| `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −1 dBTP |
+| `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −2 dBTP |
+| `make_qr.py` / `qr-blackbox.svg` | 片尾二维码：用 segno 在本地生成，指向 caijiechao.com/blackbox/ |
 | `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
-| `share.sh` | 分享用小体积版本：1080p30，两遍编码 4.5 Mbps + AAC 192k，约 138 MB |
+| `share.sh` | 分享用小体积版本：1080p30，两遍编码 3.6 Mbps + AAC 192k，约 145 MB |
 | `review.py` | 抽帧拼成带时间码的联系表，检查用 |
 | `dbg.mjs` | 调试：跳到第 t 秒，在页面里执行一段表达式（可顺带截图） |
 | `serve.py` | 本地服务器（仓库根目录 + D 盘上的字体） |
@@ -520,12 +523,13 @@ git push deploy main                                               # 发布（�
 # 需要 /mnt/d/cjc/videos/llm-inference/fonts/ 下的 NotoSerifSC-{Black,SemiBold}.otf 和 NotoSansSC-VF.ttf（都是 SIL OFL）
 python tools/video/serve.py --port 8776 &
 O=/mnt/d/cjc/videos/llm-inference
-node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # 约 3 分钟；已有的帧会跳过，中断了可以接着渲
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/make_qr.py                 # 只在网址变了时需要（uv pip install segno）
+node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # 约 5 分钟；已有的帧会跳过，中断了可以接着渲
 node tools/video/render.mjs events --out tools/video/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events.json --out $O/score.wav
-bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference-v4.mp4 60
-bash tools/video/share.sh $O/frames60 $O/score.wav $O/qwen3-inference-v4-share.mp4
-node tools/video/render.mjs poster --out $O/poster-v4.png                   # 默认取片名落版那一刻
+bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference-v5.mp4 60
+bash tools/video/share.sh $O/frames60 $O/score.wav $O/qwen3-inference-v5-share.mp4
+node tools/video/render.mjs poster --out $O/poster-v5.png                   # 默认取片名落版那一刻
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
 

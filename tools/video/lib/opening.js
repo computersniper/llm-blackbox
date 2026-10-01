@@ -274,7 +274,7 @@ export class Opening {
     this.tiles = this.user.map((t) => {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(TILE_GEO, mat));
-      const face = new THREE.Mesh(FACE_GEO, new THREE.MeshBasicMaterial({ map: textTexture(tokPlain(t.s), { color: '#5ee4f0' }), transparent: true }));
+      const face = new THREE.Mesh(FACE_GEO, new THREE.MeshBasicMaterial({ map: textTexture(tokPlain(t.s), { color: '#5ee4f0', w: 512, h: 320, font: '600 152px "PingFang SC","Noto Sans SC",sans-serif' }), transparent: true }));
       face.position.z = 0.181;
       g.add(face);
       const top = face.clone();
