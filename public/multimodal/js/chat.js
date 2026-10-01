@@ -182,6 +182,7 @@ export class Chat {
         <canvas class="heat" width="${im.size[0]}" height="${im.size[1]}"></canvas>
         <span class="heat-cap"></span>
       </div>
+      ${im.source ? `<a class="ub-src" href="${esc(im.source.url)}" target="_blank" rel="noopener">${esc(im.source.name)} · ${esc(im.source.author)} · ${esc(im.source.license)}</a>` : ''}
       <div class="bubble">${q.chips.map((c) => tokHTML(c.s, 'r-user')).join('')}</div>`;
     this.log.append(el);
     this.scroll();

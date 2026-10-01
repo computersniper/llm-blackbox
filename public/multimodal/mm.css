@@ -49,6 +49,8 @@ body.mode-inspect .site-nav { display: none; }
 .heat-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 9px 6px; font-size: 11.5px; line-height: 1.4; color: var(--ink); background: linear-gradient(to top, rgba(4, 8, 16, .9), transparent); opacity: 0; transition: opacity .25s; pointer-events: none; }
 .heat-cap small { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
 .ub-img.on .heat-cap { opacity: 1; }
+.ub-src { max-width: min(240px, 60vw); font-size: 10.5px; line-height: 1.4; color: var(--faint); text-decoration: none; text-align: right; }
+.ub-src:hover { color: var(--dim); text-decoration: underline; }
 .msg.bot.hoverable .bot-text .rt { cursor: crosshair; }
 .msg.bot.hoverable .bot-text .rt:hover, .bot-text .rt.lit { background: rgba(255, 182, 92, .2); color: #fff; }
 .bot-meta .hover-tip { font-size: 11.5px; color: var(--faint); }
