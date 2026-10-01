@@ -3,6 +3,7 @@
 //   node tools/video/render.mjs frames --out /mnt/d/cjc/videos/llm-inference/frames [--from 0] [--to 210] [--fps 30] [--workers 4]
 //   node tools/video/render.mjs stills --times 12,40.5,96 --out dir      # 抽几帧看效果
 //   node tools/video/render.mjs events --out tools/video/events.json      # 导出配乐用的事件和段落
+//   node tools/video/render.mjs poster --t 58.4 --out poster.png            # 封面
 //
 // 帧存成 JPEG（质量 95），已经存在的帧会跳过：中途崩了重跑同一条命令就能接着渲染。
 import { createRequire } from 'node:module';
@@ -50,6 +51,12 @@ if (mode === 'events') {
   const ev = await page.evaluate(() => ({ events: window.__film.events(), score: window.__film.score, duration: window.__film.duration, fps: window.__film.fps }));
   fs.writeFileSync(A.out || 'events.json', JSON.stringify(ev, null, 1));
   console.log(`events: ${ev.events.length} · duration ${ev.duration}s · ${info.gl}`);
+  await browser.close();
+} else if (mode === 'poster') {
+  const { browser, page, cdp } = await open();
+  await page.evaluate((tt) => window.__film.poster(tt), Number(A.t || 58.4));
+  await shot(cdp, A.out || 'poster.png');
+  console.log(`poster: ${A.out}`);
   await browser.close();
 } else if (mode === 'stills') {
   const out = A.out || '.';

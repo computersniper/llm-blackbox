@@ -138,18 +138,19 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 
 /* 自回归：回答一个词一个词长出来，每个词下面一条细线 = 它被选中时的概率 */
 .reply { position: absolute; left: 50%; top: 74px; width: 1380px; transform: translateX(-50%); text-align: center; line-height: 1.55; font-size: 44px; font-weight: 600; color: var(--ink); text-shadow: 0 2px 14px rgba(0, 0, 0, .9); }
-.reply .c { position: relative; display: inline-block; margin: 0 1px; }
-.reply .c i { position: absolute; left: 6%; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(150, 190, 235, .55); }
-.reply .c i.low { background: var(--rose); }
-.reply .c.new .s { color: var(--amber); }
-.reply .c.new i { background: var(--amber); }
-.reply .c.hl .s { color: var(--amber); }
-.reply .c.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); vertical-align: middle; }
+.reply .c { display: inline-block; white-space: nowrap; margin: 0 1px; }
+.reply .t { position: relative; display: inline-block; }
+.reply .t i { position: absolute; left: 6%; bottom: 2px; height: 3px; border-radius: 2px; background: rgba(150, 190, 235, .55); }
+.reply .t i.low { background: var(--rose); }
+.reply .t.new .s { color: var(--amber); }
+.reply .t.new i { background: var(--amber); }
+.reply .t.hl .s { color: var(--amber); }
+.reply .t.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); vertical-align: middle; }
 .reply .tag { display: inline-block; margin-left: 16px; font-family: var(--mono); font-size: 17px; font-weight: 400; color: var(--amber); vertical-align: middle; }
 
 /* 片尾 */
 .endcard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
-.endcard .ans { width: 1240px; white-space: normal; font-size: 50px; line-height: 1.7; font-weight: 600; letter-spacing: .06em; color: #f2f5fb; }
+.endcard .ans { font-size: 50px; line-height: 1.75; font-weight: 600; letter-spacing: .06em; color: #f2f5fb; }
 .endcard .stat { margin-top: 30px; font-family: var(--mono); font-size: 18px; letter-spacing: .14em; color: var(--dim); }
 .endcard .brand { font-size: 84px; font-weight: 900; letter-spacing: .1em; }
 .endcard .url { margin-top: 28px; font-family: var(--mono); font-size: 30px; letter-spacing: .08em; color: var(--cyan); }

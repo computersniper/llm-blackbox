@@ -40,8 +40,9 @@
    "type": "open"
   },
   {
-   "t": 21.875,
-   "type": "whoosh"
+   "t": 22.5,
+   "type": "whoosh",
+   "k": 0.6
   },
   {
    "t": 24.2,

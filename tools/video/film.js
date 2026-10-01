@@ -80,7 +80,7 @@ async function boot() {
   tameScene();
   buildExtras();
   buildOverlays();
-  window.__film = { M, E, Q, probe, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
+  window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
   if (PREVIEW) startPreview();
 }
 
@@ -89,11 +89,14 @@ function tameScene() {
   // 玻璃层板、外壳太光滑：主光的镜面高光叠在一起会形成一大团泛光（像背景里有个光源），把粗糙度调高
   M.root.traverse((o) => {
     const mt = o.material;
-    if (mt && mt.isMeshStandardMaterial && mt.roughness < 0.3) { mt.roughness = 0.62; mt.metalness = Math.min(mt.metalness, 0.3); }
+    if (mt && mt.isMeshStandardMaterial && mt.roughness < 0.5) { mt.roughness = 0.72; mt.metalness = Math.min(mt.metalness, 0.25); }
   });
   M.pulses.material.color.setHex(0x8fd9e6);
   // silu(g)⊙u 那根向量原来是纯白发光，太刺眼：换成偏冷的灰蓝
   M.mats.mlp.din.segs.forEach((m) => { m.material.emissive.setHex(0x8fb4c8); m.material.color.setHex(0x1c2a36); });
+  // ⊕ 和 RMSNorm 的圆环闪一下时是纯白，泛光之后像一盏灯：换成偏冷的浅灰蓝，亮度也压一点
+  for (const o of [M.exAdd1, M.exAdd2]) o.mat.color.setHex(0xa9c4d6);
+  for (const o of [M.exRing1, M.exRing2]) o.material.color.setHex(0x86c6d8);
   for (const o of E.scene.children) {
     if (o.isMesh && o.geometry?.type === 'CircleGeometry') o.material.opacity = 0.32;
     if (o.isPoints) { o.material.opacity = 0.2; o.material.size = 0.04; }
@@ -405,13 +408,18 @@ function updateReply(R) {
   const key = `${R.n}|${(R.k ?? 1).toFixed(2)}|${R.hl ?? ''}`;
   if (key === OV.replyKey) return;
   OV.replyKey = key;
-  OV.reply.innerHTML = Q.steps.slice(0, R.n).map((st, g) => {
+  // 标点和前一个词元排在同一个不换行的块里，避免一行以「，」开头
+  const groups = [];
+  Q.steps.slice(0, R.n).forEach((st, g) => {
     const sp = st.chosenS === '<|im_end|>';
     const newest = g === R.n - 1;
     const k = newest ? R.k ?? 1 : 1;
     const low = st.chosenRank > 0;
-    return `<span class="c${newest ? ' new' : ''}${sp ? ' sp' : ''}${g === R.hl ? ' hl' : ''}" style="opacity:${(0.2 + 0.8 * k).toFixed(3)}"><span class="s">${sp ? esc(shortSpecial(st.chosenS)) : tk(st.chosenS)}</span><i class="${low ? 'low' : ''}" style="width:${Math.max(6, st.chosenP1 * 100).toFixed(1)}%"></i></span>`;
-  }).join('') + (R.tag ? `<span class="tag">${R.tag}</span>` : '');
+    const html = `<span class="t${newest ? ' new' : ''}${sp ? ' sp' : ''}${g === R.hl ? ' hl' : ''}" style="opacity:${(0.2 + 0.8 * k).toFixed(3)}"><span class="s">${sp ? esc(shortSpecial(st.chosenS)) : tk(st.chosenS)}</span><i class="${low ? 'low' : ''}" style="width:${Math.max(6, st.chosenP1 * 100).toFixed(1)}%"></i></span>`;
+    if ((sp || /^[，。、！？；：,.!?]$/.test(st.chosenS)) && groups.length) groups[groups.length - 1].push(html);
+    else groups.push([html]);
+  });
+  OV.reply.innerHTML = groups.map((g) => `<span class="c">${g.join('')}</span>`).join('') + (R.tag ? `<span class="tag">${R.tag}</span>` : '');
 }
 
 function updateEnd(D) {
@@ -419,7 +427,13 @@ function updateEnd(D) {
   OV.end.style.display = a1 > 0.001 ? 'block' : 'none';
   OV.end2.style.display = a2 > 0.001 ? 'block' : 'none';
   if (a1 > 0.001) {
-    if (!OV.end.innerHTML) OV.end.innerHTML = `<div class="ans">${esc(Q.manifest.questions.find((x) => x.id === QID).reply)}</div><div class="stat">${SC.statLine}</div>`;
+    if (!OV.end.innerHTML) {
+      // 回答按逗号断成几行（每行不超过 22 个字），不在词中间折行
+      const parts = Q.manifest.questions.find((x) => x.id === QID).reply.split(/(?<=[，。！？])/);
+      const lines = [];
+      for (const p of parts) { if (lines.length && (lines[lines.length - 1] + p).length <= 22) lines[lines.length - 1] += p; else lines.push(p); }
+      OV.end.innerHTML = `<div class="ans">${lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div><div class="stat">${SC.statLine}</div>`;
+    }
     OV.end.style.opacity = a1.toFixed(3);
     OV.end.querySelector('.stat').style.opacity = (D.k1 ?? 1).toFixed(3);
   }
@@ -526,6 +540,25 @@ function seek(t, pre = 8) {
   const t0 = Math.max(0, t - pre);
   for (let x = t0; x < t - 1e-6; x += 1 / FPS) renderAt(x, { render: false });
   renderAt(t);
+}
+
+/* ================================================================ 封面 */
+
+// 封面：渲染第 t 秒的画面，去掉字幕和数据条，叠上片名
+function poster(t = 58.4) {
+  seek(t);
+  for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid', '.band']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
+  const T = OV.title;
+  T.style.display = 'block';
+  T.style.opacity = '1';
+  T.style.top = '30%';
+  T.style.filter = '';
+  const h1 = T.querySelector('h1');
+  h1.style.letterSpacing = h1.style.paddingLeft = '0.18em';
+  T.querySelector('.rule').style.width = '520px';
+  for (const c of ['.st', '.spec', '.eb']) T.querySelector(c).style.opacity = '1';
+  $('#fade').style.opacity = '0.25';
+  E.render();
 }
 
 /* ================================================================ 预览 */

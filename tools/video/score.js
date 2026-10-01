@@ -322,8 +322,8 @@ export function buildScore(Q) {
   const BLEND = { over: 2.8, ln1: 1.3, qkv: 1.5, score: 1.4, heads: 1.6, dot: 1.4, mix: 1.3, add1: 1.1, mlp: 1.5, mm: 1.5, neuron: 1.4, bits: 1.6 };
   const headCam = (M, st, o = {}) => {
     const hx = M.headX(st);
-    const look = v3(hx + (o.lx ?? -0.9), M.yTop + (o.ly ?? 2.3), 0.1);
-    return { pos: look.clone().add(v3(o.dx ?? 0.9, o.dy ?? 1.1, o.dz ?? 8.6)), look, fov: 32 };
+    const look = v3(hx + (o.lx ?? -0.4), M.yTop + (o.ly ?? 2.75), 0.1);
+    return { pos: look.clone().add(v3(o.dx ?? 0.9, o.dy ?? 1.0, o.dz ?? 10.0)), look, fov: 32 };
   };
   shot('dissect', B(24), B(52), (lt, t, { M }) => {
     const s = pick(D, t);
@@ -414,7 +414,7 @@ export function buildScore(Q) {
     return {
       st,
       cam: () => {
-        const head = headCam(M, st, { dz: lerp(9.2, 8.0, smooth(lt / (t1 - t0))), dx: lerp(1.3, 0.4, smooth(lt / (t1 - t0))) });
+        const head = headCam(M, st, { dz: lerp(10.6, 9.6, smooth(lt / (t1 - t0))), dx: lerp(1.6, 0.4, smooth(lt / (t1 - t0))) });
         let live = head;
         if (mmA) {
           const mmK = smooth(seg(t, mmA.t0, mmA.t0 + 1.1)) * (1 - smooth(seg(t, mmZ.t0, mmZ.t0 + 1.1)));
@@ -463,6 +463,11 @@ export function buildScore(Q) {
     const look = v3(lx, o.ly ?? 5.9, 0);
     return orbit({ pos: look.clone().add(v3(1.6, o.dy ?? 4.6, o.dz ?? 31)), look, fov: 32 }, o.yaw ?? 0, 0, 1);
   };
+  // 自回归：从机器右前方斜着看，新词元沿右侧的回路落回托盘、在新的一列里往上算，KV 缓存一格格变长
+  const loopCam = (M, fx, t, o = {}) => {
+    const look = v3(fx - (o.back ?? 3), o.ly ?? 5.6, 0);
+    return orbit({ pos: look.clone().add(v3(0, o.dy ?? 3.6, o.dz ?? 23)), look, fov: 32 }, o.yaw ?? 28, 0, 1);
+  };
   shot('loop1', B(57), B(63), (lt, t, { M }) => {
     const s = loopState(loop1, t);
     const detail = s.g === 1 && (s.ph === 'head' || s.ph === 'sample');
@@ -474,7 +479,7 @@ export function buildScore(Q) {
     return {
       st,
       cam: () => {
-        const wide = machineCam(M, lerp(-1.5, 2.2, smooth(seg(t, B(58), B(63)))), { yaw: lerp(16, 2, smooth(lt / 15)) });
+        const wide = loopCam(M, lerp(M.x(Q.row(1)), M.x(Q.row(13)), smooth(seg(t, B(57), B(63)))), t, { yaw: lerp(34, 20, smooth(lt / 15)), dz: lerp(21, 25, smooth(lt / 15)) });
         const close = headCam(M, mst(4, 1, { ph: 'sample', sub: 'draw' }, 0), { dz: 9.4 });
         const kc = smooth(seg(t, loop1[0].t0 + 6.25 * 0.5, loop1[0].t0 + 6.25 * 0.66)) * (1 - smooth(seg(t, loop1[1].t0 + 0.2, loop1[1].t0 + 1.6)));
         const live = blendCam(wide, close, kc);
@@ -564,7 +569,7 @@ export function buildScore(Q) {
     return {
       st,
       cam: () => {
-        const live = machineCam(M, lerp(3.5, 8.0, smooth(lt / 17.5)), { yaw: lerp(-12, 8, smooth(lt / 17.5)), dz: lerp(30, 33, smooth(lt / 17.5)) });
+        const live = loopCam(M, lerp(M.x(Q.row(GK + 1)), M.x(Q.row(Q.G - 1)), smooth(seg(t, B(72), B(79) - 2))), t, { yaw: lerp(18, 30, smooth(lt / 17.5)), dz: lerp(24, 28, smooth(lt / 17.5)), back: lerp(3, 6, smooth(lt / 17.5)) });
         return blendCam(prevCam('sampleK', live), live, smoother(seg(lt, 0, 2.2)));
       },
       ov: { reply: { a: 1, n: Math.min(Q.G, n), k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.3)) : 1 }, corner: { g: s.g }, cornerA: 1 },
@@ -585,7 +590,7 @@ export function buildScore(Q) {
       st: mst(2, Q.G - 1, { ph: 'sample' }, 1, { dAnim: dA, view: 'machine' }),
       cam: () => {
         const far = cam([-11, 5.5, 70], [0, 11.5, 0], 30);
-        const live = machineCam(M, 8.0, { yaw: 8, dz: 33 });
+        const live = loopCam(M, M.x(Q.row(Q.G - 1)), t, { yaw: 30, dz: 28, back: 6 });
         return blendCam(prevCam('loop2', live), far, smoother(seg(lt, 0, 10)));
       },
       dof: { focus: 14, range: 24, blur: 6 * smooth(seg(t, B(80), B(81))) },
