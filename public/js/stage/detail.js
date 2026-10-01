@@ -252,7 +252,7 @@ export class Detail {
     this.linkS = link(v3(3.2, 1.2, 0), v3(3.5, 0.15, 0));
     this.linkU = link(v3(1.15, -0.8, 0), v3(3.45, -0.1, 0));
     R.add(this.linkS, this.linkU);
-    const title = label(`神经元 #${n.n}`, 'lbl title');
+    const title = label(`神经元 #${n.j}`, 'lbl title');
     title.position.set(-2.1, 2.05, 0);
     title.center.set(0, 0.5);
     R.add(title);
@@ -266,7 +266,7 @@ export class Detail {
     if (!n) { this.rig.visible = false; return; }
     const key = `${st.g}|${s.L}`;
     if (key !== this.rigKey) { this.rigKey = key; this.buildRig(n); this.bitsIndex = 0; this.flips.clear(); }
-    const bp = this.bulbPos(st, n.n);
+    const bp = this.bulbPos(st, n.j);
     this.rig.position.copy(bp).add(v3(0.35, 0.05, 0.55));
     this.rig.scale.setScalar(0.3);
     this.rigCenter = this.rig.position.clone().add(v3(0.7 * 0.3, 0.05, 0));
