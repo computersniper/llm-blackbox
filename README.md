@@ -250,29 +250,42 @@ python tools/agent/record.py --model ... --chips-only                           
 
 ## 推理视频
 
-`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 52 秒的片子：「天空为什么是蓝色的？」从对话框里点选词元提问、按下发送，词元穿过界面飞进黑箱落到托盘（一个连续跟随镜头），再到嵌入、穿过 28 层（逻辑透镜在第 21 层说「因为」、第 24 层改口成「天空」），到拆开第 24 层（RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特），再到输出头、采样和自回归写完整句回答。配乐由 `compose.py` 用 numpy / scipy 现场合成。
+`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 55 秒的片子《AI 的一个字是怎么思考出来的——走进大模型推理的“黑箱”》。问题是「天空为什么是蓝色的？」。
+
+片子从一个干净的聊天页开始：用拼音一个字一个字打出问题，按发送，问题变成消息气泡，助手显示“正在思考…”。接着镜头推近气泡，文字按真实分词裂成词元块，变成 3D 方块飞进黑箱、落到托盘上（一个连续跟随镜头），片名落在黑箱正面。之后依次是：
+
+- 嵌入；
+- 穿过 28 层：逻辑透镜在第 21 层说「因为」，第 24 层改口成「天空」；
+- 拆开第 24 层：RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特；
+- 输出头、采样，自回归写完整句回答。
+
+配乐由 `compose.py` 用 numpy / scipy 现场合成。
 
 | 文件 | 作用 |
 | --- | --- |
 | `film.html` / `film.js` / `film.css` / `board.css` | 电影模式页面：复用 `public/js/stage/` 的机器和算式板，`__film.renderAt(t)` 确定地渲染第 t 秒 |
 | `score.js` | 分镜表：每个镜头的机器状态、机位（样条 + 单调三次插值）、字幕、数据条、配乐事件（96 BPM，段落卡在小节线上） |
-| `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层、开场对话框（`opening.js`：界面词元换成 3D 方块后的飞行与落位） |
-| `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面 |
+| `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层；`opening.js` 是开场：聊天页（打字、输入法候选、气泡、推近、裂成词元），以及词元交给 3D 方块以后的飞行与落位 |
+| `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面；WebGL 上下文丢失（GPU 进程崩溃）时自动重开浏览器重渲 |
 | `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −1 dBTP |
 | `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
+| `share.sh` | 分享用小体积版本：1080p30，两遍编码 4.5 Mbps，约 136 MB |
 | `review.py` | 抽帧拼成带时间码的联系表，检查用 |
-| `serve.py` | 本地服务器（仓库根目录 + D 盘上的完整思源宋体） |
+| `dbg.mjs` | 调试：跳到第 t 秒，在页面里执行一段表达式（可顺带截图） |
+| `serve.py` | 本地服务器（仓库根目录 + D 盘上的字体） |
 
 重新生成（帧序列、配乐、成片都放 D 盘，不放仓库里）：
 
 ```bash
-python tools/video/serve.py --port 8776 &      # 需要 /mnt/d/cjc/videos/llm-inference/fonts/NotoSerifSC-{Black,SemiBold}.otf（SIL OFL）
+# 需要 /mnt/d/cjc/videos/llm-inference/fonts/ 下的 NotoSerifSC-{Black,SemiBold}.otf 和 NotoSansSC-VF.ttf（都是 SIL OFL）
+python tools/video/serve.py --port 8776 &
 O=/mnt/d/cjc/videos/llm-inference
 node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # 约 3 分钟；已有的帧会跳过，中断了可以接着渲
 node tools/video/render.mjs events --out tools/video/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events.json --out $O/score.wav
-bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference.mp4 60
-node tools/video/render.mjs poster --t 52.9 --out $O/poster.png
+bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference-v4.mp4 60
+bash tools/video/share.sh $O/frames60 $O/score.wav $O/qwen3-inference-v4-share.mp4
+node tools/video/render.mjs poster --out $O/poster-v4.png                   # 默认取片名落版那一刻
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
 

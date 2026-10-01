@@ -376,7 +376,7 @@ export class Opening {
       const formAt = (tt) => {
         const c = easeInOut(Math.min(1, seg(tt, T.swapT, T.landStart0) * 3));
         const n = this.user.length;
-        const l = L[k].local.clone().lerp(v3((k - (n - 1) / 2) * 0.5, -0.75, -5.6), c);
+        const l = L[k].local.clone().lerp(v3((k - (n - 1) / 2) * 0.55, -0.75, -5.6), c);
         l.y += Math.sin(tt * 2.1 + k * 1.3) * 0.045 * c;
         l.x += Math.sin(tt * 1.4 + k * 0.7) * 0.02 * c;
         return l.applyMatrix4(Opening.basis(camAt(tt)));
@@ -391,7 +391,7 @@ export class Opening {
         p = new THREE.QuadraticBezierCurve3(a, ctrl, b).getPoint(q);
       }
       g.position.copy(p);
-      const sc = lerp(L[k].scale, 1, smooth(fly));
+      const sc = lerp(L[k].scale, 1, easeInOut(Math.min(1, fly * 3)));
       g.scale.setScalar(sc);
       const wob = smooth(seg(t, T.swapT, T.swapT + 0.8)) * (1 - seg(t, tl0, tl1));
       g.rotation.set(0, Math.sin(t * 1.7 + k) * 0.18 * wob, Math.sin(t * 1.3 + k * 2) * 0.06 * wob);

@@ -94,12 +94,23 @@ if (mode === 'events') {
   const t0 = Date.now();
   let done = 0;
   await Promise.all(chunks.map(async (frames, w) => {
-    const { browser, page, cdp, errs } = await open();
+    let { browser, page, cdp, errs } = await open();
     let prev = -10;
+    // GPU 进程偶尔会崩（显卡和别的任务共用）：WebGL 上下文丢了以后画面全白、不会自己恢复。
+    // 每帧检查一次，丢了就重开浏览器，从这一帧重新预滚
+    const lost = () => page.evaluate(() => document.querySelector('#gl canvas').getContext('webgl2').isContextLost());
     for (const f of frames) {
       const t = f / FPS;
-      if (f !== prev + 1) await page.evaluate((tt) => window.__film.seek(tt, 8), t);
-      else await page.evaluate((tt) => window.__film.renderAt(tt), t);
+      for (let tries = 0; ; tries++) {
+        if (f !== prev + 1) await page.evaluate((tt) => window.__film.seek(tt, 8), t);
+        else await page.evaluate((tt) => window.__film.renderAt(tt), t);
+        if (!(await lost())) break;
+        if (tries >= 3) throw new Error(`worker ${w}: WebGL context lost at frame ${f}`);
+        console.log(`worker ${w}: WebGL context lost at frame ${f} (t=${t.toFixed(2)}), restarting browser`);
+        await browser.close().catch(() => {});
+        ({ browser, page, cdp, errs } = await open());
+        prev = -10;
+      }
       await shot(cdp, name(f) + '.tmp.jpg');
       fs.renameSync(name(f) + '.tmp.jpg', name(f));
       prev = f;
