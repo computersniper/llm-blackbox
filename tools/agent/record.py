@@ -40,18 +40,22 @@ OUT = ROOT / "public" / "agent" / "data"
 
 TEMPERATURE, TOP_K, TOP_P = 0.7, 20, 0.8   # Qwen3 非思考模式的推荐采样参数
 TOPN = 5               # 每个词元记录前几名候选
-MAX_TURNS = 10         # 最多几轮“模型 ⇄ 工具”
+MAX_TURNS = 14         # 最多几轮“模型 ⇄ 工具”
 MAX_NEW = 700          # 每轮最多生成多少词元
 CMD_TIMEOUT = 10       # 沙箱里每条命令的超时（秒）
 OUT_LIMIT = 3000       # 工具输出最多回给模型多少字符
 
-SYSTEM = """你是一个在终端里工作的编程助手。你可以用工具查看、修改当前项目里的文件，以及执行 shell 命令。
+SYSTEM = """你是一个在终端里工作的编程助手，要亲自用工具把用户的任务做完，而不是只给建议。
+你可以查看、创建、修改 /work 里的文件，也可以执行 shell 命令。
 工作方式：
-- 每次调用工具之前，先用一句话说明你要做什么。
+- 每次调用工具之前，先用一句话说明你要做什么，然后紧接着调用工具。
 - 一次只调用一个工具，看到结果之后再决定下一步。
+- 需要写的代码要保存成文件，再用命令运行它。
 - 改完代码要运行测试或命令，确认结果正确。
-- 任务完成后，用简短的中文总结你做了什么。
-环境：Linux，工作目录 /work，没有网络。"""
+- 任务全部完成之后，再用简短的中文总结你做了什么。
+环境：Linux，工作目录 /work，没有网络。
+项目里的文件：
+{files}"""
 
 TOOLS = [
     {"type": "function", "function": {
@@ -88,14 +92,16 @@ def sh(work, cmd):
     return r["code"], r["out"]
 
 
-def check_fix_median(work, final, orig):
+def check_fix_median(work, final, orig, turns):
     code, out = sh(work, "python3 -m unittest -q 2>&1")
     same_test = (work / "test_stats.py").read_text() == orig["test_stats.py"]
-    ok = code == 0 and same_test
-    return ok, f"python3 -m unittest → 退出码 {code}；测试文件{'没有' if same_test else '被'}改动"
+    # 再用几组测试里没有的数据检查一遍，防止“只对付测试”
+    hid, _ = sh(work, "python3 -c 'from stats import median; assert median([1, 2]) == 1.5; assert median([5]) == 5; assert median([7, 1, 3, 9]) == 5'")
+    ok = code == 0 and same_test and hid == 0
+    return ok, f"python3 -m unittest → 退出码 {code}；测试文件{'没有' if same_test else '被'}改动；额外数据{'正确' if hid == 0 else '出错'}"
 
 
-def check_log_errors(work, final, orig):
+def check_log_errors(work, final, orig, turns):
     p = work / "summary.md"
     if not p.exists():
         return False, "没有生成 summary.md"
@@ -109,18 +115,22 @@ def check_log_errors(work, final, orig):
     return not bad, "summary.md 里三种错误的次数都正确" if not bad else f"这些错误的次数不对或缺失：{', '.join(bad)}"
 
 
-def check_sales_top(work, final, orig):
-    scripts = [p for p in work.rglob("*.py")]
-    ok = "杭州" in final and "9250" in final and bool(scripts)
-    return ok, f"回答{'提到' if '杭州' in final else '没有提到'}杭州（9250 元）；写了 {len(scripts)} 个脚本"
+def check_sales_top(work, final, orig, turns):
+    # 必须真的写了脚本、真的跑通了（输出里有答案），回答也要对
+    ran = [c for t in turns for c in t["calls"] if c["name"] == "bash" and ".py" in str(c["args"].get("command", ""))
+           and c["info"].get("exit") == 0 and "杭州" in c["result"]]
+    ok = "杭州" in final and "9250" in final and bool(ran)
+    return ok, f"脚本{'跑通了' if ran else '没有跑通'}；回答{'提到' if '杭州' in final else '没有提到'}杭州（9250 元）"
 
 
-def check_rename(work, final, orig):
+def check_rename(work, final, orig, turns):
     left = [str(p.relative_to(work)) for p in work.rglob("*.py") if "calc_total" in p.read_text()]
     defined = "def total_price" in (work / "shop" / "cart.py").read_text()
+    # 测试只允许改名字，不允许改期望值
+    test_ok = (work / "test_shop.py").read_text() == orig["test_shop.py"].replace("calc_total", "total_price")
     code, out = sh(work, "python3 -m unittest -q 2>&1")
-    ok = not left and defined and code == 0
-    return ok, f"残留 calc_total：{left or '无'}；total_price 已定义：{defined}；测试退出码 {code}"
+    ok = not left and defined and code == 0 and test_ok
+    return ok, f"残留 calc_total：{left or '无'}；total_price 已定义：{defined}；测试只改了名字：{test_ok}；测试退出码 {code}"
 
 
 TASKS = [
@@ -442,7 +452,9 @@ class Recorder:
         work = tmp / "work"
         shutil.copytree(SANDBOX_SRC / task["id"], work)
         files0 = snapshot(work)
-        msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": task["prompt"]}]
+        # 和 Claude Code 等 agent 一样，把运行环境（工作目录里有哪些文件）写进系统提示
+        system = SYSTEM.format(files="\n".join(sorted(files0)))
+        msgs = [{"role": "system", "content": system}, {"role": "user", "content": task["prompt"]}]
         gen = torch.Generator(device=model.device).manual_seed(seed)
         cache = DynamicCache()
         cached_ids = []          # KV 缓存里现在存着哪些词元
@@ -461,7 +473,7 @@ class Recorder:
                 lcp += 1
             lcp = min(lcp, len(ids) - 1)
             if cache.get_seq_length() > lcp:
-                cache.crop(cache.get_seq_length() - lcp)
+                cache.crop(lcp - cache.get_seq_length())   # 负数 = 从末尾删掉这么多词元
             keep = 0
             while keep < min(len(text), len(prev_text)) and text[keep] == prev_text[keep]:
                 keep += 1
@@ -532,11 +544,11 @@ class Recorder:
             turns.append(turn)
         total_ms = (time.perf_counter() - t_start) * 1000
         files1 = snapshot(work)
-        ok, why = task["check"](work, final or "", files0)
+        ok, why = task["check"](work, final or "", files0, turns)
         shutil.rmtree(tmp, ignore_errors=True)
         return {
             "id": task["id"], "title": task["title"], "prompt": task["prompt"], "seed": seed,
-            "system": SYSTEM, "tools": TOOLS,
+            "system": system, "tools": TOOLS,
             "files0": files0, "files1": files1,
             "turns": turns, "final": final, "finished": final is not None,
             "check": {"ok": ok, "detail": why},
