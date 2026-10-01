@@ -52,10 +52,11 @@
 
 脚本会自己复现一遍注意力（RMSNorm → RoPE → GQA），并和模型输出对比（平均误差约 3×10⁻⁴）。导出结果在 `public/data/`，数据文件额外存一份 `.gz`，网页用 `DecompressionStream` 解压（服务器只对 HTML 做 gzip），不支持时退回未压缩的版本。
 
-每个问题的数据分成两部分：
+网页载入的数据分三块（前两块按问题，第三块所有问题共用）：
 
-- **主文件** `qNN.json` + `qNN.bin`：揭开这条回复时一次载入（gz 后 60–320 KB）；
-- **“一次乘加”的分块** `qNN/L00.json.gz` … `qNN/L27.json.gz`：每层一个文件，装着这一层所有生成词元的乘加数据（每个 8–41 KB，一个问题 28 层合计 0.2–1.1 MB）。分块**只存 .gz**，不存原始文件；浏览器不支持 `DecompressionStream` 时看不到 D6 的乘加细节（会提示“当前浏览器不支持解压”），其余深度不受影响。网页按需载入：深度 ≥ 5 停在第 L 层时，预取第 L 层和上下相邻两层；真走进某层的 D6 而数据还没到，时间线就在这一步原地等（舞台先画上一级，顶部提示“正在载入第 L 层的乘加数据…”），到了再继续。
+- **主文件** `qNN.json` + `qNN.bin`：发出问题、回答开始流式输出时就在后台取（gz 后 60–320 KB），点 ＋ 时一般已经到了；
+- **“一次乘加”的分块** `qNN/L00.json.gz` … `qNN/L27.json.gz`：每层一个文件，装着这一层所有生成词元的乘加数据（每个 8–41 KB，一个问题 28 层合计 0.2–1.1 MB）。分块**只存 .gz**，不存原始文件；浏览器不支持 `DecompressionStream` 时看不到 D6 的乘加细节（会提示“当前浏览器不支持解压”），其余深度不受影响。网页按需载入：深度 ≥ 5 停在第 L 层时，预取第 L 层和上下相邻两层；真走进某层的 D6 而数据还没到，时间线就在这一步原地等（舞台先画上一级，顶部提示“正在载入第 L 层的乘加数据…”），到了再继续；
+- **权重缩略图** `weights.bin`（gz 后约 380 KB）：只有拆开一层（D4）时才用得到，深度 ≥ 3 时才开始取，没到之前权重面板先用装饰纹理。
 
 重新导出：
 
@@ -84,6 +85,7 @@ public/
   js/controls.js    调试器界面
   js/data.js        读取导出的数据
   js/resize.js      左右面板拖动调整宽度（四个页面共用：手柄、键盘、双击复位、存进 localStorage）
+  js/prefetch.js    后台预取：聊天页空闲时用 modulepreload 一次性取回舞台的整张模块图（省流量 / 2G 时跳过）
   js/stage/         Three.js 舞台：engine（渲染 / 相机 / 拾取）、machine（机器本体）、detail（神经元 / 打分 / 比特）、
                     mats（权重面板）、micro（矩阵乘法显微镜）、board（D6 / D7 的算式板）
   js/vendor/three/  自托管的 Three.js r186
@@ -92,7 +94,7 @@ tools/              导出脚本、截图测试、字体子集、版本号、发
 deploy/             服务器端 post-receive 钩子与初始化脚本
 ```
 
-改了页面上的中文标题后，重新生成字体子集：`python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf`。
+标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（四个页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`）：`python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf`。
 
 ## 部署
 
@@ -154,6 +156,8 @@ python tools/train/qwen_step.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6
 | D5 一次乘加 | 一个图块的 1536 个输入（3 通道 × 2 帧 × 16 × 16）乘第 c 个卷积核再加偏置，得到嵌入的一个数；第 17 / 20 层 16 个头各自在看图的哪里 |
 
 左上角的监视器是 2D 画布，显示这张图在模型里“此刻的样子”；右侧是伪代码、讲解和变量监视，全部用真实数值。
+
+载入：选图时就在后台取这张图的视觉侧数据，发出问题时取语言侧数据；聊天页空闲时预取 3D 舞台的模块（和推理页共用 `js/prefetch.js`），点 ＋ 时模块和数据并行等待，一般都已经在缓存里。
 
 ### 数据
 
