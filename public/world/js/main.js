@@ -1,5 +1,5 @@
 // 世界模型页入口：载入真实权重 → 真实世界和梦并排跑（D1）→ ＋ 一层层揭开（循环 / V / M / 一次乘加）。
-// 第二章「大模型里的世界地图」是另一个模块（./probe/probe.js），切过去时才载入；文件还没有时显示“即将上线”。
+// 第二章「大模型里的世界地图」是另一个模块（public/world/probe/probe.js），切过去时才载入；文件还没有时显示“即将上线”。
 import { loadWorld } from './data.js';
 import { Sim } from './sim.js';
 import { Timeline, MAC_OPS } from './timeline.js';
@@ -315,7 +315,7 @@ async function setChapter(ch) {
   if (!probeTried) {
     probeTried = true;
     try {
-      const m = await import('./probe/probe.js');
+      const m = await import('../probe/probe.js');
       probeApi = await m.mountProbe($('#probeHost'), { onExplain: (html) => { if (chapter === 'probe') $('#explain').innerHTML = html; } });
       probeApi?.setLayer?.(probeL);
     } catch (e) {
