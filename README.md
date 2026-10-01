@@ -137,9 +137,29 @@ git push deploy main                                               # 发布
 python tools/train/prep_corpus.py --src /mnt/d/cjc/datasets/chinese-poetry --out /mnt/d/cjc/datasets/poetry-train
 python tools/train/train_tiny.py            # 约 5 分钟，显存 < 2 GB；--export-only 只用上次的记录重新导出
 python tools/train/qwen_step.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6B   # 约 6 GB 显存
+python tools/train/split_data.py --from-git <提交>   # 只重新切分：从某个提交里的旧格式整份文件切，不用 GPU
 ```
 
-需要 torch、transformers（5.x）、numpy、opencc。导出在 `public/train/data/`（`tiny.json` + `tiny.bin`、`qwen.json`，各带一份 `.gz`，合计约 1.2 MB gzip）。页面代码在 `public/train/`：`js/timeline.js`（步骤树）、`js/explain.js`（伪代码 / 讲解 / 变量）、`js/stage.js`（2D 舞台与相机）、`js/scenes/`（各层视图）。
+需要 torch、transformers（5.x）、numpy、opencc。页面代码在 `public/train/`：`js/data.js`（数据和分块载入器）、`js/timeline.js`（步骤树）、`js/explain.js`（伪代码 / 讲解 / 变量）、`js/stage.js`（2D 舞台与相机）、`js/scenes/`（各层视图）。
+
+### 数据与载入
+
+导出脚本最后都交给 `tools/train/split_data.py`，把数据拆成“首屏小文件 + 按需分块”，写完再读回来和原始数组逐字节、和元数据逐个数核对（只重新排布，不改任何数值）。全部在 `public/train/data/`，gzip 后合计约 1.16 MB：
+
+| 文件 | 内容 | 什么时候取 | 大小（gzip） |
+| --- | --- | --- | --- |
+| `tiny.json` + `tiny.bin` | 元数据（配置、语料、词表、41 个检查点的标量和生成的诗）、每一步的损失 / 学习率 / 梯度范数、批次第 0 行的字、损失地形 | 首屏 | 43 + 40 KB |
+| `qwen.json` | Qwen3 的对话、逐词元概率与前 5 名、两种损失、DPO、改动统计 | 首屏 | 10 KB |
+| `tiny/ck00…40.bin` | D1：留出诗的逐字概率与前 5 名、24 个注意力头（只存下三角）、嵌入 PCA、三块权重 / 梯度局部 | 进入 D1、播放或拖到这个检查点 | 每块约 19 KB |
+| `tiny/st00…40.bin` | D2–D4：批次第 0 行的概率与前 5 名、更新后的概率、逻辑透镜、残差范数与梯度、张量梯度范数、AdamW 算式 | 进入一步之内 | 每块约 5 KB |
+| `tiny/feat.bin` | 4 个权重每 4 步一个点的 w / g / m / v | D2 起提前取（D3 更新要用） | 48 KB |
+| `qwen/st0…2.json` | 每一步的逻辑透镜、残差范数 / 梯度、每个参数张量的梯度范数 | 进入 Qwen3 的 D1 时 | 每块 12–15 KB |
+
+首屏文件另留一份未压缩的（给不支持 `DecompressionStream` 的浏览器）；分块只存 `.gz`，这类浏览器里对应的卡片会写明“不支持解压”。浮点数组按字节分面存放（先放所有数的第 0 个字节……），gzip 能多压 10–30%。
+
+页面（`js/data.js` 的 `Loader`、`js/main.js` 的 `plan()`）每帧算出当前画面要用的分块：这一屏要用的立即取，播放方向上后几个检查点、相邻检查点、往下一层要用的排队预取（同时最多 4 个）；首屏字体下完后在浏览器空闲时一块一块地后台预取（省流量模式 / 2G 不预取），约 10 秒（8 Mbps）取完。数据没到时：D1 的卡片单独显示载入占位，或者先拿最近的已到检查点顶上（调暗并标注是第几步）；D2–D4 整屏先显示最近的已到检查点并在顶部标注；播放时缺块就原地等到了再走；提示都延迟 0.25 秒再淡入，数据很快到时不会闪。失败后自动重试（间隔从 4 秒翻倍到 30 秒）。
+
+在本地模拟 8 Mbps / 60 ms（冷缓存）：首屏从 2.2 秒、1.9 MB（其中数据 1.1 MB）降到约 0.7 秒、0.25 MB（数据 93 KB）；首屏后立刻进入各层，第一次要等的分块约 0.1–0.15 秒，在首屏停留几秒后基本不用等。
 
 ## 多模态页面（/blackbox/multimodal/）
 
