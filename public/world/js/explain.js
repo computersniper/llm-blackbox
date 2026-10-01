@@ -261,7 +261,7 @@ function explainM(op, { rec, F, meta }) {
     case 'mdn': {
       const sp = spreadOf(rec);
       let d = 0;
-      for (let k = 0; k < Z; k++) if (used(meta, k) && (!used(meta, d) || sp[k] > sp[d])) d = k;
+      for (let k = 0; k < Z; k++) if (dimShort(meta, k) && (!dimShort(meta, d) || sp[k] > sp[d])) d = k;
       return `<p><b>混合密度网络</b>：一个全连接层把 h 变成 481 个数——32 维 × 5 个高斯 ×（权重 π、中心 μ、宽度 σ）+ 1 个撞车 logit。</p><p>每一维单独一个“5 个山峰”的分布。大多数维度只有一个峰很高（模型很确定）；不确定的维度会有好几个峰，比如 z<sub>${d}</sub>——前面会不会刷出车、刷在哪，本来就说不准。</p>`;
     }
     case 'done': return `<p>撞车概率：sigmoid(w·h + b) = <b>${pct(rec.M.done)}</b>。训练时只有每局最后一步是 1，所以模型学会了在“快撞上”的时候把它调高。闭眼时它超过 50%，这一段梦就到此为止，下一步重新睁眼。</p>`;

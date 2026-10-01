@@ -3,7 +3,7 @@
 import { COL, rr, text, card, hexA, line, ease, clamp } from '../../../train/js/draw.js';
 import { vecGrid } from '../pix.js';
 import { ACTIONS } from '../game.js';
-import { dimOrder, dimMeaning, used as isUsed } from '../explain.js';
+import { dimOrder, dimMeaning, dimShort, used as isUsed } from '../explain.js';
 import { Z, KMIX } from '../nn.js';
 
 const GATES = [['gi', 'i', '输入门', 'σ'], ['gf', 'f', '遗忘门', 'σ'], ['gg', 'g', '候选记忆', 'tanh'], ['go', 'o', '输出门', 'σ']];
@@ -176,7 +176,7 @@ export class MemView {
     // 默认挑用得上的维度里分布最“散”的（模型最拿不准的）
     let best = dimOrder(meta)[0], bv = -1;
     for (const d of dimOrder(meta)) {
-      if (!isUsed(meta, d)) continue;
+      if (!isUsed(meta, d) || !dimShort(meta, d)) continue;
       let m = 0, v = 0;
       for (let k = 0; k < KMIX; k++) m += Math.exp(rec.M.logpi[d * KMIX + k]) * rec.M.mu[d * KMIX + k];
       for (let k = 0; k < KMIX; k++) { const pk = Math.exp(rec.M.logpi[d * KMIX + k]); v += pk * ((rec.M.mu[d * KMIX + k] - m) ** 2 + Math.exp(2 * rec.M.logsig[d * KMIX + k])); }

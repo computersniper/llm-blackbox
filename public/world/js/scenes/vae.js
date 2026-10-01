@@ -122,7 +122,7 @@ export class VaeView {
     }
     this.arrow(g, B.d3, B.out, st8('d4') === 'on' ? p : st8('d4') === 'done' ? 1 : 0, COL.amber, pt, true);
     const rev = st8('d4') === 'on' ? ease(seg(p, 0.2, 1)) : st8('d4') === 'done' ? 1 : 0;
-    this.pixBox(g, B.out, this.out, '梦见的下一帧 ô', '反卷积 4 + sigmoid', COL.amber, st8('d4'), env, rev, 'd4');
+    this.pixBox(g, B.out, this.out, '梦见的下一帧 ô', '64×64×3', COL.amber, st8('d4'), env, rev, 'd4');
     // ---- z 的每一维扫一遍
     if (s.op === 'z' || s.op === 'mu') this.sweepPanel(g, B.sweep, det, env, s.op === 'z');
     else {
