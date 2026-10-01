@@ -3,11 +3,11 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-name = "Qwen/Qwen3-0.6B"  # 国内下载慢：先 modelscope download Qwen/Qwen3-0.6B --local-dir ./Qwen3-0.6B，再把这里换成 "./Qwen3-0.6B"
+name = "Qwen/Qwen3-0.6B"  # 国内下载慢可以换成 ModelScope 下载的本地目录
 tok = AutoTokenizer.from_pretrained(name)
 model = AutoModelForCausalLM.from_pretrained(name)
 
-msgs = [{"role": "system", "content": "你是一个乐于助人的助手，请用一两句话简洁地回答。"},  # 和本站推理页用的系统提示一样
+msgs = [{"role": "system", "content": "你是一个乐于助人的助手，请用一两句话简洁地回答。"},  # 推理页的系统提示
         {"role": "user", "content": "天空为什么是蓝色的？"}]
 text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
 ids = tok(text, return_tensors="pt").input_ids

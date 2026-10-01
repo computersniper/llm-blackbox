@@ -7,6 +7,7 @@
       "goal": "把问题套上聊天模板、切成词元，跑一次前向，看模型给“下一个词元”的前 5 名候选和概率。",
       "env": ["CPU 可跑", "约 1.5 GB 权重", "pip install torch \"transformers>=4.51\""],
       "time": "CPU 上约 30–50 秒（大部分是载入权重）",
+      "note": "第一次运行会从 Hugging Face 下载权重。国内下载慢的话，先 pip install modelscope，再运行 modelscope download Qwen/Qwen3-0.6B --local-dir ./Qwen3-0.6B，然后把代码里的 name 换成 \"./Qwen3-0.6B\"。后面三段同理。",
       "files": [{ "path": "snippets/01_next_token.py", "lang": "python" }],
       "output": "39 个词元： ['<|im_start|>', 'system', '\\n', '你', '是一个', '乐', '于', '助', '人的', '助手', '，请', '用', '一', '两', '句话', '简洁', '地', '回答', '。', '<|im_end|>', '\\n', '<|im_start|>', 'user', '\\n', '天空', '为什么', '是', '蓝色', '的', '？', '<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n']\n        '天空'   98.86%\n        '因为'    0.59%\n        '蓝天'    0.31%\n         '天'    0.10%\n        '蓝色'    0.03%",
       "explain": "非思考模式下，聊天模板会自动补上一对空的 <think></think>。推理页导出的同一个问题，第一步前 5 名也是“天空 98.6%、因为 0.75%、蓝天 0.36%、天、蓝色”：小数点后的差别是不同硬件上的数值误差（推理页在 GPU 上导出，这里用 CPU）。",

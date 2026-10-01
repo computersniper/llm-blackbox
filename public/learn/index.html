@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>延伸学习 · 揭开黑箱</title>
+  <meta name="description" content="看完揭开黑箱，接着往下学：一条从“大模型是什么”到“读论文、自己动手”的学习路线，80 条逐个核对过的中英文资料，54 个术语的白话解释，以及 6 段能在自己电脑上跑起来的代码。">
+  <meta name="theme-color" content="#060d1a">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="learn.css">
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="modulepreload" href="../js/ui.js">
+  <link rel="modulepreload" href="../js/bg.js">
+  <link rel="preload" href="data/roadmap.json" as="fetch" crossorigin>
+  <link rel="preload" href="data/resources.json" as="fetch" crossorigin>
+</head>
+<body class="learn">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="揭开黑箱 · 延伸学习">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">BLACK&nbsp;BOX</span>
+      <span class="brand-zh">延伸学习</span>
+    </a>
+    <nav class="site-nav" aria-label="站点">
+      <a href="../">推理</a>
+      <a href="../train/">训练</a>
+      <a href="../multimodal/">多模态</a>
+      <a href="../agent/">智能体</a>
+      <a href="../world/">世界模型</a>
+      <a href="./" aria-current="page">学习</a>
+    </nav>
+    <nav class="lp-jump" aria-label="本页">
+      <a href="#route">路线图</a><a href="#library">资源库</a><a href="#glossary">术语表</a><a href="#try">动手试试</a>
+    </nav>
+    <div class="top-actions">
+      <a class="hud-btn lp-prog-btn" id="topProg" href="#route" title="学习路线的进度（存在这台设备的浏览器里）"><span class="ring" aria-hidden="true"></span><span class="lp-prog-txt"><b>0</b>/20</span></a>
+    </div>
+  </header>
+
+  <main class="lp" id="top">
+    <section class="lp-hero" aria-labelledby="heroTitle">
+      <div class="hero-main">
+        <div class="eyebrow">LEARN · 延伸学习</div>
+        <h1 id="heroTitle">从看懂，到动手</h1>
+        <p class="lede">这个网站把真实的模型一层层拆开给你看。看完想接着往下学，就从这里出发：一条从“大模型是什么”走到“读论文、自己动手”的路线，一份逐条核对过的资料清单，一张白话术语表，和几段能在自己电脑上跑起来的代码。</p>
+        <dl class="lp-stats" id="heroStats">
+          <div><dt>路线</dt><dd><b>6</b> 段 <b>20</b> 站</dd></div>
+          <div><dt>资源</dt><dd><b>80</b> 条</dd></div>
+          <div><dt>术语</dt><dd><b>54</b> 个</dd></div>
+          <div><dt>代码</dt><dd><b>6</b> 段</dd></div>
+        </dl>
+      </div>
+      <nav class="gauge" id="heroGauge" aria-label="路线的六段"></nav>
+    </section>
+
+    <section class="lp-sec" id="route" aria-labelledby="routeTitle">
+      <header class="sec-head">
+        <div>
+          <div class="eyebrow">ROUTE · 学习路线</div>
+          <h2 id="routeTitle">一条往下走的路</h2>
+          <p class="sec-desc">从水面一直走到深处。每一站写着这一步要弄懂什么、在本站哪一页的哪一层能亲眼看到它，再挂几份最值得看的资料。学完一站就点一下“学完了”，进度只存在这台设备的浏览器里。</p>
+        </div>
+        <div class="rm-progress" id="rmProgress" aria-live="polite">
+          <div class="rm-meter"><span class="rm-bar"><i></i></span><b class="rm-count">0 / 20</b></div>
+          <button class="linkish" id="rmReset" type="button">清空进度</button>
+        </div>
+      </header>
+      <div class="rm" id="roadmap">
+        <svg class="rm-svg" id="rmSvg" aria-hidden="true"></svg>
+        <p class="lp-loading">正在载入路线…</p>
+      </div>
+    </section>
+
+    <section class="lp-sec" id="library" aria-labelledby="libTitle">
+      <header class="sec-head">
+        <div>
+          <div class="eyebrow">LIBRARY · 资源库</div>
+          <h2 id="libTitle">按主题找资料</h2>
+          <p class="sec-desc" id="libDesc">每一条都实际打开核对过，标题、作者和年份照页面上写的抄。优先收中文讲解；论文和代码大多只有英文原版。</p>
+        </div>
+      </header>
+      <div class="lib-ctl" id="libCtl">
+        <label class="search"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="libSearch" type="search" placeholder="搜索标题、作者、关键词…" autocomplete="off" aria-label="搜索资源"></label>
+        <div class="chips" id="fTopic" role="group" aria-label="主题"></div>
+        <div class="chip-rows">
+          <div class="chips" id="fType" role="group" aria-label="类型"></div>
+          <div class="chips" id="fLevel" role="group" aria-label="难度"></div>
+          <div class="chips" id="fLang" role="group" aria-label="语言"></div>
+        </div>
+        <div class="lib-count"><span id="libCount" aria-live="polite"></span><button class="linkish" id="libClear" type="button" hidden>清除筛选</button></div>
+      </div>
+      <div class="lib" id="library-list"></div>
+    </section>
+
+    <section class="lp-sec" id="glossary" aria-labelledby="glTitle">
+      <header class="sec-head">
+        <div>
+          <div class="eyebrow">GLOSSARY · 术语表</div>
+          <h2 id="glTitle">术语，说人话</h2>
+          <p class="sec-desc">每个词一两句白话，后面标着在本站哪里能亲眼看到它。数字都是按本站用的真实模型写的。</p>
+        </div>
+      </header>
+      <div class="gl-ctl">
+        <label class="search"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input id="glSearch" type="search" placeholder="搜索术语，中英文都行…" autocomplete="off" aria-label="搜索术语"></label>
+        <div class="seg" role="radiogroup" aria-label="排列方式">
+          <button type="button" role="radio" aria-checked="true" data-mode="group">按主题</button>
+          <button type="button" role="radio" aria-checked="false" data-mode="az">A–Z</button>
+        </div>
+        <nav class="az-rail" id="azRail" aria-label="字母索引" hidden></nav>
+      </div>
+      <div class="glo" id="glossary-list"></div>
+    </section>
+
+    <section class="lp-sec" id="try" aria-labelledby="tryTitle">
+      <header class="sec-head">
+        <div>
+          <div class="eyebrow">HANDS-ON · 动手试试</div>
+          <h2 id="tryTitle">在自己电脑上跑起来</h2>
+          <p class="sec-desc" id="tryDesc">每一段都是能直接复制运行的完整代码，下面的输出是原样跑出来的。</p>
+        </div>
+      </header>
+      <div class="try" id="tryBox">
+        <div class="try-tabs" id="tryTabs" role="tablist" aria-label="代码片段"></div>
+        <div class="try-panel" id="tryPanel" role="tabpanel"></div>
+      </div>
+    </section>
+
+    <footer class="lp-foot">
+      <p id="footNote">资料清单由本站维护，每条外部链接都用 <code>tools/learn/check_links.py</code> 逐个检查过。发现失效的链接或更好的资料，欢迎在 <a href="https://github.com/computersniper/llm-blackbox" target="_blank" rel="noopener">GitHub</a> 上告诉我们。</p>
+      <p><a href="#top">回到顶部 ↑</a></p>
+    </footer>
+  </main>
+
+  <noscript><p class="noscript">这个页面需要 JavaScript 才能显示内容。</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
