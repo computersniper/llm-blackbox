@@ -1,0 +1,155 @@
+/* 电影模式：固定 1920×1080 画幅。所有动画都由 film.js 按时间计算，CSS 里不写过渡和动画（逐帧渲染要确定）。 */
+
+@font-face { font-family: "Film Serif"; src: url("/ext/fonts/NotoSerifSC-Black.otf") format("opentype"); font-weight: 900; }
+@font-face { font-family: "Film Serif"; src: url("/ext/fonts/NotoSerifSC-SemiBold.otf") format("opentype"); font-weight: 600; }
+/* 机器里的方块文字用 canvas 画，字体名写死成苹方 / Noto Sans SC：在这里指向同一款思源宋体，免得渲染机上没有中文字体 */
+@font-face { font-family: "PingFang SC"; src: url("/ext/fonts/NotoSerifSC-SemiBold.otf") format("opentype"); font-weight: 400 700; }
+@font-face { font-family: "Noto Sans SC"; src: url("/ext/fonts/NotoSerifSC-SemiBold.otf") format("opentype"); font-weight: 400 700; }
+@font-face { font-family: "JetBrains Mono"; src: url("/public/fonts/jetbrains-mono-400.woff2") format("woff2"); font-weight: 400; }
+@font-face { font-family: "JetBrains Mono"; src: url("/public/fonts/jetbrains-mono-700.woff2") format("woff2"); font-weight: 700; }
+
+:root {
+  --bg: #03070f;
+  --ink: #e6ecf6;
+  --ink2: #b0bacd;
+  --dim: #76819a;
+  --faint: #47506a;
+  --line: rgba(150, 180, 230, .14);
+  --line2: rgba(150, 180, 230, .24);
+  --cyan: #5ef0d4;
+  --amber: #ffb65c;
+  --rose: #ff6b93;
+  --blue: #6b9bff;
+  --violet: #b39dff;
+  --serif: "Film Serif", serif;
+  --mono: "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; overflow: hidden; }
+body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+#frame { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+#gl, #gl canvas, .css2d, #ov, #vignette, #grain, #fade { position: absolute; inset: 0; }
+#gl canvas { width: 1920px !important; height: 1080px !important; display: block; }
+.css2d { pointer-events: none; overflow: hidden; }
+#ov { pointer-events: none; }
+#vignette { pointer-events: none; background: radial-gradient(ellipse 75% 70% at 50% 46%, rgba(0, 0, 0, 0) 55%, rgba(0, 2, 6, .5) 100%); }
+#grain { width: 1920px; height: 1080px; pointer-events: none; opacity: .05; }
+#fade { background: #000; opacity: 0; pointer-events: none; }
+
+/* 预览用的时间轴（渲染时隐藏） */
+#scrub { position: fixed; left: 0; right: 0; top: 1080px; padding: 8px 16px; display: flex; gap: 12px; align-items: center; background: #111; color: #ccc; font: 13px var(--mono); }
+#scrub input { flex: 1; }
+
+/* ---------------------------------------------------------------- 3D 标签（机器里的 CSS2D 标签，按 1080p 放大） */
+.lbl { pointer-events: none; font-family: var(--serif); font-weight: 600; font-size: 17px; color: var(--ink2); white-space: nowrap; padding: 3px 11px; border-radius: 8px; background: rgba(4, 9, 19, .74); border: 1px solid var(--line2); }
+.lbl small { font-family: var(--mono); color: var(--dim); font-size: 13.5px; margin-left: 6px; font-weight: 400; }
+.lbl sub, .lbl sup { font-size: .7em; }
+.lbl.part { font-size: 17px; color: var(--ink); border-color: rgba(94, 240, 212, .32); }
+.lbl.lens { font-size: 16px; display: flex; align-items: center; gap: 9px; border-color: rgba(255, 182, 92, .26); padding: 2px 10px; }
+.lbl.lens .l { font-family: var(--mono); color: var(--dim); font-size: 13px; font-weight: 400; }
+.lbl.lens .p { font-family: var(--mono); color: var(--amber); font-size: 14px; font-weight: 400; }
+.lbl.lens.on { border-color: var(--amber); box-shadow: 0 0 14px rgba(255, 182, 92, .18); }
+.lbl.bar { text-align: center; padding: 4px 9px; }
+.lbl.bar .t { display: block; font-size: 21px; color: var(--ink); }
+.lbl.bar .p { display: block; font-family: var(--mono); font-size: 14px; color: var(--amber); font-weight: 400; }
+.lbl.bar.win { border-color: var(--amber); box-shadow: 0 0 16px rgba(255, 182, 92, .3); }
+.lbl.bar.cut { opacity: .3; }
+.lbl.num { font-family: var(--mono); font-weight: 400; font-size: 15.5px; padding: 2px 9px; color: var(--ink); }
+.lbl.num.pos { color: var(--amber); border-color: rgba(255, 182, 92, .32); }
+.lbl.num.neg { color: var(--blue); border-color: rgba(107, 155, 255, .32); }
+.lbl.big { font-family: var(--mono); font-weight: 400; font-size: 23px; padding: 6px 14px; color: #fff; border-color: rgba(255, 182, 92, .45); }
+.lbl.big small { font-size: 14px !important; }
+.lbl.title { font-family: var(--serif); font-weight: 600; font-size: 22px; color: var(--ink); background: none; border: 0; text-shadow: 0 2px 10px #000; }
+.lbl.hint { font-size: 16px; color: var(--dim); background: none; border: 0; text-shadow: 0 1px 6px #000; }
+.lbl.hide { opacity: 0 !important; }
+.lbl b { color: inherit; }
+/* 词元编号（电影里额外加在托盘方块下面） */
+.lbl.tid { font-family: var(--mono); font-weight: 400; font-size: 14px; color: var(--dim); background: none; border: 0; padding: 0; text-shadow: 0 1px 6px #000; }
+.lbl.tid.u { color: var(--cyan); }
+.lbl.emb { font-family: var(--mono); font-weight: 400; font-size: 14px; color: var(--cyan); background: rgba(4, 9, 19, .6); border-color: rgba(94, 240, 212, .25); padding: 1px 7px; }
+
+/* ---------------------------------------------------------------- 叠加层：字幕、数据条、章节 */
+.band { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; background: linear-gradient(to top, rgba(1, 4, 10, .78) 0%, rgba(1, 4, 10, .45) 45%, rgba(1, 4, 10, 0) 100%); }
+.sub { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); font-weight: 600; font-size: 38px; letter-spacing: .05em; color: var(--ink); white-space: nowrap; text-shadow: 0 2px 16px rgba(0, 0, 0, .95), 0 0 3px rgba(0, 0, 0, .8); }
+.sub .m, .strip .m, .m { font-family: var(--mono); font-weight: 400; letter-spacing: 0; }
+.sub em { font-style: normal; color: var(--amber); }
+.sub q { quotes: "「" "」"; color: var(--amber); }
+.strip { position: absolute; left: 50%; bottom: 132px; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; white-space: nowrap; font-size: 23px; color: var(--ink2); letter-spacing: .03em; }
+.strip::before, .strip::after { content: ""; width: 56px; height: 1px; background: linear-gradient(to right, transparent, rgba(255, 182, 92, .7)); }
+.strip::after { background: linear-gradient(to left, transparent, rgba(255, 182, 92, .7)); }
+.strip .k { font-family: var(--mono); font-size: 16px; letter-spacing: .18em; color: var(--amber); }
+.strip .v { color: var(--ink); }
+.strip .v .m { color: var(--amber); }
+.strip .sep { width: 1px; height: 22px; background: var(--line2); }
+.strip .tk { color: var(--amber); }
+
+.chapter { position: absolute; left: 76px; top: 64px; display: flex; align-items: baseline; gap: 16px; }
+.chapter .n { font-family: var(--mono); font-size: 15px; color: var(--cyan); letter-spacing: .2em; }
+.chapter .bar { width: 44px; height: 1px; background: rgba(94, 240, 212, .55); align-self: center; }
+.chapter .zh { font-size: 25px; font-weight: 600; letter-spacing: .12em; color: var(--ink); }
+.chapter .en { font-family: var(--mono); font-size: 13px; letter-spacing: .26em; color: var(--dim); }
+
+.corner { position: absolute; right: 76px; top: 66px; text-align: right; font-family: var(--mono); font-size: 13px; letter-spacing: .2em; color: var(--faint); line-height: 1.9; }
+.corner b { color: var(--dim); font-weight: 400; }
+
+/* 冷开场：问题一个词元一个词元地拼出来 */
+.qline { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); display: flex; gap: 14px; align-items: flex-start; }
+.qtok { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.qtok .s { font-size: 70px; font-weight: 600; line-height: 1; padding: 16px 20px 18px; border-radius: 14px; border: 1px solid rgba(94, 228, 240, .28); background: rgba(94, 228, 240, .05); color: #dff8fb; letter-spacing: .02em; }
+.qtok .id { font-family: var(--mono); font-size: 17px; color: var(--dim); letter-spacing: .06em; }
+.qcaret { width: 3px; height: 74px; margin-top: 18px; background: var(--cyan); }
+
+/* 片名 */
+.title { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
+.title .eb { font-family: var(--mono); font-size: 16px; letter-spacing: .5em; color: var(--cyan); margin-bottom: 34px; padding-left: .5em; }
+.title h1 { margin: 0; font-weight: 900; font-size: 168px; line-height: 1; color: #f2f5fb; text-shadow: 0 8px 50px rgba(0, 0, 0, .8); }
+.title .rule { width: 520px; height: 1px; margin: 40px auto 30px; background: linear-gradient(to right, transparent, rgba(255, 182, 92, .8), transparent); }
+.title .st { font-size: 38px; font-weight: 600; letter-spacing: .3em; color: var(--ink2); padding-left: .3em; }
+.title .spec { margin-top: 26px; font-family: var(--mono); font-size: 15px; letter-spacing: .28em; color: var(--dim); }
+
+/* 逐层：『秋』的概率曲线（逻辑透镜） */
+.lenspanel { position: absolute; right: 72px; top: 150px; width: 430px; padding: 22px 24px 18px; border-radius: 16px; background: rgba(4, 9, 19, .62); border: 1px solid var(--line); }
+.lenspanel .h { font-size: 21px; font-weight: 600; color: var(--ink); letter-spacing: .06em; }
+.lenspanel .h small { display: block; margin-top: 4px; font-family: var(--mono); font-size: 12.5px; font-weight: 400; color: var(--dim); letter-spacing: .14em; }
+.lenspanel svg { display: block; margin-top: 14px; overflow: visible; }
+.lenspanel .ax { font-family: var(--mono); font-size: 12px; fill: var(--faint); }
+
+/* 16 个头的注意力矩阵 */
+.attgrid { position: absolute; left: 72px; top: 150px; padding: 18px 20px 16px; border-radius: 16px; background: rgba(4, 9, 19, .7); border: 1px solid var(--line); }
+.attgrid .h { font-size: 20px; font-weight: 600; letter-spacing: .05em; margin-bottom: 12px; }
+.attgrid .h small { font-family: var(--mono); font-size: 12.5px; color: var(--dim); font-weight: 400; margin-left: 10px; letter-spacing: .08em; }
+.attgrid .row { display: flex; align-items: center; gap: 2px; height: 17px; margin-bottom: 2px; }
+.attgrid .row .hn { width: 34px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+.attgrid .row.on .hn { color: var(--amber); }
+.attgrid .row i { width: 12px; height: 15px; border-radius: 2px; background: rgba(94, 240, 212, .05); }
+.attgrid .cols { display: flex; gap: 2px; margin-left: 36px; margin-top: 6px; }
+.attgrid .cols span { width: 12px; font-size: 11px; color: var(--dim); text-align: center; line-height: 1.1; writing-mode: vertical-rl; height: 52px; overflow: hidden; }
+.attgrid .cols span.u { color: #8ee9f2; }
+
+/* 公式 / 形状卡片 */
+.card { position: absolute; padding: 18px 22px; border-radius: 14px; background: rgba(4, 9, 19, .72); border: 1px solid var(--line2); font-size: 21px; color: var(--ink2); line-height: 1.75; white-space: nowrap; }
+.card .k { display: block; font-family: var(--mono); font-size: 12.5px; letter-spacing: .22em; color: var(--cyan); margin-bottom: 6px; }
+.card .m { color: var(--ink); }
+.card b { color: var(--amber); font-weight: 600; }
+.card .m b { font-family: var(--mono); font-weight: 400; }
+
+/* 自回归：回答一个字一个字长出来，下面是它当时的概率 */
+.reply { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); display: flex; gap: 6px; align-items: flex-end; }
+.reply .c { display: flex; flex-direction: column; align-items: center; width: 74px; }
+.reply .c .s { font-size: 58px; font-weight: 600; line-height: 1.15; color: var(--ink); }
+.reply .c.new .s { color: var(--amber); }
+.reply .c .bar { width: 44px; height: 3px; margin-top: 10px; background: rgba(255, 255, 255, .08); border-radius: 2px; overflow: hidden; }
+.reply .c .bar i { display: block; height: 100%; background: var(--amber); }
+.reply .c .p { margin-top: 6px; font-family: var(--mono); font-size: 14px; color: var(--dim); }
+.reply .c .r { font-family: var(--mono); font-size: 12px; color: var(--rose); height: 15px; }
+.reply .c.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); padding-bottom: 14px; }
+
+/* 片尾 */
+.endcard { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
+.endcard .ans { font-size: 76px; font-weight: 600; letter-spacing: .12em; color: #f2f5fb; }
+.endcard .stat { margin-top: 30px; font-family: var(--mono); font-size: 18px; letter-spacing: .14em; color: var(--dim); }
+.endcard .brand { font-size: 84px; font-weight: 900; letter-spacing: .1em; }
+.endcard .url { margin-top: 28px; font-family: var(--mono); font-size: 30px; letter-spacing: .08em; color: var(--cyan); }
+.endcard .cred { margin-top: 46px; font-size: 18px; color: var(--dim); letter-spacing: .1em; line-height: 1.9; }
