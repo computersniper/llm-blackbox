@@ -704,9 +704,8 @@ export class Scene {
       }
       case 'image': return fromFront(v3(PX, PY, 0), this.pw + 0.6, this.ph + 0.8, 0.08, 0, 1.25);
       case 'embed':
-        if (s.mi) return fromFront(v3(PX + 1.6, PY - 0.3, 0), 5.2, 3.4, 0.4, 0.1);
         return fromFront(v3((PX + VX) / 2, 1.0, 0.2), Math.abs(PX - VX) + this.pw + 1.2, 3.6, 0.45, 0.05);
-      case 'conv': case 'micro': return fromFront(v3((PX + VX) / 2, 1.0, 0.2), Math.abs(PX - VX) + this.pw + 1, 3.4, 0.5, 0.05);
+      case 'conv': case 'micro': return fromFront(v3(VX, 0.9, 0.4), this.pw + 1.6, 2.6, 0.5, 0.15);
       case 'vit': return fromFront(v3(VX, Y0 + 12 * LVL, 0), this.pw + 2.4, 24 * LVL + 1.6, 0.42, 0.45);
       case 'vitlayer': case 'vitop': {
         const k = s.op === 'ln1' || s.op === 'attn' || s.op === 'add1' || s.op === 'ln2' || s.op === 'mlp' ? s.L : s.L + 1;
