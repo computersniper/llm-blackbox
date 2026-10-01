@@ -67,6 +67,8 @@ def all_chars():
     # 所有页面的 HTML / JS / CSS，加上子页面 manifest 里的标题（任务卡片等用衬线体）
     files = [f for ext in ("*.html", "*.js", "*.css") for f in PUB.rglob(ext)]
     files += [f for f in PUB.glob("*/data/manifest.json")]
+    # 延伸学习页的路线、术语、资源标题都从 JSON 渲染，其中站名、段名、术语名用衬线体
+    files += sorted(PUB.glob("learn/data/*.json"))
     for f in files:
         chars |= cjk(f.read_text(encoding="utf-8"))
     return chars

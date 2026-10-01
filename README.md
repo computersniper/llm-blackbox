@@ -24,6 +24,7 @@
 &nbsp;·&nbsp; <a href="#四个页面">四个页面</a>
 &nbsp;·&nbsp; <a href="#为什么说它是真的">为什么说它是真的</a>
 &nbsp;·&nbsp; <a href="#一层层揭开">一层层揭开</a>
+&nbsp;·&nbsp; <a href="#延伸学习">延伸学习</a>
 &nbsp;·&nbsp; <a href="#架构">架构</a>
 &nbsp;·&nbsp; <a href="#本地运行">本地运行</a>
 &nbsp;·&nbsp; <a href="#推理视频">推理视频</a>
@@ -302,6 +303,27 @@ flowchart TB
 
 </details>
 
+## 延伸学习
+
+[`/blackbox/learn/`](https://caijiechao.com/blackbox/learn/) 是看完以后接着往下学的入口，四个页面的知识碎片图鉴底部都有“延伸学习 →”。
+
+- **学习路线图**：6 段 20 站，从“它只是在接龙”一直走到“读一篇原始论文”“跑起来，改一改”。每站一句白话目标、本站对应的页面和深度，再挂 2–4 个资源；可以标记“学完”，进度只存在浏览器的 localStorage 里。
+- **资源库**：80 条（中文 29 条），分 7 个主题（起步 / 推理 / 训练 / 多模态 / 智能体 / 世界模型 / 可解释性）、4 类（入门讲解 / 原始论文 / 动手代码 / 交互可视化）、3 档难度，可以筛选和搜索。
+- **术语表**：54 个术语的白话解释，每条标出在本站哪里能看到它，可按主题或 A–Z 排。
+- **动手试试**：6 段能直接复制运行的代码：Qwen3-0.6B 的下一个词元前 5 名、手写采样循环（温度 / top-k / top-p + KV 缓存）、注意力、逻辑透镜，以及用 nanoGPT 在 CPU 上训练莎士比亚和唐诗。
+
+数据在 `public/learn/data/`（`roadmap.json` 路线、`resources.json` 资源、`glossary.json` 术语、`snippets.json` 代码说明和实测输出），代码文件在 `public/learn/snippets/`，页面（`public/learn/js/`）只负责渲染。
+
+**资源怎么选、怎么核对**：优先收优质的中文讲解（3Blue1Brown 官方中文频道、李沐的《论文精读》和《动手学深度学习》、李宏毅的课程），论文链到 arXiv 摘要页，代码链到官方仓库。标题、作者、年份按页面上的实际内容填写（B 站取发布日期，arXiv 取首次提交日期），查不到的年份就不写。每一条链接都用脚本走代理实际打开过：
+
+```bash
+python tools/learn/check_links.py --stamp   # 结果写到 tools/learn/links_checked.json；全部通过时顺便更新页面上显示的检查日期
+```
+
+脚本收集 `public/learn/data/*.json` 和页面里的全部外部链接（包括代码片段会下载 / 克隆的地址），逐个用浏览器 UA 发 GET、跟随跳转，记录状态码、跳转后的地址、页面标题和检查时间；B 站视频另外核对页面里确实有视频标题（被删的视频也返回 200），YouTube 视频再查一次 oEmbed。只用标准库，有链接打不开时退出码为 1。打不开的资料不收录（例如 kexue.fm 和 openai.com 对脚本返回 403，Qwen 文档站返回 429）。
+
+**代码怎么验证**：四个 Qwen3 片段把模型名换成本地权重目录后，只用 CPU 在 transformers 5.17 和 4.51.3 上各跑一遍（片段①的前 5 名和推理页导出的同一个问题一致）；nanoGPT 两段按它 README 里的 CPU 配方原样运行（莎士比亚训练 63 秒，验证损失 1.89；唐诗连下载共 136 秒）。页面上的“实测输出”就是这些运行的原样输出。
+
 ## 架构
 
 纯静态站点，原生 ES Modules，没有构建步骤和运行时依赖（Three.js 自托管）。以推理页为例：
@@ -368,12 +390,14 @@ llm-blackbox/
 │   ├── train/               训练页：2D 画布舞台（js/stage.js）和各层视图（js/scenes/）
 │   ├── multimodal/          多模态页：3D 舞台（js/scene.js）和图像监视器（js/monitor.js）
 │   ├── agent/               智能体页：编辑器 / 终端回放（js/screen.js）和循环 / 上下文视图
+│   ├── learn/               延伸学习页：路线图、资源库、术语表、动手试试（data/*.json、snippets/）
 │   └── fonts/               思源宋体子集、JetBrains Mono（SIL OFL）
 ├── tools/
 │   ├── export_qwen.py       推理页数据导出
 │   ├── train/               prep_corpus.py · train_tiny.py · qwen_step.py
 │   ├── multimodal/          export_qwen3vl.py · make_images.py · grounding.py · images/
 │   ├── agent/               record.py · sandbox/（各任务的初始文件）
+│   ├── learn/               check_links.py（延伸学习页的外链检查）· links_checked.json（最近一次结果）
 │   ├── shot.mjs             截图 / 冒烟测试（playwright-core）
 │   ├── subset_fonts.py      字体子集
 │   └── stamp.sh deploy.sh   版本号、发布
@@ -387,7 +411,7 @@ llm-blackbox/
 
 ```bash
 cd public && python3 -m http.server 8765
-# 打开 http://localhost:8765/ （训练 /train/、多模态 /multimodal/、智能体 /agent/）
+# 打开 http://localhost:8765/ （训练 /train/、多模态 /multimodal/、智能体 /agent/、延伸学习 /learn/）
 ```
 
 ### 重新导出数据
@@ -469,7 +493,7 @@ python tools/agent/record.py --model ... --dry                                  
 python tools/agent/record.py --model ... --chips-only                                # 只重建输入法候选
 ```
 
-**字体子集**：标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（四个页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`）：
+**字体子集**：标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（四个页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`；延伸学习页从 `learn/data/*.json` 渲染的站名、术语名也会收进 ext）：
 
 ```bash
 python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf
