@@ -3,7 +3,7 @@
 // 底下三张卡片是 V、M、C 真实的训练记录。
 import { COL, rr, text, card, hexA, line, clamp, ease, seg } from '../../../train/js/draw.js';
 import { Pix, vecGrid } from '../pix.js';
-import { ACTIONS } from '../game.js';
+import { ACTIONS, toCHW } from '../game.js';
 import { dimOrder, used as isUsed, fmtMSE } from '../explain.js';
 
 const ORDER_STAGE = ['obs', 'enc', 'rnn', 'sample', 'dec', 'cmp'];
@@ -260,13 +260,33 @@ export class LoopView {
     g.restore();
   }
 
+  samples(g, x, y, ts, n, env) {
+    const { meta, model } = this.app;
+    if (!this.sp) {
+      this.sp = meta.samples.slice(0, n).map((s) => {
+        const o = Uint8Array.from(atob(s.frame), (c) => c.charCodeAt(0));
+        const y = model.decode(model.encode(toCHW(o)).mu).y;
+        return { a: new Pix().palette(o), b: new Pix().chw(y), mse: s.mse };
+      });
+    }
+    text(g, '测试集 · 原图 / 重建', x, y - 6, { size: 9, color: COL.dim });
+    this.sp.forEach((s, k) => {
+      const xx = x + k * (ts + 6);
+      s.a.draw(g, xx, y, ts, ts);
+      s.b.draw(g, xx, y + ts + 4, ts, ts);
+      g.strokeStyle = COL.line2; g.lineWidth = 1;
+      g.strokeRect(xx - 0.5, y - 0.5, ts + 1, ts + 1); g.strokeRect(xx - 0.5, y + ts + 3.5, ts + 1, ts + 1);
+      env.hit(xx, y, ts, ts * 2 + 4, { tip: `<span class="k">测试集第 ${k + 1} 帧</span>上：真实画面；下：V 编码再解码（浏览器里现场算）。<br>每像素均方误差 <span class="v">${s.mse.toFixed(4)}</span>（导出时 PyTorch 算的）` });
+    });
+  }
+
   // V、M、C 真实的训练记录
   cards(g, r, env) {
     const { meta } = this.app;
     const T = meta.train;
     const pt = this.portrait;
     const items = [
-      { t: 'V 怎么训出来的', a: `${(T.collect.frames / 1e4).toFixed(0)} 万帧 · ${T.V.epochs} 轮 · ${Math.round(T.V.seconds)} 秒`, b: `重建误差（加权平方和）${T.V.finalRecon} · KL ${T.V.finalKL}`, curve: T.Vcurve.map((c) => c[1]), color: COL.violet },
+      { t: 'V 怎么训出来的', a: `${(T.collect.frames / 1e4).toFixed(0)} 万帧 · ${T.V.epochs} 轮 · ${Math.round(T.V.seconds)} 秒`, b: `重建 ${T.V.finalRecon.toFixed(1)} · KL ${T.V.finalKL.toFixed(1)} · 测试 MSE ${T.V.testMSE.toFixed(4)}`, curve: T.Vcurve.map((c) => c[1]), color: COL.violet },
       { t: 'M 怎么训出来的', a: `${T.M.iters.toLocaleString()} 步 · 每批 ${T.M.batch}×${T.M.seqLen} · ${Math.round(T.M.seconds)} 秒`, b: `负对数似然 ${T.M.finalNLL} · 测试集 ${T.M.testNLL}`, curve: T.Mcurve.map((c) => c[1]), color: COL.amber },
     ];
     if (T.C) items.push({ t: 'C 在梦里学开车', a: `CMA-ES ${T.C.gens} 代 × ${T.C.pop} 个 · ${Math.round(T.C.seconds)} 秒`, b: `梦里活 ${T.C.dreamLife} 步 · 真实游戏 ${T.C.realLife} 步（乱开 ${T.C.randomLife}）`, curve: T.Ccurve.map((c) => c[1]), color: COL.cyan });
@@ -275,11 +295,14 @@ export class LoopView {
     const w = pt ? r.w : (r.w - gap * (n - 1)) / n, h = pt ? (r.h - gap * (n - 1)) / n : r.h;
     items.forEach((it, i) => {
       const x = pt ? r.x : r.x + i * (w + gap), y = pt ? r.y + i * (h + gap) : r.y;
+      // V 的卡片右边：测试集里的几帧（导出时挑的、训练时没见过）和它们的重建，浏览器里现场算
+      const ns = i === 0 && !pt ? 4 : 0, ts = 34, tw = w - 28 - (ns ? ns * (ts + 6) + 4 : 0);
       card(g, x, y, w, h, { r: 10, accent: it.color });
       text(g, it.t, x + 14, y + 24, { size: pt ? 12 : 13.5, kind: 'serif', weight: 600 });
-      text(g, it.a, x + 14, y + 42, { size: pt ? 9.5 : 10.5, kind: 'mono', color: COL.ink2, max: w - 28 });
-      text(g, it.b, x + 14, y + 57, { size: pt ? 9.5 : 10.5, color: COL.dim, max: w - 28 });
-      const P = { x: x + 14, y: y + (pt ? 64 : 70), w: w - 28, h: h - (pt ? 72 : 82) };
+      text(g, it.a, x + 14, y + 42, { size: pt ? 9.5 : 10.5, kind: 'mono', color: COL.ink2, max: tw });
+      text(g, it.b, x + 14, y + 57, { size: pt ? 9.5 : 10.5, color: COL.dim, max: tw });
+      if (ns) this.samples(g, x + w - 14 - ns * (ts + 6) + 6, y + 30, ts, ns, env);
+      const P = { x: x + 14, y: y + (pt ? 64 : 70), w: w - 28 - (ns ? ns * (ts + 6) + 4 : 0), h: h - (pt ? 72 : 82) };
       if (P.h > 14) {
         const c = it.curve;
         let mn = Infinity, mx = -Infinity;
