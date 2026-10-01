@@ -7,7 +7,7 @@ const NARROW = matchMedia('(max-width: 900px)');
 const STEP = 16;
 const DEFAULTS = { left: { min: 280, max: 720 }, right: { min: 260, max: 680 } };
 
-const load = (key) => { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; } };
+const load = (key) => { try { const v = JSON.parse(localStorage.getItem(key)); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch { return {}; } };
 const store = (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* 忽略 */ } };
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 
