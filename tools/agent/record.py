@@ -323,6 +323,22 @@ def tok_show(tok, tid):
         return "".join(f"<0x{b:02X}>" for b in raw)
 
 
+def make_chips(tok, text):
+    """输入法的候选：用户任务的真实分词。半个汉字的字节片段和后面的词元合成一块（ids 里保留每个真实词元的编号）。"""
+    chips, ids, buf = [], [], b""
+    for i in tok(text, add_special_tokens=False)["input_ids"]:
+        raw, _ = tok_bytes(tok, i)
+        ids.append(int(i))
+        buf += raw
+        try:
+            s = buf.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        chips.append({"ids": ids, "s": s})
+        ids, buf = [], b""
+    return chips
+
+
 # ---------------------------------------------------------------- 采样（与 transformers 的 temperature → top_k → top_p 一致）
 
 def sample(logits, gen):
@@ -569,7 +585,16 @@ def main():
     ap.add_argument("--only", default=None, help="只录这个任务 id")
     ap.add_argument("--seeds", default="0,1,2,3,4,5,6,7", help="依次尝试的随机种子，录到第一个通过检查的为止")
     ap.add_argument("--dry", action="store_true", help="只打印，不写文件")
+    ap.add_argument("--chips-only", action="store_true", help="只用分词器重建 manifest 里的输入法候选，不跑模型")
     args = ap.parse_args()
+    if args.chips_only:
+        man_path = OUT / "manifest.json"
+        manifest = json.loads(man_path.read_text())
+        tok = AutoTokenizer.from_pretrained(args.model)
+        for t in manifest["tasks"]:
+            t["chips"] = make_chips(tok, t["prompt"])
+        write_json(man_path, manifest)
+        return
     if shutil.which("bwrap") is None:
         raise SystemExit("需要 bubblewrap（bwrap）来做沙箱")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -602,7 +627,7 @@ def main():
         last = rec_ok["turns"][-1]
         by_id[task["id"]] = {
             "id": task["id"], "title": task["title"], "prompt": task["prompt"], "icon": task["icon"], "blurb": task["blurb"],
-            "chips": [{"id": int(i), "s": tok_show(rec.tok, i)} for i in rec.tok(task["prompt"], add_special_tokens=False)["input_ids"]],
+            "chips": make_chips(rec.tok, task["prompt"]),
             "turns": len(rec_ok["turns"]), "calls": sum(len(t["calls"]) for t in rec_ok["turns"]),
             "ctxEnd": last["ctx"]["n"] + last["gen"]["n"],
             "attempts": tries, "bytes": gz, "rawBytes": raw,
