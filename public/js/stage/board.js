@@ -16,7 +16,9 @@ const sg = (v, d = 3) => (Number.isFinite(v) ? `${v >= 0 ? '+' : MINUS}${Math.ab
 // 权重很小，按有效数字显示
 const sw = (v) => (Math.abs(v) >= 0.01 || v === 0 ? sg(v, 4) : `${v >= 0 ? '+' : MINUS}${Math.abs(v).toPrecision(3)}`);
 // 极大 / 极小 / 无穷都能写的数
-const sx = (v, d = 3) => (Number.isFinite(v) && Math.abs(v) < 1e5 && (Math.abs(v) >= 1e-3 || v === 0) ? sg(v, d) : (v > 0 ? '+' : '') + fmtSci(v));
+// 科学计数法的指数写成上标：× 10^−21 → × 10<sup>−21</sup>
+const sci = (v) => fmtSci(v).replace(/10\^([−-]?\d+)/, '10<sup>$1</sup>');
+const sx = (v, d = 3) => (Number.isFinite(v) && Math.abs(v) < 1e5 && (Math.abs(v) >= 1e-3 || v === 0) ? sg(v, d) : (v > 0 ? '+' : '') + sci(v));
 const pct = (v) => (Number.isFinite(v) ? fmtPct(v) : '—');
 
 const STEPS = {
@@ -458,7 +460,7 @@ export class Board {
     // 翻转的后果：只改了这一个数，下游那一个输出元素怎么变（精确重算：总和里只有这一项变了）
     const flipped = !!flips && bits.some((b, i) => b !== base[i]);
     const ov = old.value, nv = val.value, dv = nv - ov;
-    const row = (k, a, b, extra = '') => `<div class="bd-ef"><span class="k">${k}</span><span class="a">${a}</span><span class="to">→</span><b>${b}</b>${extra}</div>`;
+    const row = (k, a, b, extra = '') => `<div class="bd-ef"><span class="k">${k}</span><span class="v"><span class="a">${a}</span><span class="to">→</span><b>${b}</b>${extra}</span></div>`;
     let h = '';
     if (tg.kind === 'q') {
       const d = tg.d, kd = d.k[tg.k];
@@ -466,7 +468,7 @@ export class Board {
       const w2 = 1 / (1 + (1 / d.w - 1) * Math.exp(d.score - sc2));
       h = flipped
         ? row(`q[${d.dims[tg.k]}]`, sx(ov, 4), sx(nv, 4), ratio(ov, nv)) + row('q·k', sg(d.sum, 2), sx(s2, 2)) + row('打分', sg(d.score, 3), sx(sc2, 3)) + row('注意力权重', pct(d.w), pct(w2))
-          + `<p>q·k 里只有这一项变了：新的 q·k = 原来的 ${sg(d.sum, 2)} + k × (新 − 旧) = ${sg(d.sum, 2)} + ${sg(kd, 3)} × ${sx(dv, 4)}。</p>`
+          + `<p>q·k 里只有这一项变了：新的 q·k = 原来的 ${sg(d.sum, 2)} + k[${d.dims[tg.k]}] × (新 − 旧) = ${sg(d.sum, 2)} + ${par(sg(kd, 3))} × ${par(sx(dv, 4))}。</p>`
         : `<p>它和「${esc(tokPlain(this.M.Q.tokens[d.key]?.s ?? ''))}」的 k[${d.dims[tg.k]}] = ${sg(kd, 3)} 相乘，贡献了 <b class="cp">${sg(ov * kd, 2)}</b>。</p>`;
     } else {
       const t2 = tg.total + tg.x * dv;
@@ -482,7 +484,7 @@ export class Board {
         if (p1) h += row(`「${esc(tokPlain(tg.head.token))}」的概率`, pct(p1), pct(1 / (1 + (1 / p1 - 1) * Math.exp(tg.total - t2))));
       }
       h += flipped
-        ? `<p>${tg.out} 里只有这一项变了：新值 = 原来的 ${sg(tg.total)} + ${tg.xHtml} × (新权重 − 旧权重) = ${sg(tg.total)} + ${sg(tg.x)} × ${sx(dv, 5)}。</p>`
+        ? `<p>${tg.out} 里只有这一项变了：新值 = 原来的 ${sg(tg.total)} + ${tg.xHtml} × (新权重 − 旧权重) = ${sg(tg.total)} + ${par(sg(tg.x))} × ${par(sx(dv, 5))}。</p>`
         : `<p>这个权重乘的是 <span class="cx">${tg.xHtml} = ${sg(tg.x)}</span>，贡献了 <b class="cp">${sg(tg.x * ov, 4)}</b>，是 ${tg.out} 里最大的几项之一。</p>`;
     }
     if (!flipped) h += '<p class="dim">试试看：翻<b class="e">指数</b>位，数会成倍地变大变小；翻<b class="m">尾数</b>位，只改一点点；翻<b class="s">符号</b>位，正负颠倒。</p>';
@@ -536,9 +538,10 @@ export class Board {
     const tr = t.closest('.bd-tr[data-k]');
     if (tr && (this.mode === 'mm' || this.mode === 'dot')) {
       const k = Number(tr.dataset.k), d = Number(tr.dataset.d);
+      // 和点 3D 格子走同一条路：记下选中的那一项，乘法这一步里直接进入比特层。
+      // 打分里选的是 q 的某一维，不要动矩阵那边已经选好的格子
       if (this.mode === 'dot') this.M.detail.dotSel = k;
-      // 和点 3D 格子走同一条路：记下选中的权重，乘法这一步里直接进入比特层
-      this.E.onPick?.({ type: 'mmcell', d, click: true });
+      this.E.onPick?.({ type: 'mmcell', d: this.mode === 'dot' ? this.M.micro.selD : d, click: true });
       this.fk = '';
     }
   }
@@ -550,9 +553,11 @@ const ratio = (a, b) => {
   if (!Number.isFinite(b) || !a) return '';
   const r = b / a;
   if (r === 1) return '';
-  return `<small>${r < 0 ? '变号，' : ''}×${Math.abs(r) >= 100 || Math.abs(r) < 0.01 ? fmtSci(Math.abs(r)) : Math.abs(r).toFixed(Math.abs(r) >= 10 ? 1 : 3)}</small>`;
+  return `<small>${r < 0 ? '变号，' : ''}×${Math.abs(r) >= 100 || Math.abs(r) < 0.01 ? sci(Math.abs(r)) : Math.abs(r).toFixed(Math.abs(r) >= 10 ? 1 : 3)}</small>`;
 };
-const diff = (d) => (Number.isFinite(d) ? `变化 ${sg(d, Math.abs(d) >= 100 ? 1 : 3)}` : '');
+const diff = (d) => (Number.isFinite(d) ? `变化 ${sx(d)}` : '');
+// 算式里的带符号数：负数加括号，免得出现“+ −2.1”
+const par = (s) => (s.startsWith(MINUS) ? `(${s})` : s);
 
 // SiLU 曲线（x ∈ [−6, 6]）
 const sx2 = (x) => (12 + ((x + 6) / 12) * 216).toFixed(1);

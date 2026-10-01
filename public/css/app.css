@@ -461,7 +461,9 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .bd-bfx { font-size: 14px; }
 .bd-bfx small { display: block; color: var(--dim); }
 .bd-eff-h { margin-bottom: 4px; font-size: 11.5px; letter-spacing: .1em; color: var(--dim); }
-.bd-ef { display: grid; grid-template-columns: minmax(6em, auto) auto auto 1fr; gap: 0 8px; align-items: baseline; font-family: var(--mono); font-size: 13px; }
+.bd-ef { display: flex; gap: 0 10px; align-items: baseline; padding: 1px 0; font-family: var(--mono); font-size: 13px; }
+.bd-ef .k { flex: none; width: 7.5em; }
+.bd-ef .v { display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline; min-width: 0; }
 .bd-ef .k { font-family: var(--sans); font-size: 12px; color: var(--dim); }
 .bd-ef .to { color: var(--faint); }
 .bd-ef b { color: #fff; }
@@ -555,6 +557,7 @@ body.mode-inspect .toast { padding: 9px 12px; }
   /* 手机上先看累加器和结果落点，清单在下面，往下滑 */
   .bd-body { display: flex; flex-direction: column; gap: 8px; }
   .bd-side { order: -1; }
+  .bd-bits-body .bd-side { order: 0; }
   .bd-acc { padding: 6px 10px 7px; }
   .bd-acc-k { font-size: 11px; }
   .bd-dest { margin-top: 6px; padding-top: 6px; }
