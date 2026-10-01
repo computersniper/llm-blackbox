@@ -93,7 +93,9 @@ deploy/             服务器端 post-receive 钩子与初始化脚本
 
 ```bash
 git remote add deploy root@182.61.48.178:/srv/blackbox/repo.git   # 只需一次
-git push deploy main                                               # 发布
+git push deploy HEAD:main                                          # 发布当前分支
 ```
+
+也可运行 `sh tools/deploy.sh`，或指定要发布的分支：`sh tools/deploy.sh codex/real-data-work`。
 
 更早的版本保存在 git 标签里：`v1`（九个深度的分页式下潜）、`v2`（聊天 + 调试器初版）。
