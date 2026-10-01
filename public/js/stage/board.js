@@ -8,6 +8,7 @@ import { termAt, termsDone } from './micro.js';
 import { neuronId, sums } from './fields.js';
 
 const small = () => matchMedia('(max-width: 900px)').matches;
+const Q_ID = (M) => M.Q?.id ?? '';
 const easeOut = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 const MINUS = '−';
 // 带符号的数：+1.234 / −1.234
@@ -53,7 +54,7 @@ export class Board {
     else if (v === 'bits') mode = 'bits';
     if (!mode || st.dAnim < 4.6) return this.hide();
     const data = this.dataFor(mode, st);
-    const key = data ? `${mode}|${st.g}|${s.ph}|${s.L}|${s.sub}|${data.id}|${small()}` : `wait|${s.L}`;
+    const key = data ? `${Q_ID(this.M)}|${mode}|${st.g}|${s.ph}|${s.L}|${s.sub}|${data.id}|${small()}` : `wait|${s.L}`;
     if (key !== this.key) {
       this.key = key;
       this.fk = '';
@@ -129,12 +130,12 @@ export class Board {
   }
 
   // 一张“乘积清单”：前 R 项逐行列出，其余的合成一行，加起来正好等于 total
-  table(rows, { xh, wh, ph, restN, rest, pn, maxP }) {
+  table(rows, { xh, wh, ph, restN, rest, maxP }) {
     const bar = (v) => {
       const w = Math.min(100, (Math.abs(v) / maxP) * 100);
       return `<span class="bar"><i class="${v >= 0 ? 'pos' : 'neg'}" style="width:${(w / 2).toFixed(1)}%"></i></span>`;
     };
-    const restPN = pn ? `<small>正的 ${sg(pn[0], 2)} · 负的 ${sg(pn[1], 2)}</small>` : '<small>每项都很小，但数量多</small>';
+    const restPN = '<small>每一项都很小</small>';
     return `<div class="bd-tbl">
       <div class="bd-tr bd-th"><span class="i">i</span><span class="cx">${xh}</span><span class="o"></span><span class="cw">${wh}</span><span class="o"></span><span class="cp">${ph}</span><span class="bar"></span></div>
       ${rows.map((r) => `<div class="bd-tr" data-k="${r.k}" data-d="${r.d}" title="点一下：之后按 ＋ 看这个权重的比特"><span class="i">${r.d}</span><span class="cx">${sg(r.x, r.xd ?? 3)}</span><span class="o">×</span><span class="cw">${r.wf ? r.wf(r.w) : sw(r.w)}</span><span class="o">=</span><span class="cp" data-p>${sg(r.p, r.pd ?? 3)}</span>${bar(r.p)}</div>`).join('')}
@@ -189,13 +190,12 @@ export class Board {
     const rest = e.total - shownR;
     const n = src.sum.n;
     const pn = src.sum.pos != null && src.sum.neg != null ? [src.sum.pos, src.sum.neg] : null;
-    const pnRest = pn ? [pn[0] - rows.reduce((a, r) => a + Math.max(0, r.p), 0), pn[1] - rows.reduce((a, r) => a + Math.min(0, r.p), 0)] : null;
     const maxP = Math.max(...rows.map((r) => Math.abs(r.p)), Math.abs(rest), 1e-9);
     this.calc = { rows, R, rest, total: e.total, n, shownR, scale: Math.max(Math.abs(e.total), Math.abs(shownR), ...(src.sum.cum || []).map((c) => Math.abs(c[1])), ...rows.map((_, k) => Math.abs(rows.slice(0, k + 1).reduce((a, r) => a + r.p, 0)))) * 1.15 || 1 };
     const yHtml = `${src.y}[${e.j}]`;
     const xi = `<span class="cx">${src.x}[i]</span>`, wi = `<span class="cw">${src.wIdx('i')}</span>`;
     this.cap = {
-      pick: `要算 <b class="cy">${yHtml}</b>，只需要 <b class="cw">${src.w}</b> 的<b>第 ${e.j} 列</b>：这一列的 ${n.toLocaleString('zh-CN')} 个权重，正好和输入 <b class="cx">${src.x}</b> 的 ${n.toLocaleString('zh-CN')} 个数一一配对。`,
+      pick: `要算 <b class="cy">${yHtml}</b>，只需要 <b class="cw">${src.w}</b> 的<b>第 ${e.j} 列</b>：这一列的 ${n.toLocaleString('zh-CN')} 个权重，正好和输入 <b class="cx">${src.x}</b> 的 ${n.toLocaleString('zh-CN')} 个数一一配对。<span class="dim"><b class="cx">${src.x}</b>：${esc(src.xDesc)}；<b class="cw">${src.w}</b>：${esc(src.wDesc)}。</span>`,
       mul: `逐项相乘：输入的第 i 个数 × 这一列的第 i 个权重。下面列出乘积绝对值最大的 ${R} 项，每乘出一项就加进累加器。<span class="dim">点一行，再按 ＋ 看那个权重的比特。</span>`,
       sum: `全部加起来：其余 ${(n - R).toLocaleString('zh-CN')} 项每一项都很小，但数量多，合起来也不能忽略。加完就是 <b class="cy">${yHtml}</b>。`,
       rope: `还要再加工两步：同一个头的 128 个数一起<b>归一化</b>（q_norm），再按词元的位置<b>旋转</b>（RoPE），才是拿去和 K 比较的 q。`,
@@ -207,8 +207,7 @@ export class Board {
       <div class="bd-body">
         <div class="bd-main">
           <div class="bd-fx"><span class="cy">${yHtml}</span> = <span class="op">Σ</span><sub class="lim">i</sub> ${xi} × ${wi}<small>i 从 0 到 ${n - 1}，一共 ${n.toLocaleString('zh-CN')} 项</small></div>
-          <div class="bd-legend"><span><i class="cx">■</i>输入 ${src.x}：${esc(src.xDesc)}</span><span><i class="cw">■</i>权重 ${src.w}：${esc(src.wDesc)}</span></div>
-          ${this.table(rows, { xh: `${src.x}[i]`, wh: src.wIdx('i'), ph: '乘积', restN: n - R, rest, pn: pnRest, maxP })}
+          ${this.table(rows, { xh: `${src.x}[i]`, wh: src.wIdx('i'), ph: '乘积', restN: n - R, rest, maxP })}
           ${rope}
         </div>
         <div class="bd-side">
@@ -246,12 +245,11 @@ export class Board {
     const shownR = rows.reduce((a, r) => a + r.p, 0);
     const n = D.sum.n, rest = d.sum - shownR;
     const pn = D.sum.pos != null && D.sum.neg != null ? [D.sum.pos, D.sum.neg] : null;
-    const pnRest = pn ? [pn[0] - rows.reduce((a, r) => a + Math.max(0, r.p), 0), pn[1] - rows.reduce((a, r) => a + Math.min(0, r.p), 0)] : null;
     const maxP = Math.max(...rows.map((r) => Math.abs(r.p)), Math.abs(rest), 1e-9);
     this.calc = { rows, R, rest, total: d.sum, n, shownR, scale: Math.max(Math.abs(d.sum), ...(D.sum.cum || []).map((c) => Math.abs(c[1])), ...rows.map((_, k) => Math.abs(rows.slice(0, k + 1).reduce((a, r) => a + r.p, 0)))) * 1.15 || 1 };
     const ctxN = Q.P + st.g;
     this.cap = {
-      mul: `第 ${d.head} 号头拿当前词元的 <b class="cx">q</b>（128 个数）和「${tok}」的 <b class="cw">k</b>（128 个数）逐维相乘。下面是乘积最大的 ${R} 维。<span class="dim">点一行，再按 ＋ 看那个数的比特。</span>`,
+      mul: `第 ${d.head} 号头拿当前词元的 <b class="cx">q</b>（128 个数，已经过 q_norm 和 RoPE）和「${tok}」的 <b class="cw">k</b>（128 个数，存在 KV 缓存里）逐维相乘。下面是乘积最大的 ${R} 维。<span class="dim">点一行，再按 ＋ 看那个数的比特。</span>`,
       sum: `128 维全部加起来就是 q·k：两个向量越“同向”，这个数越大，说明「${tok}」和当前位置越对得上。`,
       scale: `除以 √128 ≈ 11.31，防止数值太大；再和前面全部 ${ctxN} 个词元的打分一起做 softmax，变成注意力权重。`,
     };
@@ -262,8 +260,7 @@ export class Board {
       <div class="bd-body">
         <div class="bd-main">
           <div class="bd-fx"><span class="cy">q·k</span> = <span class="op">Σ</span><sub class="lim">d</sub> <span class="cx">q[d]</span> × <span class="cw">k[d]</span><small>d 从 0 到 127，一共 128 维</small></div>
-          <div class="bd-legend"><span><i class="cx">■</i>q：当前词元在第 ${d.head} 号头的查询（已经过 q_norm 和 RoPE）</span><span><i class="cw">■</i>k：「${tok}」在第 ${d.kv} 组键值头的键（存在 KV 缓存里）</span></div>
-          ${this.table(rows, { xh: 'q[d]', wh: 'k[d]', ph: '乘积', restN: n - R, rest, pn: pnRest, maxP }).replace(/title="[^"]*"/g, 'title="点一下：之后按 ＋ 看这个数的比特"')}
+          ${this.table(rows, { xh: 'q[d]', wh: 'k[d]', ph: '乘积', restN: n - R, rest, maxP }).replace(/title="[^"]*"/g, 'title="点一下：之后按 ＋ 看这个数的比特"')}
         </div>
         <div class="bd-side">
           ${this.accHTML(yHtml, pn)}
@@ -323,10 +320,12 @@ export class Board {
     return `${this.head(`比特 · ${name}`, null)}
       <div class="bd-scroll">
       <p class="bd-cap">${tg.kind === 'q' ? '激活值' : '模型里的每个权重'}在显存里都是 <b>16 个 0/1</b>（bfloat16 格式）。<b>点任意一位</b>把它翻过来，看看会发生什么。<span class="dim">${what}</span></p>
+      <div class="bd-bitrow">
+        <div class="bd-bits"><span class="g s">${bits[0]}</span><span class="g e">${bits.slice(1, 9).join('')}</span><span class="g m">${bits.slice(9).join('')}</span></div>
+        <div class="bd-bitk"><span class="s">符号</span><span class="e">指数 · 8 位</span><span class="m">尾数 · 7 位</span></div>
+      </div>
       <div class="bd-body bd-bits-body">
         <div class="bd-main">
-          <div class="bd-bits"><span class="g s">${bits[0]}</span><span class="g e">${bits.slice(1, 9).join('')}</span><span class="g m">${bits.slice(9).join('')}</span></div>
-          <div class="bd-bitk"><span class="s">符号 1 位</span><span class="e">指数 8 位</span><span class="m">尾数 7 位</span></div>
           <div class="bd-dec" data-dec></div>
           <div class="bd-fx bd-bfx" data-bfx></div>
         </div>

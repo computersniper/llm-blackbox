@@ -144,6 +144,7 @@ export class Mats {
     oinL.position.set(-0.03, (qd * U) / 2, 0);
     oinL.center.set(1.1, 0.5);
     A.oin.add(oinL);
+    A.oinL = oinL;
     A.add(A.o, A.oo, A.oin);
     this.root.add(A);
 
@@ -154,6 +155,7 @@ export class Mats {
     xl.position.set(-0.03, (H * U) / 2, 0);
     xl.center.set(1.1, 0.5);
     P.x.add(xl);
+    P.xl = xl;
     P.g = panel('W<sub>gate</sub>', H, F, C.gate, 5);
     P.u = panel('W<sub>up</sub>', H, F, C.up, 6);
     P.g.position.x = 0.14;
@@ -175,6 +177,7 @@ export class Mats {
     dinL.position.set(-0.03, (F * U) / 2, 0);
     dinL.center.set(1.1, 0.5);
     P.din.add(dinL);
+    P.dinL = dinL;
     P.dout = vec(H * U, 8, C.down);
     P.dout.position.set(P.d.position.x, P.d.position.y + F * U + 0.1, 0);
     outL(P.dout, 'Δx<small>1 × 1024 → 加回残差</small>');
@@ -191,6 +194,9 @@ export class Mats {
     const micro = v === 'mm' || (v === 'bits' && s.sub !== 'score');
     const inLayer = s.ph === 'layer' && M.e > 0.6 && (v === 'layer' || v === 'attn' || v === 'mlp' || micro);
     if (inLayer) this.applyThumbs(M.explodeL);
+    // 微观视图里输入 / 输出另有带颜色的标签（micro.js），这些尺寸标签先收起来，免得叠在一起
+    for (const l of [A.xl, A.qo.lbl, A.oo.lbl, A.oinL, P.xl, P.go.lbl, P.uo.lbl, P.dinL, P.dout.lbl, P.u.lb]) l.visible = !micro;
+    for (const pn of [A.q, A.o, P.g, P.u, P.d]) pn.edge.material.opacity = micro ? 0.35 : 0.7;
     const xf = M.xFocus(st);
     const base = 0.95 + M.explodeL * 0.26;
     const e = M.e;
@@ -211,14 +217,16 @@ export class Mats {
         out.setFill(easeOut(kP), qkv ? 0.55 : 0.25);
       }
       if (micro) {
-        // 微观视图：只突出正在放大的那块矩阵
-        for (const pn of [A.q, A.k, A.v]) { pn.scan.material.opacity = 0; pn.mat.opacity = pn === A.q && qkv ? (v === 'bits' ? 0.3 : 0.95) : 0.18; }
-        for (const out of [A.qo, A.ko, A.vo]) out.setFill(1, out === A.qo ? 0.35 : 0.12);
-      }
+        // 微观视图：只留下正在放大的那块矩阵（W_q），W_k / W_v 和 GQA 连线先收起来；面板压暗，好让高亮的那一列跳出来
+        for (const pn of [A.k, A.v, A.ko, A.vo]) pn.visible = false;
+        A.q.scan.material.opacity = 0;
+        A.q.mat.opacity = v === 'bits' ? 0.06 : 0.55;
+        A.qo.setFill(1, 0.12);
+      } else for (const pn of [A.k, A.v, A.ko, A.vo]) pn.visible = sub !== 'mix';
       A.x.visible = sub !== 'mix';
       A.x.setFill(1, qkv ? 0.6 : 0.2);
       A.gqa.material.opacity = sub === 'qkv' ? 0.55 * seg(kP, 0.7, 1) : sub === 'score' ? 0.5 : 0.15;
-      A.gqa.visible = A.gqaL.visible = sub !== 'mix';
+      A.gqa.visible = A.gqaL.visible = sub !== 'mix' && !micro;
       const mix = sub === 'mix';
       A.o.visible = A.oo.visible = A.oin.visible = mix;
       if (mix) {
@@ -230,7 +238,7 @@ export class Mats {
         A.o.scan.material.opacity = mP < 1 ? 0.85 : 0;
         A.o.scan.position.x = A.o.w * easeOut(mP);
         A.oo.setFill(easeOut(mP), 0.55);
-        if (micro) { A.o.scan.material.opacity = 0; A.oo.setFill(1, 0.3); A.o.mat.opacity = v === 'bits' ? 0.3 : 0.95; }
+        if (micro) { A.o.scan.material.opacity = 0; A.oo.setFill(1, 0.12); A.o.mat.opacity = v === 'bits' ? 0.06 : 0.55; }
       }
     }
     // 前馈这一组
@@ -257,12 +265,14 @@ export class Mats {
       P.din.setFill(sub === 'up' ? 0 : 1, sub === 'act' ? 0.7 : 0.4);
       P.dout.setFill(easeOut(dP), 0.55);
       if (micro) {
+        // 升维时只留 W_gate / W_up，降维时只留 W_down 和它的输入输出
         for (const pn of [P.g, P.u, P.d]) pn.scan.material.opacity = 0;
-        const hi = v === 'bits' ? 0.3 : 0.95;
-        P.g.mat.opacity = P.u.mat.opacity = up ? hi : 0.18;
-        P.d.mat.opacity = down ? hi : 0.18;
-        P.go.setFill(1, 0.3); P.uo.setFill(1, 0.3); P.dout.setFill(down ? 1 : 0, 0.3);
-      }
+        const hi = v === 'bits' ? 0.06 : 0.55;
+        for (const o of [P.g, P.u, P.go, P.uo, P.x, P.x2]) o.visible = up;
+        for (const o of [P.d, P.din, P.dout]) o.visible = down;
+        P.g.mat.opacity = P.u.mat.opacity = P.d.mat.opacity = hi;
+        P.go.setFill(1, 0.12); P.uo.setFill(1, 0.12); P.dout.setFill(1, 0.12); P.din.setFill(1, 0.25);
+      } else for (const o of [P.g, P.u, P.go, P.uo, P.x, P.x2, P.d, P.din, P.dout]) o.visible = true;
     }
   }
 

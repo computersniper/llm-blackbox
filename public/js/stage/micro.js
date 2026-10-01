@@ -123,10 +123,6 @@ export class Micro {
       const vec = new THREE.Mesh(new THREE.BoxGeometry(0.05, h, 0.05), new THREE.MeshStandardMaterial({ color: 0x223, emissive: ROLE.x, emissiveIntensity: 0.4 }));
       vec.position.set(-0.14, h / 2, 0);
       g.add(vec);
-      const vl = label('h<small>最终 RMSNorm 之后 · 1 × 1024</small>', 'lbl num');
-      vl.position.set(-0.18, h / 2, 0);
-      vl.center.set(1, 0.5);
-      g.add(vl);
       g.w = w; g.h = h;
       this.head = g;
       this.M.root.add(g);
@@ -186,9 +182,9 @@ export class Micro {
     this.outLbl.position.set(colX, oy + 0.04, 0.03);
     this.outLbl.center.set(0.5, 1.25);
     R.add(this.outLbl);
-    this.inLbl = label(`输入 <span class="cx">${src.x}</span>`, 'lbl tag x');
-    this.inLbl.position.set(src.inX, panel.h + 0.02, 0.03);
-    this.inLbl.center.set(0.5, 1.2);
+    this.inLbl = label(`输入 <span class="cx">${src.x}</span><small>${src.sum.n} 个数</small>`, 'lbl tag x');
+    this.inLbl.position.set(src.inX - 0.04, panel.h / 2, 0.03);
+    this.inLbl.center.set(1, 0.5);
     R.add(this.inLbl);
     // 12 项：输入的第 i 个数 → 格子 (i, j)
     const n = e.dims.length;

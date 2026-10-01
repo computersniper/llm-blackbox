@@ -7,6 +7,7 @@ import { tokPlain, shortSpecial, fmtPct, hueOf, esc } from '../ui.js';
 import { Detail } from './detail.js';
 import { Mats } from './mats.js';
 import { Micro } from './micro.js';
+import { Board } from './board.js';
 
 export const ROLE = { system: 0x8fa6d6, user: 0x5ee4f0, assistant: 0xffb65c, tpl: 0xb39dff };
 const S = 0.42;        // 词元间距
@@ -47,6 +48,7 @@ export class Machine {
     this.detail = new Detail(E);
     this.mats = new Mats(E, this);
     this.micro = new Micro(E, this);
+    this.board = new Board(E, this);
     this.buildStatic();
     this.root = null;
   }
@@ -395,6 +397,10 @@ export class Machine {
     const FADE = { layer: 0.35, attn: 0.8, dot: 0.9, mlp: 0.85, neuron: 0.95, bits: 0.97, mm: 0.93 };
     this.fade += ((FADE[view] || 0) - (this.fade || 0)) * Math.min(1, dt * 3);
     const fade = this.fade;
+    // 最深的几层（一次乘加 / 比特）：残差流光柱、光环、⊕ 这些和“这一个数”无关的东西几乎全部收起
+    const deepT = ['mm', 'dot', 'neuron', 'bits'].includes(view) ? 1 : 0;
+    this.deep = (this.deep || 0) + (deepT - (this.deep || 0)) * Math.min(1, dt * 3);
+    const deep = this.deep;
     const BLOOM = { box: 0.46, machine: 0.42, tray: 0.38, tower: 0.34, layer: 0.32, attn: 0.36, head: 0.34, mlp: 0.28, neuron: 0.16, dot: 0.12, bits: 0.14, mm: 0.14 };
     this.E.bloom.strength += ((BLOOM[view] ?? 0.36) * (this.brightness ?? 1) - this.E.bloom.strength) * Math.min(1, dt * 3);
 
@@ -439,7 +445,7 @@ export class Machine {
       c.scale.y = h;
       const nL = Math.min(NL - 1, Math.max(0, Math.floor(flow)));
       const bright = isA ? 0.68 : 0.14 + 0.12 * Math.min(1, Q.norm(nL, i) / 60);
-      c.material.opacity = bright * inside * (i === focus ? 1 - fade * 0.4 : 1 - fade * 0.92);
+      c.material.opacity = bright * inside * (i === focus ? 1 - fade * 0.4 : 1 - fade * 0.92) * (1 - deep * 0.9);
       c.scale.x = c.scale.z = i === focus ? 1.35 : isA ? 1.1 : 1;
     });
 
@@ -454,7 +460,7 @@ export class Machine {
         this.pulses.setMatrixAt(pc++, tmpM);
       }
     }
-    this.pulses.count = pc;
+    this.pulses.count = deep > 0.5 ? 0 : pc;
     this.pulses.instanceMatrix.needsUpdate = true;
     this.pulses.material.opacity = 0.45 + 0.2 * Math.sin(t * 10);
 
@@ -516,6 +522,7 @@ export class Machine {
     this.detail.update(st, dt, t);
     this.mats.update(st, dt, t);
     this.micro.update(st, dt, t);
+    this.board.update(st);
 
     this.dust.rotation.y += dt * 0.01;
   }
@@ -561,7 +568,7 @@ export class Machine {
         });
       } else this.beamList = [];
     }
-    const hideBeams = ['mlp', 'neuron', 'bits', 'mm'].includes(view);
+    const hideBeams = ['mlp', 'neuron', 'bits', 'mm', 'dot'].includes(view);
     this.beams.visible = !hideBeams;
     for (const b of this.beamList || []) {
       b.geo.setDrawRange(0, Math.floor(b.geo.index.count * grow / 6) * 6);
@@ -579,8 +586,9 @@ export class Machine {
     const at = (k) => base + SUB[k] * e;
     this.exAttn.position.set(0, at('attn'), 0);
     this.exMlp.position.set(0, at('mlp'), 0);
-    this.exAttn.material.opacity = 0.1 * e;
-    this.exMlp.material.opacity = 0.09 * e;
+    const dk = 1 - (this.deep || 0) * 0.8;
+    this.exAttn.material.opacity = 0.1 * e * dk;
+    this.exMlp.material.opacity = 0.09 * e * dk;
     this.exRing1.position.set(xf, at('ln1'), 0);
     this.exRing2.position.set(xf, at('ln2'), 0);
     this.exAdd1.position.set(xf, at('add1'), 0);
@@ -588,12 +596,14 @@ export class Machine {
     this.exUnit.position.set(xf, at('mlp') + 0.11, 0);
     const opOn = (k) => (s.op === k ? 1 : 0);
     const flash = (k) => opOn(k) * (0.5 + 0.5 * Math.sin(st.p * Math.PI));
-    this.exRing1.material.opacity = (0.3 + 0.5 * flash('ln1')) * e;
-    this.exRing2.material.opacity = (0.3 + 0.5 * flash('ln2')) * e;
+    this.exRing1.material.opacity = (0.3 + 0.5 * flash('ln1')) * e * dk;
+    this.exRing2.material.opacity = (0.3 + 0.5 * flash('ln2')) * e * dk;
     this.exRing1.scale.setScalar(1.6 + flash('ln1') * 0.6);
     this.exRing2.scale.setScalar(1.6 + flash('ln2') * 0.6);
-    this.exAdd1.mat.opacity = (0.35 + 0.45 * flash('add1')) * e;
-    this.exAdd2.mat.opacity = (0.35 + 0.45 * flash('add2')) * e;
+    this.exAdd1.mat.opacity = (0.35 + 0.45 * flash('add1')) * e * dk;
+    this.exAdd2.mat.opacity = (0.35 + 0.45 * flash('add2')) * e * dk;
+    this.exUnit.visible = dk > 0.5;
+    this.exRing1.visible = this.exRing2.visible = this.exAdd1.visible = this.exAdd2.visible = dk > 0.35;
     this.exAdd1.scale.setScalar(1 + flash('add1') * 0.5);
     this.exAdd2.scale.setScalar(1 + flash('add2') * 0.5);
     this.exAttn.material.emissiveIntensity = 0.04 + opOn('attn') * 0.16;
@@ -602,7 +612,7 @@ export class Machine {
     const show = st.view === 'layer';
     for (const [k, lb] of Object.entries(this.exLabels)) {
       lb.position.set(xf + 0.32, at(k) + (k === 'mlp' ? 0.1 : 0), 0.25);
-      lb.visible = e > 0.6 && (show || k === s.op);
+      lb.visible = e > 0.6 && (show || k === s.op) && dk > 0.6;
       lb.el.style.borderColor = s.op === k ? 'var(--amber)' : '';
     }
   }
