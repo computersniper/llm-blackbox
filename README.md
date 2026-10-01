@@ -269,7 +269,7 @@ python tools/agent/record.py --model ... --chips-only                           
 | `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面；WebGL 上下文丢失（GPU 进程崩溃）时自动重开浏览器重渲 |
 | `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −1 dBTP |
 | `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
-| `share.sh` | 分享用小体积版本：1080p30，两遍编码 4.5 Mbps，约 136 MB |
+| `share.sh` | 分享用小体积版本：1080p30，两遍编码 4.5 Mbps + AAC 192k，约 138 MB |
 | `review.py` | 抽帧拼成带时间码的联系表，检查用 |
 | `dbg.mjs` | 调试：跳到第 t 秒，在页面里执行一段表达式（可顺带截图） |
 | `serve.py` | 本地服务器（仓库根目录 + D 盘上的字体） |

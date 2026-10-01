@@ -290,7 +290,8 @@ def hat(vel=1.0, open_=False):
     n = n_of(0.35 if open_ else 0.08)
     t = tvec(n)
     y = filt(noise(n), 'high', 7200, 2)
-    return soft(y * np.exp(-t / (0.11 if open_ else 0.022)) * vel * 0.42)
+    # 2 毫秒的起音：瞬间起振的噪声在 AAC 里会冲出很高的峰值
+    return soft(y * np.exp(-t / (0.11 if open_ else 0.022)) * np.minimum(1, t / 0.002) * vel * 0.42)
 
 
 def shaker(vel=1.0):
@@ -786,7 +787,7 @@ def true_peak_db(x):
     return 20 * np.log10(np.max(np.abs(up)) + 1e-12)
 
 
-def limit(x, ceiling_db=-1.6):
+def limit(x, ceiling_db=-2.0):
     c = 10 ** (ceiling_db / 20)
     up = ss.resample_poly(x, 4, 1, axis=-1)
     pk = np.max(np.abs(up), axis=0)
