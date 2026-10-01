@@ -395,7 +395,12 @@ function updateAtt(A) {
       return `<i style="background:${col}"></i>`;
     }).join('')}<span class="pk">${on && Q.att(A.L, h, i)[0] ? `${tk(Q.tokens[Q.att(A.L, h, i)[0].j].s)} ${pct(Q.att(A.L, h, i)[0].w)}` : ''}</span></div>`);
   }
-  const marks = Q.tokens.slice(0, n).map((t, j) => (j === 0 || isUser(t) ? `<span style="left:${(j * 15).toFixed(0)}px" class="${isUser(t) ? 'u' : ''}">${j === 0 ? '开头' : tk(t.s)}</span>` : '')).join('');
+  // 列标：开头的标记、问题那几个词元（用一个括号框起来）、最后一个位置自己
+  const us = Q.tokens.slice(0, n).map((t, j) => (isUser(t) ? j : -1)).filter((j) => j >= 0);
+  const cx = (j) => j * 15 + 6.5;
+  const marks = `<span style="left:${cx(0)}px">开头</span>`
+    + (us.length ? `<b style="left:${cx(us[0]) - 6}px;width:${cx(us[us.length - 1]) - cx(us[0]) + 12}px"></b><span class="u" style="left:${(cx(us[0]) + cx(us[us.length - 1])) / 2}px">问题「${us.map((j) => tk(Q.tokens[j].s)).join('')}」</span>` : '')
+    + `<span style="left:${cx(i)}px">自己</span>`;
   OV.att.innerHTML = `<div class="h">第 ${A.L} 层 · 16 个头的注意力<small>最后一个位置在看谁 · 每行一个头</small></div>${rows.join('')}<div class="cols">${marks}</div>`;
 }
 

@@ -31,6 +31,8 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 
 #frame { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
 #gl, #gl canvas, .css2d, #ov, #vignette, #grain, #fade { position: absolute; inset: 0; }
+/* CSS2DRenderer 会给每个 3D 标签设 z-index：把整个 3D 层隔离成一个层叠上下文，免得标签盖到字幕和面板上面 */
+#gl { isolation: isolate; z-index: 0; }
 #gl canvas { width: 1920px !important; height: 1080px !important; display: block; }
 .css2d { pointer-events: none; overflow: hidden; }
 #ov { pointer-events: none; }
@@ -75,7 +77,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .sub { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); font-weight: 600; font-size: 38px; letter-spacing: .05em; color: var(--ink); white-space: nowrap; text-shadow: 0 2px 16px rgba(0, 0, 0, .95), 0 0 3px rgba(0, 0, 0, .8); }
 .sub .m, .strip .m, .m { font-family: var(--mono); font-weight: 400; letter-spacing: 0; }
 .sub em { font-style: normal; color: var(--amber); }
-.sub q { quotes: "「" "」"; color: var(--amber); }
+.sub q, .strip q, .card q { quotes: "「" "」"; color: var(--amber); }
 .strip { position: absolute; left: 50%; bottom: 132px; transform: translateX(-50%); display: flex; align-items: center; gap: 18px; white-space: nowrap; font-size: 23px; color: var(--ink2); letter-spacing: .03em; }
 .strip::before, .strip::after { content: ""; width: 56px; height: 1px; background: linear-gradient(to right, transparent, rgba(255, 182, 92, .7)); }
 .strip::after { background: linear-gradient(to left, transparent, rgba(255, 182, 92, .7)); }
@@ -126,8 +128,10 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .attgrid .row i { width: 13px; height: 17px; border-radius: 2px; }
 .attgrid .row .pk { margin-left: 10px; width: 120px; font-size: 15px; color: var(--amber); white-space: nowrap; }
 .attgrid .cols { position: relative; height: 26px; margin-left: 32px; margin-top: 6px; }
-.attgrid .cols span { position: absolute; top: 0; transform: translateX(-30%); font-size: 14px; color: var(--dim); white-space: nowrap; }
+.attgrid .cols { height: 44px; }
+.attgrid .cols span { position: absolute; top: 8px; transform: translateX(-50%); font-size: 14px; color: var(--dim); white-space: nowrap; }
 .attgrid .cols span.u { color: #8ee9f2; }
+.attgrid .cols b { position: absolute; top: 0; height: 5px; border: 1px solid rgba(142, 233, 242, .6); border-top: 0; }
 
 /* 公式 / 形状卡片 */
 .card { position: absolute; padding: 18px 22px; border-radius: 14px; background: rgba(3, 7, 15, .88); backdrop-filter: blur(8px); border: 1px solid var(--line2); font-size: 21px; color: var(--ink2); line-height: 1.75; white-space: nowrap; }

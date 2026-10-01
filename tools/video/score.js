@@ -334,7 +334,7 @@ export function buildScore(Q) {
         cam: () => {
           const a = endCam.get('d-bits') || headCam(M, st);
           const far = cam([M.x(row0) + 9, 15.5, 23], [M.x(row0) - 1.5, 8.6, 0], 34);
-          const target = headCam(M, st);
+          const target = headCam(M, st, { dz: 7.2, ly: 0.9, lx: 1.8, dx: 1.6 });
           return s.p < 0.5 ? blendCam(a, far, easeIn(s.p / 0.5)) : blendCam(far, target, smoother((s.p - 0.5) / 0.5));
         },
         ov: { corner: { g: G0 }, cornerA: 1 },
@@ -414,7 +414,9 @@ export function buildScore(Q) {
     return {
       st,
       cam: () => {
-        const head = headCam(M, st, { dz: lerp(10.6, 9.6, smooth(lt / (t1 - t0))), dx: lerp(1.6, 0.4, smooth(lt / (t1 - t0))) });
+        // 归一化 / 乘输出矩阵时概率柱还没升起来：镜头先低一点、近一点，看塔顶的归一化环和输出矩阵
+        const up = smooth(seg(t, mmZ.t0 - 0.9, mmZ.t0 + 0.5));
+        const head = headCam(M, st, { dz: lerp(7.2, lerp(10.6, 9.6, smooth(lt / (t1 - t0))), up), dx: lerp(1.6, 0.4, smooth(lt / (t1 - t0))), ly: lerp(0.9, 2.75, up), lx: lerp(1.8, -0.4, up) });
         let live = head;
         if (mmA) {
           const mmK = smooth(seg(t, mmA.t0, mmA.t0 + 1.1)) * (1 - smooth(seg(t, mmZ.t0, mmZ.t0 + 1.1)));
