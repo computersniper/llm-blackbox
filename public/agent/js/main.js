@@ -200,6 +200,8 @@ function frame(now) {
     if (view !== lastView) {
       views.dataset.view = view;
       lastView = view;
+      for (const [id, v] of [['vLoop', 'loop'], ['vCtx', 'ctx'], ['vTok', 'tok'], ['vFwd', 'fwd']]) $(`#${id}`).setAttribute('aria-hidden', String(v !== view));
+      $('#desk').setAttribute('aria-hidden', String(view !== 'screen' && view !== 'loop'));
       if (view !== 'loop') resetDesk();
     }
     const cur = cursorOf();

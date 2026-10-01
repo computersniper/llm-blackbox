@@ -94,7 +94,7 @@ export function explain(s, depth, R) {
           : `上一圈算过的词元，它们在每一层的 K、V 还存在缓存里。新的上下文和缓存逐个比对：前 <b>${fmtNum(T.kv.reused)}</b> 个一模一样，直接复用；只需要新算 <b>${fmtNum(T.kv.computed)}</b> 个（主要是刚接回来的工具结果），实测 <b>${T.ms.prefill} ms</b>。<br><span class="dimmed">如果不复用，要把 ${fmtNum(T.ctx.n)} 个词元从头再算一遍。${prev && T.kv.reused < prev.ctx.n + prev.gen.n ? `上一圈结尾的 &lt;|im_end|&gt; 当时没有喂进模型，所以从那里开始重算。` : ''}</span>`;
       }
       return s.t === 0
-        ? `harness 用聊天模板把系统提示、<b>${R.tools.length}</b> 个工具的定义（JSON 格式，就占了 <b>${T.ctx.segs.find((g) => g.k === 'tools')?.n}</b> 个词元）和你的任务拼成一整串，一共 <b>${fmtNum(T.ctx.n)}</b> 个词元。<br>模型看到的不是“对话”，只是一串词元。`
+        ? `harness 用聊天模板把系统提示、<b>${R.tools.length}</b> 个工具的定义（JSON 格式，连同模板里的调用说明一共 <b>${T.ctx.segs.find((g) => g.k === 'tools')?.n}</b> 个词元）和你的任务拼成一整串，一共 <b>${fmtNum(T.ctx.n)}</b> 个词元。<br>模型看到的不是“对话”，只是一串词元。`
         : `第 ${s.t + 1} 圈：<b>整段历史</b>重新拼一遍喂给模型，包括之前每一圈它自己写的话和每一次工具结果。<br>上下文从 <b>${fmtNum(R.turns[s.t - 1].ctx.n)}</b> 涨到了 <b>${fmtNum(T.ctx.n)}</b> 个词元。模型自己什么都不记得，记忆全在这串文字里。`;
     case 'gen':
       if (s.j === undefined) return `模型开始往后写，一次一个词元，直到写出 &lt;|im_end|&gt;。<br>这一圈写了 <b>${T.gen.n}</b> 个词元，实测 <b>${(T.ms.decode / 1000).toFixed(2)} s</b>${T.calls.length ? `，其中 &lt;tool_call&gt; 那段是一个 JSON：${code(`${T.calls[0].name}(${callArg(T.calls[0])})`, 70)}` : '。这次没有工具调用。'}`;

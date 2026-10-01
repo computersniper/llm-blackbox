@@ -16,13 +16,8 @@
   --term: #050a14;
 }
 
-/* ---------------- 站点导航 ---------------- */
+/* ---------------- 顶栏（站点导航 .site-nav 的样式在共享的 ../css/app.css 里） ---------------- */
 
-.site-nav { display: flex; align-items: center; gap: 2px; flex: none; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
-.site-nav a { padding: 4px 11px; border-radius: 999px; color: var(--dim); text-decoration: none; font-size: 13px; transition: color .2s, background .2s; }
-.site-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
-.site-nav a[aria-current="page"] { color: #04121a; background: var(--acc); font-weight: 600; }
-body.mode-inspect .site-nav { display: none; }
 body.mode-watch .crumbs { visibility: hidden; }
 
 /* ---------------- 布局 ---------------- */
@@ -347,8 +342,6 @@ body.dbg-folded .dbg .dbg-body { display: none; }
 }
 
 @media (max-width: 900px) {
-  .site-nav { margin-left: auto; }
-  .site-nav a { padding: 3px 8px; font-size: 12px; }
   body.mode-inspect .crumbs { flex: 1; }
   body.mode-inspect .brand-en { display: none; }
   .crumbs { overflow-x: auto; scrollbar-width: none; }
