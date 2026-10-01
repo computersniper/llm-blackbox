@@ -18,11 +18,11 @@ from fontTools import subset
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PUB = ROOT / "public"
-PAGES = [PUB / "index.html", PUB / "train" / "index.html", PUB / "multimodal" / "index.html", PUB / "agent" / "index.html"]
+PAGES = [PUB / "index.html", PUB / "train" / "index.html", PUB / "multimodal" / "index.html", PUB / "agent" / "index.html", PUB / "world" / "index.html"]
 CSS = [PUB / "css" / "app.css", PUB / "train" / "css" / "train.css"]
 BASE = set(chr(c) for c in range(0x20, 0x7F)) | set(" 　，。、；：？！“”‘’（）《》【】—…·×−→↓↑≈⊕Σ√")
-# 训练页第一屏（流水线）画在画布上的衬线体文字；画布不经过 HTML，单独列出
-CANVAS_FIRST = {"900": ["一个大模型是怎么训练出来的"], "600": ["预训练 · 学会语言", "监督微调 · 学会对话", "偏好对齐 · 学会答得更好"]}
+# 训练页第一屏（流水线）、世界模型页第一屏（真实世界 / 梦）画在画布上的衬线体文字；画布不经过 HTML，单独列出
+CANVAS_FIRST = {"900": ["一个大模型是怎么训练出来的"], "600": ["预训练 · 学会语言", "监督微调 · 学会对话", "偏好对齐 · 学会答得更好", "真实世界", "模型的梦", "梦和真实差多少", "梦此刻的 z：32 个数", "|真实 − 梦|"]}
 
 
 def cjk(text):

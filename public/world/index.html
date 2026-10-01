@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>世界模型 · 在模型的梦里开车</title>
+  <meta name="description" content="一个真正训练出来、能在浏览器里玩的小世界模型（Ha & Schmidhuber 2018《World Models》的 V + M 结构）：你在梦里开车，旁边的真实游戏用同一串动作跑，看梦怎么一点点走样。再像调试程序一样一层层揭开：编码、记忆、混合密度、解码，直到一次乘加。">
+  <meta name="theme-color" content="#060d1a">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="world.css">
+  <!-- 权重（约 3 MB）和描述不必等脚本跑起来再取 -->
+  <link rel="preload" href="data/model.json.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/model.bin" as="fetch" crossorigin>
+  <link rel="modulepreload" href="js/main.js">
+  <link rel="modulepreload" href="js/data.js">
+  <link rel="modulepreload" href="js/nn.js">
+  <link rel="modulepreload" href="js/game.js">
+  <link rel="modulepreload" href="js/sim.js">
+  <link rel="modulepreload" href="js/timeline.js">
+  <link rel="modulepreload" href="js/controls.js">
+  <link rel="modulepreload" href="js/explain.js">
+  <link rel="modulepreload" href="js/stage.js">
+  <link rel="modulepreload" href="js/pix.js">
+  <link rel="modulepreload" href="js/mac.js">
+  <link rel="modulepreload" href="js/insights.js">
+  <link rel="modulepreload" href="js/scenes/play.js">
+  <link rel="modulepreload" href="js/scenes/loop.js">
+  <link rel="modulepreload" href="js/scenes/vae.js">
+  <link rel="modulepreload" href="js/scenes/mem.js">
+  <link rel="modulepreload" href="js/scenes/macview.js">
+  <link rel="modulepreload" href="../train/js/draw.js">
+  <link rel="modulepreload" href="../js/bg.js">
+  <link rel="modulepreload" href="../js/audio.js">
+  <link rel="modulepreload" href="../js/ui.js">
+  <link rel="modulepreload" href="../js/resize.js">
+</head>
+<body class="w-play">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="揭开黑箱 · 世界模型">
+      <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-en">BLACK&nbsp;BOX</span>
+      <span class="brand-zh">世界模型</span>
+    </a>
+    <nav class="site-nav" aria-label="站点">
+      <a href="../">推理</a>
+      <a href="../train/">训练</a>
+      <a href="../multimodal/">多模态</a>
+      <a href="../agent/">智能体</a>
+      <a href="./" aria-current="page">世界模型</a>
+    </nav>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
+    <div class="top-actions">
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
+      <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="w-app">
+    <main class="stage" id="stage" aria-label="世界模型">
+      <div class="gl" id="gl"><canvas id="cv"></canvas></div>
+
+      <div class="stage-top">
+        <div class="chap" id="chap" role="tablist" aria-label="章节">
+          <button type="button" role="tab" data-ch="wm" aria-selected="true" class="on"><b>能玩的世界模型</b><span>自己训练 · 浏览器里实时跑</span></button>
+          <button type="button" role="tab" data-ch="probe" aria-selected="false"><b>大模型里的世界地图</b><span>探针 · 真实大模型</span></button>
+        </div>
+        <button class="follow" id="btnFollow" type="button" hidden>◎ 回到跟随视角 <kbd>F</kbd></button>
+        <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）">操作说明</button>
+      </div>
+
+      <!-- D1：玩的时候用的开关 -->
+      <div class="play-ui" id="playUi">
+        <div class="seg" id="segEye" role="radiogroup" aria-label="梦要不要看真实画面">
+          <button type="button" data-eye="open" role="radio" title="每一步都把真实画面编码成 z 喂给模型（O）">睁眼</button>
+          <button type="button" data-eye="closed" role="radio" title="不看真实画面，让梦用自己上一步想出来的 z 往下想（O）">闭眼</button>
+        </div>
+        <label class="tau" title="采样温度 τ：越高梦越放飞，越低越保守"><span>温度 τ</span><input id="tau" type="range" min="0.1" max="1.5" step="0.05" value="1"><b id="tauV" class="mono">1.00</b></label>
+        <button type="button" class="pbtn" id="btnSync" title="把梦拉回和真实世界同一帧（R）">⟲ 同步</button>
+        <div class="seg" id="segAuto" role="radiogroup" aria-label="谁来开车">
+          <button type="button" data-auto="off" role="radio" title="你来开：A / D（播放时 ← → 也行）">我来开</button>
+          <button type="button" data-auto="heur" role="radio" title="采集训练数据用的启发式司机（看得见真实的路）">自动驾驶</button>
+          <button type="button" data-auto="ctrl" role="radio" title="控制器 C：只在梦里训练出来的线性策略，看的是 z 和 h">C 开车</button>
+        </div>
+        <button type="button" class="pbtn" id="btnNew" title="换一条新路重新开始（N）">新的一局</button>
+      </div>
+      <div class="pad" id="pad" aria-label="方向键">
+        <button type="button" data-a="1" aria-label="向左">◀</button>
+        <button type="button" data-a="2" aria-label="向右">▶</button>
+      </div>
+
+      <div class="stage-hint" id="stageHint">
+        <b>在梦里开车</b>
+        <span><kbd>A</kbd>/<kbd>D</kbd> 转向（播放时 <kbd>←</kbd>/<kbd>→</kbd> 也行）</span><span><kbd>O</kbd> 睁眼 / 闭眼</span><span><kbd>R</kbd> 同步</span><span><kbd>N</kbd> 新的一局</span>
+        <span>拖动下面的 32 根柱子改梦里的画面</span>
+        <span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> 或 <kbd>↓</kbd>/<kbd>↑</kbd> 换层</span><span><kbd>空格</kbd> 播放 / 暂停</span><span>暂停时 <kbd>←</kbd>/<kbd>→</kbd> 单步</span><span><kbd>1</kbd>–<kbd>6</kbd> 倍速</span>
+        <span>舞台：拖动平移、滚轮缩放、双击放大</span>
+      </div>
+      <div class="stage-loading" id="loading"><span class="spin"></span><span>正在载入世界模型的真实权重…</span></div>
+      <div class="probe-host" id="probeHost" hidden></div>
+
+      <aside class="dbg" id="dbg" aria-label="调试器">
+        <header class="dbg-h">
+          <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono" id="dbgSub">world_model()</span>
+          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
+        </header>
+        <div class="dbg-body">
+          <pre class="code" id="code"></pre>
+          <div class="dbg-explain" id="explain"></div>
+          <div class="dbg-watch" id="watch"></div>
+        </div>
+      </aside>
+
+      <div class="board" id="board" hidden></div>
+
+      <div class="ctl" id="ctl">
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-bar">
+          <div class="ctl-depth">
+            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+            <span class="ctl-dname" id="dname"></span>
+            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
+          </div>
+          <div class="ctl-play">
+            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
+            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
+            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
+          </div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+          <div class="ctl-pos mono" id="pos"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="tooltip" role="tooltip"></div>
+
+  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴">
+    <div class="cx-panel">
+      <header class="cx-head">
+        <div>
+          <div class="eyebrow">CODEX · 世界模型的知识碎片</div>
+          <h2>你在梦里的发现</h2>
+        </div>
+        <div class="cx-progress"><b>0</b><span class="cx-bar"><i></i></span></div>
+        <button class="cx-close" type="button" aria-label="关闭">✕</button>
+      </header>
+      <div class="cx-grid"></div>
+      <footer class="cx-foot">
+        <p id="cxFoot">模型是在本地一块 RTX 5090 上真实训练出来的（结构照 Ha & Schmidhuber 2018《World Models》），网页下载的是它的真实权重，每一帧的梦都是浏览器现场算出来的。</p>
+        <button class="linkish" id="btnReset" type="button">重置进度</button>
+      </footer>
+    </div>
+  </div>
+
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

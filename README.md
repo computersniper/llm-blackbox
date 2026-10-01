@@ -21,7 +21,7 @@
 
 <p>
 <a href="https://caijiechao.com/blackbox/"><b>▶ 在线体验</b></a>
-&nbsp;·&nbsp; <a href="#四个页面">四个页面</a>
+&nbsp;·&nbsp; <a href="#五个页面">五个页面</a>
 &nbsp;·&nbsp; <a href="#为什么说它是真的">为什么说它是真的</a>
 &nbsp;·&nbsp; <a href="#一层层揭开">一层层揭开</a>
 &nbsp;·&nbsp; <a href="#延伸学习">延伸学习</a>
@@ -32,11 +32,11 @@
 
 </div>
 
-> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), and a **coding agent** (Qwen3-4B recorded in a real sandbox). Pure static site, no build step, Three.js r186. The UI is in Chinese.
+> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), a **coding agent** (Qwen3-4B recorded in a real sandbox), and a **world model** (a small V + M model in the style of Ha & Schmidhuber's *World Models*, trained here and run live in the browser: drive inside its dream next to the real game). Pure static site, no build step, Three.js r186. The UI is in Chinese.
 
-## 四个页面
+## 五个页面
 
-顶栏导航互通，交互方式一致：**点选输入 → 流式回答 → ＋ 逐层揭开 → 调试器式播放**。数据都来自真实模型的离线运行。
+顶栏导航互通，交互方式一致：**点选输入 → 流式回答 → ＋ 逐层揭开 → 调试器式播放**（世界模型页把前两步换成了“开车”）。数据都来自真实模型的离线运行；世界模型页是自己训练的小模型，用真实权重在浏览器里现场算。
 
 <table>
 <tr>
@@ -99,6 +99,35 @@
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+### [世界模型](https://caijiechao.com/blackbox/world/) · 自己训练的 V + M
+
+<img src="docs/images/world-play.jpg" alt="世界模型页 D1：左边是真实的小游戏，右边是模型闭眼自己想了 32 步的梦，路已经弯得不一样，梦里还“撞车”了；右上是逐像素的差和差异曲线，下面是梦此刻的 32 个潜变量">
+
+<sub>闭眼 32 步：左边是真实的游戏，右边是模型自己往下想的梦——路已经弯得不一样了，梦里还撞上了一辆它自己编出来的车</sub>
+
+- 一个确定性的小游戏「夜路」（64×64，3 个动作），Python 和 JS 各一份整数实现，**逐像素一致**
+- 照 Ha & Schmidhuber 2018《World Models》在 RTX 5090 上**真实训练**：V（卷积 VAE，z = 32）+ M（LSTM 256 + 5 个高斯的混合密度）+ C（线性，只在梦里用 CMA-ES 训练），39 万帧，全流程约 8 分钟
+- 网页下载**真实权重**（float16，3 MB），纯 JS 现场前向，和 PyTorch 逐元素核对；你开车，梦和真实世界用同一个动作并排跑：睁眼 / 闭眼、温度 τ、拖 32 根潜变量柱子改梦、让 C 在梦里开
+- 一路拆到一个数：循环、V 的每一层特征图和潜空间逐维扫描、LSTM 的门和混合密度、一次乘加
+
+</td>
+<td width="50%" valign="top">
+
+### 世界模型 · V 的内部
+
+<img src="docs/images/world-vae.jpg" alt="世界模型页 D3：编码器 4 层卷积的特征图、μ 和 σ、M 预测的 ẑ、解码器各层；下方是潜空间每一维扫一遍的解码结果">
+
+<sub>D3 V 的内部：这一帧真实算出来的每一层特征图；下面把用得最多的 8 维各扫一遍——有的管路往哪弯，有的管小车左右，有的管抛锚车在哪</sub>
+
+- 编码器 4 层卷积（每层 16→128 个特征图）、μ / σ、z；解码器全连接 + 4 层反卷积，层层都是浏览器里现场算的真实激活值
+- 32 维里用上了 23 维；每一维“管什么”是导出时在解码画面上量出来的（小车、三段路、抛锚车跟着动了几个像素）
+- 点任意一格（或梦里任意一个像素），按 ＋ 看它的 Σ x·w + b：最多 1,024 项，前 12 项逐项相乘，加起来和前向结果一致
+
+</td>
+</tr>
 </table>
 
 <table>
@@ -114,12 +143,13 @@
 
 ## 为什么说它是真的
 
-网页本身不跑模型。所有数字都是先在本地 GPU 上用**真实的开源权重**跑出来、导出成静态文件，浏览器只负责回放和讲解。
+推理、训练、多模态、智能体四页的网页本身不跑模型：所有数字都是先在本地 GPU 上用**真实的开源权重**跑出来、导出成静态文件，浏览器只负责回放和讲解。世界模型页例外——模型小到可以在浏览器里实时跑，所以网页下载它的真实权重，每一帧现场算。
 
 - **真实推理**：推理页用 Qwen3-0.6B 的非思考模式（T=0.7 / top_k=20 / top_p=0.8，固定种子），连各温度下的概率、top-k / top-p 候选池和采样用的随机数都导出了，网页上的每一次抽签用的都是这些真实数值；多模态页贪心解码；智能体页用 Qwen3-4B-Instruct-2507，同样的采样参数。
 - **自己复现，和模型核对**：推理导出脚本自己复现一遍注意力（RMSNorm → RoPE → GQA），和模型输出的平均误差约 3×10⁻⁴；多模态脚本复现 ViT 的 qkv → 2D RoPE → softmax，平均相对误差约 4×10⁻³；训练脚本按公式重算 AdamW 的中间量，误差在 5 个 fp32 ulp 以内。
 - **加得起来**：D6 算式板上，前 12 项加上“其余 N−12 项”的汇总，正好等于真实结果；D7 翻转一个比特，旧权重 → 新权重、旧输出 → 新输出都是精确重算的。
 - **说错也照录**：Qwen3-0.6B 只有 6 亿参数，偶尔会一本正经地说错，这也是真实的一部分；智能体每条轨迹录完都在沙箱里独立检查，没通过就换下一个随机种子重录，所有尝试（包括失败原因）写进 manifest，页面上如实显示。
+- **世界模型是自己训练、在浏览器里现场算的**：世界模型页的 V / M / C 是在本地 RTX 5090 上用 39 万帧真实游戏画面训练出来的，网页下载的就是这份权重，每一帧的梦都由浏览器里的 JS 前向现场算出（不是录像）。JS 前向和 PyTorch 用同一份 float16 权重逐元素核对：最大绝对误差 2.1×10⁻⁵（激活值最大约 43），梦见的画面（0–1）最大误差 2.6×10⁻⁶；“一次乘加”的算式板再用双精度把 n 项重新加一遍，和前向的值差在 10⁻⁶ 量级。游戏有 Python / JS 两份整数实现，60 局 9,370 帧逐像素一致。照论文原样的损失训练，VAE 会把抛锚车整个丢掉，所以重建误差里给抛锚车和小车的像素加了权重、KL 项乘 0.25——这些改动页面上和下文都写明了。
 - **示意会标出来**：训练页“偏好对齐 / 强化学习”一段是示意（其中的 DPO 损失是用真实对数概率代入公式算的一次），凡是标“示意”的都不是实测。
 - **不冒用商业产品**：智能体页展示的是编程 agent 的通用模式，用的是开源模型在真实沙箱里的真实运行，不模仿任何商业产品的界面或输出。
 
@@ -130,12 +160,14 @@ flowchart TB
     X2["<b>训练</b> · 唐宋诗小模型 + Qwen3-0.6B<br/>tools/train/*.py"]
     X3["<b>多模态</b> · Qwen3-VL-2B<br/>tools/multimodal/export_qwen3vl.py"]
     X4["<b>智能体</b> · Qwen3-4B + bwrap 沙箱<br/>tools/agent/record.py"]
+    X5["<b>世界模型</b> · 自己训练的 V + M + C<br/>tools/world/train.py"]
   end
   subgraph DATA["② 静态文件：JSON / 二进制 + .gz，提交进仓库"]
     D1["public/data/"]
     D2["public/train/data/"]
     D3["public/multimodal/data/"]
     D4["public/agent/data/"]
+    D5["public/world/data/<br/>真实权重 float16"]
   end
   subgraph WEB["③ 浏览器：只回放"]
     L["fetch + DecompressionStream<br/>按需懒加载"] --> T["步骤树 timeline.js<br/>按深度展开"] --> V["3D / 2D 舞台 · 调试器 · 聊天"]
@@ -144,7 +176,9 @@ flowchart TB
   X2 --> D2
   X3 --> D3
   X4 --> D4
+  X5 --> D5
   D1 & D2 & D3 & D4 --> L
+  D5 --> NN["世界模型页：nn.js 用真实权重<br/>在浏览器里现场前向"] --> V
 ```
 
 <details>
@@ -173,6 +207,7 @@ flowchart TB
 
 **小模型：从零预训练**
 
+- **论文**：David Ha、Jürgen Schmidhuber，*[World Models](https://arxiv.org/abs/1803.10122)*（2018）。世界模型页的 V / M / C 结构、KL 容忍度、MDN-RNN、温度 τ、在梦里训练控制器都照这篇论文；游戏、数据和训练是本仓库自己做的。
 - **语料**：[chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)（MIT 许可，诗歌本身属公有领域）的《全唐诗》《全宋诗》，取自提交 `b8594f8`。用 OpenCC 繁转简，只留“，。”交替的五言 / 七言绝句和律诗，去重，丢掉含低频字（出现不到 3 次）的诗：训练集 215,116 首 / 990 万字，验证集 4,390 首。《登鹳雀楼》被整首留出，训练时从没见过。
 - **模型**：transformers 的 `Qwen3ForCausalLM`，改小尺寸：6 层、隐藏维 256、4 个查询头 / 2 个键值头（GQA）、每头 64 维、q_norm / k_norm、RMSNorm、RoPE（θ = 10⁴）、SwiGLU 768、输入输出共享嵌入；字符级词表 7,478（含 `<|endoftext|>`），共 664 万参数。
 - **训练**：4,000 步 × 64 行 × 128 字（约 3,277 万字、3.3 轮），AdamW（β = 0.9 / 0.95，权重衰减 0.1，RMSNorm 不衰减），峰值学习率 3e-3、预热 200 步后余弦退火到 3e-4，梯度裁剪 1.0；bf16 autocast 前向，fp32 主权重。训练本身约 3 分钟（含检查点记录共 275 秒），验证损失 8.94 → 4.05。
@@ -200,6 +235,21 @@ flowchart TB
 `grounding.py` 用几张图上手工标的物体区域，量了“生成某个词时注意力是否落在对应物体上”：第 16–26 层的富集倍数是 3–5 倍，更浅的层基本不看物体，所以网页的总览热力图默认用这几层平均。
 
 数据约 2.5 MB（gzip），另有 7 张图约 0.2 MB。
+
+</details>
+
+<details>
+<summary><b>世界模型页怎么训的</b>（<code>tools/world/</code>）</summary>
+
+结构照 Ha & Schmidhuber 2018《[World Models](https://arxiv.org/abs/1803.10122)》，全部在本地 RTX 5090 上真实训练（全流程约 8 分钟，显存峰值 6.6 GB），网页下载的是训练出来的真实权重。
+
+- **游戏「夜路」**（`game.py` / `public/world/js/game.js`）：俯视角，小车在蜿蜒的夜路上开，躲开抛锚的车；画面 64×64（12 色调色板），动作 直行 / 向左 / 向右，每步路面下滚 2 行、小车横移 2 格，撞车或冲出路面就结束。路的弯道和抛锚车由 xorshift32 随机数生成，全程只用整数，Python 和 JS 两份实现同一个种子、同一串动作逐像素一致（`check_game.mjs`：60 局 9,370 帧，画面、启发式司机的选择、结局全部一致）。
+- **采集**：4,000 局、389,949 帧——2,500 局由“往前看 20 步”的动态规划启发式司机开（每步有 0–12% 的概率插一段随机动作），1,500 局随机乱开（带惯性）；每局最多 300 步。按局打乱后留出 2% 做测试。
+- **V（卷积 VAE）**：编码 Conv 3→16→32→64→128（4×4，步长 2）→ 512 → μ、logσ²（各 32 维）；解码 32 → 512（1×1×512）→ 反卷积 64（5×5）→ 32（5×5）→ 16（6×6）→ 3（6×6），sigmoid。和论文同一结构、通道数减半（浏览器里一次编码 + 解码约 15 ms），111 万参数。损失是逐像素平方和 + KL（容忍度 0.5×32，同论文）；照论文原样训练时 VAE 把抛锚车整个丢掉（一辆只有 31 个像素，32 维里只用上 8 维），所以抛锚车的像素权重 ×6、小车 ×2，KL 乘 0.25（β-VAE），用上了 23 维。30 轮、Adam + OneCycle（峰值 1e-3）、批 256，184 秒；测试集每像素均方误差 0.0021。
+- **M（MDN-RNN）**：LSTM（输入 [z, 动作 one-hot] 35 维，隐状态 256）+ 全连接到每一维 5 个高斯（log π、μ、log σ）和一个“这一步撞车了吗”的 logit（论文 Doom 实验的做法），42 万参数。输入的 z 每次从 N(μ, σ²) 重新采样（同论文），损失是混合密度负对数似然 + 撞车的加权交叉熵；2 万步 × 256 条 × 96 步，157 秒；测试集撞车预测的召回 76%、精确率 73%。
+- **C（控制器）**：a = argmax(W [z, h, 1])，867 个参数，用（对角协方差的）CMA-ES **只在 M 的梦里**训练（论文 Doom 实验的做法）：每代 64 个候选、每个在梦里开 16 局 300 步，温度 τ = 1.15，撞车概率超过 50% 算这一局梦结束；200 代，56 秒。拿到真实游戏里检验（30 局）：平均开 65 步，随机乱开 20 步、一直直行 38 步、启发式司机能开满 1,000 步——梦里学会了一点，但远不如看得见真实路面的司机。
+- **导出**（`export_world.py`）：权重存 float16（3.0 MB，gzip 只能压 7%，不另存 .gz），再读回来做所有参考输出；`model.json` 里有训练记录和损失曲线、潜变量每一维的统计、每一维“扫一遍”的测量（以 32 帧的 μ 为底，把这一维从数据里的 1% 分位扫到 99% 分位，在解码画面上量小车、三段路的中心、抛锚车跟着动了多少）、测试集上梦与现实的平均差异（30 局：睁眼一步预测每像素均方误差约 0.0021–0.0028；闭眼 10 步约 0.0043、30 步约 0.0079、60 步约 0.0099；只看 V 的重建 0.0020）。
+- **浏览器里**（`public/world/js/nn.js`）：卷积、反卷积、全连接、LSTM、混合密度采样都是纯 JS + typed array（float32），和 PyTorch 的张量排布一致；`check_nn.mjs` 用同一份权重和 PyTorch 的 float32 / float64 前向逐元素核对（16 个张量，大的等间隔抽样约 3,000 个元素）：最大绝对误差 2.1×10⁻⁵，输出画面最大误差 2.6×10⁻⁶。无头 Chromium（CPU）里一次编码 6.3 ms、解码 8.9 ms、LSTM 一步 0.3 ms；D1 的 1× 是每秒 20 帧（实测 20.2）；8× 时睁眼每一帧都要编码，受 CPU 限制实测每秒约 100 帧，闭眼时跑满每秒 160 帧。
 
 </details>
 
@@ -242,7 +292,7 @@ flowchart TB
 </details>
 
 <details>
-<summary><b>操作方式</b>（四个页面通用）</summary>
+<summary><b>操作方式</b>（五个页面通用）</summary>
 
 | 做什么 | 怎么操作 |
 | :-- | :-- |
@@ -253,6 +303,7 @@ flowchart TB
 | 自由移动（推理页 3D 舞台） | 左键拖动旋转，右键 / Shift 拖动平移，滚轮推进（到头会穿过去），WASD 移动，Q/E 升降，双击飞到物体跟前，F 回到跟随视角 |
 | 自由移动（训练页 2D 舞台） | 拖动平移，滚轮或双指缩放，双击放大，点卡片飞过去 |
 | 调整面板宽度 | 拖动左侧聊天栏、右侧调试器的边缘；双击恢复默认，宽度会记住（手机上不能拖） |
+| 开车（世界模型页） | A / D（D1 播放时 ← → 也行），手机上按住屏幕下方的 ◀ ▶；O 睁眼 / 闭眼，R 把梦拉回真实，N 新的一局；拖 32 根潜变量柱子直接改梦 |
 
 </details>
 
@@ -268,6 +319,23 @@ flowchart TB
 | **D4** 细到一个数 | 一个位置的交叉熵（softmax → 取概率 → −ln）；一层 7 个矩阵各自的梯度；写回的那个权重的 fp32 / bf16 比特 | 子步骤 |
 
 19 个知识碎片。
+
+</details>
+
+<details>
+<summary><b>世界模型页的深度</b>（D1–D5）</summary>
+
+顶部两个章节：「能玩的世界模型」（下表）和「大模型里的世界地图」（另一章，独立模块 `world/probe/probe.js`，＋ / − 换它的层）。
+
+| 深度 | 看到什么 | 每一步是什么 |
+| :-- | :-- | :-- |
+| **D1** 玩 | 真实游戏和模型的梦并排，同一个动作；逐像素的差、差异曲线（闭眼时叠上测试集的平均走样曲线）、梦此刻的 32 个潜变量（可拖） | 一帧 |
+| **D2** 循环 | 真实画面 → V 编码 → z → M（LSTM 记忆 h、撞车概率）→ 采样 ẑ → V 解码 → 梦见的下一帧；上面一条是真实世界自己走一步，闭眼时 ẑ 从下面绕回来；V、M、C 的训练曲线 | 看 / 编码 / 记忆与预测 / 采样 / 解码 / 对照 |
+| **D3** V 的内部 | U 形排开的每一层特征图（编码器 4 层、μ / σ、z，解码器全连接和 4 层反卷积）、V 自己的重建；走到 z 时把用得最多的几维各扫一遍 | 一层 |
+| **D4** M 的内部 | 拼输入、输入门 / 遗忘门 / 候选记忆 / 输出门（16×16）、f⊙c + i⊙g、新的 h；32 维各自的混合密度、放大的一维（5 个分量、温度调过的分布、采样值、睁眼时真实下一帧的值）、撞车概率 | 一个算子 |
+| **D5** 一次乘加 | 选一个输出 → 全部 n 项的 x、w、x·w → 加起来 + 偏置 → 激活；算式板和推理页同一套 | 选 / 乘 / 加 / 激活 |
+
+V 的层在 D3 展开、M 的在 D4 展开，某一步在某个深度没有新东西时，＋ / − 直接跳过那一层。15 个知识碎片。
 
 </details>
 
@@ -391,6 +459,7 @@ llm-blackbox/
 │   ├── multimodal/          多模态页：3D 舞台（js/scene.js）和图像监视器（js/monitor.js）
 │   ├── agent/               智能体页：编辑器 / 终端回放（js/screen.js）和循环 / 上下文视图
 │   ├── learn/               延伸学习页：路线图、资源库、术语表、动手试试（data/*.json、snippets/）
+│   ├── world/               世界模型页：游戏（js/game.js）、JS 前向（js/nn.js）、真实世界与梦（js/sim.js）、2D 舞台和各层视图（js/scenes/）；probe/ 是第二章
 │   └── fonts/               思源宋体子集、JetBrains Mono（SIL OFL）
 ├── tools/
 │   ├── export_qwen.py       推理页数据导出
@@ -398,6 +467,7 @@ llm-blackbox/
 │   ├── multimodal/          export_qwen3vl.py · make_images.py · grounding.py · images/
 │   ├── agent/               record.py · sandbox/（各任务的初始文件）
 │   ├── learn/               check_links.py（延伸学习页的外链检查）· links_checked.json（最近一次结果）
+│   ├── world/               game.py · train.py · export_world.py · check_game.mjs · check_nn.mjs · ref/（核对用的参考输出）
 │   ├── shot.mjs             截图 / 冒烟测试（playwright-core）
 │   ├── subset_fonts.py      字体子集
 │   └── stamp.sh deploy.sh   版本号、发布
@@ -411,7 +481,7 @@ llm-blackbox/
 
 ```bash
 cd public && python3 -m http.server 8765
-# 打开 http://localhost:8765/ （训练 /train/、多模态 /multimodal/、智能体 /agent/、延伸学习 /learn/）
+# 打开 http://localhost:8765/ （训练 /train/、多模态 /multimodal/、智能体 /agent/、世界模型 /world/、延伸学习 /learn/）
 ```
 
 ### 重新导出数据
@@ -433,6 +503,12 @@ python tools/multimodal/export_qwen3vl.py --model /path/to/Qwen3-VL-2B-Instruct
 
 # 智能体 → public/agent/data/（另需 bubblewrap）
 python tools/agent/record.py --model /path/to/Qwen3-4B-Instruct-2507
+
+# 世界模型 → public/world/data/（只要 torch、numpy；采集的画面和检查点放 --work，默认 /mnt/d/cjc/world-model）
+python tools/world/train.py                      # 采集 → V → M → C → 导出，RTX 5090 上约 8 分钟
+python tools/world/train.py --stage export       # 只用已有的检查点重新导出（还有 collect / vae / rnn / ctrl）
+python tools/world/make_game_check.py && node tools/world/check_game.mjs   # 游戏的 Python / JS 两份实现逐像素核对
+node tools/world/check_nn.mjs                    # 网页里的 JS 前向和 PyTorch 逐元素核对，结果写进 public/world/data/check.json
 ```
 
 <details>
