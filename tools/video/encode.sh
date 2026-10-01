@@ -16,6 +16,6 @@ ffmpeg -hide_banner -loglevel warning -stats -y \
   -color_primaries bt709 -color_trc bt709 -colorspace bt709 \
   -c:a aac -b:a 192k -ar 48000 \
   -shortest -movflags +faststart \
-  -metadata title="揭开黑箱 · 一个词是怎样被算出来的（Qwen3-0.6B 真实推理）" \
+  -metadata title="AI 的一个字是怎么思考出来的 · 走进大模型推理的“黑箱”（Qwen3-0.6B 真实推理）" \
   "$MP4"
 ffprobe -v error -show_entries format=duration,size:stream=codec_name,width,height,r_frame_rate -of compact "$MP4"

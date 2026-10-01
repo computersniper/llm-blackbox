@@ -54,7 +54,9 @@ function schedule(list, t) {
 
 async function boot() {
   await Promise.all([
-    document.fonts.load('900 100px "Film Serif"', '揭开黑箱法国'),
+    document.fonts.load('900 100px "Film Serif"', 'AI 的一个字是怎么思考出来的'),
+    document.fonts.load('400 38px "Film Sans"', '天空为什么是蓝色的？'),
+    document.fonts.load('600 38px "Film Sans"', 'Qwen'),
     document.fonts.load('600 40px "Film Serif"', '法国的首都是哪里'),
     document.fonts.load('600 76px "PingFang SC"', '法国的首都'),
     document.fonts.load('600 76px "Noto Sans SC"', '法国'),
@@ -81,7 +83,7 @@ async function boot() {
   tameScene();
   buildExtras();
   buildOverlays();
-  OPENING = new Opening({ E, M, Q, ov: $('#ov'), T: SC.open });
+  OPENING = new Opening({ E, M, Q, frame: $('#frame'), T: SC.open });
   window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
   if (PREVIEW) startPreview();
 }
@@ -252,7 +254,7 @@ function buildOverlays() {
   OV.qcaret = el('div', 'qcaret', '', OV.qline);
 
   // 片名
-  OV.title = el('div', 'title', `<div class="eb">INSIDE A LANGUAGE MODEL</div><h1>揭开黑箱</h1><div class="rule"></div><div class="st">一个词，是怎样被算出来的</div><div class="spec">QWEN3-0.6B · 28 LAYERS · ${MAN.model.params.toLocaleString('en-US')} PARAMETERS · BF16</div>`, ov);
+  OV.title = el('div', 'title', `<div class="eb">INSIDE A LANGUAGE MODEL</div><h1><span>AI 的一个字</span><span>是怎么思考出来的</span></h1><div class="rule"></div><div class="st">走进大模型推理的“黑箱”</div><div class="spec">QWEN3-0.6B · 28 LAYERS · ${MAN.model.params.toLocaleString('en-US')} PARAMETERS · BF16</div>`, ov);
 
   // 逻辑透镜面板
   OV.lens = el('div', 'lenspanel', '', ov);
@@ -312,9 +314,16 @@ function updateOverlays(t, f) {
     const k = o.titleK ?? 1;
     OV.title.style.opacity = ta.toFixed(3);
     const h1 = OV.title.querySelector('h1');
-    h1.style.letterSpacing = `${(0.42 - 0.24 * easeOut(k)).toFixed(4)}em`;
+    h1.style.letterSpacing = `${(0.16 - 0.11 * easeOut(k)).toFixed(4)}em`;
     h1.style.paddingLeft = h1.style.letterSpacing;
     OV.title.style.filter = o.titleBlur ? `blur(${o.titleBlur.toFixed(2)}px)` : '';
+    // 片名落在黑箱正面：跟着前面板中心在屏幕上的位置走
+    if (o.titleOnBox) {
+      E.camera.updateMatrixWorld();
+      const p = M.cFront.getWorldPosition(new THREE.Vector3()).project(E.camera);
+      OV.title.style.left = `${(((p.x + 1) / 2) * 1920).toFixed(1)}px`;
+      OV.title.style.top = `${(((1 - p.y) / 2) * 1080).toFixed(1)}px`;
+    } else { OV.title.style.left = ''; OV.title.style.top = ''; }
     OV.title.querySelector('.rule').style.width = `${(520 * easeInOut(seg(k, 0.15, 0.8))).toFixed(1)}px`;
     OV.title.querySelector('.st').style.opacity = smooth(seg(k, 0.35, 0.8)).toFixed(3);
     OV.title.querySelector('.spec').style.opacity = (0.9 * smooth(seg(k, 0.55, 1))).toFixed(3);
@@ -445,7 +454,7 @@ function updateEnd(D) {
     OV.end.querySelector('.stat').style.opacity = (D.k1 ?? 1).toFixed(3);
   }
   if (a2 > 0.001) {
-    if (!OV.end2.innerHTML) OV.end2.innerHTML = `<div class="brand">揭开黑箱</div><div class="url">caijiechao.com/blackbox/</div><div class="cred">在网页里，你可以亲手把这台机器一层层拆开<br><span class="m" style="font-size:15px;letter-spacing:.12em">Qwen3-0.6B 真实离线运行数据 · 画面与音乐均由程序生成</span></div>`;
+    if (!OV.end2.innerHTML) OV.end2.innerHTML = `<div class="brand">在线体验</div><div class="url">caijiechao.com/blackbox/</div><div class="cred">在网页里，你可以亲手把这台机器一层层拆开<br><span class="m" style="font-size:15px;letter-spacing:.12em">Qwen3-0.6B 真实离线运行数据 · 画面与音乐均由程序生成</span></div>`;
     OV.end2.style.opacity = a2.toFixed(3);
     OV.end2.style.transform = `translate(-50%, -50%) translateY(${((1 - easeOut(D.k2 ?? 1)) * 12).toFixed(2)}px)`;
   }
@@ -523,9 +532,9 @@ function renderAt(t, { render = true } = {}) {
     if (f.slabDim) M.slabs.forEach((sl) => { sl.material.opacity *= 1 - f.slabDim; sl.edge.material.opacity *= 1 - f.slabDim; sl.lbl.visible = false; });
     // 开场：对话框、飞行的词元、托盘上方块的落下时间
     OPENING.update(t, SC.open.camAt);
-    // 片名压在黑箱正面上时，正面的型号字先隐去，等片名淡出再亮，免得两层字叠在一起
-    const fa = (1 - (f.ov?.title ?? 0)) ** 3;
-    for (const c of M.cFront.children) if (c.isMesh && c.material.map) { c.material.opacity = fa; c.visible = fa > 0.01; }
+    // 片名落在黑箱正面的那几秒，正面的型号字不亮；片名淡出以后再亮（分镜里给出 boxLabel）
+    const fa = f.boxLabel ?? 1;
+    for (const c of M.cFront.children) { if (!c.isMesh) continue; if (c.material.map) c.material.opacity = fa; else c.scale.setScalar(Math.max(1e-3, fa)); c.visible = fa > 0.01; }
     // 神经元阵列点亮的先后顺序原来用 Math.random：换成确定的哈希
     if (M.detail.panelKey && M.detail.panelKey !== lastPanel) {
       lastPanel = M.detail.panelKey;
@@ -557,32 +566,10 @@ function seek(t, pre = 8) {
 
 /* ================================================================ 封面 */
 
-// 封面：渲染第 t 秒的画面，去掉字幕和数据条，叠上片名
-function poster(t = 52.9) {
-  seek(t);
-  for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid', '.band']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
-  // 左侧压一层渐变，片名靠左放在上面；右边留给 28 层的逻辑透镜读数
-  const scrim = el('div', '', '', $('#ov'));
-  scrim.style.cssText = 'position:absolute;inset:0;background:linear-gradient(to right, rgba(3,7,15,.94) 0%, rgba(3,7,15,.82) 34%, rgba(3,7,15,0) 62%)';
-  $('#ov').prepend(scrim);
-  const T = OV.title;
-  T.style.display = 'block';
-  T.style.opacity = '1';
-  T.style.left = '130px';
-  T.style.top = '50%';
-  T.style.transform = 'translateY(-50%)';
-  T.style.textAlign = 'left';
-  T.style.filter = '';
-  T.querySelector('.rule').style.margin = '40px 0 30px';
-  T.querySelector('.rule').style.background = 'linear-gradient(to right, rgba(255,182,92,.85), transparent)';
-  T.querySelector('.eb').style.paddingLeft = '0';
-  T.querySelector('.st').style.paddingLeft = '0';
-  const h1 = T.querySelector('h1');
-  h1.style.letterSpacing = '0.16em';
-  h1.style.paddingLeft = '0';
-  T.querySelector('.rule').style.width = '520px';
-  for (const c of ['.st', '.spec', '.eb']) T.querySelector(c).style.opacity = '1';
-  $('#fade').style.opacity = '0.1';
+// 封面：片名落版那一刻的画面（黑箱正面的发光边框 + 片名卡 + 下面飞行的词元），去掉字幕等叠加层
+function poster(t) {
+  seek(t ?? SC.open.titleIn + 2.55);
+  for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
   E.render();
 }
 

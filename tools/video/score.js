@@ -15,7 +15,7 @@ const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
 
 // 段落：名字、小节数、能量（配乐用）
 const PLAN = [
-  ['chat', 4, 0.1], ['fly', 3, 0.55], ['land', 3, 0.4], ['embed', 3, 0.5], ['layers1', 10, 0.78],
+  ['chat', 5, 0.1], ['fly', 3, 0.55], ['land', 3, 0.4], ['embed', 3, 0.5], ['layers1', 10, 0.78],
   ['dissect', 35, 0.55], ['sample1', 6, 0.6], ['loop1', 6, 0.72], ['layersK', 6, 0.85], ['sampleK', 4, 0.7],
   ['loop2', 7, 0.9], ['end', 6, 0.22],
 ];
@@ -85,22 +85,47 @@ export function buildScore(Q) {
   const hm0 = Q.headMMAt(G0);
   const X = (M, i) => M.x(i);
 
-  /* ------------------------------------------------------------ 开场：对话框 → 发送 → 词元飞进黑箱 → 落进托盘（一个连续镜头） */
+  /* ------------------------------------------------------------ 开场：聊天页 → 打字 → 发送 → 气泡裂成词元 → 飞进黑箱 → 落进托盘（一个连续镜头） */
+  // 打字：中文用拼音输入，每个词敲完拼音、候选一闪、上屏。上屏的时刻卡在八分音符上（配乐的拨弦跟着它走）
+  const PY = {
+    '天空': ["tian'kong", ['天空', '填空', '天', '田']],
+    '为什么': ["wei'shen'me", ['为什么', '为', '喂', '未']],
+    '是': ['shi', ['是', '时', '事', '使', '十']],
+    '蓝色': ["lan'se", ['蓝色', '蓝', '篮', '拦']],
+    '的': ['de', ['的', '得', '地', '德']],
+  };
+  const upAt = [B(0, 3), B(1, 0.5), B(1, 1.5), B(1, 2.5), B(1, 3.5), B(2, 0.5)];
+  const jit = (i) => (((i * 7919) % 13) / 13 - 0.5) * 0.03; // 敲键间隔的一点不均匀（确定的）
+  const typing = user.map((u, k) => {
+    const [segd, cands] = PY[u.s] || [null, null];
+    const up = upAt[k] ?? upAt[upAt.length - 1] + (k - upAt.length + 1) * BEAT;
+    if (!segd) return { s: u.s, py: null, keys: [up], commit: up };
+    const n = segd.replace(/'/g, '').length;
+    const keys = Array.from({ length: n }, (_, j) => up - 0.17 - (n - 1 - j) * 0.074 + jit(k * 10 + j));
+    return { s: u.s, py: segd.replace(/'/g, ''), seg: segd, cands, keys, commit: up };
+  });
   const OPEN = {
-    popT: user.map((_, k) => B(0, 2) + k * BEAT), // 问题一个词元一个词元点进输入框
-    sendT: B(3),                                   // 按下发送（小节线上）
-    lift: 26,                                      // 发送后词元块升起的像素
+    typing,
+    sendT: B(2, 2),                               // 按下发送（Enter）
+    boxY0: 560, boxY1: 912,                        // 输入框：屏幕中间 → 贴底
+    push0: B(2, 2) + 1.15, push1: B(4) - 0.1,      // 镜头推近你的消息气泡
+    zoom: 1.9, zoom2: 0.06, focusY: 470,
+    split0: B(3, 2) - 0.25, splitGap: 0.1, splitD: 0.5, // 文字按真实分词裂成词元块
     depth: 7,                                      // 交给 3D 方块时离镜头的距离
-    boxOpen0: B(5, 2) + 0.55, boxOpen1: B(6, 2) + 0.05,
-    landStart0: B(6, 2) - 0.05, landGap: 0.08,     // 6 个词元开始离开编队、落向托盘
+    boxOpen0: SEC.fly.t0 + 4.3, boxOpen1: SEC.fly.t0 + 6.3,
+    landStart0: SEC.fly.t0 + 6.2, landGap: 0.08,   // 6 个词元开始离开编队、落向托盘
     dropD: 0.45,
     landAt: {},
     end: SEC.land.t1,
   };
-  OPEN.liftT0 = OPEN.sendT + 0.1;
-  OPEN.swapT = OPEN.sendT + 0.75;
-  OPEN.uiOut0 = OPEN.swapT - 0.05; // 交接完成后，镜头穿过界面
-  OPEN.uiOut1 = OPEN.swapT + 0.9;
+  OPEN.bubT = OPEN.sendT + 0.06;                   // 你的消息出现在对话区
+  OPEN.botT = OPEN.sendT + 0.4;                    // 助手：正在思考…
+  OPEN.diss0 = B(4) - 0.05; OPEN.diss1 = B(4) + 0.6; // 气泡以外的界面散去
+  OPEN.swapT = B(4) + 0.7;                         // 词元块换成 3D 方块
+  OPEN.warpT = OPEN.swapT - 1.0;                   // 背景粒子“跃迁”
+  OPEN.fog0 = OPEN.swapT + 0.5; OPEN.fog1 = SEC.fly.t0 + 0.4; // 远处的黑箱从黑暗里显出来
+  const titleIn = SEC.fly.t0 + 0.1, titleOut0 = SEC.fly.t0 + 2.8, titleOut1 = SEC.fly.t0 + 3.6; // 片名落版
+  OPEN.titleIn = titleIn; OPEN.titleOut0 = titleOut0; OPEN.titleOut1 = titleOut1;
   user.forEach((u, k) => { OPEN.landAt[u.i] = SEC.land.t0 + k * OPEN.landGap; });
   // 聊天模板的其余词元：以问题为中心，一圈圈往两边落下来
   const uFirst = user[0].i, uLast = user[user.length - 1].i;
@@ -109,11 +134,11 @@ export function buildScore(Q) {
     const r = i < uFirst ? uFirst - i : i - uLast;
     OPEN.landAt[i] = SEC.land.t0 + 0.5 + 0.065 * r + OPEN.dropD;
   }
-  // 镜头：从屏幕前一路飞到黑箱跟前，越过倒下的前面板，降到托盘上；再稍微拉开看模板把问题包起来
+  // 镜头：词元交接以后从远处一路飞到黑箱跟前，越过倒下的前面板，降到托盘上；再稍微拉开看模板把问题包起来
   const camOpen = path([
     { t: 0, p: [0, 5.8, 124], l: [0, 5.8, 0], fov: 32 },
-    { t: OPEN.sendT + 0.1, p: [0, 5.8, 124], l: [0, 5.8, 0], fov: 32 },
-    { t: OPEN.swapT, p: [0, 5.9, 120], l: [0, 5.8, 0], fov: 32 },
+    { t: OPEN.swapT - 0.3, p: [0, 5.8, 124], l: [0, 5.8, 0], fov: 32 },
+    { t: OPEN.swapT + 0.5, p: [0, 5.85, 121.6], l: [0, 5.8, 0], fov: 32 },
     { t: SEC.fly.t0, p: [-1.0, 6.3, 97], l: [-1.5, 5.6, 0], fov: 32 },
     { t: SEC.fly.t0 + 2.5, p: [-3.0, 6.6, 62], l: [-4.0, 4.8, 0], fov: 32 },
     { t: SEC.fly.t0 + 4.5, p: [-4.6, 5.9, 33], l: [-5.0, 3.0, 0], fov: 32 },
@@ -125,15 +150,19 @@ export function buildScore(Q) {
     { t: SEC.land.t1, p: [-5.9, 1.8, 5.2], l: [-5.1, 0.22, 0], fov: 32 },
   ]);
   OPEN.camAt = camOpen;
-  OPEN.popT.forEach((t, i) => ev(t, 'type', { i }));
+  let kn = 0;
+  for (const w of typing) if (w.py) for (const k of w.keys) ev(k, 'key', { i: kn++ });
+  typing.forEach((w, i) => ev(w.commit, 'type', { i }));
   ev(OPEN.sendT, 'send');
   ev(OPEN.swapT, 'whoosh', { k: 0.8 });
+  ev(OPEN.swapT, 'rise', { d: SEC.fly.t0 - OPEN.swapT });   // 词元飞起来，一路推到片名
   ev(SEC.fly.t0, 'hit', { k: 1 });
   ev(OPEN.boxOpen0 - 2.0, 'rise', { d: 2.0 });
   ev(OPEN.boxOpen0, 'open');
   for (let i = 0; i < Q.P; i++) ev(OPEN.landAt[i], 'tick', { i, k: i >= uFirst && i <= uLast ? 1 : 0.4 });
-  sub(OPEN.popT[OPEN.popT.length - 1] + 0.35, OPEN.sendT - 0.2, '你问它一个问题。');
-  sub(OPEN.boxOpen0 + 0.1, SEC.land.t0 - 0.2, '按下发送：问题已经被切成了词元。');
+  // 片名在画面上的那几秒不放字幕
+  sub(OPEN.split0 + 0.45, titleIn - 0.35, '发出去的问题，先被切成词元。');
+  sub(OPEN.boxOpen0 + 0.1, SEC.land.t0 - 0.2, '黑箱打开，词元落进托盘。');
   sub(SEC.land.t0 + 0.3, SEC.land.t0 + 3.3, '聊天模板给问题包上系统提示和特殊标记。');
   sub(SEC.land.t0 + 3.5, SEC.land.t1 - 0.2, `一共 ${m(Q.P)} 个词元。模型看到的不是字，是编号：${q(user[3].s)} = ${m(user[3].id)}。`);
   strip(SEC.land.t0 + 3.5, SEC.land.t1 - 0.2, user.map((t) => `<span class="tk">${tk(t.s)}</span> ${m(t.id)}`).join('<span class="sep"></span>'));
@@ -144,9 +173,11 @@ export function buildScore(Q) {
     return {
       st: opened ? mst(2, 0, { ph: 'read' }, 1, { dAnim: lerp(1, 2.6, smoother(seg(t, OPEN.boxOpen0, OPEN.boxOpen1))) }) : mst(1, 0, { ph: 'pass' }, 0.04),
       cam: () => camOpen(t),
-      fade: 1 - smooth(seg(t, OPEN.sendT + 0.3, OPEN.sendT + 1.5)),
+      fade: 1 - smooth(seg(t, OPEN.diss0, OPEN.diss0 + 0.3)),
+      // 黑箱正面的型号字：片名淡出以后才亮，再开箱
+      boxLabel: smooth(seg(t, titleOut1 + 0.05, titleOut1 + 0.55)),
       extras: { ids: smooth(seg(t, SEC.land.t0 + 3.3, SEC.land.t0 + 3.9)), idsFocus: true },
-      ov: { band: t < OPEN.sendT ? 0.35 : 1, title: smooth(seg(ft, 0.1, 0.9)) * (1 - smooth(seg(ft, 2.8, 3.6))), titleK: seg(ft, 0.05, 2.6), titleBlur: 7 * smooth(seg(ft, 2.8, 3.6)) },
+      ov: { band: smooth(seg(t, OPEN.diss0, OPEN.diss1)), title: smooth(seg(t, titleIn, titleIn + 0.8)) * (1 - smooth(seg(t, titleOut0, titleOut1))), titleK: seg(ft, 0.05, 2.6), titleBlur: 7 * smooth(seg(t, titleOut0, titleOut1)), titleOnBox: true },
     };
   });
 

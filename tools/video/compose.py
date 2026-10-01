@@ -444,7 +444,7 @@ P2 = ['Dmadd9', 'Gm9', 'Bbmaj7', 'A7sus4']
 
 # 每段的和弦进行（按段内的第几小节取；比段落长就循环）
 SEC_CHORDS = {
-    'chat': [None, None, None, 'Dm9'],          # 打字时只有嗡鸣，发送时和弦进来
+    'chat': [None, None, 'Dm9', 'Dm9', 'Csus2'],  # 打字时只有嗡鸣；按下发送，和弦从那一下进来；推近、裂开时往上走
     'fly': ['Dm9', 'Bbmaj7', 'Csus2'],          # 穿入：一路往上走
     'land': ['Dm9', 'Bbmaj7', 'Fmaj7'],
     'embed': P1, 'layers1': P1,
@@ -520,7 +520,7 @@ def compose(ev, out_wav, stems_dir=None):
         if not c:
             continue
         t0 = b * BAR
-        en = energy(t0 + 0.1)
+        en = energy(t0 + 0.1) if not (sec(t0 + 0.1) == "chat" and t0 + BAR > send_t) else 0.5  # 发送以后：和弦亮起来
         notes, root = CH[c]
         nm = sec(t0 + 0.1)
         bright = 0.25 + 0.6 * en if nm not in ('dissect',) else 0.22
@@ -528,7 +528,12 @@ def compose(ev, out_wav, stems_dir=None):
         if nm == 'end':
             vol = 0.55
         hold = BAR + 0.3 + (BAR * 2 if b == nbars - 1 else 0)
-        pad.add(t0 - 0.3, pad_chord(notes, hold, bright), vol)
+        start = t0 - 0.3
+        if nm == 'chat' and t0 < send_t < t0 + BAR:
+            # 发送落在这一小节中间：和弦从发送那一下才进来
+            start = send_t - 0.05
+            hold = t0 + BAR + 0.3 - start
+        pad.add(start, pad_chord(notes, hold, bright), vol)
 
     # 3. 琶音：和弦音在两个八度之间上下走；能量高时 16 分音符，低时 8 分音符
     for b, c in enumerate(plan):
@@ -536,8 +541,8 @@ def compose(ev, out_wav, stems_dir=None):
             continue
         t0 = b * BAR
         nm = sec(t0 + 0.1)
-        en = energy(t0 + 0.1)
-        if nm in ('chat', 'end'):
+        en = energy(t0 + 0.1) if not (nm == "chat" and t0 + BAR > send_t) else 0.5
+        if nm == 'end' or (nm == 'chat' and t0 + BAR <= send_t + 0.5):
             continue
         notes, _ = CH[c]
         tones = sorted(set([m + 12 for m in notes] + [m + 24 for m in notes[:3]]))
@@ -546,12 +551,16 @@ def compose(ev, out_wav, stems_dir=None):
         steps = int(round(BAR / step))
         pattern = list(range(len(tones))) + list(range(len(tones) - 2, 0, -1))
         for k in range(steps):
+            if nm == "chat" and t0 + k * step < send_t + 0.3:
+                continue
             if nm == 'dissect' and k % 2 == 1 and (b % 2 == 0):
                 continue
             if nm in ('sample1', 'sampleK') and k % 4 != 0:
                 continue
             m = tones[pattern[(k + b * 3) % len(pattern)]]
             vel = (0.55 + 0.45 * (k % 4 == 0)) * (0.5 + 0.5 * en)
+            if nm == 'chat':
+                vel *= 0.55 + 0.45 * k / steps  # 推近气泡时一点点涨上去
             br = 0.35 + 0.5 * en if nm != 'dissect' else 0.25
             arp.add(t0 + k * step, pluck(m, 0.6, br, vel), 0.42, pan=0.35 * math.sin(k * 1.3 + b))
 
@@ -597,6 +606,8 @@ def compose(ev, out_wav, stems_dir=None):
             kind = 'none'   # 拆开的头两小节和最后一小节留白
         if nm == 'layers1' and k_in == 0:
             kind = 'heart'
+        if nm == 'chat' and k_in == nb_in - 1:
+            kind = 'heart'  # 词元飞起来：心跳进来
         drum_bar(b, kind)
         # 进入下一段前一小节：军鼓滚奏
         if (sname in ('embed', 'layersK') and k_in == nb_in - 1) or (sname == 'loop2' and k_in == 4):
@@ -619,7 +630,10 @@ def compose(ev, out_wav, stems_dir=None):
         b = int(t // BAR)
         c = plan[min(b, len(plan) - 1)] or 'Dm9'
         notes, root = CH[c]
-        if ty == 'type':
+        if ty == 'key':
+            # 敲拼音：很轻的键盘声，左右略有变化
+            fx.add(t, keyclick(0.22 + 0.06 * ((e.get('i', 0) * 5) % 3), pitch=0.05 * (e.get('i', 0) % 4)), pan=-0.25 + 0.05 * (e.get('i', 0) % 9))
+        elif ty == 'type':
             fx.add(t, keyclick(0.55, pitch=0.1 * (e.get('i', 0) % 3)), pan=-0.2 + 0.08 * e.get('i', 0))
             bells.add(t, blip(74 + [0, 3, 5, 7, 10, 12][e.get('i', 0) % 6], 0.25, 0.25))
         elif ty == 'tick':
@@ -699,6 +713,11 @@ def compose(ev, out_wav, stems_dir=None):
     lvl = np.ones(pad.n)
     for s_ in sections:
         lvl[n_of(s_['t0']): n_of(s_['t1'])] = LEVEL.get(s_['name'], 1.0)
+    # 聊天段：打字时轻；发送以后逐渐推到飞行段的音量
+    sc = next((s_ for s_ in sections if s_['name'] == 'chat'), None)
+    if sc:
+        a, b = n_of(send_t), n_of(sc['t1'])
+        lvl[a:b] = np.linspace(LEVEL['chat'], LEVEL['fly'], b - a)
     lvl = ss.filtfilt([1 - math.exp(-1 / (SR * 0.25))], [1, -math.exp(-1 / (SR * 0.25))], lvl)
     for bus in (pad, bass, arp, drums):
         bus.x *= lvl
