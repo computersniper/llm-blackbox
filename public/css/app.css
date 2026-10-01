@@ -587,3 +587,32 @@ body.mode-inspect .toast { padding: 9px 12px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ---------------- 拖动调整面板宽度（js/resize.js；训练页不引用本文件，样式另有一份在 train/css/train.css） ---------------- */
+
+.pane-grip { position: absolute; z-index: 8; top: 0; bottom: 0; width: 10px; cursor: ew-resize; touch-action: none; outline: none; }
+.pane-grip.l { right: -5px; }
+/* 调试器是 overflow: hidden 的：手柄贴着它的左边缘放在里面 */
+.pane-grip.r { left: 0; width: 8px; }
+.pane-grip::before { content: ""; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; border-radius: 2px; background: linear-gradient(to bottom, transparent, var(--acc) 12%, var(--acc) 88%, transparent); box-shadow: 0 0 8px rgba(94, 240, 212, .5); opacity: 0; transition: opacity .2s ease .08s; }
+.pane-grip.r::before { left: 0; top: 14px; bottom: 14px; }
+.pane-grip:hover::before { opacity: .55; }
+.pane-grip:focus-visible::before { opacity: .9; width: 3px; }
+.pane-grip.on::before { opacity: 1; transition-delay: 0s; }
+body.pane-drag { cursor: ew-resize; user-select: none; -webkit-user-select: none; }
+body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
+body.mode-chat .pane-grip, .dbg.folded > .pane-grip, body.dbg-folded .dbg > .pane-grip { display: none; }
+@media (max-width: 900px) { .pane-grip { display: none; } }
+/* 面板拖宽以后舞台变窄：控制条按自己能用的宽度先收紧，再藏起位置读数、深度名（顶栏面包屑里有），
+   还放不下才折成两行（会压到算式板，所以各页留出的宽度让它尽量不走到这一步）。窄屏另有一套，不受影响 */
+@media (min-width: 901px) {
+  .ctl { container-type: inline-size; }
+  @container (max-width: 730px) {
+    .ctl-bar { gap: 6px 10px; }
+    .ctl-depth, .ctl-play { padding-right: 8px; }
+    .ctl-speed button { min-width: 32px; padding: 0 3px; }
+  }
+  @container (max-width: 660px) { .ctl-pos { display: none; } }
+  @container (max-width: 560px) { .ctl-dname { display: none; } }
+  @container (max-width: 460px) { .ctl-bar { flex-wrap: wrap; justify-content: center; } }
+}

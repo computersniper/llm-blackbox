@@ -9,6 +9,7 @@ import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Background } from './bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc, fmtNum } from '../../js/ui.js';
+import { initPanes } from '../../js/resize.js';
 import { splitExit } from './screen.js';
 import { callArg } from './chat.js';
 
@@ -30,6 +31,7 @@ const small = () => matchMedia('(max-width: 900px)').matches;
 
 async function boot() {
   new Background($('#bg'));
+  initPanes('agent', { left: { el: '#side', v: '--side-w', name: '对话栏', min: 300 }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 520 });
   try {
     M = await loadManifest();
   } catch (e) {
