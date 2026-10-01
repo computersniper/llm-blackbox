@@ -154,9 +154,6 @@ body.mode-inspect .chat-head, body.mode-inspect .chat-log, body.mode-inspect .co
 .intro-card .key { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--acc); color: #04121a; font-weight: 900; font-size: 14px; vertical-align: -3px; }
 .intro-card .spec { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--dim); }
 .intro-card .spec b { color: var(--ink2); font-weight: 400; }
-.intro-card .intro-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--dim); }
-.intro-card .intro-foot a { color: var(--acc); text-decoration: none; }
-.intro-card .intro-foot a:hover { text-decoration: underline; }
 
 /* 词元小块 */
 .tok { --h: 180; display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 6px; background: hsla(var(--h), 70%, 60%, .13); border: 1px solid hsla(var(--h), 75%, 66%, .38); color: hsl(var(--h), 85%, 86%); font-family: var(--sans); font-size: 14px; line-height: 1.4; white-space: pre; }
@@ -590,9 +587,23 @@ body.mode-inspect .toast { padding: 9px 12px; }
 
 @media (max-width: 560px) {
   .brand-en { display: none; }
-  .visits, .gh-btn { display: none !important; }
   .brand { gap: 0; }
-  .topbar { gap: 10px; }
+  .topbar { gap: 8px; padding: 0 10px; }
+  .site-nav a { padding: 3px 7px; }
+  .top-actions { gap: 5px; }
+  .top-actions .hud-btn { height: 30px; min-width: 30px; padding: 0 8px; }
+  .top-actions .gh-btn { width: 30px; padding: 0; }
+  .visits svg { display: none; }
+  .codex-btn { width: 30px; padding: 0; }
+  .codex-btn #codexCount { display: none; }
+  body.mode-chat .crumbs { display: none; }
+}
+@media (max-width: 420px) { .brand { display: none; } }
+@media (max-width: 374px) {
+  .topbar { gap: 6px; padding: 0 8px; }
+  .site-nav a { padding: 3px 5px; font-size: 11.5px; }
+  .top-actions { gap: 4px; }
+  .top-actions .visits { padding: 0 6px; font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
