@@ -67,9 +67,10 @@ async function boot() {
   tl = new Timeline(sim);
   tl.speed = store.speed;
   tl.on((type) => {
-    if (type === 'step') { refresh(); discoverFor(); }
+    // D1 播放时一秒 20 帧：调试器的文字节流着刷新（停下来、换深度时立刻刷新）
+    if (type === 'step') { refresh(!(tl.depth === 1 && tl.playing)); discoverFor(); }
     if (type === 'frame') onFrameAdvance();
-    if (type === 'play') controls.updatePlay(tl);
+    if (type === 'play') { controls.updatePlay(tl); if (!tl.playing) refresh(); }
   });
   controls = new Controls({
     into: () => into(),

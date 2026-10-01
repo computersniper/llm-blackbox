@@ -199,7 +199,7 @@ export class Timeline {
     while (this.p >= 1 && guard++ < 40) {
       const carry = this.p - 1;
       this.advance();
-      this.p = Math.min(carry, 0.99);
+      this.p = this.depth === 1 ? carry : Math.min(carry, 0.99);   // D1 一帧很短：8× 时一次要走好几帧
       if (performance.now() - t0 > budget) { this.p = Math.min(this.p, 0.5); break; }
     }
   }

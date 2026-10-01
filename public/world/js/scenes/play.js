@@ -165,10 +165,13 @@ export class PlayView {
       line(g, pts, hexA(COL.amber, 0.45), 1.2);
       g.setLineDash([]);
     }
-    for (let k = 1; k < frames.length; k++) {
-      const a = frames[k - 1], b = frames[k];
-      if (a.mse == null || b.mse == null || b.gameNo !== a.gameNo) continue;
-      line(g, [[X(off + k - 1), Y(a.mse)], [X(off + k), Y(b.mse)]], b.dreamAge > 0 ? COL.amber : COL.cyan, 1.6);
+    // 快进时有的帧没解码过（没有差异值）：跳过它们，把同一局里前后有值的帧连起来
+    let pk = -1;
+    for (let k = 0; k < frames.length; k++) {
+      const b = frames[k];
+      if (b.mse == null) continue;
+      if (pk >= 0 && frames[pk].gameNo === b.gameNo) line(g, [[X(off + pk), Y(frames[pk].mse)], [X(off + k), Y(b.mse)]], b.dreamAge > 0 ? COL.amber : COL.cyan, 1.6);
+      pk = k;
     }
     const last = frames[frames.length - 1];
     if (last?.mse != null) { g.beginPath(); g.arc(X(119), Y(last.mse), 3, 0, Math.PI * 2); g.fillStyle = last.dreamAge > 0 ? COL.amber : COL.cyan; g.fill(); }

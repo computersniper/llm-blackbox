@@ -52,6 +52,9 @@ export class Sim {
   push(f) {
     this.hist.push(f);
     this.idx = this.hist.length - 1;
+    // 梦画出来的整幅画面（每帧 4.8 万个数）只给最近 40 帧留着，更早的退回去时再解码（差异值留着画曲线）
+    const old = this.hist[this.idx - 40];
+    if (old && old !== this._detailOf) old.dreamY = null;
     if (this.hist.length > CAP) { const k = this.hist.length - CAP; this.hist.splice(0, k); this.idx -= k; }
   }
 
