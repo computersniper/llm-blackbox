@@ -523,6 +523,9 @@ function renderAt(t, { render = true } = {}) {
     if (f.slabDim) M.slabs.forEach((sl) => { sl.material.opacity *= 1 - f.slabDim; sl.edge.material.opacity *= 1 - f.slabDim; sl.lbl.visible = false; });
     // 开场：对话框、飞行的词元、托盘上方块的落下时间
     OPENING.update(t, SC.open.camAt);
+    // 片名压在黑箱正面上时，正面的型号字先隐去，等片名淡出再亮，免得两层字叠在一起
+    const fa = (1 - (f.ov?.title ?? 0)) ** 3;
+    for (const c of M.cFront.children) if (c.isMesh && c.material.map) { c.material.opacity = fa; c.visible = fa > 0.01; }
     // 神经元阵列点亮的先后顺序原来用 Math.random：换成确定的哈希
     if (M.detail.panelKey && M.detail.panelKey !== lastPanel) {
       lastPanel = M.detail.panelKey;
@@ -555,7 +558,7 @@ function seek(t, pre = 8) {
 /* ================================================================ 封面 */
 
 // 封面：渲染第 t 秒的画面，去掉字幕和数据条，叠上片名
-function poster(t = 60.4) {
+function poster(t = 52.9) {
   seek(t);
   for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid', '.band']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
   // 左侧压一层渐变，片名靠左放在上面；右边留给 28 层的逻辑透镜读数

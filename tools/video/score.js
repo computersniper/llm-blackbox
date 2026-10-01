@@ -146,7 +146,7 @@ export function buildScore(Q) {
       cam: () => camOpen(t),
       fade: 1 - smooth(seg(t, OPEN.sendT + 0.3, OPEN.sendT + 1.5)),
       extras: { ids: smooth(seg(t, SEC.land.t0 + 3.3, SEC.land.t0 + 3.9)), idsFocus: true },
-      ov: { band: t < OPEN.sendT ? 0.35 : 1, title: smooth(seg(ft, 0.1, 0.9)) * (1 - smooth(seg(ft, 3.4, 4.3))), titleK: seg(ft, 0.05, 3.0), titleBlur: 7 * smooth(seg(ft, 3.4, 4.3)) },
+      ov: { band: t < OPEN.sendT ? 0.35 : 1, title: smooth(seg(ft, 0.1, 0.9)) * (1 - smooth(seg(ft, 2.8, 3.6))), titleK: seg(ft, 0.05, 2.6), titleBlur: 7 * smooth(seg(ft, 2.8, 3.6)) },
     };
   });
 
