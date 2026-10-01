@@ -1,7 +1,7 @@
 """把思源宋体裁剪成只包含本站用到的字符的 woff2。
 
 用法：python tools/subset_fonts.py <NotoSerifSC-Black.otf> <NotoSerifSC-SemiBold.otf>
-需要 fonttools 和 brotli（pip install fonttools brotli）。改了页面文案后重新跑一次。
+需要 fonttools 和 brotli（pip install fonttools brotli）。改了任何页面的文案后重新跑一次。
 """
 import pathlib
 import sys
@@ -13,7 +13,10 @@ PUB = ROOT / "public"
 
 chars = set(chr(c) for c in range(0x20, 0x7F))
 chars |= set("，。、；：？！“”‘’（）《》【】—…·×−→↓↑≈⊕Σ√")
-for f in list(PUB.rglob("*.js")) + [PUB / "index.html"]:
+# 所有页面（首页和 train/、multimodal/、agent/）的 HTML / JS / CSS，加上子页面 manifest 里的标题（任务卡片等用衬线体）
+files = [f for ext in ("*.html", "*.js", "*.css") for f in PUB.rglob(ext)]
+files += [f for f in PUB.glob("*/data/manifest.json")]
+for f in files:
     chars |= {ch for ch in f.read_text(encoding="utf-8") if ord(ch) > 0x7F}
 text = "".join(sorted(chars))
 print(f"{len(chars)} 个字符")
