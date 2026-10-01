@@ -1,4 +1,5 @@
 // 读取 tools/export_qwen.py 导出的真实模型数据。
+import { measure } from './prefetch.js';
 
 const cache = new Map();
 
@@ -57,18 +58,32 @@ async function fetchGz(url) {
   return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 
-// 每层每个矩阵的真实权重分布缩略图（每格 = 32×32 个权重的均方根）
+// 每层每个矩阵的真实权重分布缩略图（每格 = 32×32 个权重的均方根）。约 380 KB，只有拆开一层（D4）时才用得到，
+// 由 main.js 在深度 ≥ 3 时才来取；失败了下次再调用会重试
 let thumbs = null;
-export async function loadThumbs() {
-  if (!thumbs) thumbs = fetchData('data/weights.bin').then((b) => new Uint8Array(b));
+export function loadThumbs() {
+  if (!thumbs) {
+    thumbs = fetchData('data/weights.bin').then((b) => new Uint8Array(b));
+    thumbs.catch(() => { thumbs = null; });
+  }
   return thumbs;
 }
 
 const decodeJSON = (buf) => JSON.parse(new TextDecoder().decode(buf));
 
-export async function loadQuestion(id, manifest) {
-  if (cache.has(id)) return cache.get(id);
+// 一个问题的主文件。缓存的是 promise：预取（发送问题时）和点 ＋ 同时要同一个问题，只发一次请求；失败了从缓存里删掉，下次重试
+export function loadQuestion(id, manifest) {
+  if (!cache.has(id)) {
+    const p = decodeQuestion(id, manifest);
+    cache.set(id, p);
+    p.catch(() => cache.delete(id));
+  }
+  return cache.get(id);
+}
+
+async function decodeQuestion(id, manifest) {
   const [jbuf, buf] = await Promise.all([fetchData(`data/${id}.json`), fetchData(`data/${id}.bin`)]);
+  const t0 = performance.now();
   const meta = decodeJSON(jbuf);
   const arr = {};
   for (const [k, spec] of Object.entries(meta.bin)) arr[k] = view(buf, spec);
@@ -141,6 +156,6 @@ export async function loadQuestion(id, manifest) {
     headMMAt: (g) => meta.headMM?.[g] ?? null,
     dotAt: (L, g) => micro.get(L)?.dot?.[g] ?? null,
   };
-  cache.set(id, Q);
+  measure(`数据·解码 ${id}`, t0);
   return Q;
 }
