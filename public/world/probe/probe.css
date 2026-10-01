@@ -124,9 +124,9 @@
 
 /* ---------------- 算式面板：一个城市在一层的读数是怎么乘加出来的 ---------------- */
 
-.pb-fx { position: absolute; z-index: 4; top: 8px; right: 8px; bottom: 8px; width: min(440px, 56%); display: flex; flex-direction: column; border-radius: 12px; background: rgba(8, 13, 25, .95); border: 1px solid var(--pb-line2); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); overflow: hidden; animation: pb-in .45s var(--pb-ease); container-type: inline-size; }
+.pb-fx { position: absolute; z-index: 4; top: 60px; right: 20px; height: 300px; width: min(440px, 56%); display: flex; flex-direction: column; border-radius: 12px; background: rgba(8, 13, 25, .95); border: 1px solid var(--pb-line2); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); overflow: hidden; animation: pb-in .45s var(--pb-ease); container-type: inline-size; }
 @keyframes pb-in { from { opacity: 0; transform: translateX(14px); } }
-.pb-fx.pb-fx-l { right: auto; left: 8px; animation-name: pb-in-l; }
+.pb-fx.pb-fx-l { right: auto; left: 20px; animation-name: pb-in-l; }
 @keyframes pb-in-l { from { opacity: 0; transform: translateX(-14px); } }
 .pb-fx-h { display: flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px; border-bottom: 1px solid var(--pb-line); flex-wrap: wrap; }
 .pb-fx-h b { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
@@ -191,14 +191,18 @@
 .pb-narrow .pb-seg { width: 100%; }
 .pb-narrow .pb-seg button { flex: 1; padding: 3px 4px; font-size: 11.5px; }
 .pb-narrow .pb-seg i { display: none; }
-.pb-narrow .pb-scrub { height: 70px; }
-.pb-narrow .pb-range::-webkit-slider-thumb { height: 70px; }
+.pb-narrow .pb-scrub { height: 64px; }
+.pb-narrow .pb-range::-webkit-slider-thumb { height: 64px; }
 .pb-narrow .pb-play { width: 34px; }
 .pb-narrow .pb-feed { font-size: 10.5px; top: 5px; left: 6px; }
 .pb-narrow .pb-feed > span { display: none; }
 .pb-narrow .pb-feed code { font-size: 10px; }
 .pb-narrow .pb-chip { padding: 1px 7px 1px 5px; font-size: 11px; }
-.pb-narrow .pb-fx { inset: 0; width: auto; border-radius: 11px; }
+.pb-narrow .pb-fx { inset: 0; width: auto; height: auto; border-radius: 11px; background: #080d19; }
+.pb-narrow .pb-fx-h { flex-wrap: nowrap; padding-left: 10px; }
+.pb-narrow .pb-fx-h select { max-width: 118px; }
+.pb-narrow .pb-chip span { display: none; }
+.pb-narrow .pb-legend { gap: 3px; }
 .pb-narrow .pb-credit { display: none; }
 .pb-narrow .pb-tip { min-width: 0; max-width: 220px; font-size: 11.5px; }
 @media (prefers-reduced-motion: reduce) {

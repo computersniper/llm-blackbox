@@ -167,7 +167,6 @@ export async function mountProbe(el, opts = {}) {
       <div class="pb-credit">城市：GeoNames（CC BY 4.0）· 海岸线：Natural Earth</div>
       <div class="pb-tip" hidden></div>
       <div class="pb-loading"><span>正在载入探针数据…</span></div>
-      <aside class="pb-fx" hidden aria-label="算式"></aside>
     </div>
     <div class="pb-ctrl">
       <button type="button" class="pb-play" aria-label="播放：从第 0 层到第 27 层">
@@ -187,7 +186,8 @@ export async function mountProbe(el, opts = {}) {
         <button type="button" class="pb-tog on" data-o="lines" title="把预测位置和真实位置连起来">连线</button>
         <button type="button" class="pb-tog pb-fxbtn" data-o="fx" title="一个城市在这一层的读数是怎么乘加出来的">算式 ƒ</button>
       </div>
-    </div>`;
+    </div>
+    <aside class="pb-fx" hidden aria-label="算式"></aside>`;
   el.replaceChildren(root);
   const $ = (s) => root.querySelector(s);
   const stage = $('.pb-stage'), cv = $('.pb-map'), g = cv.getContext('2d');
@@ -248,6 +248,9 @@ export async function mountProbe(el, opts = {}) {
     buildPaths();
     CW = scrub.clientWidth; CH = scrub.clientHeight;
     sc.width = Math.max(1, Math.round(CW * dpr)); sc.height = Math.max(1, Math.round(CH * dpr));
+    // 算式面板：宽屏时盖在地图上（和地图区域对齐），窄屏时盖住整个模块
+    fxEl.style.top = S.narrow ? '' : `${stage.offsetTop + 8}px`;
+    fxEl.style.height = S.narrow ? '' : `${Math.max(120, H - 16)}px`;
     const P = plotBox();
     range.style.left = `${P.x - 11}px`;
     range.style.width = `${P.w + 22}px`;
@@ -459,6 +462,18 @@ export async function mountProbe(el, opts = {}) {
       sg.globalAlpha = cur ? 1 : 0.42;
       sg.lineWidth = cur ? 2 : 1.2;
       sg.setLineDash(VAR[VN[vi]].tag ? [4, 3] : []);
+      if (cur) {
+        const gr = sg.createLinearGradient(0, P.y, 0, Y(0));
+        gr.addColorStop(0, `${VAR[VN[vi]].col}2e`);
+        gr.addColorStop(1, `${VAR[VN[vi]].col}00`);
+        sg.fillStyle = gr;
+        sg.beginPath();
+        sg.moveTo(X(0), Y(0));
+        ms.forEach((m, L) => sg.lineTo(X(L), Y(Math.max(0, m.r2))));
+        sg.lineTo(X(NL - 1), Y(0));
+        sg.closePath();
+        sg.fill();
+      }
       sg.beginPath();
       ms.forEach((m, L) => (L ? sg.lineTo(X(L), Y(m.r2)) : sg.moveTo(X(L), Y(m.r2))));
       sg.stroke();
@@ -519,11 +534,13 @@ export async function mountProbe(el, opts = {}) {
 
   /* ---------- 动画 ---------- */
 
+  let tweenMs = TWEEN_MS;
   function retarget(dur = TWEEN_MS) {
     from.set(disp);
     to = D[S.v][S.L];
     fromL = dispL;
     t0 = performance.now();
+    tweenMs = dur;
     animating = !reduced && dur > 0;
     if (!animating) { disp.set(to); dispL = S.L; }
     kick();
@@ -537,14 +554,14 @@ export async function mountProbe(el, opts = {}) {
       else go(S.L + 1);
     }
     if (animating) {
-      const k = easeIO((t - t0) / TWEEN_MS);
+      const k = easeIO((t - t0) / tweenMs);
       for (let j = 0; j < disp.length; j++) disp[j] = from[j] + (to[j] - from[j]) * k;
       dispL = fromL + (S.L - fromL) * k;
       if (k >= 1) animating = false;
     }
     draw();
     if (S.hover >= 0 && animating) placeTip(S.hover);
-    if (animating || S.playing) raf = requestAnimationFrame(frame);
+    if ((animating || S.playing) && !raf) raf = requestAnimationFrame(frame);   // go() 里可能已经排过下一帧
   }
 
   /* ---------- 状态变化 ---------- */
@@ -682,14 +699,14 @@ export async function mountProbe(el, opts = {}) {
   }
   function fxHeader() {
     const opts = [...C.featured].sort((a, b) => C.ct[a[0]] - C.ct[b[0]]).map(([i, zh]) => `<option value="${i}"${i === fx.city ? ' selected' : ''}>${zh} ${esc(C.name[i])}</option>`).join('');
-    return `<div class="pb-fx-h"><b>算式 · 第 ${S.L} 层</b><select aria-label="城市">${opts}</select>
+    return `<div class="pb-fx-h"><b>${S.narrow ? '' : '算式 · '}第 ${S.L} 层</b><select aria-label="城市">${opts}</select>
       <div class="pb-fx-tabs"><button type="button" data-t="lat" class="${fx.tab === 'lat' ? 'on' : ''}">纬度</button><button type="button" data-t="lon" class="${fx.tab === 'lon' ? 'on' : ''}">经度</button></div>
       <button type="button" class="pb-fx-x" aria-label="关闭算式">×</button></div><div class="pb-fx-b"></div>`;
   }
   async function renderFx() {
     const i = fx.city;
     const id = C.id[i];
-    const key = `${id}|${S.L}|${fx.tab}|${S.narrow}`;
+    const key = `${id}|${S.L}|${fx.tab}|${S.narrow}|${S.v}`;
     if (key === fx.key) return;
     fx.key = key;
     fxEl.innerHTML = fxHeader();
@@ -911,8 +928,11 @@ export async function mountProbe(el, opts = {}) {
   ro.observe(stage);
   ro.observe(scrub);
   range.value = String(S.L);
+  // 开场：所有点先挤在所有城市的平均位置，再散开到当前这一层的预测
+  for (let i = 0; i < n; i++) { disp[2 * i] = meanLat; disp[2 * i + 1] = meanLon; }
   resize();
   updateUI();
+  retarget(1100);
   pushExplain(true);
 
   function destroy() {
