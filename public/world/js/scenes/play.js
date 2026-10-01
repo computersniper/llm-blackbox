@@ -124,7 +124,8 @@ export class PlayView {
       text(g, ch, cx, cy + s * 0.32, { size: s * 0.8, color: on ? COL.amber : COL.faint, align: 'center' });
     });
     if (pt) text(g, '两边同一个动作', x + s * 3 + 18, y + 3.5, { size: 9, color: COL.dim });
-    else text(g, '同一个动作', x, y + (s + 10) * 1.5 + s * 0.6, { size: 9.5, color: COL.dim, align: 'center' });
+    else text(g, '同一', x, y + (s + 10) * 1.5 + s * 0.4, { size: 9.5, color: COL.dim, align: 'center' });
+    if (!pt) text(g, '动作', x, y + (s + 10) * 1.5 + s * 0.4 + 12, { size: 9.5, color: COL.dim, align: 'center' });
   }
 
   // 差异曲线：最近 120 帧；闭眼时叠上“平均来说会涨成这样”（测试集上的离线统计）
