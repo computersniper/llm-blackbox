@@ -58,8 +58,11 @@ export class Controls {
       const top = first.offsetTop - box.clientHeight * 0.25;
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top, behavior: 'smooth' });
     }
-    const shape = shapeOf(s, Q);
-    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s))}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, Q, ctx)}`;
+    // 讲解要知道当前是不是比特视图（同一个“逐项相乘”步骤，在 D7 讲的是比特）
+    const cx = { ...ctx, view: tl.view };
+    const shape = shapeOf(s, Q, cx);
+    const label = stepLabel(s) + (tl.view === 'bits' ? ' · 比特' : '');
+    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(label)}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, Q, cx)}`;
     renderWatch($('#watch'), watch(s, Q, ctx));
     // 步骤轨道（当前深度、当前词元的所有步骤）
     const n = tl.list.length;
