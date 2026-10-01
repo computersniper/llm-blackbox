@@ -55,11 +55,21 @@ export function measure(name, start, end = performance.now()) {
   try { performance.measure(name, { start, end }); } catch { /* 不支持 User Timing 3 */ }
 }
 
-// 页面载完、字体到齐之后，等浏览器空闲时执行 fn（不和首屏抢带宽和主线程）；省流量时什么也不做
-export function whenIdle(fn) {
+// 页面载完、字体到齐（以及 after 这个 promise 完成）之后，等浏览器空闲时执行 fn（不和首屏抢带宽和主线程）；
+// 省流量时什么也不做
+export function whenIdle(fn, after = null) {
   if (saveData()) return;
   const idle = window.requestIdleCallback || ((f) => setTimeout(f, 200));
-  const go = () => document.fonts.ready.then(() => idle(() => fn(), { timeout: 3000 }));
+  const go = () => Promise.all([document.fonts?.ready, after]).then(() => idle(() => fn(), { timeout: 3000 }));
   if (document.readyState === 'complete') go();
   else addEventListener('load', go, { once: true });
+}
+
+// 这些图片都载完（或出错）；最多等 ms 毫秒。懒加载的图片不挡 load 事件，首屏上看得见的图要单独等一等
+export function imagesLoaded(imgs, ms = 4000) {
+  const each = [...imgs].filter((im) => !im.complete).map((im) => new Promise((r) => {
+    im.addEventListener('load', r, { once: true });
+    im.addEventListener('error', r, { once: true });
+  }));
+  return Promise.race([Promise.all(each), new Promise((r) => setTimeout(r, ms))]);
 }

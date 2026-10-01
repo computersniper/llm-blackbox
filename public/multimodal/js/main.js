@@ -7,7 +7,7 @@ import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc, tokPlain, fmtPct, sleep } from '../../js/ui.js';
-import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from '../../js/prefetch.js';
+import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, imagesLoaded, measure } from '../../js/prefetch.js';
 
 const KEY = 'blackbox:mm:v1';
 const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记', img: '视觉词元' };
@@ -57,8 +57,8 @@ async function boot() {
   bindKeys();
   bindChrome();
   renderCodexCount();
-  // 聊天页可以用了：趁空闲把舞台的模块取回来（失败了没关系，点 ＋ 时会重试并报错）
-  whenIdle(() => loadStage().catch(() => {}));
+  // 聊天页可以用了：等选图栏里的缩略图都到了，再趁空闲把舞台的模块取回来（失败了没关系，点 ＋ 时会重试并报错）
+  whenIdle(() => loadStage().catch(() => {}), imagesLoaded($('#pics').querySelectorAll('img')));
 }
 
 function footText() {
