@@ -444,9 +444,10 @@ P2 = ['Dmadd9', 'Gm9', 'Bbmaj7', 'A7sus4']
 
 # 每段的和弦进行（按段内的第几小节取；比段落长就循环）
 SEC_CHORDS = {
-    'cold': [None],
-    'title': ['Dm9', 'Dm9', 'Bbmaj7'],
-    'tokenize': P1, 'embed': P1, 'layers1': P1,
+    'chat': [None, None, None, 'Dm9'],          # 打字时只有嗡鸣，发送时和弦进来
+    'fly': ['Dm9', 'Bbmaj7', 'Csus2'],          # 穿入：一路往上走
+    'land': ['Dm9', 'Bbmaj7', 'Fmaj7'],
+    'embed': P1, 'layers1': P1,
     'dissect': P2,
     'sample1': ['Bbmaj7', 'Bbmaj7', 'Gm9', 'Gm9', 'A7sus4', 'A'],
     'loop1': P1,
@@ -471,7 +472,7 @@ def chord_plan(sections):
     plan = []
     for name, k, nb in bar_info(sections):
         seq = SEC_CHORDS.get(name, P1)
-        plan.append(seq[min(k, len(seq) - 1)] if name in ('end', 'sample1', 'sampleK', 'layersK', 'title') else seq[k % len(seq)])
+        plan.append(seq[min(k, len(seq) - 1)] if name in ('end', 'sample1', 'sampleK', 'layersK', 'chat', 'fly', 'land') else seq[k % len(seq)])
     return plan
 
 
@@ -490,7 +491,6 @@ def compose(ev, out_wav, stems_dir=None):
     plan = chord_plan(sections)
     binfo = bar_info(sections)
     nbars = len(plan)
-    title_t0 = next(s_['t0'] for s_ in sections if s_['name'] == 'title')
     events = ev['events']
     sec = lambda t: section_at(sections, t)['name']
     energy = lambda t: section_at(sections, t)['energy']
@@ -510,10 +510,10 @@ def compose(ev, out_wav, stems_dir=None):
     hum += 0.12 * filt(saw(mtof(38), n), 'low', 400)
     air = filt(noise(n), 'bp', (250, 900)) * (0.5 + 0.5 * np.sin(2 * np.pi * 0.11 * t)) * 0.12
     shimmer = sum(sine(mtof(m), n) * 0.04 * (0.5 + 0.5 * np.sin(2 * np.pi * r * t + m)) for m, r in ((81, 0.09), (86, 0.13), (88, 0.07)))
-    e = np.clip(t / 4.0, 0, 1) ** 2 * (1 + 0.8 * np.clip((t - 9.5) / 3.0, 0, 1) ** 2)
-    e *= np.clip((12.55 - t) / 0.08, 0, 1)
+    send_t = next((e_['t'] for e_ in events if e_['type'] == 'send'), 7.5)
+    e = np.clip(t / 3.0, 0, 1) ** 2 * (1 + 0.5 * np.clip((t - (send_t - 2.5)) / 2.5, 0, 1) ** 2)
+    e *= np.clip(1 - (t - send_t) / 2.2, 0, 1) ** 1.5
     pad.add(0, (hum + air * 1.6 + shimmer * 1.5) * e * 0.4)
-    fx.add(title_t0 - 1.2, reverse_swell(1.2, 0.9))
 
     # 2. 铺底和弦：每小节一个，按段落能量调亮度和音量
     for b, c in enumerate(plan):
@@ -537,11 +537,11 @@ def compose(ev, out_wav, stems_dir=None):
         t0 = b * BAR
         nm = sec(t0 + 0.1)
         en = energy(t0 + 0.1)
-        if nm in ('cold', 'title', 'end'):
+        if nm in ('chat', 'end'):
             continue
         notes, _ = CH[c]
         tones = sorted(set([m + 12 for m in notes] + [m + 24 for m in notes[:3]]))
-        sixteenth = nm in ('layers1', 'loop1', 'layersK', 'loop2')
+        sixteenth = nm in ('fly', 'layers1', 'loop1', 'layersK', 'loop2')
         step = BEAT / 4 if sixteenth else BEAT / 2
         steps = int(round(BAR / step))
         pattern = list(range(len(tones))) + list(range(len(tones) - 2, 0, -1))
@@ -590,7 +590,7 @@ def compose(ev, out_wav, stems_dir=None):
     for b, c in enumerate(plan):
         t0 = b * BAR
         nm = sec(t0 + 0.1)
-        kind = {'cold': 'none', 'title': 'none', 'tokenize': 'none', 'embed': 'heart', 'layers1': 'groove', 'dissect': 'half',
+        kind = {'chat': 'none', 'fly': 'heart', 'land': 'none', 'embed': 'heart', 'layers1': 'groove', 'dissect': 'half',
                 'sample1': 'heart', 'loop1': 'groove', 'layersK': 'four', 'sampleK': 'heart', 'loop2': 'full', 'end': 'none'}[nm]
         sname, k_in, nb_in = binfo[b]
         if nm == 'dissect' and (k_in < 2 or k_in == nb_in - 1):
@@ -602,7 +602,7 @@ def compose(ev, out_wav, stems_dir=None):
         if (sname in ('embed', 'layersK') and k_in == nb_in - 1) or (sname == 'loop2' and k_in == 4):
             for k in range(16):
                 drums.add(t0 + k * BEAT / 4, snare(0.15 + 0.5 * k / 16, clap=False), pan=0.05)
-        if c and nm not in ('cold', 'title', 'tokenize', 'end'):
+        if c and nm not in ('chat', 'land', 'end'):
             _, root = CH[c]
             if kind in ('groove', 'four', 'full'):
                 for k in range(8):
@@ -642,6 +642,13 @@ def compose(ev, out_wav, stems_dir=None):
         elif ty == 'whoosh':
             fx.add(t - 0.3, whoosh(1.6, 0.6 * k))
             fx.add(t - 2.5, riser(2.5, 0.35))
+        elif ty == 'send':
+            fx.add(t - 0.12, whoosh(0.9, 0.45, up=True))
+            fx.add(t, impact(0.35, 2.0))
+            bells.add(t, bell(74, 2.6, 0.38))
+            bells.add(t + 0.06, bell(81, 2.2, 0.2), pan=0.2)
+        elif ty == 'rise':
+            fx.add(t, riser(e.get('d', 2.0), 0.45))
         elif ty == 'open':
             fx.add(t, mech_open(0.6))
             fx.add(t + 0.2, whoosh(2.0, 0.35, up=False))
@@ -687,7 +694,7 @@ def compose(ev, out_wav, stems_dir=None):
         bus.x *= duck
 
     # 段落音量：冷开场、拆层段落更安静，28 层和最后的自回归最满
-    LEVEL = {'cold': 0.75, 'title': 0.8, 'tokenize': 0.72, 'embed': 0.78, 'layers1': 1.0, 'dissect': 0.8, 'sample1': 0.76,
+    LEVEL = {'chat': 0.7, 'fly': 0.95, 'land': 0.78, 'embed': 0.78, 'layers1': 1.0, 'dissect': 0.8, 'sample1': 0.76,
              'loop1': 0.9, 'layersK': 1.0, 'sampleK': 0.74, 'loop2': 1.0, 'end': 0.7}
     lvl = np.ones(pad.n)
     for s_ in sections:

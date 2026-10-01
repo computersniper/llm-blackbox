@@ -9,6 +9,7 @@ import { FilmEngine, THREE } from './lib/engine.js';
 import { path, blendCam, orbit, handheld, clamp, lerp, seg, smooth, smoother, easeOut, easeIn, easeInOut, v3, pchip } from './lib/cam.js';
 import { el, vis, CueLayer } from './lib/overlay.js';
 import { buildScore } from './score.js';
+import { Opening } from './lib/opening.js';
 import { loadManifest, loadQuestion, loadThumbs } from '/public/js/data.js';
 import { viewOf } from '/public/js/timeline.js';
 import { label } from '/public/js/stage/engine.js';
@@ -21,7 +22,7 @@ const QID = params.get('q') || 'q01';
 const PREVIEW = params.has('preview');
 const $ = (s) => document.querySelector(s);
 
-let E, M, Q, MAN, SC;
+let E, M, Q, MAN, SC, OPENING;
 const extras = {};
 const EVENTS = []; // 给配乐 / 音效用的事件（时间点），渲染脚本会把它导出成 events.json
 
@@ -80,6 +81,7 @@ async function boot() {
   tameScene();
   buildExtras();
   buildOverlays();
+  OPENING = new Opening({ E, M, Q, ov: $('#ov'), T: SC.open });
   window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
   if (PREVIEW) startPreview();
 }
@@ -519,6 +521,8 @@ function renderAt(t, { render = true } = {}) {
     for (const o of [M.exAdd1, M.exAdd2, M.exRing1, M.exRing2, M.exUnit]) o.visible = !hide.has('exDeco');
     if (f.lensWin != null && f.st.step.L != null) M.slabs.forEach((sl, L) => { if (L < f.st.step.L - f.lensWin || L > f.st.step.L) sl.lbl.visible = false; });
     if (f.slabDim) M.slabs.forEach((sl) => { sl.material.opacity *= 1 - f.slabDim; sl.edge.material.opacity *= 1 - f.slabDim; sl.lbl.visible = false; });
+    // 开场：对话框、飞行的词元、托盘上方块的落下时间
+    OPENING.update(t, SC.open.camAt);
     // 神经元阵列点亮的先后顺序原来用 Math.random：换成确定的哈希
     if (M.detail.panelKey && M.detail.panelKey !== lastPanel) {
       lastPanel = M.detail.panelKey;

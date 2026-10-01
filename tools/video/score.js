@@ -15,7 +15,7 @@ const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
 
 // 段落：名字、小节数、能量（配乐用）
 const PLAN = [
-  ['cold', 5, 0.12], ['title', 3, 0.35], ['tokenize', 5, 0.45], ['embed', 3, 0.5], ['layers1', 10, 0.78],
+  ['chat', 4, 0.1], ['fly', 3, 0.55], ['land', 3, 0.4], ['embed', 3, 0.5], ['layers1', 10, 0.78],
   ['dissect', 35, 0.55], ['sample1', 6, 0.6], ['loop1', 6, 0.72], ['layersK', 6, 0.85], ['sampleK', 4, 0.7],
   ['loop2', 7, 0.9], ['end', 6, 0.22],
 ];
@@ -68,6 +68,7 @@ export function buildScore(Q) {
 
   const shots = [];
   const shot = (name, fn) => shots.push({ name, t0: SEC[name].t0, t1: SEC[name].t1, fn });
+  const shotSpan = (name, t0, t1, fn) => shots.push({ name, t0, t1, fn });
   const endCam = new Map(); // 每个镜头（及镜头内每个小段）最后一帧的机位：下一段从这里平滑接过去
   const prevCam = (name, fallback) => endCam.get(name) || fallback;
 
@@ -84,72 +85,70 @@ export function buildScore(Q) {
   const hm0 = Q.headMMAt(G0);
   const X = (M, i) => M.x(i);
 
-  /* ------------------------------------------------------------ 冷开场 */
-  const qTimes = user.map((_, k) => B(0, 3) + k * BEAT);
-  qTimes.forEach((t, i) => ev(t, 'type', { i }));
-  sub(B(2, 3), B(3, 3) + 0.2, '你问它一个问题。');
-  sub(B(3, 3) + 0.4, B(5) - 0.15, '在它开口之前，黑箱里发生了什么？');
-  const coldCam = path([{ t: 0, p: [-15, 3.0, 74], l: [0, 5.8, 0], fov: 30 }, { t: B(5), p: [-9, 4.0, 58], l: [0, 5.9, 0], fov: 30 }]);
-  shot('cold', (lt, t) => ({
-    st: mst(1, 0, { ph: 'pass' }, 0.04 + 0.42 * smooth(seg(t, 9.5, 12.4))),
-    cam: () => coldCam(t),
-    dof: { focus: 14, range: 18, blur: 9 * (1 - smooth(seg(t, 10.5, 12.5))) },
-    fade: t < 4.5 ? lerp(1, 0.62, smooth(seg(t, 0.4, 4.5))) : lerp(0.62, 0.35, seg(t, 4.5, 12.4)),
-    ov: { band: 0.5, qline: smooth(seg(t, qTimes[0] - 0.6, qTimes[0])) * (1 - smooth(seg(t, 11.5, 12.35))), qScale: 1 + 0.05 * smooth(seg(t, 11.5, 12.35)), qBlur: 7 * smooth(seg(t, 11.5, 12.35)) },
-  }));
-
-  /* ------------------------------------------------------------ 片名 */
-  ev(SEC.title.t0, 'hit', { k: 1 });
-  const titleCam = (lt) => {
-    const k = smooth(lt / 7.5);
-    const yaw = THREE.MathUtils.degToRad(lerp(-34, -13, k)), R = lerp(50, 45, k), h = lerp(2.4, 3.8, k);
-    const look = v3(0, 5.6, 0);
-    return { pos: look.clone().add(v3(R * Math.sin(yaw), h - 5.6, R * Math.cos(yaw))), look, fov: 32 };
+  /* ------------------------------------------------------------ 开场：对话框 → 发送 → 词元飞进黑箱 → 落进托盘（一个连续镜头） */
+  const OPEN = {
+    popT: user.map((_, k) => B(0, 2) + k * BEAT), // 问题一个词元一个词元点进输入框
+    sendT: B(3),                                   // 按下发送（小节线上）
+    lift: 26,                                      // 发送后词元块升起的像素
+    depth: 7,                                      // 交给 3D 方块时离镜头的距离
+    boxOpen0: B(5, 2) + 0.55, boxOpen1: B(6, 2) + 0.05,
+    landStart0: B(6, 2) - 0.05, landGap: 0.08,     // 6 个词元开始离开编队、落向托盘
+    dropD: 0.45,
+    landAt: {},
+    end: SEC.land.t1,
   };
-  shot('title', (lt) => ({
-    st: mst(1, 0, { ph: 'pass' }, 0.04),
-    cam: () => titleCam(lt),
-    fade: 0.38 * (1 - smooth(seg(lt, 0, 0.6))) + 0.25,
-    ov: { band: 0, title: smooth(seg(lt, 0.1, 1.0)) * (1 - smooth(seg(lt, 6.3, 7.3))), titleK: seg(lt, 0.05, 3.4), titleBlur: 7 * smooth(seg(lt, 6.3, 7.3)) },
-    dof: { focus: 20, range: 30, blur: 3 },
-  }));
-
-  /* ------------------------------------------------------------ 01 揭开 + 分词 */
-  {
-    const T0 = SEC.tokenize.t0, T1 = SEC.tokenize.t1;
-    chapter(T0 + 0.3, T1 - 0.2, '01', '分词', 'TOKENIZE');
-    ev(T0, 'open');
-    ev(T0 + BAR, 'whoosh', { k: 0.6 });
-    var dropT0 = T0 + 3.0, dropD = 4.0;
-    var landT = (i) => dropT0 + dropD * ((i / Q.P) * 0.7 + 0.3);
-    for (let i = 0; i < Q.P; i++) ev(landT(i), 'tick', { i, k: Q.tokens[i].role === 'user' ? 1 : 0.45 });
-    sub(T0 + 0.4, T0 + 2.4, '第一步：分词。');
-    sub(dropT0, landT(Q.P - 1) - 0.3, `系统提示、你的问题和几个特殊标记，拼成 ${m(Q.P)} 个词元。`);
-    sub(landT(Q.P - 1) + 0.1, T1 - 0.2, `模型看到的不是文字，是编号：${q(user[3].s)} = ${m(user[3].id)}。`);
-    strip(landT(Q.P - 1) + 0.1, T1 - 0.2, user.map((t) => `<span class="tk">${tk(t.s)}</span> ${m(t.id)}`).join('<span class="sep"></span>'));
-    var tokCamKeys = (M) => {
-      const tr = (i) => ({ p: [X(M, i) - 3.0, 1.75, 4.4], l: [X(M, i) + 0.9, 0.22, 0] });
-      const uc = (X(M, user[0].i) + X(M, user[user.length - 1].i)) / 2;
-      return [
-        { t: 2.5, ...tr(0), fov: 30 },
-        { t: landT(0) - T0 - 0.1, ...tr(0), fov: 30 },
-        { t: landT(19) - T0, ...tr(19), fov: 30 },
-        { t: landT(38) - T0, ...tr(38), fov: 30 },
-        { t: 7.6, p: [uc - 1.5, 1.85, 4.9], l: [uc + 0.25, 0.2, 0], fov: 30 },
-        { t: 12.5, p: [uc - 0.9, 1.45, 3.9], l: [uc + 0.25, 0.18, 0], fov: 30 },
-      ];
-    };
-    let tokPath = null, openPath = null;
-    shot('tokenize', (lt, t, { M }) => ({
-      st: mst(2, 0, { ph: 'read' }, seg(t, dropT0, dropT0 + dropD), { dAnim: lerp(1, 2.6, smoother(seg(lt, 0, 2.4))) }),
-      cam: () => {
-        // 前 2.5 秒看机箱打开；卡在小节线上硬切到托盘的低机位跟拍
-        if (lt < 2.5) { const T = titleCam(7.5); openPath ||= path([{ t: 0, p: T.pos.toArray(), l: T.look.toArray(), fov: 32 }, { t: 2.5, p: [-6.5, 7.8, 39], l: [-1.0, 4.6, 0], fov: 32 }]); return openPath(lt); }
-        tokPath ||= path(tokCamKeys(M)); return tokPath(lt);
-      },
-      extras: { ids: smooth(seg(t, landT(0), landT(0) + 0.5)), idsFocus: t > landT(Q.P - 1) + 0.1 },
-    }));
+  OPEN.liftT0 = OPEN.sendT + 0.1;
+  OPEN.swapT = OPEN.sendT + 0.75;
+  OPEN.uiOut0 = OPEN.swapT - 0.05; // 交接完成后，镜头穿过界面
+  OPEN.uiOut1 = OPEN.swapT + 0.9;
+  user.forEach((u, k) => { OPEN.landAt[u.i] = SEC.land.t0 + k * OPEN.landGap; });
+  // 聊天模板的其余词元：以问题为中心，一圈圈往两边落下来
+  const uFirst = user[0].i, uLast = user[user.length - 1].i;
+  for (let i = 0; i < Q.P; i++) {
+    if (OPEN.landAt[i] != null) continue;
+    const r = i < uFirst ? uFirst - i : i - uLast;
+    OPEN.landAt[i] = SEC.land.t0 + 0.5 + 0.065 * r + OPEN.dropD;
   }
+  // 镜头：从屏幕前一路飞到黑箱跟前，越过倒下的前面板，降到托盘上；再稍微拉开看模板把问题包起来
+  const camOpen = path([
+    { t: 0, p: [0, 5.8, 124], l: [0, 5.8, 0], fov: 32 },
+    { t: OPEN.sendT + 0.1, p: [0, 5.8, 124], l: [0, 5.8, 0], fov: 32 },
+    { t: OPEN.swapT, p: [0, 5.9, 120], l: [0, 5.8, 0], fov: 32 },
+    { t: SEC.fly.t0, p: [-1.0, 6.3, 97], l: [-1.5, 5.6, 0], fov: 32 },
+    { t: SEC.fly.t0 + 2.5, p: [-3.0, 6.6, 62], l: [-4.0, 4.8, 0], fov: 32 },
+    { t: SEC.fly.t0 + 4.5, p: [-4.6, 5.9, 33], l: [-5.0, 3.0, 0], fov: 32 },
+    { t: SEC.fly.t0 + 5.8, p: [-5.0, 4.3, 16], l: [-5.0, 1.3, 0], fov: 32 },
+    { t: SEC.fly.t0 + 6.9, p: [-5.3, 2.6, 8.0], l: [-5.0, 0.35, 0], fov: 32 },
+    { t: SEC.land.t0 + 0.1, p: [-5.6, 2.0, 5.6], l: [-5.0, 0.25, 0], fov: 32 },
+    { t: SEC.land.t0 + 2.1, p: [-8.2, 3.6, 11.5], l: [-7.5, 0.4, 0], fov: 32 },
+    { t: SEC.land.t0 + 4.5, p: [-6.6, 2.3, 7.0], l: [-5.6, 0.3, 0], fov: 32 },
+    { t: SEC.land.t1, p: [-5.9, 1.8, 5.2], l: [-5.1, 0.22, 0], fov: 32 },
+  ]);
+  OPEN.camAt = camOpen;
+  OPEN.popT.forEach((t, i) => ev(t, 'type', { i }));
+  ev(OPEN.sendT, 'send');
+  ev(OPEN.swapT, 'whoosh', { k: 0.8 });
+  ev(SEC.fly.t0, 'hit', { k: 1 });
+  ev(OPEN.boxOpen0 - 2.0, 'rise', { d: 2.0 });
+  ev(OPEN.boxOpen0, 'open');
+  for (let i = 0; i < Q.P; i++) ev(OPEN.landAt[i], 'tick', { i, k: i >= uFirst && i <= uLast ? 1 : 0.4 });
+  sub(OPEN.popT[OPEN.popT.length - 1] + 0.35, OPEN.sendT - 0.2, '你问它一个问题。');
+  sub(OPEN.boxOpen0 + 0.1, SEC.land.t0 - 0.2, '按下发送：问题已经被切成了词元。');
+  sub(SEC.land.t0 + 0.3, SEC.land.t0 + 3.3, '聊天模板给问题包上系统提示和特殊标记。');
+  sub(SEC.land.t0 + 3.5, SEC.land.t1 - 0.2, `一共 ${m(Q.P)} 个词元。模型看到的不是字，是编号：${q(user[3].s)} = ${m(user[3].id)}。`);
+  strip(SEC.land.t0 + 3.5, SEC.land.t1 - 0.2, user.map((t) => `<span class="tk">${tk(t.s)}</span> ${m(t.id)}`).join('<span class="sep"></span>'));
+  chapter(OPEN.boxOpen0 + 0.1, SEC.land.t1 - 0.2, '01', '分词', 'TOKENIZE');
+  shotSpan('opening', 0, SEC.land.t1, (lt, t) => {
+    const opened = t >= OPEN.boxOpen0;
+    const ft = t - SEC.fly.t0; // 片名在飞行途中出现
+    return {
+      st: opened ? mst(2, 0, { ph: 'read' }, 1, { dAnim: lerp(1, 2.6, smoother(seg(t, OPEN.boxOpen0, OPEN.boxOpen1))) }) : mst(1, 0, { ph: 'pass' }, 0.04),
+      cam: () => camOpen(t),
+      fade: 1 - smooth(seg(t, OPEN.sendT + 0.3, OPEN.sendT + 1.5)),
+      extras: { ids: smooth(seg(t, SEC.land.t0 + 3.3, SEC.land.t0 + 3.9)), idsFocus: true },
+      ov: { band: t < OPEN.sendT ? 0.35 : 1, title: smooth(seg(ft, 0.1, 0.9)) * (1 - smooth(seg(ft, 3.4, 4.3))), titleK: seg(ft, 0.05, 3.0), titleBlur: 7 * smooth(seg(ft, 3.4, 4.3)) },
+    };
+  });
 
   /* ------------------------------------------------------------ 02 嵌入 */
   {
@@ -162,11 +161,10 @@ export function buildScore(Q) {
     strip(T0 + 0.6, T1 - 0.2, `嵌入表 ${m('151,936 × 1,024')}<span class="sep"></span>${m('155,582,464')} 个参数<span class="sep"></span>${q(user[0].s)}在第 ${m(user[0].id)} 行`);
     let embPath = null;
     shot('embed', (lt, t, { M }) => {
-      const keys = tokCamKeys(M);
-      const last = keys[keys.length - 1];
+      const last = camOpen(SEC.land.t1);
       const uc = (X(M, user[0].i) + X(M, user[user.length - 1].i)) / 2;
       embPath ||= path([
-        { t: 0, p: last.p, l: last.l, fov: 30 },
+        { t: 0, p: last.pos.toArray(), l: last.look.toArray(), fov: 32 },
         { t: 2.2, p: [uc + 0.6, 3.9, 6.6], l: [uc - 0.2, 2.6, -1.0], fov: 32 },   // 先贴近墙上问题那几行
         { t: 3.6, p: [uc + 0.4, 3.7, 7.6], l: [uc - 0.3, 2.3, -0.8], fov: 32 },
         { t: 7.5, p: [-7.6, 4.9, 19.4], l: [-8.1, 4.5, -0.6], fov: 32 },          // 再拉开：光柱从托盘长起来
@@ -653,5 +651,5 @@ export function buildScore(Q) {
     return r;
   }
 
-  return { end, frame, subs, strips, chapters, cards, events, sections, qTimes, statLine, bpm: BPM, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
+  return { end, frame, subs, strips, chapters, cards, events, sections, open: OPEN, statLine, bpm: BPM, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
 }
