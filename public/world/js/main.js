@@ -297,6 +297,8 @@ async function setChapter(ch) {
   $$('#chap button').forEach((b) => { const on = b.dataset.ch === ch; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
   stage.exitFree();
   tip.classList.remove('on');
+  $('#code').hidden = ch === 'probe';
+  $('#dbgSub').textContent = ch === 'probe' ? 'probe()' : 'world_model()';
   if (ch === 'wm') {
     $('#probeHost').hidden = true;
     lastView = '';
@@ -308,6 +310,7 @@ async function setChapter(ch) {
   $('#board').hidden = true;
   document.body.classList.remove('has-board');
   $('#probeHost').hidden = false;
+  $('#watch').innerHTML = '';
   renderProbeChrome();
   if (!probeTried) {
     probeTried = true;
@@ -340,7 +343,6 @@ function renderProbeChrome() {
   $('#dname').innerHTML = `第 ${probeL} 层<small>DEPTH ${probeL} / ${probeApi ? probeMax() : '—'}</small>`;
   $('#btnIn').disabled = !probeApi || probeL >= probeMax();
   $('#btnOut').disabled = !probeApi || probeL <= 1;
-  if (!probeApi) { $('#code').hidden = true; $('#watch').innerHTML = ''; }
 }
 
 /* ---------------------------------------------------------------- 知识碎片 */

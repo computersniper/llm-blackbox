@@ -78,7 +78,7 @@ export class PlayView {
       env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">逐像素的差</span>真实画面和梦里那一帧每个像素差了多少，越亮差得越多。<br>均方误差 <span class="v">${fmtMSE(F.mse)}</span>` });
     }
     this.chart(g, this.CH, env);
-    this.equalizer(g, this.EQ, env);
+    this.equalizer(g, this.EQ, env, st);
   }
 
   screen(g, r, pix, title, sub, accent, env, chip = '') {
@@ -180,12 +180,13 @@ export class PlayView {
   }
 
   // 32 根柱子：梦此刻的 z（按 KL 从大到小排，KL≈0 的维度模型没用上）。白色小刻度是真实画面编码出来的 z
-  equalizer(g, r, env) {
+  equalizer(g, r, env, st) {
     const { sim, meta } = this.app;
     const pt = this.portrait;
     const F = sim.cur;
     const order = dimOrder(meta);
-    const enc = sim.encOf(F).mu;
+    // 白色刻度要把真实画面再编码一次：闭眼播放时省掉（睁眼时本来就要编码）
+    const enc = sim.mode === 'open' || !st.playing || F.enc ? sim.encOf(F).mu : null;
     text(g, '梦此刻的 z：32 个数', r.x, r.y + 2, { size: pt ? 12 : 14, kind: 'serif', weight: 600 });
     text(g, pt ? '拖动柱子改梦（会自动闭眼）' : '拖动柱子改梦里的画面（会自动闭眼）· 白色刻度 = 真实画面编码出来的 z · 按“用得多不多”（KL）排序', r.x + (pt ? 128 : 160), r.y + 2, { size: pt ? 9 : 10.5, color: COL.dim, max: r.w - (pt ? 128 : 160) });
     const top = r.y + 14, bh = r.h - (pt ? 34 : 40);
@@ -209,14 +210,16 @@ export class PlayView {
       g.fillStyle = !used ? 'rgba(122,133,158,0.35)' : sim.mode === 'closed' ? hexA(COL.amber, 0.75) : hexA(COL.violet, 0.75);
       g.fillRect(x + 2, Math.min(mid, yv), bw - 4, Math.max(1, Math.abs(yv - mid)));
       // 真实画面的编码
-      const ye = Yv(enc[d]);
-      g.fillStyle = 'rgba(233,239,249,0.85)';
-      g.fillRect(x, ye - 0.75, bw, 1.5);
+      if (enc) {
+        const ye = Yv(enc[d]);
+        g.fillStyle = 'rgba(233,239,249,0.85)';
+        g.fillRect(x, ye - 0.75, bw, 1.5);
+      }
       text(g, `${d}`, x + bw / 2, top + bh + (pt ? 9 : 11), { size: pt ? 7 : 9, kind: 'mono', color: used ? COL.dim : COL.faint, align: 'center' });
       if (!pt && used && k < 12) text(g, dimShort(meta, d), x + bw / 2, top + bh + 24, { size: 9.5, color: COL.ink2, align: 'center', max: bw + gap });
       env.hit(x, top, bw, bh, {
         dim: d,
-        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${used ? `扫一遍：${dimMeaning(meta, d)}` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${enc[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`,
+        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${used ? `扫一遍：${dimMeaning(meta, d)}` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${sim.encOf(F).mu[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`,
         drag: (wx, wy, phase) => {
           if (phase === 'start') { this.drag = { d }; this.app.dragStart?.(); }
           if (phase === 'end') { this.drag = null; this.app.dragEnd?.(); return; }

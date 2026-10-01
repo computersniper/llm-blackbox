@@ -50,7 +50,8 @@ body:not(.w-play) .play-ui, body:not(.w-play) .pad, body.w-probe .play-ui, body.
 
 .probe-host { position: absolute; z-index: 3; top: 64px; left: 14px; right: calc(var(--dbg-w) + 28px); bottom: 104px; }
 body.dbg-folded .probe-host { right: 14px; }
-body.w-probe .gl, body.w-probe .ctl-play, body.w-probe .ctl-speed, body.w-probe .ctl-pos, body.w-probe .ctl-track, body.w-probe #btnFollow { visibility: hidden; }
+body.w-probe .gl, body.w-probe #btnFollow { visibility: hidden; }
+body.w-probe .ctl-play, body.w-probe .ctl-speed, body.w-probe .ctl-pos, body.w-probe .ctl-track { display: none; }
 body.w-probe .ctl-depth { border-right: 0; padding-right: 0; }
 .probe-soon { height: 100%; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 24px; text-align: center; border-radius: 16px; border: 1px dashed var(--line2); background: rgba(5, 11, 23, .7); }
 .probe-soon h2 { margin: 2px 0 6px; font-family: var(--serif); font-weight: 900; font-size: 26px; letter-spacing: .04em; color: var(--ink); }
@@ -59,12 +60,11 @@ body.w-probe .ctl-depth { border-right: 0; padding-right: 0; }
 
 /* ---------------- 提示、算式板 ---------------- */
 
-.w-app .stage-hint { top: 112px; bottom: auto; }
-#toasts { left: 16px; right: auto; top: auto; bottom: 120px; flex-direction: column-reverse; }
+.w-app .stage-hint { top: auto; bottom: 120px; }
+#toasts { left: auto; right: calc(var(--dbg-w) + 40px); top: calc(var(--top) + 58px); bottom: auto; width: min(320px, calc(100vw - 36px)); flex-direction: column; }
+body.dbg-folded #toasts { right: 18px; }
 .toast { padding: 9px 12px; }
 .toast .t-text { display: none; }
-@keyframes toastin { from { opacity: 0; transform: translateX(-40px) scale(.96); } }
-@keyframes toastout { to { opacity: 0; transform: translateX(-40px); } }
 .w-app .board { bottom: 104px; max-height: min(400px, calc(100% - 360px)); }
 body.has-board .pad { display: none; }
 .board .bd-big { font-size: 13.5px; }
@@ -93,7 +93,7 @@ body.has-board .pad { display: none; }
   .w-app .dbg { bottom: 100px; }
   .w-app .dbg.folded { bottom: 100px; }
   .w-app .stage-hint { bottom: 170px; top: auto; }
-  #toasts { left: 10px; right: 10px; width: auto; bottom: 160px; }
+  #toasts { left: 10px; right: 10px; width: auto; top: auto; bottom: 200px; }
   .w-app .board { top: 52px; bottom: auto; max-height: min(42vh, 340px); }
 }
 @media (max-width: 560px) {

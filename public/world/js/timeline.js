@@ -21,7 +21,7 @@ export const MAC_OPS = new Set(['e1', 'e2', 'e3', 'e4', 'mu', 'dfc', 'd1', 'd2',
 export const MICROS = ['pick', 'mul', 'sum', 'act'];
 
 const DUR = {
-  frame: 1 / 12,
+  frame: 1 / 20,          // D1：1× 是每秒 20 帧
   obs: 1.0, enc: 1.5, rnn: 1.8, sample: 1.3, dec: 1.5, cmp: 1.4, reset: 1.6,
   op: 1.4, z: 1.8, cell: 1.6, hid: 1.4, mdn: 2.0, done: 1.4, cat: 1.4, pick: 1.5, draw: 1.5,
   mi: { pick: 1.2, mul: 2.6, sum: 1.7, act: 1.3 },
