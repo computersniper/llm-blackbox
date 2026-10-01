@@ -1,0 +1,72 @@
+{
+  "note": "代码在 public/learn/snippets/ 里，页面按文件名取来显示。output 是在本机原样运行（只把模型名换成本地权重目录）得到的真实输出；links 是代码里会下载 / 克隆的地址，tools/learn/check_links.py 会一起检查。",
+  "tested": "本机实测：WSL2 · Python 3.12 · torch 2.11 · 只用 CPU。四个 Qwen3 片段在 transformers 5.17 和 4.51.3 上各跑通一遍（下面的输出来自 5.17；4.51 默认用 fp32，概率在小数点后第二位会有出入）。",
+  "items": [
+    {
+      "id": "next-token", "no": "①", "title": "下一个词元的前 5 名",
+      "goal": "把问题套上聊天模板、切成词元，跑一次前向，看模型给“下一个词元”的前 5 名候选和概率。",
+      "env": ["CPU 可跑", "约 1.5 GB 权重", "pip install torch \"transformers>=4.51\""],
+      "time": "CPU 上约 30–50 秒（大部分是载入权重）",
+      "files": [{ "path": "snippets/01_next_token.py", "lang": "python" }],
+      "output": "39 个词元： ['<|im_start|>', 'system', '\\n', '你', '是一个', '乐', '于', '助', '人的', '助手', '，请', '用', '一', '两', '句话', '简洁', '地', '回答', '。', '<|im_end|>', '\\n', '<|im_start|>', 'user', '\\n', '天空', '为什么', '是', '蓝色', '的', '？', '<|im_end|>', '\\n', '<|im_start|>', 'assistant', '\\n', '<think>', '\\n\\n', '</think>', '\\n\\n']\n        '天空'   98.86%\n        '因为'    0.59%\n        '蓝天'    0.31%\n         '天'    0.10%\n        '蓝色'    0.03%",
+      "explain": "非思考模式下，聊天模板会自动补上一对空的 <think></think>。推理页导出的同一个问题，第一步前 5 名也是“天空 98.6%、因为 0.75%、蓝天 0.36%、天、蓝色”：小数点后的差别是不同硬件上的数值误差（推理页在 GPU 上导出，这里用 CPU）。",
+      "site": { "label": "推理 · D2 结构 · 输出头", "href": "../" },
+      "links": ["https://huggingface.co/Qwen/Qwen3-0.6B", "https://modelscope.cn/models/Qwen/Qwen3-0.6B"]
+    },
+    {
+      "id": "sample-loop", "no": "②", "title": "自己写一个生成循环",
+      "goal": "不用 model.generate()：温度 → top-k → top-p → 掷骰子，抽中的词元接回去，靠 KV 缓存每步只算一个新位置。",
+      "env": ["CPU 可跑", "同一份权重"],
+      "time": "CPU 上约 30–45 秒",
+      "files": [{ "path": "snippets/02_sample_loop.py", "lang": "python" }],
+      "output": "我是一个AI助手，致力于帮助用户解决问题和提供支持。",
+      "explain": "固定了随机种子，所以每次结果一样；把 torch.manual_seed(0) 改成别的数，或者调高 T，就能看到同一个问题换一种说法。模型抽到 <|im_end|> 时自己停下。",
+      "site": { "label": "推理 · D2 结构 · 采样", "href": "../" },
+      "links": []
+    },
+    {
+      "id": "attention", "no": "③", "title": "看注意力落在哪",
+      "goal": "取出 28 层的注意力权重，看句子最后一个词元在不同的层里把注意力分给了谁。",
+      "env": ["CPU 可跑", "同一份权重"],
+      "time": "CPU 上约 30–60 秒",
+      "files": [{ "path": "snippets/03_attention.py", "lang": "python" }],
+      "output": "下一个词元的前 3 名： ['老鼠', '谁', '哪']\n第  0 层  [0]'今天' 0.02 | '指的是' 0.55  '它' 0.10  '。' 0.10\n第  3 层  [0]'今天' 0.70 | '指的是' 0.09  '。' 0.05  '它' 0.03\n第  6 层  [0]'今天' 0.48 | '指的是' 0.16  '。' 0.14  '，' 0.07\n第  9 层  [0]'今天' 0.56 | '指的是' 0.21  '。' 0.07  '因为它' 0.06\n第 12 层  [0]'今天' 0.56 | '。' 0.12  '，' 0.07  '指的是' 0.06\n第 15 层  [0]'今天' 0.60 | '指的是' 0.12  '它' 0.08  '。' 0.06\n第 18 层  [0]'今天' 0.65 | '指的是' 0.14  '它' 0.05  '。' 0.04\n第 21 层  [0]'今天' 0.78 | '指的是' 0.06  '老鼠' 0.04  '猫' 0.02\n第 24 层  [0]'今天' 0.76 | '指的是' 0.08  '老鼠' 0.07  '，' 0.01\n第 27 层  [0]'今天' 0.77 | '指的是' 0.16  '。' 0.02  '它' 0.01",
+      "explain": "从第 3 层起，一大半注意力都“停”在第一个词元“今天”上（注意力汇聚）。6 亿参数的模型在这里答错了：它认为“它”指老鼠，第 21、24 层的注意力也恰好落在“老鼠”上。看注意力能找到线索，但不等于看懂了推理。",
+      "site": { "label": "推理 · D5 算子（注意力）", "href": "../" },
+      "links": []
+    },
+    {
+      "id": "logit-lens", "no": "④", "title": "逻辑透镜：答案在第几层成形",
+      "goal": "把每一层的中间结果直接接到最终 RMSNorm 和输出头上，读出模型“此刻会说什么”。",
+      "env": ["CPU 可跑", "同一份权重"],
+      "time": "CPU 上约 30–60 秒",
+      "files": [{ "path": "snippets/04_logit_lens.py", "lang": "python" }],
+      "output": "嵌入          '都是'  100.0%\n第  0 层    '-present'    8.3%\n第  1 层      'ystems'   40.3%\n第  2 层      'ystems'   52.2%\n第  3 层      'ystems'   15.9%\n第  4 层          '创新'    9.3%\n第  5 层           'น'   35.3%\n第  6 层       'other'   12.0%\n第  7 层          '**'   31.7%\n第  8 层           '1'   61.9%\n第  9 层           '1'   75.1%\n第 10 层           '1'   51.1%\n第 11 层           '1'   44.4%\n第 12 层           '1'   47.6%\n第 13 层           '1'   58.0%\n第 14 层           '1'   29.4%\n第 15 层           '\"'   23.9%\n第 16 层           '\"'   19.4%\n第 17 层        '____'   59.1%\n第 18 层        '____'   66.5%\n第 19 层        '____'   81.6%\n第 20 层        '____'   84.7%\n第 21 层          '日本'   56.7%\n第 22 层          '东京'   37.0%\n第 23 层          '东京'   73.0%\n第 24 层          '东京'   91.2%\n第 25 层          '东京'   97.2%\n第 26 层          '东京'   94.0%\n第 27 层          '东京'   90.4%",
+      "explain": "前 20 层读出来几乎是乱码，第 21 层先冒出“日本”，第 22 层改口成“东京”，之后越来越确定。答案是一层层长出来的，推理页的 D3 层塔展示的就是这种读数。",
+      "site": { "label": "推理 · D3 层塔（逻辑透镜）", "href": "../" },
+      "links": []
+    },
+    {
+      "id": "nanogpt", "no": "⑤", "title": "用 nanoGPT 在 CPU 上训练一个小 GPT",
+      "goal": "按 nanoGPT README 里给 CPU 的配方：4 层、80 万参数，在约 1 MB 的莎士比亚文本上逐字符训练 2000 步，再让它续写。",
+      "env": ["CPU 可跑", "约 1 MB 数据", "pip install torch numpy requests tiktoken"],
+      "time": "本机 CPU 训练 63 秒（README 写的是约 3 分钟）",
+      "files": [{ "path": "snippets/05_nanogpt_shakespeare.sh", "lang": "bash" }],
+      "output": "step 2000: train loss 1.7648, val loss 1.8857\n…\n\nI by done what leave death,\nAnd aproposely beef the are and sors blate though wat our fort\nThine the aftior than whating bods farse dowed\nAnd nears and thou stand murs's consel.\n\nMEOF:\nSir, should and then thee.",
+      "explain": "验证损失 1.89，和 README 说的 1.88 基本一致。单词还拼不对，但已经学会了剧本的格式：人名大写加冒号、换行、标点。sample.py 默认写 10 段，这里节选一段的开头。",
+      "site": { "label": "训练 · 唐宋诗小模型", "href": "../train/" },
+      "links": ["https://github.com/karpathy/nanoGPT", "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt"]
+    },
+    {
+      "id": "tang", "no": "⑥", "title": "换成唐诗：同一套流程，自己的语料",
+      "goal": "把 chinese-poetry 的《全唐诗》前两万首拼成语料，复用莎士比亚的字符级脚本，训练一个会写“五言诗”的小模型。",
+      "env": ["CPU 可跑", "下载约 8 MB", "接着上一段，在 nanoGPT 目录里"],
+      "time": "本机 CPU 共 136 秒（含下载、准备数据、训练 2000 步）",
+      "files": [{ "path": "snippets/06_make_tang.py", "lang": "python" }, { "path": "snippets/06_train_tang.sh", "lang": "bash" }],
+      "output": "20011 首， 1321789 字\nvocab size: 7,236\n…\nstep 2000: train loss 5.5318, val loss 5.7039\n…\n\n春水飄曉日，青雲空照關。開花聲下影，欲作百仙天。山隅芳草樹，高闕照水聲。早暮長沙舞，行長對白雲。",
+      "explain": "字表有 7236 个字，比莎士比亚的 65 个字符难得多，所以同样 2000 步损失还很高；但五个字一顿、逗号句号交替的格式已经学会了。原文是繁体，所以写出来也是繁体。训练页的唐宋诗小模型用的是同一份语料（转成简体、只留绝句和律诗），训了 4000 步。Windows 上先设环境变量 PYTHONUTF8=1，否则读中文文件会报编码错误。",
+      "site": { "label": "训练 · 唐宋诗小模型", "href": "../train/" },
+      "links": ["https://github.com/chinese-poetry/chinese-poetry", "https://raw.githubusercontent.com/chinese-poetry/chinese-poetry/master/%E5%85%A8%E5%94%90%E8%AF%97/poet.tang.0.json"]
+    }
+  ]
+}

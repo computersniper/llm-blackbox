@@ -1,0 +1,881 @@
+{
+ "checked_at": "2026-10-02T04:28:38+08:00",
+ "tool": "tools/learn/check_links.py",
+ "total": 85,
+ "ok": 85,
+ "failed": 0,
+ "results": [
+  {
+   "url": "https://www.bilibili.com/video/BV1xmA2eMEFF",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1xmA2eMEFF/",
+   "title": "【官方双语】大语言模型的简要解释",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://speech.ee.ntu.edu.tw/~hylee/genai/2024-spring.php",
+   "status": 200,
+   "final_url": "https://speech.ee.ntu.edu.tw/~hylee/genai/2024-spring.php",
+   "title": "Introduction to Generative AI 2024 Spring",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://zh.d2l.ai/",
+   "status": 200,
+   "final_url": "https://zh.d2l.ai/",
+   "title": "《动手学深度学习》 — 动手学深度学习 2.0.0 documentation",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:19+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1H44y1t75x",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1H44y1t75x/",
+   "title": "如何读论文【论文精读·1】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://karpathy.ai/zero-to-hero.html",
+   "status": 200,
+   "final_url": "https://karpathy.ai/zero-to-hero.html",
+   "title": "Neural Networks: Zero To Hero",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:19+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/datawhalechina/happy-llm",
+   "status": 200,
+   "final_url": "https://github.com/datawhalechina/happy-llm",
+   "title": "GitHub - datawhalechina/happy-llm: 📚 从零开始构建大模型 · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://huggingface.co/learn/llm-course/zh-CN/chapter1/1",
+   "status": 200,
+   "final_url": "https://huggingface.co/learn/llm-course/zh-CN/chapter1/1",
+   "title": "本章简介 · Hugging Face",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:19+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV13z421U7cs",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV13z421U7cs/",
+   "title": "【官方双语】GPT是什么？直观解释Transformer | 深度学习第5章",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1TZ421j7Ke",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1TZ421j7Ke/",
+   "title": "【官方双语】直观解释注意力机制，Transformer的核心 | 【深度学习第6章】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:21+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=uhNsUCb2fJI",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=uhNsUCb2fJI",
+   "title": "【生成式AI導論 2024】第10講：今日的語言模型是如何做文字接龍的 — 淺談Transformer (已經熟悉 Transformer 的同學可略過本講)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1pu411o7BE",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1pu411o7BE/",
+   "title": "Transformer论文逐段精读【论文精读】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://jalammar.github.io/illustrated-transformer/",
+   "status": 200,
+   "final_url": "https://jalammar.github.io/illustrated-transformer/",
+   "title": "The Illustrated Transformer – Jay Alammar – Visualizing machine learning one concept at a time.",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:20+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/1706.03762",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/1706.03762",
+   "title": "[1706.03762] Attention Is All You Need",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:21+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=kCc8FmEb1nY",
+   "title": "Let's build GPT: from scratch, in code, spelled out.",
+   "content_type": "text/html",
+   "author": "Andrej Karpathy",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:23+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=zduSFxRajkE",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=zduSFxRajkE",
+   "title": "Let's build the GPT Tokenizer",
+   "content_type": "text/html",
+   "author": "Andrej Karpathy",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:23+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://tiktokenizer.vercel.app/",
+   "status": 200,
+   "final_url": "https://tiktokenizer.vercel.app/",
+   "title": "Tiktokenizer",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:21+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://poloclub.github.io/transformer-explainer/",
+   "status": 200,
+   "final_url": "https://poloclub.github.io/transformer-explainer/",
+   "title": "Transformer Explainer: LLM Transformer Model Visually Explained",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:21+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://bbycroft.net/llm",
+   "status": 200,
+   "final_url": "https://bbycroft.net/llm",
+   "title": "LLM Visualization",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/1904.09751",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/1904.09751",
+   "title": "[1904.09751] The Curious Case of Neural Text Degeneration",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2104.09864",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2104.09864",
+   "title": "[2104.09864] RoFormer: Enhanced Transformer with Rotary Position Embedding",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2505.09388",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2505.09388",
+   "title": "[2505.09388] Qwen3 Technical Report",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:22+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus",
+   "status": 200,
+   "final_url": "https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus",
+   "title": "BFloat16: The secret to high performance on Cloud TPUs | Google Cloud Blog",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:23+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1Ux411j7ri",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1Ux411j7ri/",
+   "title": "【官方双语】深度学习之梯度下降法 Part 2 ver 0.9 beta",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:24+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV16x411V7Qg",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV16x411V7Qg/",
+   "title": "【官方双语】深度学习之反向传播算法 上/下 Part 3 ver 0.9 beta",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:24+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=cCpErV7To2o",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=cCpErV7To2o",
+   "title": "【生成式AI導論 2024】第6講：大型語言模型修練史 — 第一階段: 自我學習，累積實力 (熟悉機器學習的同學從 15:00 開始看起即可)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:31+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=Q9cNkUPXUB8",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=Q9cNkUPXUB8",
+   "title": "【生成式AI導論 2024】第7講：大型語言模型修練史 — 第二階段: 名師指點，發揮潛力 (兼談對 ChatGPT 做逆向工程與 LLaMA 時代的開始)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1hd4y187CR",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1hd4y187CR/",
+   "title": "InstructGPT 论文精读【论文精读·48】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://zh.d2l.ai/chapter_optimization/adam.html",
+   "status": 200,
+   "final_url": "https://zh.d2l.ai/chapter_optimization/adam.html",
+   "title": "11.10. Adam算法 — 动手学深度学习 2.0.0 documentation",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:24+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://huggingface.co/blog/rlhf",
+   "status": 200,
+   "final_url": "https://huggingface.co/blog/rlhf",
+   "title": "Illustrating Reinforcement Learning from Human Feedback (RLHF)",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:24+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2203.02155",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2203.02155",
+   "title": "[2203.02155] Training language models to follow instructions with human feedback",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:24+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2305.18290",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2305.18290",
+   "title": "[2305.18290] Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/1711.05101",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/1711.05101",
+   "title": "[1711.05101] Decoupled Weight Decay Regularization",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/karpathy/nanoGPT",
+   "status": 200,
+   "final_url": "https://github.com/karpathy/nanoGPT",
+   "title": "GitHub - karpathy/nanoGPT: The simplest, fastest repository for training/finetuning medium-sized GPTs. · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/jingyaogong/minimind",
+   "status": 200,
+   "final_url": "https://github.com/jingyaogong/minimind",
+   "title": "GitHub - jingyaogong/minimind: 🧠 Train a 64M-parameter LLM from scratch in just 2h! · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:26+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/huggingface/trl",
+   "status": 200,
+   "final_url": "https://github.com/huggingface/trl",
+   "title": "GitHub - huggingface/trl: Train transformer language models with reinforcement learning. · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:25+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV15P4y137jb",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV15P4y137jb/",
+   "title": "ViT论文逐段精读【论文精读】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1SL4y1s7LQ",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1SL4y1s7LQ/",
+   "title": "CLIP 论文逐段精读【论文精读】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://huggingface.co/blog/vlms",
+   "status": 200,
+   "final_url": "https://huggingface.co/blog/vlms",
+   "title": "Vision Language Models Explained",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:26+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2010.11929",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2010.11929",
+   "title": "[2010.11929] An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:26+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2103.00020",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2103.00020",
+   "title": "[2103.00020] Learning Transferable Visual Models From Natural Language Supervision",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:26+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2304.08485",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2304.08485",
+   "title": "[2304.08485] Visual Instruction Tuning",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:26+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2409.12191",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2409.12191",
+   "title": "[2409.12191] Qwen2-VL: Enhancing Vision-Language Model's Perception of the World at Any Resolution",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2511.21631",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2511.21631",
+   "title": "[2511.21631] Qwen3-VL Technical Report",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/openai/CLIP",
+   "status": 200,
+   "final_url": "https://github.com/openai/CLIP",
+   "title": "GitHub - openai/CLIP: CLIP (Contrastive Language-Image Pretraining), Predict the most relevant text snippet given an image · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://poloclub.github.io/cnn-explainer/",
+   "status": 200,
+   "final_url": "https://poloclub.github.io/cnn-explainer/",
+   "title": "CNN Explainer",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:27+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=M2Yg1kwPpts",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=M2Yg1kwPpts",
+   "title": "【生成式AI時代下的機器學習(2025)】第二講：一堂課搞懂 AI Agent 的原理 (AI如何透過經驗調整行為、使用工具和做計劃)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=lVdajtNpaGI",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=lVdajtNpaGI",
+   "title": "【生成式人工智慧與機器學習導論2025】第 2 講：上下文工程 (Context Engineering) — AI Agent 背後的關鍵技術",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/datawhalechina/hello-agents",
+   "status": 200,
+   "final_url": "https://github.com/datawhalechina/hello-agents",
+   "title": "GitHub - datawhalechina/hello-agents: 📚 《从零开始构建智能体》——从零开始的智能体原理与实践教程 · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://huggingface.co/learn/agents-course/zh-CN/unit0/introduction",
+   "status": 200,
+   "final_url": "https://huggingface.co/learn/agents-course/zh-CN/unit0/introduction",
+   "title": "欢迎加入 🤗 AI Agents 课程 · Hugging Face",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:28+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/QwenLM/Qwen-Agent/blob/main/README_CN.md",
+   "status": 200,
+   "final_url": "https://github.com/QwenLM/Qwen-Agent/blob/main/README_CN.md",
+   "title": "Qwen-Agent/README_CN.md at main · QwenLM/Qwen-Agent · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:28+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+   "status": 200,
+   "final_url": "https://lilianweng.github.io/posts/2023-06-23-agent/",
+   "title": "LLM Powered Autonomous Agents | Lil'Log",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:28+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.anthropic.com/engineering/building-effective-agents",
+   "status": 200,
+   "final_url": "https://www.anthropic.com/engineering/building-effective-agents",
+   "title": "Building Effective AI Agents \\ Anthropic",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2210.03629",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2210.03629",
+   "title": "[2210.03629] ReAct: Synergizing Reasoning and Acting in Language Models",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2302.04761",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2302.04761",
+   "title": "[2302.04761] Toolformer: Language Models Can Teach Themselves to Use Tools",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2405.15793",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2405.15793",
+   "title": "[2405.15793] SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:29+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/SWE-agent/mini-swe-agent",
+   "status": 200,
+   "final_url": "https://github.com/SWE-agent/mini-swe-agent",
+   "title": "GitHub - SWE-agent/mini-swe-agent: The 100 line AI agent that solves GitHub issues or helps you in your command line. Radically simple, no huge configs, no giant monorepo—but scores >74% on SWE-bench ",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://worldmodels.github.io/",
+   "status": 200,
+   "final_url": "https://worldmodels.github.io/",
+   "title": "",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://blog.otoro.net/2018/06/09/world-models-experiments/",
+   "status": 200,
+   "final_url": "https://blog.otoro.net/2018/06/09/world-models-experiments/",
+   "title": "World Models Experiments | 大トロ",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=3oHlf8-J3Nc",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=3oHlf8-J3Nc",
+   "title": "【機器學習2021】自編碼器 (Auto-encoder) (上) – 基本概念",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:31+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://lilianweng.github.io/posts/2018-08-12-vae/",
+   "status": 200,
+   "final_url": "https://lilianweng.github.io/posts/2018-08-12-vae/",
+   "title": "From Autoencoder to Beta-VAE | Lil'Log",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/1312.6114",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/1312.6114",
+   "title": "[1312.6114] Auto-Encoding Variational Bayes",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2301.04104",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2301.04104",
+   "title": "[2301.04104] Mastering Diverse Domains through World Models",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:30+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2402.15391",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2402.15391",
+   "title": "[2402.15391] Genie: Generative Interactive Environments",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:31+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/",
+   "status": 200,
+   "final_url": "https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/",
+   "title": "Genie 3: A new frontier for world models — Google DeepMind",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:31+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/eloialonso/diamond",
+   "status": 200,
+   "final_url": "https://github.com/eloialonso/diamond",
+   "title": "GitHub - eloialonso/diamond: DIAMOND (DIffusion As a Model Of eNvironment Dreams) is a reinforcement learning agent trained in a diffusion world model. NeurIPS 2024 Spotlight. · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2310.02207",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2310.02207",
+   "title": "[2310.02207] Language Models Represent Space and Time",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:31+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/wesg52/world-models",
+   "status": 200,
+   "final_url": "https://github.com/wesg52/world-models",
+   "title": "GitHub - wesg52/world-models: Extracting spatial and temporal world models from LLMs · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:32+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=5H2bVEmYDNg",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=5H2bVEmYDNg",
+   "title": "【生成式AI導論 2024】第17講：有關影像的生成式AI (上) — AI 如何產生圖片和影片 (Sora 背後可能用的原理)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=rZzfqkfZhY8",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=rZzfqkfZhY8",
+   "title": "【生成式AI導論 2024】第11講：大型語言模型在「想」什麼呢？ — 淺談大型語言模型的可解釋性",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.youtube.com/watch?v=Xnil63UDW2o",
+   "status": 200,
+   "final_url": "https://www.youtube.com/watch?v=Xnil63UDW2o",
+   "title": "【生成式AI時代下的機器學習(2025)】第三講：AI 的腦科學 — 語言模型內部運作機制剖析 (解析單一神經元到整群神經元的運作機制、如何讓語言模型說出自己的內心世界)",
+   "content_type": "text/html",
+   "author": "Hung-yi Lee",
+   "ok": true,
+   "note": "oEmbed 200",
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.bilibili.com/video/BV1aTxMehEjK",
+   "status": 200,
+   "final_url": "https://www.bilibili.com/video/BV1aTxMehEjK/",
+   "title": "【官方双语】直观解释大语言模型如何储存事实 | 【深度学习第7章】",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens",
+   "status": 200,
+   "final_url": "https://www.lesswrong.com/posts/AcKRB8wDpdaN6v6ru/interpreting-gpt-the-logit-lens",
+   "title": "interpreting GPT: the logit lens — LessWrong",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://transformer-circuits.pub/2021/framework/index.html",
+   "status": 200,
+   "final_url": "https://transformer-circuits.pub/2021/framework/index.html",
+   "title": "A Mathematical Framework for Transformer Circuits",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html",
+   "status": 200,
+   "final_url": "https://transformer-circuits.pub/2024/scaling-monosemanticity/index.html",
+   "title": "Scaling Monosemanticity: Extracting Interpretable Features from Claude 3 Sonnet",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:36+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.anthropic.com/research/tracing-thoughts-language-model",
+   "status": 200,
+   "final_url": "https://www.anthropic.com/research/tracing-thoughts-language-model",
+   "title": "Tracing the thoughts of a large language model \\ Anthropic",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:34+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/2210.13382",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/2210.13382",
+   "title": "[2210.13382] Emergent World Representations: Exploring a Sequence Model Trained on a Synthetic Task",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:33+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.neelnanda.io/mechanistic-interpretability/othello",
+   "status": 200,
+   "final_url": "https://www.neelnanda.io/mechanistic-interpretability/othello",
+   "title": "Actually, Othello-GPT Has A Linear Emergent World Representation — Neel Nanda",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:36+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://arxiv.org/abs/1610.01644",
+   "status": 200,
+   "final_url": "https://arxiv.org/abs/1610.01644",
+   "title": "[1610.01644] Understanding intermediate layers using linear classifier probes",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:36+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/TransformerLensOrg/TransformerLens",
+   "status": 200,
+   "final_url": "https://github.com/TransformerLensOrg/TransformerLens",
+   "title": "GitHub - TransformerLensOrg/TransformerLens: A library for mechanistic interpretability of GPT-style language models · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:37+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://www.neuronpedia.org/",
+   "status": 200,
+   "final_url": "https://www.neuronpedia.org/",
+   "title": "Neuronpedia",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://huggingface.co/Qwen/Qwen3-0.6B",
+   "status": 200,
+   "final_url": "https://huggingface.co/Qwen/Qwen3-0.6B",
+   "title": "Qwen/Qwen3-0.6B · Hugging Face",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:37+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://modelscope.cn/models/Qwen/Qwen3-0.6B",
+   "status": 200,
+   "final_url": "https://modelscope.cn/models/Qwen/Qwen3-0.6B",
+   "title": "Qwen3-0.6B - ModelScope 魔搭社区",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+   "status": 200,
+   "final_url": "https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt",
+   "title": "",
+   "content_type": "text/plain",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://github.com/chinese-poetry/chinese-poetry",
+   "status": 200,
+   "final_url": "https://github.com/chinese-poetry/chinese-poetry",
+   "title": "GitHub - chinese-poetry/chinese-poetry: The most comprehensive database of Chinese poetry 🧶最全中华古诗词数据库, 唐宋两朝近一万四千古诗人, 接近5.5万首唐诗加26万宋诗. 两宋时期1564位词人，21050首词。 · GitHub",
+   "content_type": "text/html",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  },
+  {
+   "url": "https://raw.githubusercontent.com/chinese-poetry/chinese-poetry/master/%E5%85%A8%E5%94%90%E8%AF%97/poet.tang.0.json",
+   "status": 200,
+   "final_url": "https://raw.githubusercontent.com/chinese-poetry/chinese-poetry/master/%E5%85%A8%E5%94%90%E8%AF%97/poet.tang.0.json",
+   "title": "",
+   "content_type": "text/plain",
+   "ok": true,
+   "checked_at": "2026-10-02T04:28:38+08:00",
+   "tries": 1
+  }
+ ]
+}

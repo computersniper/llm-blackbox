@@ -7,7 +7,8 @@ name = "Qwen/Qwen3-0.6B"  # 国内下载慢：先 modelscope download Qwen/Qwen3
 tok = AutoTokenizer.from_pretrained(name)
 model = AutoModelForCausalLM.from_pretrained(name)
 
-msgs = [{"role": "user", "content": "天空为什么是蓝色的？"}]
+msgs = [{"role": "system", "content": "你是一个乐于助人的助手，请用一两句话简洁地回答。"},  # 和本站推理页用的系统提示一样
+        {"role": "user", "content": "天空为什么是蓝色的？"}]
 text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False)
 ids = tok(text, return_tensors="pt").input_ids
 print(len(ids[0]), "个词元：", [tok.decode(t) for t in ids[0]])
