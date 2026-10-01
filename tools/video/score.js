@@ -197,7 +197,10 @@ export function buildScore(Q) {
   const camLayers1 = (M, t) => {
     const Ls = [[B(15), 0.5], [l1(0).t0, 0.5], [l1(17).t0, 15.5], [l1(21).t0, 20.0], [l1(24).t0, 23.2], [l1(25).t0, 24.3], [hold1, 26.5]];
     const Lc = pchip(Ls.map((a) => a[0]), Ls.map((a) => a[1]))(t);
-    return towerCam(M, Lc, 0, { yaw: lerp(-4, 8, smooth(seg(t, B(15), hold1))) });
+    // 透镜改口的两个时刻（第 21 层「因为」、第 24 层「天空」）镜头推近一下
+    const bump = (t0, d) => smooth(seg(t, t0 - 0.15, t0 + 0.35)) * (1 - smooth(seg(t, t0 + d - 0.3, t0 + d + 0.6)));
+    const push = 0.2 * bump(l1(21).t0, l1(21).d) + 0.3 * bump(l1(24).t0, l1(24).d);
+    return towerCam(M, Lc, 0, { yaw: lerp(-6, 12, smooth(seg(t, B(15), hold1))), dist: 1 - push });
   };
   let e1In = null;
   shot('layers1', B(15), B(24), (lt, t, { M }) => {
@@ -300,7 +303,7 @@ export function buildScore(Q) {
   sub(Dk('out').t0 + 0.1, Dk('out').t1 - 0.1, `${m('596,049,920')} 个这样的数，一起算出了下一个词。`);
   const L = (M) => ({ xf: M.x(row0), y: M.yL(LX), e: M.e });
   const dCam = {
-    over: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 3.4, y + 2.4, 7.4], [xf + 0.75, y + 1.2, 0.2]), cam([xf + 1.5, y + 1.6, 4.4], [xf + 0.7, y + 1.2, 0.2]), smooth(p)); },
+    over: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 2.8, y + 2.3, 6.6], [xf + 0.7, y + 1.25, 0.2]), cam([xf + 1.1, y + 1.55, 3.9], [xf + 0.65, y + 1.25, 0.2]), smooth(p)); },
     ln1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.9, y + 0.85, 3.5], [xf + 0.35, y + 0.3, 0.1]), cam([xf - 0.55, y + 0.65, 2.75], [xf + 0.35, y + 0.28, 0.1]), smooth(p)); },
     qkv: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.3, y + 1.85, 4.95], [xf + 1.8, y + 1.35, 0.62]), cam([xf + 3.2, y + 1.9, 4.6], [xf + 2.6, y + 1.4, 0.62]), smooth(p)); },
     score: (M, p) => { const { xf, y } = L(M); const kx = M.x(dot.key); return blendCam(cam([(kx + xf) / 2 - 0.6, y + 1.9, 8.4], [(kx + xf) / 2, y + 0.95, 0]), cam([(kx + xf) / 2 + 0.2, y + 1.6, 7.2], [(kx + xf) / 2 + 0.1, y + 0.95, 0]), smooth(p)); },
@@ -308,10 +311,10 @@ export function buildScore(Q) {
     dot: (M, p) => { const c = M.detail.dotCenter || v3(L(M).xf - 1, L(M).y + 1.6, 0.7); return farther(blendCam(cam([c.x + 0.35, c.y + 0.3, c.z + 3.3], [c.x + 0.05, c.y + 0.02, c.z]), cam([c.x + 0.1, c.y + 0.18, c.z + 2.75], [c.x + 0.05, c.y + 0.02, c.z]), smooth(p)), 1.45); },
     mix: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 0.8, y + 1.85, 4.3], [xf + 1.3, y + 1.55, 0.62]), cam([xf + 1.8, y + 1.85, 4.0], [xf + 1.4, y + 1.55, 0.62]), smooth(p)); },
     add1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.4, y + 1.6, 2.9], [xf + 0.45, y + 1.1, 0.1]), cam([xf - 0.2, y + 1.7, 4.2], [xf + 0.6, y + 1.15, 0.1]), smooth(p)); },
-    mlp: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.6, y + 3.6, 7.6], [xf + 1.2, y + 2.85, -0.2]), cam([xf + 1.25, y + 3.4, 6.3], [xf + 1.2, y + 2.85, -0.2]), smooth(p)); },
+    mlp: (M, p) => { const { xf, y } = L(M); const a = cam([xf + 1.6, y + 3.6, 7.6], [xf + 1.2, y + 2.85, -0.2]), b = cam([xf + 1.25, y + 3.4, 6.3], [xf + 1.2, y + 2.85, -0.2]); const panel = cam([xf + 0.5, y + 3.5, 4.4], [xf + 0.2, y + 3.15, -0.9]); return p < 0.6 ? blendCam(a, panel, smooth(seg(p, 0.15, 0.35)) * (1 - smooth(seg(p, 0.45, 0.6)))) : blendCam(a, b, smooth(seg(p, 0.6, 1))); },
     mm: (M, p, st) => { const c = M.micro.camera(st); if (c) endCam.set('mm', c); const b = endCam.get('mm') || dCam.mlp(M, 1); return orbit({ ...b, fov: 32 }, lerp(-6, 4, smooth(p)), 0, lerp(1.6, 1.4, smooth(p))); },
     neuron: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-6, 5, smooth(p)), 0, lerp(1.55, 1.4, smooth(p))); },
-    bits: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-14, 4, smooth(p)), lerp(10, 2, smooth(p)), lerp(3.2, 1.5, easeInOut(seg(p, 0, 0.7)))); },
+    bits: (M, p, st) => { const c = M.detail.camera(st); return orbit({ ...c, fov: 32 }, lerp(-12, 4, smooth(p)), lerp(8, 2, smooth(p)), lerp(2.3, 1.5, easeInOut(seg(p, 0, 0.6)))); },
   };
   const camKey = { over: 'over', ln1: 'ln1', qkv: 'qkv', score: 'score', softmax: 'score', heads: 'heads', dmul: 'dot', dsum: 'dot', dscale: 'dot', mix: 'mix', add1: 'add1', up: 'mlp', act: 'mlp', down: 'mlp', pick: 'mm', mul: 'mm', sum: 'mm', silu: 'neuron', gate: 'neuron', bits: 'bits' };
   const camSpan = {}; // 同一个机位 key 跨越的时间段
@@ -319,7 +322,7 @@ export function buildScore(Q) {
   // 算式板出现的几段：画面往左让出位置
   const BOARD = ['dot', 'mm', 'neuron', 'bits'];
   const boardShift = (t) => Math.max(...[[camSpan.dot.t0, camSpan.dot.t1], [camSpan.mm.t0, camSpan.bits.t1]].map(([a, b]) => smoother(seg(t, a - 0.2, a + 0.9)) * (1 - smoother(seg(t, b - 0.7, b + 0.4)))));
-  const BLEND = { over: 2.8, ln1: 1.3, qkv: 1.5, score: 1.4, heads: 1.6, dot: 1.4, mix: 1.3, add1: 1.1, mlp: 1.5, mm: 1.5, neuron: 1.4, bits: 1.6 };
+  const BLEND = { over: 2.8, ln1: 1.3, qkv: 1.5, score: 1.4, heads: 1.6, dot: 1.4, mix: 1.3, add1: 1.1, mlp: 1.5, mm: 1.5, neuron: 0.9, bits: 1.0 };
   const headCam = (M, st, o = {}) => {
     const hx = M.headX(st);
     const look = v3(hx + (o.lx ?? -0.4), M.yTop + (o.ly ?? 2.75), 0.1);
@@ -416,7 +419,8 @@ export function buildScore(Q) {
       cam: () => {
         // 归一化 / 乘输出矩阵时概率柱还没升起来：镜头先低一点、近一点，看塔顶的归一化环和输出矩阵
         const up = smooth(seg(t, mmZ.t0 - 0.9, mmZ.t0 + 0.5));
-        const head = headCam(M, st, { dz: lerp(7.2, lerp(10.6, 9.6, smooth(lt / (t1 - t0))), up), dx: lerp(1.6, 0.4, smooth(lt / (t1 - t0))), ly: lerp(0.9, 2.75, up), lx: lerp(1.8, -0.4, up) });
+        const hmax = 3.2 * Math.max(Q.steps[g].temps['0.7'][0], Q.steps[g].top[0][1]);
+        const head = headCam(M, st, { dz: lerp(7.2, 6.4 + hmax * 1.2 - 0.8 * smooth(lt / (t1 - t0)), up), dx: lerp(1.6, 0.4, smooth(lt / (t1 - t0))), ly: lerp(0.9, 1.25 + hmax * 0.52, up), lx: lerp(1.8, -0.6, up) });
         let live = head;
         if (mmA) {
           const mmK = smooth(seg(t, mmA.t0, mmA.t0 + 1.1)) * (1 - smooth(seg(t, mmZ.t0, mmZ.t0 + 1.1)));
@@ -482,11 +486,13 @@ export function buildScore(Q) {
       st,
       cam: () => {
         const wide = loopCam(M, lerp(M.x(Q.row(1)), M.x(Q.row(13)), smooth(seg(t, B(57), B(63)))), t, { yaw: lerp(34, 20, smooth(lt / 15)), dz: lerp(21, 25, smooth(lt / 15)) });
-        const close = headCam(M, mst(4, 1, { ph: 'sample', sub: 'draw' }, 0), { dz: 9.4 });
+        const h1 = 3.2 * Q.steps[1].temps['0.7'][0];
+        const close = headCam(M, mst(4, 1, { ph: 'sample', sub: 'draw' }, 0), { dz: 6.4 + h1 * 1.2, ly: 1.25 + h1 * 0.52, lx: -0.6 });
         const kc = smooth(seg(t, loop1[0].t0 + 6.25 * 0.5, loop1[0].t0 + 6.25 * 0.66)) * (1 - smooth(seg(t, loop1[1].t0 + 0.2, loop1[1].t0 + 1.6)));
         const live = blendCam(wide, close, kc);
         return blendCam(prevCam('sample1', live), live, smoother(seg(lt, 0, 2.2)));
       },
+      hide: detail ? [] : ['bars'],
       ov: { reply: { a: smooth(seg(lt, 0.2, 0.8)), n, k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.35)) : 1 }, corner: { g: s.g }, cornerA: 1 },
       after: () => void fx,
     };
@@ -525,7 +531,9 @@ export function buildScore(Q) {
     return {
       st,
       cam: () => {
-        const live = handheld(towerCam(M, Lc, GK, { lx: -1.6, dx: -5.2, dy: 2.0, dz: 9.0, yaw: lerp(6, -8, smooth(lt / 15)) }), t, 0.003);
+        const bump = (t0, d) => smooth(seg(t, t0 - 0.15, t0 + 0.35)) * (1 - smooth(seg(t, t0 + d - 0.3, t0 + d + 0.6)));
+        const push = 0.18 * bump(lk(23).t0, lk(23).d) + 0.3 * bump(lk(27).t0, lk(27).d + 0.5);
+        const live = handheld(towerCam(M, Lc, GK, { lx: -1.6, dx: -5.2, dy: 2.0, dz: 9.0, yaw: lerp(6, -8, smooth(lt / 15)), dist: 1 - push }), t, 0.003);
         return blendCam(prevCam('loop1', live), live, smoother(seg(lt, 0, 2.0)));
       },
       lensWin: 9,
@@ -574,6 +582,7 @@ export function buildScore(Q) {
         const live = loopCam(M, lerp(M.x(Q.row(GK + 1)), M.x(Q.row(Q.G - 1)), smooth(seg(t, B(72), B(79) - 2))), t, { yaw: lerp(18, 30, smooth(lt / 17.5)), dz: lerp(24, 28, smooth(lt / 17.5)), back: lerp(3, 6, smooth(lt / 17.5)) });
         return blendCam(prevCam('sampleK', live), live, smoother(seg(lt, 0, 2.2)));
       },
+      hide: ['bars'],
       ov: { reply: { a: 1, n: Math.min(Q.G, n), k: newest ? smooth(seg(t, newest.emit, newest.emit + 0.3)) : 1 }, corner: { g: s.g }, cornerA: 1 },
     };
   });

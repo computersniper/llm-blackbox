@@ -514,6 +514,7 @@ function renderAt(t, { render = true } = {}) {
     const hide = new Set(f.hide || []);
     if (hide.has('attnMats')) M.mats.attn.visible = false;
     if (hide.has('mlpMats')) M.mats.mlp.visible = false;
+    if (hide.has('bars')) { for (const b of M.bars) { b.visible = false; b.lbl.visible = false; } M.strip.visible = false; M.ball.visible = false; }
     if (hide.has('mlpVecs')) for (const o of [M.mats.mlp.x, M.mats.mlp.x2, M.mats.mlp.go, M.mats.mlp.uo]) o.visible = false;
     for (const o of [M.exAdd1, M.exAdd2, M.exRing1, M.exRing2, M.exUnit]) o.visible = !hide.has('exDeco');
     if (f.lensWin != null && f.st.step.L != null) M.slabs.forEach((sl, L) => { if (L < f.st.step.L - f.lensWin || L > f.st.step.L) sl.lbl.visible = false; });

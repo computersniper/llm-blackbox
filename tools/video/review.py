@@ -38,9 +38,10 @@ def main():
             f = os.path.join(a.frames, f'f{int(round(tt * a.fps)):05d}.jpg')
             inputs += ['-i', f]
             filters.append(f"[{k}:v]scale={a.width}:-1,drawtext=fontfile={FONT}:text='{tt:.1f}s':x=8:y=8:fontsize=22:fontcolor=white:box=1:boxcolor=black@0.6[v{k}]")
-        while len(chunk) < per:  # 补黑格
+        while len(chunk) < per:  # 补格：用最后一帧压成全黑
             k = len(chunk)
-            filters.append(f"color=black:s={a.width}x{a.width * 9 // 16}:d=1[v{k}]")
+            inputs += ['-i', inputs[-1]]
+            filters.append(f"[{k}:v]scale={a.width}:-1,drawbox=c=black:t=fill[v{k}]")
             chunk.append(None)
         stack = ''.join(f'[v{k}]' for k in range(per))
         layout = '|'.join(f'{(k % a.cols) * a.width}_{(k // a.cols) * (a.width * 9 // 16)}' for k in range(per))
