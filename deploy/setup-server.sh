@@ -1,7 +1,7 @@
 #!/bin/sh
 # 在服务器上执行一次（幂等）：建 bare 仓库、装钩子、把站点目录挂到博客根目录下。
-#   scp deploy/post-receive root@182.61.48.178:/tmp/blackbox-post-receive
-#   ssh root@182.61.48.178 'sh -s' < deploy/setup-server.sh
+#   scp deploy/post-receive <用户>@<服务器>:/tmp/blackbox-post-receive
+#   ssh <用户>@<服务器> 'sh -s' < deploy/setup-server.sh
 # 之后本地 `git push deploy main` 即可发布。
 set -eu
 ROOT=/srv/blackbox
