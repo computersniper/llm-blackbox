@@ -127,7 +127,7 @@ function layerExplain(s, Q, ctx, i, cur) {
   const h = ctx.head ?? interestingHead(Q, L, i);
   if (s.mi && s.sub === 'qkv') {
     const e = Q.mmAt(L, g)?.q;
-    if (s.mi === 'rope' && e) return `这个数还要再加工两次：先做 <b>q_norm</b>（这个头的 128 个数一起除以均方根 ${e.rms.toFixed(3)}，再乘缩放 γ），得到 ${e.qn.toFixed(4)}；再做 <b>RoPE</b>：和第 ${e.partner} 维配成一对，按位置 ${e.pos} 转一个角度，得到 <b>${e.qr.toFixed(4)}</b>。位置越靠后转得越多，两个词元的点积因此只和它们的相对距离有关。`;
+    if (s.mi === 'rope' && e) return `这个数还要再加工两次：先做 <b>q_norm</b>（这个头的 128 个数一起除以均方根 ${e.rms.toFixed(3)}，再乘缩放 γ），得到 ${e.qn.toFixed(4)}；再做 <b>RoPE</b>：和第 ${e.partner} 维配成一对，按位置 ${e.row} 转一个角度，得到 <b>${e.qr.toFixed(4)}</b>。位置越靠后转得越多，两个词元的点积因此只和它们的相对距离有关。`;
     return mmExplain(s, e, e ? `q[${e.j}]` : 'q', 'W<sub>q</sub>', 1024, e ? `q 一共 2048 个数，每个都这样算。这里放大的是第 ${e.head} 头第 ${e.dim} 维（第 ${e.j} 列）。k、v 也完全一样，只是换成 W<sub>k</sub>、W<sub>v</sub>。` : '');
   }
   if (s.mi && s.sub === 'mix') { const e = Q.mmAt(L, g)?.o; return mmExplain(s, e, e ? `Δx[${e.j}]` : 'Δx', 'W<sub>o</sub>', 2048, '16 个头的输出拼成 2048 个数，再和 W<sub>o</sub> 的一列逐项相乘相加，得到回到残差流的 1024 个数之一。'); }
@@ -135,8 +135,8 @@ function layerExplain(s, Q, ctx, i, cur) {
   if (s.mi && s.sub === 'up') {
     const n = Q.neuronAt(L, g);
     if (!n) return '';
-    const e = { j: n.n, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
-    return mmExplain(s, e, `g[${n.n}]`, 'W<sub>gate</sub>', 1024, `同一个神经元 #${n.n} 在 W<sub>up</sub> 里也有一列，同样乘加得到 u = <b>${n.uz.toFixed(3)}</b>。`);
+    const e = { j: n.j, total: n.gz, shown: n.x.reduce((a, x, k) => a + x * n.wg[k], 0) };
+    return mmExplain(s, e, `g[${n.j}]`, 'W<sub>gate</sub>', 1024, `同一个神经元 #${n.j} 在 W<sub>up</sub> 里也有一列，同样乘加得到 u = <b>${n.uz.toFixed(3)}</b>。`);
   }
   if (s.op === 'attn') {
     if (!s.sub) return `<b>分组查询注意力（GQA）</b>：16 个查询头，每 2 个共用一组键值头，共 8 组。${cur} 平均最关注 ${tgt}。`;
@@ -161,7 +161,7 @@ function layerExplain(s, Q, ctx, i, cur) {
   const n = Q.neuronAt(L, g);
   if (!n) return '';
   if (s.mi === 'silu') return `SiLU(g) = g · σ(g) = <b>${n.silu.toFixed(3)}</b>。负数会被压到接近 0。`;
-  return `SiLU(g) × u = <b>${(n.silu * n.uz).toFixed(3)}</b>：这就是神经元 #${n.n} 的输出。`;
+  return `SiLU(g) × u = <b>${(n.silu * n.uz).toFixed(3)}</b>：这就是神经元 #${n.j} 的输出。`;
 }
 
 // 这一步的矩阵形状（预填充时 n = 提示长度，之后每步 n = 1）
@@ -225,7 +225,7 @@ export function watch(s, Q, ctx = {}) {
     }
     if (s.op === 'attn') rows.push(['head', ctx.head == null ? `${interestingHead(Q, s.L, i)}` : `${ctx.head}`], ['kv_group', `${Math.floor((ctx.head ?? interestingHead(Q, s.L, i)) / 2)}`]);
     if (s.op === 'mlp') rows.push(['active', `${Q.mlpCount(g, s.L)} / 3072`]);
-    if (s.mi && s.op === 'mlp') { const n = Q.neuronAt(s.L, g); if (n) rows.push(['neuron', `#${n.n}`], ['g', n.gz.toFixed(4)], ['u', n.uz.toFixed(4)], ['silu(g)*u', (n.silu * n.uz).toFixed(4)]); }
+    if (s.mi && s.op === 'mlp') { const n = Q.neuronAt(s.L, g); if (n) rows.push(['neuron', `#${n.j}`], ['g', n.gz.toFixed(4)], ['u', n.uz.toFixed(4)], ['silu(g)*u', (n.silu * n.uz).toFixed(4)]); }
     if (s.mi && s.op === 'attn') { const d = Q.dotAt(s.L, g); if (d) rows.push(['q·k', d.sum.toFixed(4)], ['score', d.score.toFixed(4)], ['weight', fmtPct(d.w)]); }
   }
   if (s.ph === 'head' || s.ph === 'sample' || s.ph === 'pass') {

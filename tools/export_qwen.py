@@ -3,10 +3,13 @@
 用法：
     python tools/export_qwen.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6B
 
-每个问题导出两个文件：
-    qNN.json  词元、逐步的候选概率与采样过程、逻辑透镜、残差范数、单神经元 / 单次打分的真实乘加
-    qNN.bin   注意力（每个头每一行的前 4 个键）、MLP 激活（每层前 24 个 + 焦点层完整 3072 维）
+每个问题导出：
+    qNN.json        词元、逐步的候选概率与采样过程、逻辑透镜、残差范数、输出头 logit 的真实乘加
+    qNN.bin         注意力（每个头每一行的前 4 个键）、MLP 激活（每层前 16 个 + 第 14 层完整 3072 维）
+    qNN/Lxx.json    第 xx 层、每个生成词元的真实乘加（单神经元、单次 Q·K 打分、W_q / W_o / W_down 各一个输出元素）。
+                    28 层全都有，按层拆成小文件，网页进入“一次乘加”时才按需载入
 以及 manifest.json：模型配置、问题列表、回复文本、输入法候选（问题的真实分词）。
+所有数据文件都额外存一份 .gz（服务器只压缩 HTML），网页优先读 .gz。
 
 生成用的是 Qwen3 非思考模式的推荐参数（T=0.7, top_k=20, top_p=0.8），随机数种子固定，
 所以回答和网页里演示的采样过程完全一致、可复现。
@@ -47,9 +50,9 @@ QUESTIONS = [
 TEMPERATURE, TOP_K, TOP_P = 0.7, 20, 0.8
 TEMPS = [0.3, 0.7, 1.0, 1.5]  # 网页里温度滑块可选的几个档位，概率都是真实算出来的
 MAX_NEW = 64
-FOCUS_LAYERS = [3, 14, 25]  # 导出完整 Q/K、单神经元细节的层
 FULL_MLP_LAYER = 14         # 导出完整 3072 维激活的层
 ATT_TOPK, MLP_TOPK, TOPN = 4, 16, 12
+CUM_RANKS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]  # 累加曲线的采样名次（再补上 n）
 
 
 # ---------------------------------------------------------------- 词元显示
@@ -204,8 +207,7 @@ def internals(model, seq, cfg):
         diff = (torch.softmax(s, -1) - att[li]).abs()
         max_err = max(max_err, float(diff.max()))
         res.setdefault("mean_err", []).append(float(diff.sum() / (H * T * (T + 1) / 2)))
-        if li in FOCUS_LAYERS:
-            res["qk"][li] = (q, k)
+        res["qk"][li] = (q, k)
     res["check"] = max_err  # 自己复现的注意力与模型输出的最大误差
     # 逻辑透镜：每层输出接上最终 RMSNorm 和（与嵌入共享的）输出矩阵
     W = model.lm_head.weight.float()
@@ -218,6 +220,33 @@ def internals(model, seq, cfg):
 
 
 # ---------------------------------------------------------------- 导出
+
+def sig(v, d=5):
+    """保留 d 位有效数字（控制 JSON 体积）。"""
+    return float(f"{float(v):.{d}g}")
+
+
+def summary(c):
+    """一次点积里全部 n 个乘积的汇总：正乘积之和、负乘积之和，
+    以及按 |乘积| 从大到小排好后的累计和，在名次 1, 2, 4, …, 2048（不超过 n）和 n 处采样。"""
+    c = c.double()
+    n = c.numel()
+    run = c[torch.argsort(c.abs(), descending=True)].cumsum(0)
+    ranks = [r for r in CUM_RANKS if r <= n]
+    if ranks[-1] != n:
+        ranks.append(n)
+    vals = run[torch.tensor([r - 1 for r in ranks], device=c.device)].tolist()
+    return {"pos": sig(c.clamp(min=0).sum()), "neg": sig(c.clamp(max=0).sum()), "cum": [[r, sig(v)] for r, v in zip(ranks, vals)]}
+
+
+def write_data(path, data):
+    """写一个数据文件和它的 .gz（网页优先读 .gz，用 DecompressionStream 解压）；返回 .gz 的字节数。"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    gz = gzip.compress(data, 9, mtime=0)
+    path.write_bytes(data)
+    path.with_name(path.name + ".gz").write_bytes(gz)
+    return len(gz)
+
 
 class Bin:
     def __init__(self):
@@ -323,33 +352,50 @@ def export_question(qi, text, tok, model, cfg):
     b.add("mlpFull", full)
     b.add("mlpFullScale", fscale)
 
-    # 单神经元（SwiGLU）与单次打分（Q·K）的真实乘加，只在焦点层导出
-    neuron, dot = {}, {}
-    for li in FOCUS_LAYERS:
+    # 矩阵乘法的“一个输出元素”：y[j] = Σ_i x[i]·W[j, i]，导出贡献最大的 12 项、总和，以及全部 n 项的汇总
+    def mm_entry(x, w, total, j):
+        c = x * w
+        top = torch.topk(c.abs(), TOPN).indices.tolist()
+        return {"j": j, "dims": top, "x": [round(float(x[i]), 5) for i in top], "w": [float(w[i]) for i in top],
+                "total": round(float(total), 5), "shown": round(float(c[top].sum()), 5), "n": c.numel(), **summary(c)}
+
+    # 每一层、每个生成词元的真实乘加：单神经元（SwiGLU）、单次打分（Q·K）、W_q / W_o / W_down 各一个输出元素。
+    # 28 层全部导出，每层一个小文件 qNN/Lxx.json，网页按需载入
+    qid = f"q{qi + 1:02d}"
+    theta_base = rope_theta(cfg)
+    Dh = cfg.head_dim
+    micro_bytes = 0
+    for li in range(L):
         layer = model.model.layers[li]
+        a = layer.self_attn
         Wg, Wu = layer.mlp.gate_proj.weight.float(), layer.mlp.up_proj.weight.float()
+        Wq, Wo, Wd = a.q_proj.weight.float(), a.o_proj.weight.float(), layer.mlp.down_proj.weight.float()
         q, k = r["qk"][li]
-        nlist, dlist = [], []
+        nlist, dlist, mlist = [], [], []
         for g, row in enumerate(rows):
-            a = r["act"][li][row]
-            n = int(torch.argmax(a))
+            # 单神经元：这一步激活最大的那个
+            act = r["act"][li][row]
+            n = int(torch.argmax(act))
             x = r["ln2"][li][row]
             wg, wu = Wg[n], Wu[n]
             contrib = (x * wg).abs()
             top = torch.topk(contrib, TOPN).indices.tolist()
             gz, uz = float(x @ wg), float(x @ wu)
             nlist.append({
-                "n": n,
+                "j": n,                              # 神经元编号
+                "n": x.numel(),                      # 每个点积的项数（1024）
                 "dims": top,
                 "x": [round(float(x[i]), 5) for i in top],
                 "wg": [float(wg[i]) for i in top],  # bf16 权重，转成 float 后是精确值
                 "wu": [float(wu[i]) for i in top],
                 "gz": round(gz, 5), "uz": round(uz, 5),
                 "silu": round(gz / (1 + math.exp(-gz)), 5),
-                "act": round(float(a[n]), 5),
+                "act": round(float(act[n]), 5),
                 "xnorm": round(float(x.norm()), 3),
+                "g": summary(x * wg),                # gate：x·w_gate 的 1024 个乘积
+                "u": summary(x * wu),                # up：x·w_up 的 1024 个乘积
             })
-            # 这一行里注意力最集中在“非开头”位置的头
+            # 单次打分：这一行里注意力最集中在“非开头”位置的头
             w = r["att"][li][:, row, :]
             w2 = w.clone()
             w2[:, 0] = 0
@@ -368,49 +414,34 @@ def export_question(qi, text, tok, model, cfg):
                 "sum": round(float(prod.sum()), 4),
                 "score": round(float(prod.sum()) / math.sqrt(cfg.head_dim), 4),
                 "w": round(float(w[h, key]), 5),
+                "n": prod.numel(), **summary(prod),  # 128 项
             })
-        neuron[li], dot[li] = nlist, dlist
-
-    # 矩阵乘法的“一个输出元素”：y[j] = Σ_i x[i]·W[j, i]，导出贡献最大的 12 项和总和
-    def mm_entry(x, w, total, j):
-        c = x * w
-        top = torch.topk(c.abs(), TOPN).indices.tolist()
-        return {"j": j, "dims": top, "x": [round(float(x[i]), 5) for i in top], "w": [float(w[i]) for i in top],
-                "total": round(float(total), 5), "shown": round(float(c[top].sum()), 5)}
-
-    mm = {}
-    theta_base = rope_theta(cfg)
-    Dh = cfg.head_dim
-    for li in FOCUS_LAYERS:
-        layer = model.model.layers[li]
-        a = layer.self_attn
-        Wq, Wo, Wd = a.q_proj.weight.float(), a.o_proj.weight.float(), layer.mlp.down_proj.weight.float()
-        qfull, _ = r["qk"][li]
-        per = []
-        for g, row in enumerate(rows):
+            # W_q 的一个输出元素：同一个头里绝对值最大的那一维，并跟着它做 q_norm 和 RoPE
             x = r["ln1"][li][row]
-            h = dot[li][g]["head"]
             qraw = (x @ Wq[h * Dh:(h + 1) * Dh].T)          # 这个头的 128 维（投影后、归一化和旋转之前）
             d = int(torch.argmax(qraw.abs()))
             j = h * Dh + d
             eq = mm_entry(x, Wq[j], qraw[d], j)
             qn = rms(qraw, a.q_norm.weight, cfg.rms_norm_eps)
             partner = d + Dh // 2 if d < Dh // 2 else d - Dh // 2
-            k = d % (Dh // 2)
-            ang = row / (theta_base ** (2 * k / Dh))
-            eq.update({"head": h, "dim": d, "partner": partner, "pos": row, "angle": round(ang, 6), "freq": k,
+            fk = d % (Dh // 2)
+            ang = row / (theta_base ** (2 * fk / Dh))
+            eq.update({"head": h, "dim": d, "partner": partner, "row": row, "angle": round(ang, 6), "freq": fk,
                        "qn": round(float(qn[d]), 5), "qnP": round(float(qn[partner]), 5), "qnW": float(a.q_norm.weight[d]),
                        "rms": round(float(qraw.pow(2).mean().sqrt()), 5),
-                       "qr": round(float(qfull[row, h, d]), 5), "qrP": round(float(qfull[row, h, partner]), 5)})
+                       "qr": round(float(q[row, h, d]), 5), "qrP": round(float(q[row, h, partner]), 5)})
+            # W_o、W_down：输出里绝对值最大的那个元素
             oin = r["oin"][li][row]
             oout = oin @ Wo.T
             jo = int(torch.argmax(oout.abs()))
-            act = r["act"][li][row]
             dout = act @ Wd.T
             jd = int(torch.argmax(dout.abs()))
-            per.append({"q": eq, "o": mm_entry(oin, Wo[jo], oout[jo], jo), "down": mm_entry(act, Wd[jd], dout[jd], jd)})
-        mm[li] = per
-    # 输出头：被选中的词元的分数 = 最终向量 · 它在嵌入表里的那一行
+            mlist.append({"q": eq, "o": mm_entry(oin, Wo[jo], oout[jo], jo), "down": mm_entry(act, Wd[jd], dout[jd], jd)})
+        chunk = {"id": qid, "L": li, "neuron": nlist, "mm": mlist, "dot": dlist}
+        raw = json.dumps(chunk, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        micro_bytes += write_data(OUT / qid / f"L{li:02d}.json", raw)
+
+    # 输出头：被选中的词元的分数 = 最终向量 · 它在嵌入表里的那一行（按词元，放在主文件里）
     E = model.lm_head.weight.float()
     last = cfg.num_hidden_layers - 1
     head_mm = []
@@ -422,7 +453,7 @@ def export_question(qi, text, tok, model, cfg):
         head_mm.append(ent)
 
     meta = {
-        "id": f"q{qi + 1:02d}",
+        "id": qid,
         "question": text,
         "T": T, "P": P, "G": G, "ended": ended,
         "tokens": toks,
@@ -430,17 +461,13 @@ def export_question(qi, text, tok, model, cfg):
         "lens": lens,
         "norms": norms,
         "embNorm": emb_norm,
-        "neuron": {str(k): v for k, v in neuron.items()},
-        "mm": {str(k): v for k, v in mm.items()},
         "headMM": head_mm,
-        "dot": {str(k): v for k, v in dot.items()},
         "bin": b.index,
         "attCheck": r["check"],
     }
     raw_json = json.dumps(meta, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    for name, data in ((f"{meta['id']}.bin", bytes(b.buf)), (f"{meta['id']}.json", raw_json)):
-        (OUT / name).write_bytes(data)
-        (OUT / (name + ".gz")).write_bytes(gzip.compress(data, 9, mtime=0))  # 网页优先读 .gz，用 DecompressionStream 解压
+    first_bytes = write_data(OUT / f"{qid}.bin", bytes(b.buf)) + write_data(OUT / f"{qid}.json", raw_json)
+    print(f"  首次载入 {first_bytes / 1024:.0f} KB（gz），28 层乘加分块共 {micro_bytes / 1024:.0f} KB（gz）")
     reply_text = tok.decode(reply[:-1] if ended else reply)
     q_ids = tok(text, add_special_tokens=False).input_ids
     return {
@@ -450,7 +477,8 @@ def export_question(qi, text, tok, model, cfg):
         "reply": reply_text,
         "replyTokens": [{"id": int(i), "s": token_display(tok, i)[0]} for i in (reply[:-1] if ended else reply)],
         "ended": ended,
-        "bytes": len(gzip.compress(bytes(b.buf), 9)) + len(gzip.compress(raw_json, 9)),
+        "bytes": first_bytes,        # 揭开时首次要载入的数据（.gz）
+        "microBytes": micro_bytes,   # 28 层乘加分块合计（.gz，按需载入）
     }
 
 
@@ -471,7 +499,7 @@ def main():
         items.append(export_question(qi, q, tok, model, cfg))
         print("  →", items[-1]["reply"])
     n_params = sum(p.numel() for p in model.parameters())
-    sample_w = model.model.layers[FOCUS_LAYERS[1]].mlp.gate_proj.weight
+    sample_w = model.model.layers[FULL_MLP_LAYER].mlp.gate_proj.weight
     thumbs = bytearray()
     thumb_index = {}
     B = 32
@@ -500,7 +528,6 @@ def main():
         },
         "sampling": {"temperature": TEMPERATURE, "top_k": TOP_K, "top_p": TOP_P, "temps": TEMPS},
         "system": SYSTEM,
-        "focusLayers": FOCUS_LAYERS,
         "fullMlpLayer": FULL_MLP_LAYER,
         "attTopk": ATT_TOPK,
         "mlpTopk": MLP_TOPK,
@@ -512,7 +539,7 @@ def main():
         print(json.dumps(items, ensure_ascii=False, indent=1)[:3000])
         return
     (OUT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
-    print("total bytes:", sum(i["bytes"] for i in items))
+    print("首次载入合计（gz）:", sum(i["bytes"] for i in items), " 乘加分块合计（gz）:", sum(i["microBytes"] for i in items))
 
 
 if __name__ == "__main__":

@@ -29,11 +29,6 @@
   ]
  },
  "system": "你是一个乐于助人的助手，请用一两句话简洁地回答。",
- "focusLayers": [
-  3,
-  14,
-  25
- ],
  "fullMlpLayer": 14,
  "attTopk": 4,
  "mlpTopk": 16,
@@ -227,7 +222,8 @@
     }
    ],
    "ended": true,
-   "bytes": 394487
+   "bytes": 324386,
+   "microBytes": 1129973
   },
   {
    "id": "q02",
@@ -322,7 +318,8 @@
     }
    ],
    "ended": true,
-   "bytes": 164103
+   "bytes": 134527,
+   "microBytes": 482298
   },
   {
    "id": "q03",
@@ -429,7 +426,8 @@
     }
    ],
    "ended": true,
-   "bytes": 191672
+   "bytes": 156839,
+   "microBytes": 564334
   },
   {
    "id": "q04",
@@ -496,7 +494,8 @@
     }
    ],
    "ended": true,
-   "bytes": 127272
+   "bytes": 104209,
+   "microBytes": 372999
   },
   {
    "id": "q05",
@@ -567,7 +566,8 @@
     }
    ],
    "ended": true,
-   "bytes": 135521
+   "bytes": 110986,
+   "microBytes": 400169
   },
   {
    "id": "q06",
@@ -662,7 +662,8 @@
     }
    ],
    "ended": true,
-   "bytes": 175080
+   "bytes": 143620,
+   "microBytes": 509713
   },
   {
    "id": "q07",
@@ -741,7 +742,8 @@
     }
    ],
    "ended": true,
-   "bytes": 145363
+   "bytes": 118738,
+   "microBytes": 427151
   },
   {
    "id": "q08",
@@ -860,7 +862,8 @@
     }
    ],
    "ended": true,
-   "bytes": 237974
+   "bytes": 194022,
+   "microBytes": 703486
   },
   {
    "id": "q09",
@@ -919,7 +922,8 @@
     }
    ],
    "ended": true,
-   "bytes": 75994
+   "bytes": 61749,
+   "microBytes": 227823
   },
   {
    "id": "q10",
@@ -1010,7 +1014,8 @@
     }
    ],
    "ended": true,
-   "bytes": 123532
+   "bytes": 100551,
+   "microBytes": 370632
   },
   {
    "id": "q11",
@@ -1105,7 +1110,8 @@
     }
    ],
    "ended": true,
-   "bytes": 125599
+   "bytes": 102410,
+   "microBytes": 375169
   },
   {
    "id": "q12",
@@ -1164,7 +1170,8 @@
     }
    ],
    "ended": true,
-   "bytes": 76030
+   "bytes": 61785,
+   "microBytes": 228330
   },
   {
    "id": "q13",
@@ -1251,7 +1258,8 @@
     }
    ],
    "ended": true,
-   "bytes": 152476
+   "bytes": 124529,
+   "microBytes": 456667
   },
   {
    "id": "q14",
@@ -1338,7 +1346,8 @@
     }
    ],
    "ended": true,
-   "bytes": 153863
+   "bytes": 126401,
+   "microBytes": 451665
   },
   {
    "id": "q15",
@@ -1429,7 +1438,8 @@
     }
    ],
    "ended": true,
-   "bytes": 145351
+   "bytes": 119153,
+   "microBytes": 426167
   },
   {
    "id": "q16",
@@ -1496,7 +1506,8 @@
     }
    ],
    "ended": true,
-   "bytes": 85235
+   "bytes": 69217,
+   "microBytes": 257650
   }
  ],
  "weightSample": [

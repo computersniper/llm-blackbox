@@ -1,6 +1,6 @@
 import { loadManifest, loadQuestion, loadThumbs } from './data.js';
 import { Chat } from './chat.js';
-import { Timeline } from './timeline.js';
+import { Timeline, microLayer, withoutMicro, viewOf } from './timeline.js';
 import { Controls, SPEEDS } from './controls.js';
 import { interestingHead } from './explain.js';
 import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
@@ -46,7 +46,7 @@ async function boot() {
     seek: (i) => { if (!tl) return; tl.pause(); tl.seekIndex(i); },
     depth: (d) => { if (!tl) return; if (d === 0) exitInspect(); else { d > tl.depth ? sfx.dive() : sfx.rise(); engine?.exitFree(); tl.setDepth(d); } },
     fold: () => updateInsets(),
-    head: (h) => { ctx.head = h; if (tl) { controls.update(tl, ctx); checkSink(); } },
+    head: (h) => { ctx.head = h; if (tl) { if (tl.ready(tl.step)) controls.update(tl, ctx); checkSink(); } },
   });
   chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus });
   bindKeys();
@@ -140,12 +140,14 @@ async function attach(msg, from = null) {
   cur = msg;
   chat.markInspected(msg);
   const prevDepth = tl ? tl.depth : 1;
-  tl = new Timeline(Q, manifest.focusLayers);
+  microWaitHide();
+  const T = (tl = new Timeline(Q));
+  T.ready = (s) => { const L = microLayer(s); return L < 0 || T.Q.hasMicro(L); };
   tl.speed = store.speed;
   if (prevDepth > 1) tl.setDepth(prevDepth);
   if (from != null && from > 0) tl.seekToken(Math.min(from, Q.G - 1));
   tl.on((type) => {
-    if (type === 'step') { controls.update(tl, ctx); discoverFor(); }
+    if (type === 'step' && syncMicro()) { controls.update(tl, ctx); discoverFor(); }
     if (type === 'token') { cur.render(tl.g, { cur: true, fresh: true }); renderStrip(); }
     if (type === 'play') controls.updatePlay(tl);
     if (type === 'end') {
@@ -164,8 +166,61 @@ async function attach(msg, from = null) {
   msg.render(tl.g, { cur: true });
   if (msg.done) { msg.done = false; }
   renderStrip();
+  syncMicro();
   controls.update(tl, ctx);
   tl.play();
+}
+
+/* ---------------------------------------------------------------- 按层懒加载的乘加数据 */
+
+// “一次乘加”的数据 28 层都有，但每层单独一个小文件（data/qNN/Lxx.json）。深度 ≥5 停在第 L 层时，
+// 先把 L 和 L±1 取回来；真走进某层的 D6 而数据还没到，时间线原地等（tl.ready），舞台先画上一级，
+// 数据到了再继续。每换一步调用一次，这一步的数据已经就绪时返回 true
+function syncMicro() {
+  const s = tl.step, need = microLayer(s);
+  if (tl.depth >= 5 && s.ph === 'layer' && s.L !== undefined) {
+    for (const L of [s.L, s.L + 1, s.L - 1]) {
+      if (L >= 0 && L < Q.NL && !Q.hasMicro(L)) Q.ensureMicro(L).catch(() => { /* 真用到这一层时再提示、重试 */ });
+    }
+  }
+  if (need < 0 || Q.hasMicro(need)) { microWaitHide(); return true; }
+  microWaitShow(need);
+  const t = tl;
+  t.Q.ensureMicro(need).then(() => {
+    if (tl !== t || microLayer(tl.step) !== need) return; // 已经走开了，新的那一步自己会处理
+    microWaitHide();
+    controls.update(tl, ctx);
+    discoverFor();
+  }, (e) => {
+    if (tl === t && microLayer(tl.step) === need) microWaitShow(need, e);
+  });
+  return false;
+}
+
+let microEl = null, microTimer = 0;
+function microWaitShow(L, err = null) {
+  if (!microEl) {
+    microEl = document.createElement('div');
+    microEl.id = 'microWait';
+    microEl.setAttribute('role', 'status');
+    microEl.style.cssText = 'position:absolute;left:50%;top:14px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:var(--panel);border:1px solid var(--line2);color:var(--ink2);font-size:13px;white-space:nowrap';
+    microEl.addEventListener('click', () => { if (tl && microEl.dataset.err) syncMicro(); });
+    $('#loading').parentElement.append(microEl);
+  }
+  microEl.dataset.err = err ? '1' : '';
+  microEl.style.cursor = err ? 'pointer' : 'default';
+  microEl.title = err ? String(err.message || err) : '';
+  microEl.innerHTML = err
+    ? `第 ${L} 层的乘加数据没有载入成功，点这里重试`
+    : `<span class="spin" style="width:14px;height:14px;border-width:2px"></span>正在载入第 ${L} 层的乘加数据…`;
+  clearTimeout(microTimer);
+  // 缓存命中或网络很快时不闪一下
+  if (err) microEl.style.display = 'flex';
+  else microTimer = setTimeout(() => { microEl.style.display = 'flex'; }, 150);
+}
+function microWaitHide() {
+  clearTimeout(microTimer);
+  if (microEl) microEl.style.display = 'none';
 }
 
 function exitInspect() {
@@ -175,6 +230,7 @@ function exitInspect() {
   document.body.classList.replace('mode-inspect', 'mode-chat');
   document.body.classList.remove('chat-open');
   controls.renderCrumbs(null);
+  microWaitHide();
   if (tl) tl.pause();
   if (cur) {
     const n = tl ? tl.g : 0;
@@ -237,20 +293,24 @@ function flashBtn(sel) {
 function onFrame(dt, t) {
   if (!tl || !machine) return;
   tl.tick(dt);
-  dAnim += (tl.depth - dAnim) * (1 - Math.exp(-dt * 2.6));
-  const view = tl.view, s = tl.step;
+  // 这一步的乘加数据还没到：舞台先按上一级（D5 算子）画，绝不渲染缺数据的微观内容
+  const ready = tl.ready(tl.step);
+  const s = ready ? tl.step : withoutMicro(tl.step);
+  const depth = ready ? tl.depth : Math.min(tl.depth, 5);
+  const view = ready ? tl.view : viewOf(depth, s);
+  dAnim += (depth - dAnim) * (1 - Math.exp(-dt * 2.6));
   let head = null;
   if ((view === 'attn' || view === 'dot' || view === 'bits') && s.ph === 'layer') {
     if (ctx.head === 'avg') head = null;
     else if (typeof ctx.head === 'number') head = ctx.head;
     else head = view === 'dot' ? Q.dotAt(s.L, tl.g)?.head ?? interestingHead(Q, s.L, Q.row(tl.g)) : interestingHead(Q, s.L, Q.row(tl.g));
   }
-  const st = { step: s, p: tl.p, g: tl.g, depth: tl.depth, dAnim, view, head };
+  const st = { step: s, p: tl.p, g: tl.g, depth, dAnim, view, head };
   machine.update(st, dt, t);
   const cam = machine.camera(st);
-  const same = view === lastView && tl.depth === lastDepth;
+  const same = view === lastView && depth === lastDepth;
   engine.setView(cam.pos, cam.look, { speed: same ? 2.4 : 2.0 });
-  if (!same) { lastView = view; lastDepth = tl.depth; }
+  if (!same) { lastView = view; lastDepth = depth; }
 }
 
 /* ---------------------------------------------------------------- 悬停 / 点击 3D 物体 */

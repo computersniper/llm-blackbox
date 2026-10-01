@@ -55,14 +55,20 @@ export async function loadThumbs() {
   return thumbs;
 }
 
+const decodeJSON = (buf) => JSON.parse(new TextDecoder().decode(buf));
+
 export async function loadQuestion(id, manifest) {
   if (cache.has(id)) return cache.get(id);
   const [jbuf, buf] = await Promise.all([fetchData(`data/${id}.json`), fetchData(`data/${id}.bin`)]);
-  const meta = JSON.parse(new TextDecoder().decode(jbuf));
+  const meta = decodeJSON(jbuf);
   const arr = {};
   for (const [k, spec] of Object.entries(meta.bin)) arr[k] = view(buf, spec);
   const M = manifest.model;
   const NL = M.layers, H = M.heads, G = meta.G, K = manifest.attTopk, MK = manifest.mlpTopk;
+  // “一次乘加”的数据（单神经元 / 单次打分 / 矩阵乘法的一个输出元素）28 层都有，但按层拆成小文件
+  // data/qNN/Lxx.json，进入某一层的 D6 时才去取。micro 存已经到手的层，pending 合并同一层的并发请求
+  const micro = new Map();
+  const pending = new Map();
   const Q = {
     ...meta,
     M,
@@ -104,10 +110,26 @@ export async function loadQuestion(id, manifest) {
     },
     norm: (L, i) => meta.norms[L][i],
     lensAt: (g, L) => meta.lens[g][L],
-    neuronAt: (L, g) => meta.neuron[String(L)]?.[g] ?? null,
-    mmAt: (L, g) => meta.mm?.[String(L)]?.[g] ?? null,
+    // 第 L 层的乘加数据到了没有；没到时下面三个访问器返回 null
+    hasMicro: (L) => micro.has(L),
+    // 取第 L 层的乘加数据：已缓存就立即完成，同一层同时只发一个请求；失败后下次调用会重试
+    ensureMicro(L) {
+      if (micro.has(L)) return Promise.resolve(micro.get(L));
+      if (pending.has(L)) return pending.get(L);
+      if (!Number.isInteger(L) || L < 0 || L >= NL) return Promise.reject(new Error(`没有第 ${L} 层`));
+      const p = fetchData(`data/${id}/L${String(L).padStart(2, '0')}.json`).then((b) => {
+        const d = decodeJSON(b);
+        micro.set(L, d);
+        pending.delete(L);
+        return d;
+      }, (e) => { pending.delete(L); throw e; });
+      pending.set(L, p);
+      return p;
+    },
+    neuronAt: (L, g) => micro.get(L)?.neuron?.[g] ?? null,
+    mmAt: (L, g) => micro.get(L)?.mm?.[g] ?? null,
     headMMAt: (g) => meta.headMM?.[g] ?? null,
-    dotAt: (L, g) => meta.dot[String(L)]?.[g] ?? null,
+    dotAt: (L, g) => micro.get(L)?.dot?.[g] ?? null,
   };
   cache.set(id, Q);
   return Q;
