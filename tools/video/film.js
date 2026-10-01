@@ -22,7 +22,7 @@ const QID = params.get('q') || 'q01';
 const PREVIEW = params.has('preview');
 const $ = (s) => document.querySelector(s);
 
-let E, M, Q, MAN, SC, OPENING;
+let E, M, Q, MAN, SC, OPENING, QR_SVG = '';
 const extras = {};
 const EVENTS = []; // 给配乐 / 音效用的事件（时间点），渲染脚本会把它导出成 events.json
 
@@ -63,6 +63,7 @@ async function boot() {
     document.fonts.load('400 20px "JetBrains Mono"', '0123'),
     document.fonts.load('700 20px "JetBrains Mono"', '0123'),
   ]);
+  QR_SVG = await (await fetch('/tools/video/qr-blackbox.svg')).text();
   MAN = await loadManifest();
   Q = await loadQuestion(QID, MAN);
   await Promise.all(Array.from({ length: Q.NL }, (_, L) => Q.ensureMicro(L)));
@@ -268,6 +269,128 @@ function buildOverlays() {
   // 片尾
   OV.end = el('div', 'endcard', '', ov);
   OV.end2 = el('div', 'endcard', '', ov);
+  // 继续探索：一句引子 → 站内另外几页 → 延伸学习 + 二维码（二维码由 make_qr.py 在本地生成）
+  OV.end3 = el('div', 'endcard', '<div class="lead">这只是一个字的旅程。想继续看？</div>', ov);
+  OV.end4 = el('div', 'endcard', `<div class="more">${[['训练', '模型是怎么学会的'], ['多模态', '它怎么看图'], ['智能体', '它怎么动手干活'], ['世界模型', '它脑子里的世界']].map(([a, b]) => `<b>${a}</b><span>${b}</span>`).join('')}</div>`, ov);
+  OV.end5 = el('div', 'endcard fin', `<div class="qr">${QR_SVG}</div><div class="fin-t"><div class="k">延伸学习</div><div class="url">caijiechao.com/blackbox/learn/</div><div class="hint">扫码打开网站 · caijiechao.com/blackbox/</div><div class="cred">Qwen3-0.6B 真实离线运行数据 · 画面与音乐均由程序生成</div></div>`, ov);
+
+  // v5 讲解层：章节进度、术语标签、注意力公式、6 个头的小图、指示环
+  OV.terms = new CueLayer(ov, 'term', SC.terms, { rise: 6, fin: 0.3, fout: 0.3 });
+  OV.prog = el('div', 'prog', SC.chapterNames.map((c, i) => `${i ? '<span class="ln"></span>' : ''}<span class="it"><i>${i + 1}</i>${c}</span>`).join(''), ov);
+  OV.progIt = [...OV.prog.querySelectorAll('.it')];
+  OV.progKey = '';
+  OV.formula = el('div', 'formula', `<div class="eq">
+      <span class="t" data-k="lhs">Attention(<span class="q">Q</span>, <span class="k">K</span>, <span class="v">V</span>) =</span>
+      <span class="t" data-k="smL">softmax(</span>
+      <span class="frac"><span class="t" data-k="qk"><span class="q">Q</span><span class="k">K</span><sup>T</sup></span><span class="bar" data-k="sd"></span><span class="t" data-k="sd">√<span style="text-decoration:overline">d</span></span></span>
+      <span class="t" data-k="smR">)</span>
+      <span class="t" data-k="v">· <span class="v">V</span></span>
+    </div><div class="cap"></div>`, ov);
+  OV.fTerms = [...OV.formula.querySelectorAll('[data-k]')];
+  OV.fCap = OV.formula.querySelector('.cap');
+  OV.fKey = '';
+  OV.heads6 = el('div', 'heads6', '', ov);
+  OV.h6Key = '';
+  OV.rings = [];
+}
+
+// 章节进度：当前一章亮
+function updateProg(t) {
+  const p = SC.progAt(t);
+  OV.prog.style.display = p.a > 0.001 ? 'flex' : 'none';
+  if (p.a <= 0.001) return;
+  OV.prog.style.opacity = p.a.toFixed(3);
+  const key = String(p.i);
+  if (key === OV.progKey) return;
+  OV.progKey = key;
+  OV.progIt.forEach((e, i) => { e.className = `it${i === p.i ? ' on' : i < p.i ? ' done' : ''}`; });
+}
+
+// 注意力公式：show = 已经讲到的项，hi = 正在讲的项（'sm' 表示 softmax 的左右括号一起亮），cap = 下面一行真实数字
+function updateFormula(F) {
+  OV.formula.style.display = F && F.a > 0.001 ? 'block' : 'none';
+  if (!F || F.a <= 0.001) return;
+  OV.formula.style.opacity = F.a.toFixed(3);
+  OV.formula.style.transform = `translateX(-50%) translateY(${((1 - easeOut(Math.min(1, F.a * 1.2))) * -10).toFixed(1)}px)`;
+  const key = `${F.show.join(',')}|${F.hi}|${F.cap}`;
+  if (key === OV.fKey) return;
+  OV.fKey = key;
+  const grp = (k) => (k === 'smL' || k === 'smR' ? 'sm' : k);
+  for (const e of OV.fTerms) {
+    const k = e.dataset.k;
+    const shown = F.show.includes(grp(k)) || F.show.includes(k);
+    e.style.opacity = shown ? '1' : '0.13';
+    if (e.classList.contains('t')) e.className = `t${F.hi !== 'all' && F.hi === grp(k) ? ' on' : shown ? ' done' : ''}`;
+  }
+  OV.formula.classList.toggle('all', F.hi === 'all');
+  OV.fCap.innerHTML = F.cap || '';
+}
+
+// 6 个头的小图：每个头前 3 名（真实数据）。「天空」那一行用琥珀色
+const tokShort = (s) => ({ '<|im_start|>': '开头', '\n\n': '换行', '</think>': '思考结束', '\n': '换行' }[s] ?? tokPlain(s));
+function updateHeads6(H) {
+  OV.heads6.style.display = H && H.a > 0.001 ? 'grid' : 'none';
+  if (!H || H.a <= 0.001) return;
+  OV.heads6.style.opacity = H.a.toFixed(3);
+  if (OV.h6Key !== H.list.join(',')) {
+    OV.h6Key = H.list.join(',');
+    const row = Q.row(H.g ?? 0);
+    OV.heads6.innerHTML = H.list.map((h) => {
+      const top = Q.att(H.L, h, row).slice(0, 3);
+      return `<div class="hd" data-h="${h}"><div class="hn">第 ${h} 个头<small>${esc(H.notes?.[h] ?? '')}</small></div>${top.map((r) => `<div class="r${Q.tokens[r.j].s === H.sky ? ' sky' : ''}"><span>「${esc(tokShort(Q.tokens[r.j].s))}」</span><span class="bar" style="width:${Math.max(3, r.w * 100).toFixed(1)}%"></span><span class="p">${pct(r.w)}</span></div>`).join('')}</div>`;
+    }).join('');
+  }
+  OV.heads6.querySelectorAll('.hd').forEach((d, k) => {
+    const a = smooth(clamp((H.k ?? 1) * H.list.length - k));
+    d.style.opacity = a.toFixed(3);
+    d.style.transform = `translateY(${((1 - a) * 14).toFixed(1)}px)`;
+    d.classList.toggle('on', Number(d.dataset.h) === H.on);
+  });
+}
+
+// 指示环：at() 给世界坐标，w / h 是要圈住的世界尺寸
+const toScreen = (v) => { const p = v.clone().project(E.camera); return { x: ((p.x + 1) / 2) * 1920, y: ((1 - p.y) / 2) * 1080 }; };
+function updateRings(R) {
+  const list = (R || []).filter((r) => r.a > 0.001);
+  while (OV.rings.length < list.length) OV.rings.push(el('div', 'ring', '<span class="rl"></span>', $('#ov')));
+  if (list.length) E.camera.updateMatrixWorld();
+  OV.rings.forEach((e, k) => {
+    const r = list[k];
+    e.style.display = r ? 'block' : 'none';
+    if (!r) return;
+    const c = typeof r.at === 'function' ? r.at() : r.at;
+    if (!c) { e.style.display = 'none'; return; }
+    const a = toScreen(c), bx = toScreen(c.clone().add(new THREE.Vector3((r.w ?? 0.3) / 2, 0, 0))), by = toScreen(c.clone().add(new THREE.Vector3(0, (r.h ?? r.w ?? 0.3) / 2, 0)));
+    const w = Math.max(r.min ?? 60, Math.hypot(bx.x - a.x, bx.y - a.y) * 2 + (r.pad ?? 36)), h = Math.max(r.min ?? 60, Math.hypot(by.x - a.x, by.y - a.y) * 2 + (r.pad ?? 36));
+    const pop = 1 + 0.25 * (1 - easeOut(Math.min(1, r.a * 1.4)));
+    e.className = `ring${r.cls ? ` ${r.cls}` : ''}${r.top ? ' top' : ''}`;
+    e.style.left = `${(a.x - (w * pop) / 2).toFixed(1)}px`;
+    e.style.top = `${(a.y - (h * pop) / 2).toFixed(1)}px`;
+    e.style.width = `${(w * pop).toFixed(1)}px`;
+    e.style.height = `${(h * pop).toFixed(1)}px`;
+    e.style.opacity = r.a.toFixed(3);
+    const lb = e.firstChild;
+    if (lb.innerHTML !== (r.label || '')) lb.innerHTML = r.label || '';
+  });
+}
+
+// 注意力的三块矩阵：讲到哪个，哪个亮，另外两块和它们的标签压暗 / 收起
+function focusAttn(which, k = 1) {
+  const A = M.mats.attn;
+  if (!A || !A.visible) return;
+  A.gqaL.visible = false;
+  A.gqa.visible = false;
+  for (const [key, pn, vec] of [['q', A.q, A.qo], ['k', A.k, A.ko], ['v', A.v, A.vo]]) {
+    const on = !which || which === key;
+    const dim = on ? 1 : 1 - 0.88 * k;
+    pn.mat.opacity *= dim;
+    pn.edge.material.opacity = 0.7 * dim;
+    pn.scan.material.opacity *= dim;
+    vec.segs.forEach((s) => { s.material.opacity = 0.95 * dim; });
+    const base = key === 'q' ? A.q.lb.visible : true; // W_q 的标签在微观视图里由 mats.js 收起
+    pn.lb.visible = base && on;
+    if (vec.lbl) vec.lbl.visible = on && !which;
+  }
 }
 
 function updateOverlays(t, f) {
@@ -323,7 +446,12 @@ function updateOverlays(t, f) {
       const p = M.cFront.getWorldPosition(new THREE.Vector3()).project(E.camera);
       OV.title.style.left = `${(((p.x + 1) / 2) * 1920).toFixed(1)}px`;
       OV.title.style.top = `${(((1 - p.y) / 2) * 1080).toFixed(1)}px`;
-    } else { OV.title.style.left = ''; OV.title.style.top = ''; }
+      // 黑箱还远的时候前面板在屏幕上很窄：片名跟着缩小，始终收在发光边框里
+      const W = M.cFront.geometry.parameters.width;
+      const l = toScreen(M.cFront.localToWorld(new THREE.Vector3(-W / 2, 0, 0))), r = toScreen(M.cFront.localToWorld(new THREE.Vector3(W / 2, 0, 0)));
+      const fit = Math.min(1, (0.86 * Math.hypot(r.x - l.x, r.y - l.y)) / Math.max(1, OV.title.offsetWidth));
+      OV.title.style.transform = `translate(-50%, -50%) scale(${fit.toFixed(4)})`;
+    } else { OV.title.style.left = ''; OV.title.style.top = ''; OV.title.style.transform = ''; }
     OV.title.querySelector('.rule').style.width = `${(520 * easeInOut(seg(k, 0.15, 0.8))).toFixed(1)}px`;
     OV.title.querySelector('.st').style.opacity = smooth(seg(k, 0.35, 0.8)).toFixed(3);
     OV.title.querySelector('.spec').style.opacity = (0.9 * smooth(seg(k, 0.55, 1))).toFixed(3);
@@ -334,6 +462,11 @@ function updateOverlays(t, f) {
   updateAtt(o.att);
   updateReply(o.reply);
   updateEnd(o.end);
+  OV.terms.update(t);
+  updateProg(t);
+  updateFormula(o.formula);
+  updateHeads6(o.heads6);
+  updateRings(o.rings);
 }
 
 // 逻辑透镜：每层输出直接接最终归一化 + 输出头，读出两个候选词的概率（真实数据：选中词的概率 + 每层前 3 名）
@@ -454,10 +587,18 @@ function updateEnd(D) {
     OV.end.querySelector('.stat').style.opacity = (D.k1 ?? 1).toFixed(3);
   }
   if (a2 > 0.001) {
-    if (!OV.end2.innerHTML) OV.end2.innerHTML = `<div class="brand">在线体验</div><div class="url">caijiechao.com/blackbox/</div><div class="cred">在网页里，你可以亲手把这台机器一层层拆开<br><span class="m" style="font-size:15px;letter-spacing:.12em">Qwen3-0.6B 真实离线运行数据 · 画面与音乐均由程序生成</span></div>`;
+    if (!OV.end2.innerHTML) OV.end2.innerHTML = `<div class="brand">在线体验</div><div class="url">caijiechao.com/blackbox/</div>`;
     OV.end2.style.opacity = a2.toFixed(3);
     OV.end2.style.transform = `translate(-50%, -50%) translateY(${((1 - easeOut(D.k2 ?? 1)) * 12).toFixed(2)}px)`;
   }
+  // 继续探索
+  const a3 = D?.a3 ?? 0, a4 = D?.a4 ?? 0, a5 = D?.a5 ?? 0;
+  for (const [e, a] of [[OV.end3, a3], [OV.end4, a4], [OV.end5, a5]]) {
+    e.style.display = a > 0.001 ? (e === OV.end5 ? 'flex' : 'block') : 'none';
+    if (a > 0.001) { e.style.opacity = a.toFixed(3); e.style.transform = `translate(-50%, -50%) translateY(${((1 - easeOut(Math.min(1, a * 1.3))) * 14).toFixed(2)}px)`; }
+  }
+  if (a4 > 0.001) [...OV.end4.querySelectorAll('.more > *')].forEach((c, i) => { const k = smooth(clamp((D.k4 ?? 1) * 4 - Math.floor(i / 2) * 0.9)); c.style.opacity = k.toFixed(3); });
+  if (a5 > 0.001) { const k = D.k5 ?? 1; OV.end5.querySelector('.qr').style.opacity = smooth(seg(k, 0, 0.5)).toFixed(3); OV.end5.querySelector('.hint').style.opacity = smooth(seg(k, 0.4, 0.9)).toFixed(3); OV.end5.querySelector('.cred').style.opacity = (0.8 * smooth(seg(k, 0.6, 1))).toFixed(3); }
 }
 
 /* ================================================================ 算式板 */
@@ -517,6 +658,16 @@ function renderAt(t, { render = true } = {}) {
     M.update(f.st, dt, t);
     cleanBoard(f.boardA ?? 1);
     if (f.after) f.after(M);
+    // v5：讲到 Q / K / V 中的哪一个，哪块矩阵亮；打分那一步先不显示弧线上的权重（softmax 之后才有）
+    focusAttn(f.attnFocus ?? null, f.attnFocusK ?? 1);
+    for (const b of M.beamList || []) b.m.children.forEach((c) => { if (c.el) c.visible = f.beamLabels !== false; });
+    // 层板展开时的部件标签：只留正在讲的那一个（exOnly），其余收起
+    if (f.exOnly !== undefined) for (const [k, lb] of Object.entries(M.exLabels)) if (k !== f.exOnly) lb.visible = false;
+    if (f.hideMlpLabels) {
+      const P = M.mats.mlp;
+      for (const l of [P.xl, P.x2l, P.go.lbl, P.uo.lbl, P.dinL, P.dout.lbl, P.g.lb, P.u.lb, P.d.lb]) if (l) l.visible = false;
+    }
+    M.detail.panelTitle.visible = !f.hideMlpLabels;
     isolate(f.iso ?? 0, f.st);
     // 层板右端的逻辑透镜读数：机器太宽（78 个位置），挪到当前词元的光柱旁边
     const lx = M.x(Q.row(f.st.g)) + (f.lensDx ?? 0.75);

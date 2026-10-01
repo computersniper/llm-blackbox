@@ -449,13 +449,14 @@ SEC_CHORDS = {
     'fly': ['Dm9', 'Bbmaj7', 'Csus2'],          # 穿入：一路往上走
     'land': ['Dm9', 'Bbmaj7', 'Fmaj7'],
     'embed': P1, 'layers1': P1,
-    'dissect': P2,
+    'attn': P2,                                 # 注意力：讲解段，安静
+    'ffn': ['Gm9', 'Bbmaj7', 'Dm9', 'A7sus4'],  # 前馈
     'sample1': ['Bbmaj7', 'Bbmaj7', 'Gm9', 'Gm9', 'A7sus4', 'A'],
     'loop1': P1,
     'layersK': ['Bbmaj7', 'C', 'Dm9', 'Bbmaj7', 'C', 'A7sus4'],
     'sampleK': ['Gm9', 'Gm9', 'A7sus4', 'A'],
     'loop2': P1,
-    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Dsus2', 'D'],
+    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Bbmaj9', 'FmajA', 'Gm9', 'Dsus2', 'D', 'D'],  # 答案卡 → 继续探索 → 收尾
 }
 
 
@@ -524,7 +525,7 @@ def compose(ev, out_wav, stems_dir=None):
         en = energy(t0 + 0.1) if not (sec(t0 + 0.1) == "chat" and t0 + BAR > send_t) else 0.5  # 发送以后：和弦亮起来
         notes, root = CH[c]
         nm = sec(t0 + 0.1)
-        bright = 0.25 + 0.6 * en if nm not in ('dissect',) else 0.22
+        bright = 0.25 + 0.6 * en if nm not in ('attn', 'ffn') else 0.22
         vol = 0.32 + 0.35 * en
         if nm == 'end':
             vol = 0.55
@@ -554,7 +555,10 @@ def compose(ev, out_wav, stems_dir=None):
         for k in range(steps):
             if nm == "chat" and t0 + k * step < send_t + 0.3:
                 continue
-            if nm == 'dissect' and k % 2 == 1 and (b % 2 == 0):
+            # 讲解段：琶音稀一点，留出思考的空间
+            if nm == 'attn' and k % 4 != 0:
+                continue
+            if nm == 'ffn' and k % 2 == 1:
                 continue
             if nm in ('sample1', 'sampleK') and k % 4 != 0:
                 continue
@@ -562,7 +566,7 @@ def compose(ev, out_wav, stems_dir=None):
             vel = (0.55 + 0.45 * (k % 4 == 0)) * (0.5 + 0.5 * en)
             if nm == 'chat':
                 vel *= 0.55 + 0.45 * k / steps  # 推近气泡时一点点涨上去
-            br = 0.35 + 0.5 * en if nm != 'dissect' else 0.25
+            br = 0.35 + 0.5 * en if nm not in ('attn', 'ffn') else 0.25
             arp.add(t0 + k * step, pluck(m, 0.6, br, vel), 0.42, pan=0.35 * math.sin(k * 1.3 + b))
 
     # 4. 贝斯与鼓
@@ -600,11 +604,11 @@ def compose(ev, out_wav, stems_dir=None):
     for b, c in enumerate(plan):
         t0 = b * BAR
         nm = sec(t0 + 0.1)
-        kind = {'chat': 'none', 'fly': 'heart', 'land': 'none', 'embed': 'heart', 'layers1': 'groove', 'dissect': 'half',
+        kind = {'chat': 'none', 'fly': 'heart', 'land': 'none', 'embed': 'heart', 'layers1': 'groove', 'attn': 'none', 'ffn': 'none',
                 'sample1': 'heart', 'loop1': 'groove', 'layersK': 'four', 'sampleK': 'heart', 'loop2': 'full', 'end': 'none'}[nm]
         sname, k_in, nb_in = binfo[b]
-        if nm == 'dissect' and (k_in < 2 or k_in == nb_in - 1):
-            kind = 'none'   # 拆开的头两小节和最后一小节留白
+        if nm == 'ffn' and k_in % 4 == 2 and k_in < nb_in - 2:
+            kind = 'heart'  # 前馈段偶尔垫一下心跳，别完全停住
         if nm == 'layers1' and k_in == 0:
             kind = 'heart'
         if nm == 'chat' and k_in == nb_in - 1:
@@ -620,7 +624,7 @@ def compose(ev, out_wav, stems_dir=None):
                 for k in range(8):
                     bass.add(t0 + k * BEAT / 2, bass_note(root + (12 if k % 4 == 3 else 0), BEAT / 2 * 0.9, 0.9 if k % 2 == 0 else 0.7))
             else:
-                bass.add(t0, bass_note(root, BAR * 0.95, 0.5 if nm == 'dissect' else 0.65))
+                bass.add(t0, bass_note(root, BAR * 0.95, 0.45 if nm in ('attn', 'ffn') else 0.65))
     # 片尾最后一个低音
     bass.add((nbars - 1) * BAR, bass_note(38, 4.5, 0.6))
 
@@ -709,7 +713,7 @@ def compose(ev, out_wav, stems_dir=None):
         bus.x *= duck
 
     # 段落音量：冷开场、拆层段落更安静，28 层和最后的自回归最满
-    LEVEL = {'chat': 0.7, 'fly': 0.95, 'land': 0.78, 'embed': 0.78, 'layers1': 1.0, 'dissect': 0.8, 'sample1': 0.76,
+    LEVEL = {'chat': 0.7, 'fly': 0.95, 'land': 0.78, 'embed': 0.78, 'layers1': 1.0, 'attn': 0.64, 'ffn': 0.68, 'sample1': 0.76,
              'loop1': 0.9, 'layersK': 1.0, 'sampleK': 0.74, 'loop2': 1.0, 'end': 0.7}
     lvl = np.ones(pad.n)
     for s_ in sections:
@@ -744,7 +748,7 @@ def compose(ev, out_wav, stems_dir=None):
     # 淡入淡出
     t = tvec(n_end)
     mix *= np.clip(t / 0.4, 0, 1)
-    mix *= np.clip((dur - t) / 3.5, 0, 1) ** 1.5
+    mix *= np.clip((dur - t) / 6.0, 0, 1) ** 1.5   # 片尾（延伸学习那一屏）慢慢淡出
 
     if stems_dir:
         for name, bus in (('pad', pad), ('arp', arp), ('bass', bass), ('drums', drums), ('fx', fx), ('bells', bells)):

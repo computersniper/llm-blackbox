@@ -207,3 +207,76 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .cp-bot .th .tx { background: linear-gradient(90deg, #8390aa 0%, #8390aa 38%, #f2f6fc 50%, #8390aa 62%, #8390aa 100%); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; }
 .cp-bot .dots { display: inline-flex; gap: 9px; padding-top: 6px; }
 .cp-bot .dots i { width: 10px; height: 10px; border-radius: 50%; background: #7a859e; }
+
+/* ================================================================ v5：讲解层（一次只讲一件事）
+   顶部章节进度条 + 字幕上方的小号术语标签 + 注意力公式板 + 6 个头的小图 + 指示环 */
+
+/* 章节进度：很小、低调；当前一章亮，讲过的半亮，没到的暗 */
+.prog { position: absolute; left: 50%; top: 34px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; white-space: nowrap; font-size: 21px; font-weight: 600; letter-spacing: .06em; }
+.prog .it { display: flex; align-items: center; gap: 8px; color: rgba(150, 165, 195, .38); }
+.prog .it i { font-style: normal; font-family: var(--mono); font-weight: 400; font-size: 15px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 1px solid rgba(150, 180, 230, .22); }
+.prog .it.done { color: rgba(176, 186, 205, .62); }
+.prog .it.done i { border-color: rgba(94, 240, 212, .3); color: rgba(94, 240, 212, .6); }
+.prog .it.on { color: #eef3fb; }
+.prog .it.on i { border-color: #5ef0d4; background: #5ef0d4; color: #03100d; box-shadow: 0 0 14px rgba(94, 240, 212, .45); }
+.prog .ln { width: 30px; height: 1px; background: rgba(150, 180, 230, .2); }
+
+/* 术语标签：字幕正上方，一次最多一个 */
+.term { position: absolute; left: 50%; bottom: 128px; padding: 5px 16px 6px; border-radius: 999px; border: 1px solid rgba(94, 240, 212, .45); background: rgba(3, 10, 16, .72); color: #9ff3e2; font-size: 21px; font-weight: 600; letter-spacing: .05em; white-space: nowrap; }
+.term .m { color: #d8fff6; }
+.term sub, .term sup { font-size: .7em; }
+.term q { quotes: "「" "」"; color: var(--amber); }
+
+/* 注意力公式板：随画面一项一项搭出来；正在讲的那一项亮，下面配真实数字 */
+.formula { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 20px 34px 16px; border-radius: 18px; background: rgba(3, 7, 15, .84); border: 1px solid var(--line2); backdrop-filter: blur(8px); white-space: nowrap; }
+.formula .eq { display: flex; align-items: center; gap: 10px; font-family: "Film Serif", serif; font-weight: 600; font-size: 44px; color: rgba(176, 186, 205, .55); }
+.formula .t { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 10px; }
+.formula .t.on { color: #fff; background: rgba(94, 240, 212, .12); box-shadow: 0 0 0 1.5px rgba(94, 240, 212, .7), 0 0 24px rgba(94, 240, 212, .25); }
+.formula .t.done { color: #dfe7f3; }
+.formula .q { color: #7fe9d6; }
+.formula .k { color: #ffc27a; }
+.formula .v { color: #c9b5ff; }
+.formula sup, .formula sub { font-size: .55em; }
+.formula .frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.formula .frac .bar { align-self: stretch; height: 2px; background: currentColor; margin: 5px 0 3px; opacity: .8; }
+.formula .cap { margin-top: 12px; min-height: 32px; text-align: center; font-size: 25px; font-weight: 600; color: var(--ink2); letter-spacing: .03em; }
+.formula .cap .m { color: #5ef0d4; }
+.formula .cap q { quotes: "「" "」"; color: var(--amber); }
+
+/* 16 个头里挑 6 个：每个头一张小图（前几名键 + 权重条） */
+.heads6 { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); display: grid; grid-template-columns: repeat(3, 370px); gap: 18px 22px; }
+.heads6 .hd { padding: 16px 20px 12px; border-radius: 16px; background: rgba(3, 7, 15, .88); border: 1px solid var(--line2); }
+.heads6 .hd.on { border-color: rgba(94, 240, 212, .7); box-shadow: 0 0 22px rgba(94, 240, 212, .18); }
+.heads6 .hn { font-size: 22px; font-weight: 600; color: var(--ink); margin-bottom: 8px; letter-spacing: .04em; }
+.heads6 .hn small { margin-left: 10px; font-size: 18px; color: var(--dim); }
+.heads6 .r { display: grid; grid-template-columns: 132px 1fr 66px; align-items: center; gap: 10px; height: 34px; font-size: 21px; color: var(--ink2); }
+.heads6 .r .bar { height: 12px; border-radius: 6px; background: rgba(150, 175, 210, .55); }
+.heads6 .r .p { font-family: var(--mono); font-size: 18px; color: var(--ink2); text-align: right; }
+.heads6 .r.sky { color: #ffd29a; }
+.heads6 .r.sky .bar { background: #ffb65c; }
+
+/* 指示环：圈住正在讲的那个东西（跟着 3D 物体在屏幕上的位置走） */
+.ring { position: absolute; border: 2.5px solid rgba(94, 240, 212, .9); border-radius: 50%; box-shadow: 0 0 18px rgba(94, 240, 212, .45), inset 0 0 12px rgba(94, 240, 212, .2); pointer-events: none; }
+.ring.amber { border-color: rgba(255, 182, 92, .95); box-shadow: 0 0 18px rgba(255, 182, 92, .45), inset 0 0 12px rgba(255, 182, 92, .2); }
+.ring .rl { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 10px); white-space: nowrap; font-size: 30px; font-weight: 600; color: #e9fffa; text-shadow: 0 2px 10px #000, 0 0 3px #000; }
+.ring.amber .rl { color: #ffe3bd; }
+.ring.top .rl { top: auto; bottom: 100%; transform: translate(-50%, -8px); }
+.ring q { quotes: "「" "」"; }
+.formula.all { box-shadow: 0 0 0 1.5px rgba(94, 240, 212, .55), 0 0 34px rgba(94, 240, 212, .22); }
+.formula.all .t.done { color: #fff; }
+
+/* 算式板（网站 D6/D7）在片子里只留算式、表格和累加器：说明文字、步骤胶囊、去向说明都藏起来 */
+.board .bd-cap, .board .bd-steps, .board .bd-dest, .board .bd-dest-h, .board .bd-eff p { display: none !important; }
+
+/* 片尾：继续探索 */
+.endcard .lead { font-size: 58px; font-weight: 600; letter-spacing: .08em; color: #f2f5fb; }
+.endcard .more { display: grid; grid-template-columns: auto auto; gap: 30px 44px; align-items: baseline; text-align: left; }
+.endcard .more b { font-size: 46px; font-weight: 900; letter-spacing: .08em; color: #f2f5fb; }
+.endcard .more span { font-size: 38px; font-weight: 600; letter-spacing: .04em; color: var(--ink2); }
+.endcard.fin { align-items: center; gap: 72px; text-align: left; }
+.endcard .qr { flex: none; width: 340px; height: 340px; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
+.endcard .qr svg { display: block; width: 100%; height: 100%; }
+.endcard .fin-t .k { font-size: 72px; font-weight: 900; letter-spacing: .12em; color: #f2f5fb; }
+.endcard .fin-t .url { margin-top: 22px; font-family: var(--mono); font-size: 36px; letter-spacing: .04em; color: var(--cyan); }
+.endcard .fin-t .hint { margin-top: 26px; font-size: 26px; font-weight: 600; letter-spacing: .06em; color: var(--ink2); }
+.endcard .fin-t .cred { margin-top: 40px; font-size: 19px; font-weight: 600; letter-spacing: .08em; color: var(--dim); }
