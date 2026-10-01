@@ -45,7 +45,7 @@ export function buildSteps(depth, g, C) {
   else {
     for (let L = 0; L < C.NL; L++) {
       if (depth === 3) { s.push({ g, ph: 'layer', L }); continue; }
-      const ops = L < C.deep ? [...LLM_OPS, 'deep'] : LLM_OPS;
+      const ops = L < C.deep && g === 0 ? [...LLM_OPS, 'deep'] : LLM_OPS;  // DeepStack 只在预填充时加到图片位置上
       for (const op of ops) {
         if (depth >= 5 && op === 'attn' && C.focus.includes(L)) s.push({ g, ph: 'layer', L, op, mi: 'heads' });
         else s.push({ g, ph: 'layer', L, op });
