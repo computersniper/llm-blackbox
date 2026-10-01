@@ -447,7 +447,7 @@ llm-blackbox/
 │   │   ├── controls.js      调试器界面
 │   │   ├── data.js          读取导出的数据
 │   │   ├── prefetch.js      后台预取：空闲时 modulepreload 舞台的整张模块图
-│   │   ├── resize.js        左右面板拖动调整宽度（四个页面共用）
+│   │   ├── resize.js        左右面板拖动调整宽度（各页面共用）
 │   │   ├── insights.js      知识碎片
 │   │   ├── audio.js bg.js   WebAudio 即时合成的音效（默认静音）、背景粒子
 │   │   ├── stage/           Three.js 舞台：engine 渲染 / 相机 / 拾取，machine 机器本体，
@@ -569,7 +569,7 @@ python tools/agent/record.py --model ... --dry                                  
 python tools/agent/record.py --model ... --chips-only                                # 只重建输入法候选
 ```
 
-**字体子集**：标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（四个页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`；延伸学习页从 `learn/data/*.json` 渲染的站名、术语名也会收进 ext）：
+**字体子集**：标题用的衬线体（思源宋体，SIL OFL）每个字重拆成两个子集：`-core` 只含首屏一定会用到的字（所有页面 HTML 里的静态文字、开场卡片的大标题、任务卡片等；600 约 60 KB、900 约 20 KB），`-ext` 是其余的字。CSS 用 `unicode-range` 声明两段，页面真的渲染到 ext 里的字时浏览器才去下载它。改了页面上的中文文案后，重新生成字体子集（脚本会同时改写 `css/app.css` 和 `train/css/train.css` 里的 `@font-face`；延伸学习页从 `learn/data/*.json` 渲染的站名、术语名也会收进 ext）：
 
 ```bash
 python tools/subset_fonts.py NotoSerifSC-Black.otf NotoSerifSC-SemiBold.otf

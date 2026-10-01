@@ -3,7 +3,7 @@
 // 取城市名最后一个词元在每一层的隐状态，用线性探针（岭回归）读出经纬度。地图上每个点都是探针对一个“训练时没见过”的城市
 // 的预测（5 折交叉），细线连到真实位置。数据由 tools/world/probe_export.py 离线导出，这里只回放，不跑模型。
 //
-// 接口：mountProbe(el, { onExplain(html) }) → { setLayer(L), destroy() }
+// 接口：mountProbe(el, { onExplain(html), onLayer(L) }) → { setLayer(L), destroy() }
 //   el 是一个空容器（自适应大小）；onExplain 把当前讲解推给页面右侧；setLayer 由外部调试器驱动（0–27）。
 
 const URL_CSS = new URL('./probe.css', import.meta.url).href;
@@ -140,6 +140,7 @@ function dropCSS() {
 export async function mountProbe(el, opts = {}) {
   useCSS();
   const onExplain = typeof opts.onExplain === 'function' ? opts.onExplain : null;
+  const onLayer = typeof opts.onLayer === 'function' ? opts.onLayer : null;   // 层变了（拖滑杆、播放、外部 setLayer）时通知外层
   const ac = new AbortController();
   const on = (t, ev, fn, o = {}) => t.addEventListener(ev, fn, { ...o, signal: ac.signal });
   let dead = false, ro = null;
@@ -571,6 +572,7 @@ export async function mountProbe(el, opts = {}) {
     if (L === S.L && !quiet) return;
     S.L = L;
     range.value = String(L);
+    onLayer?.(L);
     retarget();
     updateUI();
     if (!quiet) pushExplain();

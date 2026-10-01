@@ -296,7 +296,7 @@ function afterSimChange() {
 
 /* ---------------------------------------------------------------- 第二章：大模型里的世界地图 */
 
-let probeApi = null, probeTried = false, probeL = 1;
+let probeApi = null, probeTried = false, probeL = 0;   // 第二章的 ＋/− 走 Qwen3-0.6B 的第 0–27 层
 async function setChapter(ch) {
   if (ch === chapter) return;
   chapter = ch;
@@ -323,7 +323,10 @@ async function setChapter(ch) {
     probeTried = true;
     try {
       const m = await import('../probe/probe.js');
-      probeApi = await m.mountProbe($('#probeHost'), { onExplain: (html) => { if (chapter === 'probe') $('#explain').innerHTML = html; } });
+      probeApi = await m.mountProbe($('#probeHost'), {
+        onExplain: (html) => { if (chapter === 'probe') $('#explain').innerHTML = html; },
+        onLayer: (L) => { probeL = L; renderProbeChrome(); },   // 模块里拖滑杆 / 播放时同步面包屑
+      });
       probeApi?.setLayer?.(probeL);
     } catch (e) {
       probeApi = null;
@@ -334,10 +337,10 @@ async function setChapter(ch) {
   renderProbeChrome();
 }
 
-function probeMax() { return Number(probeApi?.maxLayer || probeApi?.layers?.length || probeApi?.levels || 4); }
+const PROBE_LAST = 27;   // Qwen3-0.6B 共 28 层（0–27）
 function probeLayer(d) {
   if (!probeApi) { flashBtn(d > 0 ? '#btnIn' : '#btnOut'); return; }
-  const n = Math.max(1, Math.min(probeMax(), probeL + d));
+  const n = Math.max(0, Math.min(PROBE_LAST, probeL + d));
   if (n === probeL) { flashBtn(d > 0 ? '#btnIn' : '#btnOut'); return; }
   probeL = n;
   d > 0 ? sfx.dive() : sfx.rise();
@@ -346,10 +349,10 @@ function probeLayer(d) {
 }
 function renderProbeChrome() {
   if (chapter !== 'probe') return;
-  $('#crumbs').innerHTML = `<button type="button" data-d="0"><span class="d">CH1</span>能玩的世界模型</button><span class="sep">›</span><button type="button" class="on" data-d="${probeL}"><span class="d">CH2</span>大模型里的世界地图 · 第 ${probeL} 层</button>`;
-  $('#dname').innerHTML = `第 ${probeL} 层<small>DEPTH ${probeL} / ${probeApi ? probeMax() : '—'}</small>`;
-  $('#btnIn').disabled = !probeApi || probeL >= probeMax();
-  $('#btnOut').disabled = !probeApi || probeL <= 1;
+  $('#crumbs').innerHTML = `<button type="button" data-d="0"><span class="d">CH1</span>能玩的世界模型</button><span class="sep">›</span><button type="button" class="on" data-d="${probeL}"><span class="d">CH2</span>大模型里的世界地图 · Qwen 第 ${probeL} 层</button>`;
+  $('#dname').innerHTML = `第 ${probeL} 层<small>LAYER ${probeL} / ${PROBE_LAST}</small>`;
+  $('#btnIn').disabled = !probeApi || probeL >= PROBE_LAST;
+  $('#btnOut').disabled = !probeApi || probeL <= 0;
 }
 
 /* ---------------------------------------------------------------- 知识碎片 */
