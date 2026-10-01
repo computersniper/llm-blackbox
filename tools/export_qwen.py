@@ -6,10 +6,10 @@
 每个问题导出：
     qNN.json        词元、逐步的候选概率与采样过程、逻辑透镜、残差范数、输出头 logit 的真实乘加
     qNN.bin         注意力（每个头每一行的前 4 个键）、MLP 激活（每层前 16 个 + 第 14 层完整 3072 维）
-    qNN/Lxx.json    第 xx 层、每个生成词元的真实乘加（单神经元、单次 Q·K 打分、W_q / W_o / W_down 各一个输出元素）。
-                    28 层全都有，按层拆成小文件，网页进入“一次乘加”时才按需载入
+    qNN/Lxx.json.gz 第 xx 层、每个生成词元的真实乘加（单神经元、单次 Q·K 打分、W_q / W_o / W_down 各一个输出元素）。
+                    28 层全都有，按层拆成小文件，网页进入“一次乘加”时才按需载入；只存 .gz，不存原始文件
 以及 manifest.json：模型配置、问题列表、回复文本、输入法候选（问题的真实分词）。
-所有数据文件都额外存一份 .gz（服务器只压缩 HTML），网页优先读 .gz。
+主文件额外存一份 .gz（服务器只压缩 HTML），网页优先读 .gz，不支持解压时退回原始文件。
 
 生成用的是 Qwen3 非思考模式的推荐参数（T=0.7, top_k=20, top_p=0.8），随机数种子固定，
 所以回答和网页里演示的采样过程完全一致、可复现。
@@ -239,11 +239,15 @@ def summary(c):
     return {"pos": sig(c.clamp(min=0).sum()), "neg": sig(c.clamp(max=0).sum()), "cum": [[r, sig(v)] for r, v in zip(ranks, vals)]}
 
 
-def write_data(path, data):
-    """写一个数据文件和它的 .gz（网页优先读 .gz，用 DecompressionStream 解压）；返回 .gz 的字节数。"""
+def write_data(path, data, raw=True):
+    """写一个数据文件的 .gz（网页用 DecompressionStream 解压）；raw=True 时再存一份原始文件给不支持解压的浏览器。
+    返回 .gz 的字节数。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     gz = gzip.compress(data, 9, mtime=0)
-    path.write_bytes(data)
+    if raw:
+        path.write_bytes(data)
+    elif path.exists():
+        path.unlink()  # 旧版本导出的原始文件
     path.with_name(path.name + ".gz").write_bytes(gz)
     return len(gz)
 
@@ -439,7 +443,7 @@ def export_question(qi, text, tok, model, cfg):
             mlist.append({"q": eq, "o": mm_entry(oin, Wo[jo], oout[jo], jo), "down": mm_entry(act, Wd[jd], dout[jd], jd)})
         chunk = {"id": qid, "L": li, "neuron": nlist, "mm": mlist, "dot": dlist}
         raw = json.dumps(chunk, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        micro_bytes += write_data(OUT / qid / f"L{li:02d}.json", raw)
+        micro_bytes += write_data(OUT / qid / f"L{li:02d}.json", raw, raw=False)  # 分块只存 .gz
 
     # 输出头：被选中的词元的分数 = 最终向量 · 它在嵌入表里的那一行（按词元，放在主文件里）
     E = model.lm_head.weight.float()

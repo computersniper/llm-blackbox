@@ -48,6 +48,15 @@ async function fetchData(url) {
   return r.arrayBuffer();
 }
 
+// “一次乘加”的按层分块只存了 .gz（省一半体积），浏览器不支持解压时直接失败，不去请求不存在的原始文件
+const NO_GUNZIP = '当前浏览器不支持解压，无法显示这一层的乘加细节';
+async function fetchGz(url) {
+  if (typeof DecompressionStream === 'undefined') throw Object.assign(new Error(NO_GUNZIP), { unsupported: true });
+  const r = await fetch(`${url}.gz`);
+  if (!r.ok || !r.body) throw new Error(`${url}.gz ${r.status}`);
+  return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+}
+
 // 每层每个矩阵的真实权重分布缩略图（每格 = 32×32 个权重的均方根）
 let thumbs = null;
 export async function loadThumbs() {
@@ -112,12 +121,13 @@ export async function loadQuestion(id, manifest) {
     lensAt: (g, L) => meta.lens[g][L],
     // 第 L 层的乘加数据到了没有；没到时下面三个访问器返回 null
     hasMicro: (L) => micro.has(L),
-    // 取第 L 层的乘加数据：已缓存就立即完成，同一层同时只发一个请求；失败后下次调用会重试
+    // 取第 L 层的乘加数据：已缓存就立即完成，同一层同时只发一个请求；网络失败后下次调用会重试，
+    // 浏览器不支持解压时立即失败（err.unsupported），不发请求
     ensureMicro(L) {
       if (micro.has(L)) return Promise.resolve(micro.get(L));
       if (pending.has(L)) return pending.get(L);
       if (!Number.isInteger(L) || L < 0 || L >= NL) return Promise.reject(new Error(`没有第 ${L} 层`));
-      const p = fetchData(`data/${id}/L${String(L).padStart(2, '0')}.json`).then((b) => {
+      const p = fetchGz(`data/${id}/L${String(L).padStart(2, '0')}.json`).then((b) => {
         const d = decodeJSON(b);
         micro.set(L, d);
         pending.delete(L);

@@ -207,12 +207,13 @@ function microWaitShow(L, err = null) {
     microEl.addEventListener('click', () => { if (tl && microEl.dataset.err) syncMicro(); });
     $('#loading').parentElement.append(microEl);
   }
-  microEl.dataset.err = err ? '1' : '';
-  microEl.style.cursor = err ? 'pointer' : 'default';
-  microEl.title = err ? String(err.message || err) : '';
-  microEl.innerHTML = err
-    ? `第 ${L} 层的乘加数据没有载入成功，点这里重试`
-    : `<span class="spin" style="width:14px;height:14px;border-width:2px"></span>正在载入第 ${L} 层的乘加数据…`;
+  const retry = err && !err.unsupported; // 浏览器不支持解压：重试也没用，只说明原因
+  microEl.dataset.err = retry ? '1' : '';
+  microEl.style.cursor = retry ? 'pointer' : 'default';
+  microEl.title = retry ? String(err.message || err) : '';
+  microEl.innerHTML = !err
+    ? `<span class="spin" style="width:14px;height:14px;border-width:2px"></span>正在载入第 ${L} 层的乘加数据…`
+    : retry ? `第 ${L} 层的乘加数据没有载入成功，点这里重试` : esc(err.message);
   clearTimeout(microTimer);
   // 缓存命中或网络很快时不闪一下
   if (err) microEl.style.display = 'flex';
