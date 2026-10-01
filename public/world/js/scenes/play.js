@@ -50,7 +50,7 @@ export class PlayView {
     const eyeTxt = closed ? (F.dreamAge > 0 ? `闭眼 · 自己想了 ${F.dreamAge} 步` : '闭眼') : '睁眼 · 每步看着真实画面预测';
     this.screen(g, this.D, this.dream, '模型的梦', pt ? 'V 解码 M 的预测' : 'V.decode(M 预测的 z) · 浏览器现场算', closed ? COL.amber : COL.violet, env, eyeTxt);
     // 里程、撞车
-    text(g, `里程 ${F.t}`, this.R.x + 8, this.R.y + this.R.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: 'rgba(233,239,249,0.75)' });
+    text(g, `里程 ${F.t}${sim.best > F.t ? `  最远 ${sim.best}` : ''}`, this.R.x + 8, this.R.y + this.R.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: 'rgba(233,239,249,0.75)' });
     if (F.realDone) this.flash(g, this.R, F.why === 'offroad' ? '冲出路面' : '撞车了', '下一步换一条新路', env);
     if (F.dreamDone > 0.5) this.flash(g, this.D, '梦里撞车了', `M 预测撞车的概率 ${(F.dreamDone * 100).toFixed(0)}%`, env);
     else if (F.dreamDone > 0.15) text(g, `撞车概率 ${(F.dreamDone * 100).toFixed(0)}%`, this.D.x + this.D.w - 8, this.D.y + this.D.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: COL.rose, align: 'right' });

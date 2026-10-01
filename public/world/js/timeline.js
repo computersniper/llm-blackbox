@@ -124,6 +124,8 @@ export class Timeline {
       if (!prev || !sameStep(prev.a, a) || prev.v !== v) out.push({ d, step: a, v });
       prev = { a, v };
     }
+    // 当前所在的深度总是列在最后（比如 D3 里“看真实画面”这一步和 D2 一样，但你确实在 D3）
+    if (out[out.length - 1].d !== this.depth) out.push({ d: this.depth, step: this.step, v: viewOf(this.depth, this.step) });
     return out;
   }
 

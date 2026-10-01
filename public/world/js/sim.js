@@ -25,6 +25,7 @@ export class Sim {
     this.idx = -1;
     this.frameNo = 0;
     this.gameNo = 0;
+    this.best = 0;                // 这次打开页面以来，真实世界里开得最远的一局
     this.keys = () => 0;          // 现在按着的方向（main.js 提供）：0 没按，1 左，2 右
     this.listeners = new Set();
     this.push(this.firstFrame(seed));
@@ -152,6 +153,7 @@ export class Sim {
     const G = this.computeNext(F, this.chooseAction(F));
     this.push(G);
     this.game.load(G.snap);
+    this.best = Math.max(this.best, G.t);
     this.emit('frame', G);
     if (G.realDone) this.emit('crash', G);
     if (G.dreamDone > 0.5) this.emit('dreamCrash', G);
