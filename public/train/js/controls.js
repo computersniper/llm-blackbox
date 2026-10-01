@@ -44,8 +44,9 @@ export class Controls {
     this.lines = $$('.ln', this.code);
   }
 
-  // 每换一步调用一次
-  update(tl, R, ctx) {
+  // 每换一步调用一次。ready = 讲解 / 变量要用的数据分块都到了；没到时先保留上一步的内容并调暗（CSS 里延迟一点再暗，免得一闪），
+  // 到了以后页面会再调用一次
+  update(tl, R, ctx, ready = true) {
     const s = tl.step;
     this.renderCode(tl, R);
     const cr = crumbs(tl.depth, s, R);
@@ -61,9 +62,15 @@ export class Controls {
       const box = this.code.parentElement;
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top: first.offsetTop - box.clientHeight * 0.2, behavior: 'smooth' });
     }
-    const shape = shapeOf(s, R, tl.depth);
-    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, R, tl.depth))}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, R, ctx, tl.depth)}`;
-    $('#watch').innerHTML = watch(s, R, ctx, tl.depth).map(([k, v]) => (k === 'wh' ? `<div class="wh">${esc(v)}</div>` : `<span class="k">${esc(k)}</span><span class="v" title="${esc(String(v))}">${esc(String(v))}</span>`)).join('');
+    const ex = $('#explain'), wt = $('#watch');
+    const head = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, R, tl.depth))}</div>`;
+    if (ready) {
+      const shape = shapeOf(s, R, tl.depth);
+      ex.innerHTML = `${head}${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, R, ctx, tl.depth)}`;
+      wt.innerHTML = watch(s, R, ctx, tl.depth).map(([k, v]) => (k === 'wh' ? `<div class="wh">${esc(v)}</div>` : `<span class="k">${esc(k)}</span><span class="v" title="${esc(String(v))}">${esc(String(v))}</span>`)).join('');
+    } else if (!ex.textContent.trim()) ex.innerHTML = `${head}<span class="dimmed">正在载入这一步的真实记录…</span>`;
+    ex.classList.toggle('stale', !ready);
+    wt.classList.toggle('stale', !ready);
     this.renderTrack(tl, R);
     this.updatePlay(tl);
   }

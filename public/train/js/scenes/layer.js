@@ -1,5 +1,5 @@
 // D4 · 反向 · 一层之内：这一层 7 个矩阵各分到多少梯度。矩阵按真实形状等比例画出（宽 = 输出维，高 = 输入维）。
-import { COL, text, rr, card, hexA, clamp, sciSup, fmtInt, divColor, wrap } from '../draw.js';
+import { COL, text, rr, card, hexA, clamp, sciSup, fmtInt, divColor, wrap, waitFade } from '../draw.js';
 import { shapes, TENSOR_NAME } from '../run.js';
 
 const ORDER = ['q', 'k', 'v', 'o', 'gate', 'up', 'down'];
@@ -87,7 +87,7 @@ export class LayerView {
       // 小模型：两块有真实梯度局部（左上角 48×48）
       if (T) {
         const ci = L === 2 && t === 'q' ? 1 : L === 4 && t === 'down' ? 2 : -1;
-        if (ci >= 0) {
+        if (ci >= 0 && R.D.has('ck', k)) {
           const cs = 48 * this.u;
           g.imageSmoothingEnabled = false;
           g.drawImage(this.crop(k, ci), p.x, p.y, cs, cs);
@@ -95,6 +95,11 @@ export class LayerView {
           g.strokeStyle = COL.ink2;
           g.strokeRect(p.x, p.y, cs, cs);
           text(g, '真实梯度 48×48', p.x + cs + 4, p.y + 10, { size: 8.5, color: COL.ink2 });
+        } else if (ci >= 0) {
+          // 梯度局部在这个检查点的 D1 分块里，还没到
+          g.globalAlpha = waitFade(env.t - st.wait.since);
+          text(g, '真实梯度 48×48 · 载入中…', p.x + 4, p.y + 12, { size: 8.5, color: COL.ink2 });
+          g.globalAlpha = 1;
         }
       }
       text(g, TENSOR_NAME[t], p.x, p.y - (P ? 22 : 26), { size: P ? 11 : 13, color: on ? COL.amber : COL.ink, weight: 600 });

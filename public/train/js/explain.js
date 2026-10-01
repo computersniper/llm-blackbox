@@ -135,6 +135,7 @@ const f4 = (v) => (Math.abs(v) >= 1e-3 || v === 0 ? Number(v.toPrecision(5)).toS
 
 function tinyNarrative(R, k) {
   const D = R.D, m = D.meta, t = m.ckpts[k].t;
+  if (!D.has('ck', k)) return '<span class="dimmed">（这个检查点的逐字概率正在载入…）</span>';
   let punct = 0, np = 0, cont = 0, nc = 0;
   for (let i = 0; i < D.Lv; i++) {
     const c = m.held.text[i] ?? '⏎';

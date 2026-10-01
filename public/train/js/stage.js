@@ -1,5 +1,7 @@
 // 2D 舞台：一块可以平移缩放的画布。跟随镜头自动对准当前步骤；拖动 / 滚轮 / 双指 / WASD 进入自由视角。
 // 每个视图（scene）在自己的“世界坐标”里画，舞台负责相机、换场过渡（快照淡出 + 缩放）和拾取。
+// 数据分块还没到：st.blocked 时画载入占位代替视图；st.stale 时视图先画最近一个已到的检查点，底部标注一行。
+import { COL, rr, text, measure, waitBox, waitFade } from './draw.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -236,7 +238,9 @@ export class Stage {
     this.clock += dt;
     const st = this.onFrame?.(dt, this.clock);
     if (this.scene && st) {
-      this.focusRect = this.scene.focus(st, this.env());
+      // 视图有时要画过一帧才知道自己的取景范围（被占位挡住时还没画过）：拿到的不是有限数就沿用上一个
+      const f = this.scene.focus(st, this.env());
+      if (f && Number.isFinite(f.x + f.y + f.w + f.h)) this.focusRect = f;
       // 键盘移动
       const mk = ['w', 'a', 's', 'd', 'q', 'e'].filter((k) => this.keys.has(k));
       if (mk.length) {
@@ -276,7 +280,10 @@ export class Stage {
       vis: { x: c.x - v.w / 2 / c.s, y: c.y - v.h / 2 / c.s, w: v.w / c.s, h: v.h / c.s },
     };
     g.globalAlpha = 1;
-    this.scene.draw(g, st, env);
+    if (st.blocked) {
+      const f = this.focusRect || { x: 0, y: 0, w: 600, h: 400 };
+      waitBox(g, f.x + 12, f.y + 12, f.w - 24, Math.min(f.h - 24, f.w * 0.75), env, st.wait, { withCard: true, label: '正在载入这一步的真实记录…', size: 13 });
+    } else this.scene.draw(g, st, env);
     // 换场：旧画面的快照在上面放大（下潜）或缩小（上浮）并淡出
     if (this.trans) {
       const e = (this.clock - this.trans.t0) / 0.75;
@@ -294,5 +301,30 @@ export class Stage {
         g.globalAlpha = 1;
       }
     }
+    if (st.stale) this.drawStale(st.stale);
+  }
+
+  // 屏幕底部一行：这一步的数据还在路上，先显示的是哪一步
+  drawStale({ since, label }) {
+    const a = waitFade(this.clock - since);
+    if (a <= 0) return;
+    const g = this.g, v = this.view;
+    g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    g.globalAlpha = a;
+    const w = measure(g, label, 11.5) + 40, h = 26, x = v.cx - w / 2, y = v.y + v.h - h - 10;
+    rr(g, x, y, w, h, h / 2);
+    g.fillStyle = 'rgba(10,17,31,0.92)';
+    g.fill();
+    g.strokeStyle = 'rgba(255,182,92,0.45)';
+    g.lineWidth = 1;
+    g.stroke();
+    const r = 5, cx = x + 15, cy = y + h / 2, a0 = this.clock * 5.5;
+    g.lineWidth = 1.4;
+    g.strokeStyle = COL.line2;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = COL.amber;
+    g.beginPath(); g.arc(cx, cy, r, a0, a0 + 1.4); g.stroke();
+    text(g, label, x + 27, cy + 4, { size: 11.5, color: COL.ink2 });
+    g.globalAlpha = 1;
   }
 }
