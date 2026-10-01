@@ -30,7 +30,7 @@ export class CueLayer {
       const a = vis(t, c.t0, c.t1, c.fin ?? this.fin, c.fout ?? this.fout);
       let e = this.live.get(i);
       if (a <= 0.001) { if (e) { e.remove(); this.live.delete(i); } return; }
-      if (!e) { e = el('div', `${this.cls} ${c.cls || ''}`, c.html, this.parent); this.live.set(i, e); }
+      if (!e) { e = el('div', `${this.cls} ${c.cls || ''}`, c.html, this.parent); if (c.style) e.style.cssText = c.style; this.live.set(i, e); }
       const kIn = easeOut(clamp((t - c.t0) / ((c.fin ?? this.fin) * 1.6)));
       const dy = (1 - kIn) * this.rise;
       e.style.opacity = a.toFixed(4);
