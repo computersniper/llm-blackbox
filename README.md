@@ -144,3 +144,33 @@ python tools/multimodal/grounding.py
 - `starry.jpg`：*The Starry Night*（1889），Vincent van Gogh，**公共领域**。来源：<https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg>
 
 两张照片缩小到长边 640 像素后存入仓库。
+
+## 推理视频
+
+`tools/video/` 用网站的 3D 舞台和真实数据做了一支 3 分 35 秒的片子：「天空为什么是蓝色的？」从分词、嵌入、穿过 28 层（逻辑透镜在第 21 层说「因为」、第 24 层改口成「天空」），到拆开第 24 层（RMSNorm、Q/K/V、16 个头、一次 Q·K 打分、残差、SwiGLU、一次乘加、bf16 比特），再到输出头、采样和自回归写完整句回答。配乐由 `compose.py` 用 numpy / scipy 现场合成。
+
+| 文件 | 作用 |
+| --- | --- |
+| `film.html` / `film.js` / `film.css` / `board.css` | 电影模式页面：复用 `public/js/stage/` 的机器和算式板，`__film.renderAt(t)` 确定地渲染第 t 秒 |
+| `score.js` | 分镜表：每个镜头的机器状态、机位（样条 + 单调三次插值）、字幕、数据条、配乐事件（96 BPM，段落卡在小节线上） |
+| `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层 |
+| `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面 |
+| `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −1 dBTP |
+| `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
+| `review.py` | 抽帧拼成带时间码的联系表，检查用 |
+| `serve.py` | 本地服务器（仓库根目录 + D 盘上的完整思源宋体） |
+
+重新生成（帧序列、配乐、成片都放 D 盘，不放仓库里）：
+
+```bash
+python tools/video/serve.py --port 8776 &      # 需要 /mnt/d/cjc/videos/llm-inference/fonts/NotoSerifSC-{Black,SemiBold}.otf（SIL OFL）
+O=/mnt/d/cjc/videos/llm-inference
+node tools/video/render.mjs frames --out $O/frames60 --fps 60 --workers 4   # 约 3 分钟；已有的帧会跳过，中断了可以接着渲
+node tools/video/render.mjs events --out tools/video/events.json
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events.json --out $O/score.wav
+bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference.mp4 60
+node tools/video/render.mjs poster --t 58.4 --out $O/poster.png
+python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
+```
+
+浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=60>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。

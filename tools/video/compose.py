@@ -140,6 +140,14 @@ def noise(n):
     return RNG.standard_normal(n)
 
 
+def soft(y, ms=1.5):
+    """开头 ms 毫秒的淡入：去掉起音瞬间的阶跃"""
+    k = min(len(y), max(2, int(SR * ms / 1000)))
+    y = y.copy()
+    y[:k] *= np.sin(np.linspace(0, np.pi / 2, k)) ** 2
+    return y
+
+
 # ---------------------------------------------------------------- 混响 / 延迟
 
 def make_ir(rt60=3.2, pre=0.018, dur=4.5, dark=5200):
@@ -260,7 +268,7 @@ def kick(vel=1.0):
     f = 46 + 110 * np.exp(-t / 0.035)
     y = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.32)
     click = filt(noise(n), 'high', 2500) * np.exp(-t / 0.004) * 0.25
-    return np.tanh(1.4 * (y + click)) * vel
+    return soft(np.tanh(1.4 * (y + click)) * vel, 1.0)
 
 
 def snare(vel=1.0, clap=True):
@@ -275,14 +283,14 @@ def snare(vel=1.0, clap=True):
     else:
         e = np.exp(-t / 0.11)
     body = np.sin(2 * np.pi * 190 * t) * np.exp(-t / 0.06) * 0.5
-    return (nz * e + body) * vel * 0.6
+    return soft((nz * e + body) * vel * 0.6)
 
 
 def hat(vel=1.0, open_=False):
     n = n_of(0.35 if open_ else 0.08)
     t = tvec(n)
     y = filt(noise(n), 'high', 7200, 2)
-    return y * np.exp(-t / (0.11 if open_ else 0.022)) * vel * 0.42
+    return soft(y * np.exp(-t / (0.11 if open_ else 0.022)) * vel * 0.42)
 
 
 def shaker(vel=1.0):
@@ -310,7 +318,7 @@ def impact(vel=1.0, dur=3.0):
     sub = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-t / 0.8) * 0.75
     crack = filt(noise(n), 'low', 3000) * np.exp(-t / 0.09) * 0.5
     air = filt(noise(n), 'bp', (300, 2500)) * np.exp(-t / 0.7) * 0.18
-    return np.tanh(1.3 * (sub + crack + air)) * vel
+    return soft(np.tanh(1.3 * (sub + crack + air)) * vel, 2.0)
 
 
 def whoosh(dur=1.3, vel=1.0, up=True):
@@ -354,7 +362,7 @@ def keyclick(vel=1.0, pitch=0.0):
     t = tvec(n)
     y = filt(noise(n), 'bp', (1800 * 2 ** pitch, 5200 * 2 ** pitch)) * np.exp(-t / 0.008)
     thump = np.sin(2 * np.pi * 180 * t) * np.exp(-t / 0.02) * 0.6
-    return (y + thump) * vel
+    return soft((y + thump) * vel)
 
 
 def wood(vel=1.0, m=84):
@@ -362,7 +370,7 @@ def wood(vel=1.0, m=84):
     t = tvec(n)
     f = mtof(m)
     y = np.sin(2 * np.pi * f * t) * np.exp(-t / 0.012) + 0.4 * filt(noise(n), 'bp', (2000, 6000)) * np.exp(-t / 0.004)
-    return y * vel
+    return soft(y * vel)
 
 
 def droplet(vel=1.0, m=86):
@@ -383,8 +391,9 @@ def dice(vel=1.0):
         m = n_of(0.05)
         tk = tvec(m)
         c = filt(noise(m), 'bp', (1400, 4200)) * np.exp(-tk / 0.006) + np.sin(2 * np.pi * RNG.uniform(700, 1100) * tk) * np.exp(-tk / 0.012) * 0.6
+        c = soft(c)
         y[i: i + m] += c[: n - i] * (1 - k * 0.09)
-    return y * vel
+    return soft(y * vel)
 
 
 def bitblip(k, vel=1.0):
@@ -392,7 +401,7 @@ def bitblip(k, vel=1.0):
     t = tvec(n)
     f = 1200 if k % 2 == 0 else 1800
     sq = np.sign(np.sin(2 * np.pi * f * t))
-    return filt(sq, 'low', 6000) * np.exp(-t / 0.014) * vel * 0.35
+    return soft(filt(sq, 'low', 6000) * np.exp(-t / 0.014) * vel * 0.35)
 
 
 def glitch(vel=1.0):
@@ -694,6 +703,7 @@ def compose(ev, out_wav, stems_dir=None):
     mix = filt(mix, 'high', 30)
     mix = shelf(mix, 110, -3.0, high=False)
     mix = shelf(mix, 4500, 3.5, high=True)
+    mix = filt(mix, 'low', 17000, 4)
     n_end = n_of(dur)
     mix = mix[:, : n_end]
     # 淡入淡出
@@ -742,7 +752,7 @@ def true_peak_db(x):
     return 20 * np.log10(np.max(np.abs(up)) + 1e-12)
 
 
-def limit(x, ceiling_db=-1.2):
+def limit(x, ceiling_db=-1.6):
     c = 10 ** (ceiling_db / 20)
     up = ss.resample_poly(x, 4, 1, axis=-1)
     pk = np.max(np.abs(up), axis=0)

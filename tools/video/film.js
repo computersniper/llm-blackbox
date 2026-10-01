@@ -554,16 +554,28 @@ function seek(t, pre = 8) {
 function poster(t = 58.4) {
   seek(t);
   for (const sel of ['.sub', '.strip', '.chapter', '.card', '.corner', '.lenspanel', '.attgrid', '.band']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
+  // 左侧压一层渐变，片名靠左放在上面；右边留给 28 层的逻辑透镜读数
+  const scrim = el('div', '', '', $('#ov'));
+  scrim.style.cssText = 'position:absolute;inset:0;background:linear-gradient(to right, rgba(3,7,15,.94) 0%, rgba(3,7,15,.82) 34%, rgba(3,7,15,0) 62%)';
+  $('#ov').prepend(scrim);
   const T = OV.title;
   T.style.display = 'block';
   T.style.opacity = '1';
-  T.style.top = '30%';
+  T.style.left = '130px';
+  T.style.top = '50%';
+  T.style.transform = 'translateY(-50%)';
+  T.style.textAlign = 'left';
   T.style.filter = '';
+  T.querySelector('.rule').style.margin = '40px 0 30px';
+  T.querySelector('.rule').style.background = 'linear-gradient(to right, rgba(255,182,92,.85), transparent)';
+  T.querySelector('.eb').style.paddingLeft = '0';
+  T.querySelector('.st').style.paddingLeft = '0';
   const h1 = T.querySelector('h1');
-  h1.style.letterSpacing = h1.style.paddingLeft = '0.18em';
+  h1.style.letterSpacing = '0.16em';
+  h1.style.paddingLeft = '0';
   T.querySelector('.rule').style.width = '520px';
   for (const c of ['.st', '.spec', '.eb']) T.querySelector(c).style.opacity = '1';
-  $('#fade').style.opacity = '0.25';
+  $('#fade').style.opacity = '0.1';
   E.render();
 }
 
