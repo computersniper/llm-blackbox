@@ -34,8 +34,8 @@
 .bd-cap { margin: 0 0 12px; font-size: 18px; line-height: 1.65; color: var(--ink); }
 .bd-cap b { font-weight: 600; }
 .bd-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 14px 24px; }
-.bd-fx { margin-bottom: 8px; font-family: var(--mono); font-weight: 400; font-size: 23px; line-height: 1.45; color: var(--ink); }
-.bd-fx .op { font-size: 28px; margin-left: 2px; }
+.bd-fx { margin-bottom: 8px; font-family: var(--mono); font-weight: 400; font-size: 20px; line-height: 1.45; color: var(--ink); }
+.bd-fx .op { font-size: 25px; margin-left: 2px; }
 .bd-fx .lim { font-size: 13px; color: var(--dim); margin-right: 4px; }
 .bd-fx small { display: block; font-family: var(--serif); font-weight: 600; font-size: 15px; color: var(--dim); }
 .bd-tbl { font-family: var(--mono); font-weight: 400; font-size: 16.5px; line-height: 1.45; }

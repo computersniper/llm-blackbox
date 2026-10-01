@@ -103,7 +103,7 @@ export function buildScore(Q) {
   section('tokenize', B(8), B(12), { energy: 0.45 });
   chapter(B(8) + 0.3, B(12) - 0.2, '01', '分词', 'TOKENIZE');
   ev(B(8), 'open');
-  ev(B(8, 3), 'whoosh');
+  ev(B(9), 'whoosh', { k: 0.6 });
   const dropT0 = 23.0, dropD = 4.0;
   const landT = (i) => dropT0 + dropD * ((i / Q.P) * 0.7 + 0.3);
   for (let i = 0; i < Q.P; i++) ev(landT(i), 'tick', { i, k: Q.tokens[i].role === 'user' ? 1 : 0.45 });
@@ -114,10 +114,8 @@ export function buildScore(Q) {
   const tokCamKeys = (M) => {
     const tr = (i) => ({ p: [X(M, i) - 3.0, 1.75, 4.4], l: [X(M, i) + 0.9, 0.22, 0] });
     const uc = (X(M, user[0].i) + X(M, user[user.length - 1].i)) / 2;
-    const T = titleCam(7.5);
     return [
-      { t: 0, p: T.pos.toArray(), l: T.look.toArray(), fov: 32 },
-      { t: 2.4, p: [-4.5, 6.8, 37], l: [-3.0, 4.0, 0], fov: 32 },
+      { t: 2.5, ...tr(0), fov: 30 },
       { t: landT(0) - B(8) - 0.1, ...tr(0), fov: 30 },
       { t: landT(19) - B(8), ...tr(19), fov: 30 },
       { t: landT(38) - B(8), ...tr(38), fov: 30 },
@@ -125,12 +123,16 @@ export function buildScore(Q) {
       { t: 10.0, p: [uc - 1.0, 1.5, 4.1], l: [uc + 0.25, 0.18, 0], fov: 30 },
     ];
   };
-  let tokPath = null;
+  let tokPath = null, openPath = null;
   shot('tokenize', B(8), B(12), (lt, t, { M }) => {
     const dA = lerp(1, 2.6, smoother(seg(t, 20.0, 22.4)));
     return {
       st: mst(2, 0, { ph: 'read' }, seg(t, dropT0, dropT0 + dropD), { dAnim: dA }),
-      cam: () => { tokPath ||= path(tokCamKeys(M)); return tokPath(lt); },
+      cam: () => {
+        // 前 2.5 秒看机箱打开；卡在小节线上硬切到托盘的低机位跟拍
+        if (lt < 2.5) { const T = titleCam(7.5); openPath ||= path([{ t: 0, p: T.pos.toArray(), l: T.look.toArray(), fov: 32 }, { t: 2.5, p: [-6.5, 7.8, 39], l: [-1.0, 4.6, 0], fov: 32 }]); return openPath(lt); }
+        tokPath ||= path(tokCamKeys(M)); return tokPath(lt);
+      },
       extras: { ids: smooth(seg(t, landT(0), landT(0) + 0.5)), idsFocus: t > 27.4 },
     };
   });
@@ -298,7 +300,7 @@ export function buildScore(Q) {
   sub(Dk('out').t0 + 0.1, Dk('out').t1 - 0.1, `${m('596,049,920')} 个这样的数，一起算出了下一个词。`);
   const L = (M) => ({ xf: M.x(row0), y: M.yL(LX), e: M.e });
   const dCam = {
-    over: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 4.6, y + 2.6, 9.4], [xf + 0.9, y + 1.15, 0.2]), cam([xf + 3.0, y + 1.9, 6.9], [xf + 0.8, y + 1.15, 0.2]), smooth(p)); },
+    over: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 3.4, y + 2.4, 7.4], [xf + 0.75, y + 1.2, 0.2]), cam([xf + 1.5, y + 1.6, 4.4], [xf + 0.7, y + 1.2, 0.2]), smooth(p)); },
     ln1: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf - 0.9, y + 0.85, 3.5], [xf + 0.35, y + 0.3, 0.1]), cam([xf - 0.55, y + 0.65, 2.75], [xf + 0.35, y + 0.28, 0.1]), smooth(p)); },
     qkv: (M, p) => { const { xf, y } = L(M); return blendCam(cam([xf + 1.3, y + 1.85, 4.95], [xf + 1.8, y + 1.35, 0.62]), cam([xf + 3.2, y + 1.9, 4.6], [xf + 2.6, y + 1.4, 0.62]), smooth(p)); },
     score: (M, p) => { const { xf, y } = L(M); const kx = M.x(dot.key); return blendCam(cam([(kx + xf) / 2 - 0.6, y + 1.9, 8.4], [(kx + xf) / 2, y + 0.95, 0]), cam([(kx + xf) / 2 + 0.2, y + 1.6, 7.2], [(kx + xf) / 2 + 0.1, y + 0.95, 0]), smooth(p)); },
@@ -359,7 +361,7 @@ export function buildScore(Q) {
         endCam.set(`d-${ck}`, out);
         return out;
       },
-      hide: [...(['score', 'heads', 'dot'].includes(ck) ? ['attnMats'] : []), ...(ck === 'bits' ? ['exDeco'] : [])],
+      hide: [...(['score', 'heads', 'dot'].includes(ck) ? ['attnMats'] : []), ...(ck === 'bits' ? ['exDeco', 'mlpVecs'] : [])],
       flipBit: t >= flipT0 && t < flipT1 ? FLIP : null,
       boardA: BOARD.includes(ck) ? smooth(seg(t, span.t0 + 0.05, span.t0 + 0.45)) * (1 - smooth(seg(t, span.t1 - 0.35, span.t1 - 0.02))) : 1,
       shiftX: 430 * boardShift(t),
@@ -439,8 +441,9 @@ export function buildScore(Q) {
   const PH = [{ ph: 'read', d: 0.2 }, { ph: 'embed', d: 0.1 }, { ph: 'layers', d: 0.32 }, { ph: 'head', d: 0.12 }, { ph: 'sample', d: 0.26 }];
   const emitFrac = 1 - 0.26 * 0.2;
   const toks = (g0, t0, durs) => { let t = t0; return durs.map((d, k) => { const a = { g: g0 + k, t0: t, t1: t + d, d, emit: t + d * emitFrac }; t += d; return a; }); };
-  const loop1 = toks(1, B(57), [6.25, ...Array.from({ length: 12 }, (_, k) => (B(63) - B(57) - 6.25) / 12)]);
-  loop1.forEach((s) => ev(s.emit, 'emit', { g: s.g, k: s.g === 1 ? 1.1 : 0.7 }));
+  // 时长都取拍子的整数倍，词元吐出来的时刻正好落在节拍上（配乐里的铃声跟着它）
+  const loop1 = toks(1, B(57), [10 * BEAT, ...[1.5, 1.5, 1.5, 1.5, 1, 1, 1, 1, 1, 1, 1, 1].map((b) => b * BEAT)]);
+  loop1.forEach((s) => ev(s.emit, 'emit', { g: s.g, k: s.g === 1 ? 1.1 : 0.7, rank: Q.steps[s.g].chosenRank }));
   ev(loop1[0].t0 + 6.25 * 0.74 + 0.05, 'dice');
   const loopState = (list, t) => {
     const s = list.find((x) => t < x.t1) || list[list.length - 1];
@@ -542,10 +545,10 @@ export function buildScore(Q) {
   section('loop2', B(72), B(79), { energy: 0.9 });
   chapter(B(72) + 0.3, B(79) - 0.2, '08', '写完整句', 'TO THE END');
   const rest = Q.G - (GK + 1);
-  const durs2 = Array.from({ length: rest }, (_, k) => (k === rest - 1 ? 2.4 : k < 6 ? 0.95 : k < 16 ? 0.62 : 0.5));
-  const scale2 = (B(79) - B(72)) / durs2.reduce((a, b) => a + b, 0);
-  const loop2 = toks(GK + 1, B(72), durs2.map((d) => d * scale2));
-  loop2.forEach((s) => ev(s.emit, s.g === Q.G - 1 ? 'end' : 'emit', { g: s.g, k: 0.55 }));
+  const durs2 = Array.from({ length: rest }, (_, k) => (k === rest - 1 ? 0 : k < 4 ? 1.5 : 0.75) * BEAT);
+  durs2[rest - 1] = B(79) - B(72) - durs2.reduce((a, b) => a + b, 0);
+  const loop2 = toks(GK + 1, B(72), durs2);
+  loop2.forEach((s) => ev(s.emit, s.g === Q.G - 1 ? 'end' : 'emit', { g: s.g, k: 0.55, rank: Q.steps[s.g].chosenRank }));
   const lowRank = Q.steps.map((x, g) => ({ g, r: x.chosenRank })).filter((x) => x.r > 0).length;
   const stEnd = S(Q.G - 1);
   sub(B(72) + 0.3, B(74) - 0.2, '剩下的词，一个接一个地写出来。');
@@ -581,12 +584,12 @@ export function buildScore(Q) {
     return {
       st: mst(2, Q.G - 1, { ph: 'sample' }, 1, { dAnim: dA, view: 'machine' }),
       cam: () => {
-        const far = cam([-11, 4.4, 66], [0, 5.8, 0], 30);
+        const far = cam([-11, 5.5, 70], [0, 11.5, 0], 30);
         const live = machineCam(M, 8.0, { yaw: 8, dz: 33 });
         return blendCam(prevCam('loop2', live), far, smoother(seg(lt, 0, 10)));
       },
       dof: { focus: 14, range: 24, blur: 6 * smooth(seg(t, B(80), B(81))) },
-      fade: lerp(0, 0.62, smooth(seg(t, B(80), B(81)))) + 0.38 * smooth(seg(t, B(85) + 0.6, B(86) - 0.05)),
+      fade: lerp(0, 0.86, smooth(seg(t, B(79) + 1.6, B(80) + 0.6))) + 0.14 * smooth(seg(t, B(85) + 0.6, B(86) - 0.05)),
       ov: {
         reply: { a: 1 - smooth(seg(lt, 0.6, 1.8)), n: Q.G, k: 1 },
         band: 1 - smooth(seg(lt, 0, 1)),
