@@ -178,7 +178,7 @@ export class Overview {
     g.setLineDash([2, 3]);
     g.beginPath(); g.moveTo(px, Y(lnV)); g.lineTo(px + pw, Y(lnV)); g.stroke();
     g.setLineDash([]);
-    text(g, `瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, X(this.S * 0.5), Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)' });
+    text(g, `瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, X(30), Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)' });
 
     const tEnd = Math.max(1, Math.round(t));
     // 原始损失（每一步，淡）+ 平滑损失（亮）

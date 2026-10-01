@@ -12,7 +12,12 @@ export class Tokens {
     this.bounds = this.portrait ? { x: -6, y: -6, w: 392, h: 1000 } : { x: -12, y: -12, w: 1124, h: 680 };
   }
 
-  focus() { return this.bounds; }
+  focus() {
+    if (!this.portrait) return this.bounds;
+    const y0 = this.R.kind === 'tiny' ? 176 : 216;
+    const y1 = (this.bottom || 900) + 24;
+    return { x: -6, y: y0, w: 392, h: y1 - y0 };
+  }
 
   draw(g, st, env) {
     if (this.R.kind === 'tiny') this.drawTiny(g, st, env);
@@ -53,6 +58,7 @@ export class Tokens {
     const top = P ? 336 : 256;
     const tile = P ? 30 : 38;
     const rows2 = rowLayout(g, R, k, 0, top + 16, W, { tile, th: si === 1 ? tile + 16 : tile + 4, gap: 4, lineGap: si === 2 ? 30 : 12 });
+    this.bottom = top + 16 + rows2.height + (si === 2 ? 30 : 16);
     const reveal = si === 0 ? Math.floor(ease(seg(st.p, 0, 0.85)) * rows2.length) + 1 : rows2.length;
     for (const r of rows2) {
       if (r.j >= reveal) break;
@@ -103,6 +109,7 @@ export class Tokens {
     // 词元
     const top = P ? 470 : th + 40;
     const rows = rowLayout(g, R, k, 0, top + 18, W, { tile: 36, th: 40, gap: 5, lineGap: si === 0 ? 28 : 40 });
+    this.bottom = top + 18 + rows.height + 26;
     text(g, si === 0 ? '每个词元下面是它在词表里的编号（词表 151,936）' : si === 1 ? '青色下划线 = 这个词元是计入损失的预测目标' : '每个词元下面：它这个位置的标签（下一个词元，或 −100）', 0, top, { size: 10.5, color: COL.dim });
     for (const r of rows) {
       const counted = r.j >= 1 && m.sftMask[r.j - 1];
