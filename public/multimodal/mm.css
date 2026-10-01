@@ -1,0 +1,118 @@
+/* ============================================================
+   揭开黑箱 · 多模态（在 ../css/app.css 的基础上）
+   ============================================================ */
+
+:root { --mon-w: 272px; --vis: #b39dff; }
+/* 揭开时聊天栏窄一点：舞台上还要放监视器 */
+body.mode-inspect { --chat-w: 320px; }
+
+/* ---------------- 站点导航 ---------------- */
+
+.site-nav { display: flex; align-items: center; gap: 2px; flex: none; padding: 3px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .02); }
+.site-nav a { padding: 4px 11px; border-radius: 999px; color: var(--dim); text-decoration: none; font-size: 13px; transition: color .2s, background .2s; }
+.site-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
+.site-nav a[aria-current="page"] { color: #04121a; background: var(--acc); font-weight: 600; }
+body.mode-inspect .site-nav { display: none; }
+
+/* ---------------- 聊天：头像（一只眼睛） ---------------- */
+
+.avatar.eye i { width: 14px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #04121a 0 28%, var(--acc) 30% 100%); box-shadow: 0 0 8px rgba(94, 240, 212, .5); }
+.msg.bot .avatar.eye i { width: 12px; height: 8px; }
+
+/* ---------------- 选图 ---------------- */
+
+.cmp-attach { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 1px dashed var(--line3); background: rgba(255, 255, 255, .03); color: var(--dim); cursor: pointer; overflow: hidden; padding: 0; display: grid; place-items: center; font-size: 13px; transition: border-color .2s; }
+.cmp-attach:hover { border-color: rgba(94, 240, 212, .6); color: var(--ink); }
+.cmp-attach.has { border-style: solid; border-color: rgba(94, 240, 212, .5); }
+.cmp-attach img { width: 100%; height: 100%; object-fit: cover; display: block; filter: brightness(.9); }
+.cmp-pics { display: none; padding: 10px 2px 0; }
+.cmp-pics.open { display: block; animation: candin .35s var(--ease); }
+.cmp-pics .lab { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; color: var(--faint); }
+.pic-row { display: flex; gap: 8px; padding: 6px 0 2px; overflow-x: auto; scrollbar-width: thin; }
+.pic { flex: none; display: flex; flex-direction: column; gap: 4px; width: 92px; padding: 4px; border-radius: 12px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .02); color: var(--ink2); font-size: 12px; cursor: pointer; transition: border-color .2s, transform .2s var(--ease), background .2s; animation: candin .4s var(--ease) backwards; }
+.pic img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 8px; display: block; filter: brightness(.88); transition: filter .2s; }
+.pic:hover { border-color: rgba(94, 240, 212, .55); transform: translateY(-2px); }
+.pic:hover img { filter: none; }
+.pic.on { border-color: var(--acc); background: rgba(94, 240, 212, .08); color: var(--ink); }
+.pic span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.qlist button { display: flex; align-items: center; gap: 8px; }
+.qlist button img { width: 26px; height: 26px !important; border-radius: 6px; object-fit: cover; flex: none; filter: brightness(.85); }
+
+/* ---------------- 消息里的图 + 注意力热力图 ---------------- */
+
+.msg.user { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ub-img { position: relative; width: min(240px, 60vw); border-radius: 14px 14px 4px 14px; overflow: hidden; border: 1px solid rgba(94, 228, 240, .28); background: #050a14; }
+.ub-img img, .ub-img canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.ub-img img { filter: brightness(.92); }
+.ub-img canvas { opacity: 0; transition: opacity .25s; }
+.ub-img.on canvas { opacity: 1; }
+.heat-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 9px 6px; font-size: 11.5px; line-height: 1.4; color: var(--ink); background: linear-gradient(to top, rgba(4, 8, 16, .9), transparent); opacity: 0; transition: opacity .25s; pointer-events: none; }
+.heat-cap small { display: block; font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
+.ub-img.on .heat-cap { opacity: 1; }
+.ub-src { max-width: min(240px, 60vw); font-size: 10.5px; line-height: 1.4; color: var(--faint); text-decoration: none; text-align: right; }
+.ub-src:hover { color: var(--dim); text-decoration: underline; }
+.msg.bot.hoverable .bot-text .rt { cursor: crosshair; }
+.msg.bot.hoverable .bot-text .rt:hover, .bot-text .rt.lit { background: rgba(255, 182, 92, .2); color: #fff; }
+.bot-meta .hover-tip { font-size: 11.5px; color: var(--faint); }
+@media (hover: none) { .bot-meta .hover-tip::after { content: "（手机上点一下字）"; } }
+
+/* ---------------- 舞台：图像监视器 ---------------- */
+
+/* CSS2D 标签会给每个元素设 z-index：把整个 3D 层关进自己的层叠上下文，免得标签盖到面板上 */
+.gl { z-index: 0; }
+
+.stage-top { left: calc(var(--mon-w) + 28px); }
+.mon { position: absolute; z-index: 4; left: 14px; top: 14px; width: var(--mon-w); max-height: calc(100% - 128px); display: flex; flex-direction: column; border-radius: 16px; background: var(--panel); border: 1px solid var(--line2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 20px 50px rgba(0, 0, 0, .4); overflow: hidden; }
+.mon-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 12px; border-bottom: 1px solid var(--line); }
+.mon-h .eyebrow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: .06em; text-transform: none; font-size: 11.5px; color: var(--ink2); }
+.mon-fold { width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--line2); background: none; color: var(--ink2); cursor: pointer; flex: none; }
+.mon.folded .mon-body { display: none; }
+.mon-body { overflow-y: auto; scrollbar-width: thin; }
+.mon-cv { padding: 10px 10px 0; }
+.mon-cv canvas { display: block; width: 100%; border-radius: 8px; background: #050a14; image-rendering: auto; }
+.mon-cap { padding: 8px 12px 10px; font-size: 12px; line-height: 1.6; color: var(--ink2); }
+.mon-cap b { color: var(--ink); font-weight: 600; }
+.mon-tools { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 10px; }
+.mon-tools:empty { display: none; }
+.mon-tools .seg { display: inline-flex; padding: 2px; border-radius: 9px; border: 1px solid var(--line2); }
+.mon-tools button { height: 24px; padding: 0 8px; border-radius: 7px; border: 0; background: none; color: var(--dim); font-size: 11.5px; cursor: pointer; white-space: nowrap; }
+.mon-tools button:hover { color: var(--ink); }
+.mon-tools button.on { color: #04121a; background: var(--acc); }
+.mon-tools .tog { border: 1px solid var(--line2); }
+.mon-tools .tog.on { border-color: var(--acc); }
+
+.ctl-track i.vis { background: rgba(179, 157, 255, .35); }
+.ctl-track i.vis.done { background: rgba(179, 157, 255, .7); }
+.ctl-track i.vis.cur { background: var(--amber); }
+
+/* ---------------- 3D 标签 ---------------- */
+
+.lbl.lens b { font-weight: 600; color: var(--ink); }
+.lbl.big small { font-size: 11px; }
+
+/* ---------------- 窄屏 ---------------- */
+
+@media (max-width: 1180px) { :root { --mon-w: 240px; } body.mode-inspect { --chat-w: 290px; } }
+@media (max-width: 900px) {
+  :root { --mon-w: min(46vw, 210px); }
+  .site-nav { margin-left: auto; }
+  .site-nav a { padding: 3px 8px; font-size: 12px; }
+  .stage-top { left: 14px; }
+  .mon { top: 62px; left: 10px; max-height: calc(100% - 330px); }
+  .mon-cap { font-size: 11px; padding: 6px 9px 8px; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .mon-cv { padding: 7px 7px 0; }
+  .mon-tools { padding: 0 7px 8px; }
+  .mon-tools button { padding: 0 5px; font-size: 10.5px; }
+  .mon-tools .seg { flex-wrap: wrap; }
+  .pic { width: 76px; }
+  .ub-img { width: min(200px, 58vw); }
+  .bot-meta .hover-tip { display: none; }
+}
+@media (max-width: 560px) {
+  .brand-en { display: none; }
+  .brand { gap: 0; }
+  .topbar { gap: 10px; padding: 0 12px; }
+  body.mode-chat .crumbs { display: none; }
+}
+
+.cmp-input .ph { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
