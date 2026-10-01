@@ -18,6 +18,7 @@ import { AdamView } from './scenes/adam.js';
 import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc } from '../../js/ui.js';
+import { initPanes } from '../../js/resize.js';
 
 const KEY = 'blackbox:train';
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
@@ -470,6 +471,7 @@ function bindChrome() {
     enterRun(b.dataset.run);
   });
   new ResizeObserver(() => updateInsets()).observe($('#dbg'));
+  initPanes('train', { right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 640 });
 }
 
 function bindKeys() {
