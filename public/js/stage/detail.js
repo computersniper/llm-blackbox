@@ -324,13 +324,15 @@ export class Detail {
       const pb = bar(prods[i], 0, AMBER, mxp);
       this.dotBars.push({ pb, qb, kb, i });
     });
-    const L = (html, x, y, cls) => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); return o; };
+    const L = (html, x, y, cls) => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); this.dotTags.push(o); return o; };
+    this.dotTags = [];
     L(`<span class="cx">q</span> · 第 ${d.head} 号头`, -2.15, 0.95, 'lbl tag x');
     L(`<span class="cw">k</span> · 「${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}」`, -2.15, -0.95, 'lbl tag w');
     L('<span class="cp">q × k</span>', -2.15, 0, 'lbl tag p');
     const hint = label(`128 维里乘积最大的 12 维`, 'lbl hint');
     hint.position.set(0, 1.85, 0);
     R.add(hint);
+    this.dotTags.push(hint);
   }
 
   updateDot(st, show) {
@@ -347,6 +349,7 @@ export class Detail {
     this.dotCenter = this.dot.position.clone().add(v3(0.4 * 0.3, 0, 0));
     // 乘法：12 维轮流出场（和算式板同一个节拍），乘积柱从中间长出来
     const mi = s.mi || 'scale', p = st.p;
+    for (const o of this.dotTags) o.visible = st.view !== 'bits';
     const sel = this.dotSel ?? 0;
     this.dotBars.forEach(({ pb, qb, kb, i }) => {
       const ph = mi === 'mul' ? termAt(p, i, 12) : 1;

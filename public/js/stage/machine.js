@@ -589,6 +589,7 @@ export class Machine {
     const dk = 1 - (this.deep || 0) * 0.8;
     this.exAttn.material.opacity = 0.1 * e * dk;
     this.exMlp.material.opacity = 0.09 * e * dk;
+    this.exAttn.children[0].material.opacity = this.exMlp.children[0].material.opacity = 0.35 * dk;
     this.exRing1.position.set(xf, at('ln1'), 0);
     this.exRing2.position.set(xf, at('ln2'), 0);
     this.exAdd1.position.set(xf, at('add1'), 0);

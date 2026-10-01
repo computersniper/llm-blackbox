@@ -170,7 +170,7 @@ export class Micro {
     this.rail = new THREE.Mesh(new THREE.PlaneGeometry(0.004, Math.max(0.01, oy - panel.h)), mat(ROLE.p, 0.35));
     this.rail.position.set(colX, (panel.h + oy) / 2, 0.003);
     R.add(this.colMesh, this.rail);
-    this.colLbl = label(`<span class="cw">${src.w}</span> 的第 ${e.j} 列`, 'lbl tag w');
+    this.colLbl = label(src.kind === 'head' ? `<span class="cw">E<sup>T</sup></span> 的第 ${e.j} 列 = 嵌入表里「${esc(tokPlain(e.token))}」那一行` : `<span class="cw">${src.w}</span> 的第 ${e.j} 列`, 'lbl tag w');
     this.colLbl.position.set(colX, 0, 0.01);
     this.colLbl.center.set(0.5, -0.35);
     R.add(this.colLbl);
@@ -332,7 +332,7 @@ export class Micro {
     const d = e.dims[k];
     return {
       v: e.w[k], x: e.x[k], total: e.total, k, d,
-      label: `${src.w.replace(/<sub>(.*?)<\/sub>/g, '_$1').replace(/<[^>]+>/g, '')}[${d}, ${e.j}]`,
+      label: src.wIdx(d).replace(/<sub>(.*?)<\/sub>/g, '_$1').replace(/<[^>]+>/g, ''),
       wHtml: src.wIdx(d), xHtml: `${src.x}[${d}]`, out: src.yIdx, yDesc: src.yDesc,
       anchor: row?.cell, srcKind: src.kind, e2: src.e2, head: src.kind === 'head' ? e : null,
     };
