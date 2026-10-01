@@ -265,8 +265,13 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
   .t-title { font-size: 14px; }
 }
 @media (max-width: 420px) {
-  .site-nav a { padding: 3px 6px; font-size: 11.5px; }
+  .brand { display: none; }
+  .site-nav a { padding: 3px 5px; font-size: 11.5px; }
   .top-actions { gap: 5px; }
+}
+@media (max-width: 374px) {
+  .topbar { gap: 6px; padding: 0 8px; }
+  .site-nav a { padding: 3px 3px; font-size: 11px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
