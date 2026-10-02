@@ -317,3 +317,6 @@ mark { background: rgba(255, 182, 92, .26); color: inherit; border-radius: 3px; 
   .lp-prog-btn { min-width: 52px; padding: 0 8px; }
   .lib-ctl .chips .lab { display: none; }
 }
+
+/* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号、破折号是全角的，夹在英文里会空出一大块）；代码里的中文提示词、诗句照常落到后面的中文字体 */
+html[lang="en"] { --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
