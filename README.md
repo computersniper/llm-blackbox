@@ -602,7 +602,7 @@ git push deploy main                                               # 发布（�
 - 写完整句（蒙太奇）；
 - 收尾：推理页的真实录屏（点选问题发送 → 点 ＋ 揭开黑箱 → 一层层往里钻 → 播放 / 倍速 / 暂停 / 单步），落版网址和二维码。
 
-**英文版**（`film.html?lang=en`，成片 `qwen3-inference-v7-en.mp4`）：结构、节奏、画面和中文版一样，问题换成 “Why is the sky blue?”，数据用网站英文版的同一份导出 `public/data/en/e01`（英文系统提示、采样参数和中文相同）。开场逐字母打字（没有输入法），片名 “How Does AI Think Up a Single Word?”，字幕是白话英文、Noto Serif / Noto Sans。戏剧点由 `score.js` 里的 `findDrama` 从英文数据里找：逻辑透镜在第 15 层最想“什么都不说”（结束符 83%），第 17 层 “The” 领先（52%）；拆开第 19 层，第 13 号头 74% 的注意力给了 “sky”（点积 178.3）；这次 3072 个开关亮了 157 个；第 6 个词 “it” 49% / “of” 38%，抽中了 “of”。片尾录的是推理页英文界面，二维码指向 `caijiechao.com/blackbox/?lang=en`。
+**英文版**（`film.html?lang=en`，成片 `qwen3-inference-v7-en.mp4`，同样 3 分 40 秒）：结构、节奏、画面和中文版一样，问题换成 “Why is the sky blue?”，数据用网站英文版的同一份导出 `public/data/en/e01`（英文系统提示、采样参数和中文相同）。开场逐字母打字（没有输入法），片名 “How Does AI Think Up a Single Word?”，字幕是白话英文、Noto Serif / Noto Sans。戏剧点由 `score.js` 里的 `findDrama` 从英文数据里找：逻辑透镜在第 15 层最想“什么都不说”（结束符 83%），第 17 层 “The” 领先（52%）；拆开第 19 层，第 13 号头 74% 的注意力给了 “sky”（点积 178.3）；这次 3072 个开关亮了 157 个；第 6 个词 “it” 49% / “of” 38%，抽中了 “of”。片尾录的是推理页英文界面，二维码指向 `caijiechao.com/blackbox/?lang=en`。
 
 全片只演示一次逐数计算（注意力里的一次点积）。讲解的写法是一次只讲一件事：顶部有一条很小的章节进度条；任何时刻最多一行白话字幕，加一个小号术语标签；正在讲的东西用高亮或指示环点出来，其他压暗。配乐由 `compose.py` 用 numpy / scipy 现场合成，讲解段落更安静。
 
@@ -613,7 +613,7 @@ git push deploy main                                               # 发布（�
 | `lib/` | 渲染器（多重采样、泛光、景深）、运镜工具、叠加层；`opening.js` 是开场：聊天页（打字、输入法候选、气泡、推近、裂成词元），以及词元交给 3D 方块以后的飞行与落位 |
 | `render.mjs` | 无头 Chromium 逐帧截图（WSL 下走 Mesa d3d12 用 GPU），也能抽单帧、导出事件、出封面；WebGL 上下文丢失（GPU 进程崩溃）时自动重开浏览器重渲 |
 | `compose.py` | 原创配乐：铺底、琶音、贝斯、鼓、钟和音效，按 `events.json` 对齐画面；母带 −14 LUFS、真峰值 −2 dBTP |
-| `make_qr.py` / `qr-blackbox.svg` | 片尾二维码：用 segno 在本地生成，指向 caijiechao.com/blackbox/ |
+| `make_qr.py` / `qr-blackbox.svg` / `qr-blackbox-en.svg` | 片尾二维码：用 segno 在本地生成，指向 caijiechao.com/blackbox/（英文版指向 `?lang=en`） |
 | `sitecap.mjs` | 片尾用的推理页录屏：无头 Chromium 打开 `public/index.html`，像用户一样点一遍，用 CDP screencast 录下来，重采样成 30 fps 的帧序列（放 D 盘 `sitecap/`）和点击时间表 `meta.json`；电影页按时间表剪辑、变速、叠加鼠标 |
 | `encode.sh` | 帧 + 配乐 → H.264（crf 18、slow、yuv420p、+faststart）+ AAC 192k |
 | `share.sh` | 分享用小体积版本：1080p30，两遍编码，码率按片长算到 ≤150 MB（3:35 用 4.8 Mbps） |
@@ -636,12 +636,13 @@ bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference-v7.mp4 60
 bash tools/video/share.sh $O/frames60 $O/score.wav $O/qwen3-inference-v7-share.mp4
 node tools/video/render.mjs poster --out $O/poster-v7.png                   # 默认取片名落版那一刻
 # 英文版：数据从 $O/data-en/（public/data/en/ 的拷贝）读，录屏放 $O/sitecap-en/，帧、配乐、成片都单独放
+# 英文界面还没合进本仓库时：serve.py 加 --site-en <那份工作目录>/public，录屏加 --site http://127.0.0.1:8776/site-en/
 node tools/video/sitecap.mjs --lang en --out $O/sitecap-en
-node tools/video/render.mjs frames --lang en --out $O/frames60-en --fps 60 --workers 4
+node tools/video/render.mjs frames --lang en --out $O/frames60-en --fps 60 --workers 2   # WSL 下别和 CUDA 任务同时跑 GPU 渲染
 node tools/video/render.mjs events --lang en --out tools/video/events-en.json
-/mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events-en.json --out $O/score-en.wav
-TITLE="How Does AI Think Up a Single Word? · Inside the black box of LLM inference (real Qwen3-0.6B run)" bash tools/video/encode.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en.mp4 60
-TITLE="..." bash tools/video/share.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en-share.mp4
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events-en.json --out $O/score-en.wav --ceiling -3.5
+TITLE="How Does AI Think Up a Single Word? · Inside the “black box” of LLM inference (a real Qwen3-0.6B run)" bash tools/video/encode.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en.mp4 60
+TITLE="（同上）" bash tools/video/share.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en-share.mp4
 node tools/video/render.mjs poster --lang en --out $O/poster-v7-en.png
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
