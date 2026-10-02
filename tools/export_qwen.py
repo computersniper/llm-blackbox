@@ -59,7 +59,7 @@ QUESTIONS_EN = [
     "Why is seawater salty?",
     "Why do cats like boxes?",
     "Who are you?",
-    "What can you do?",
+    "How many r's are in the word strawberry?",   # 数字母：模型看到的是词元，不是一个个字母
     "How do large language models work?",
     "What is the attention mechanism?",
     "What is a token?",
