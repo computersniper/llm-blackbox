@@ -179,8 +179,9 @@ MSG = {
         "chk_log_nofile": "summary.md was not created",
         "chk_log_ok": "summary.md has the correct count for all three errors",
         "chk_log_bad": "wrong or missing counts for: {bad}",
-        "chk_sales": "script {ran}; answer {told} 杭州 / Hangzhou (9250)",
+        "chk_sales": "script {ran}; answer {told} 杭州 / Hangzhou; total 9250 {num}",
         "ran_yes": "ran successfully", "ran_no": "never ran successfully", "told_yes": "names", "told_no": "does not name",
+        "num_yes": "given", "num_no": "missing from the answer",
         "chk_rename": "calc_total left in: {left}; total_price defined: {defined}; test file only renamed: {test_ok}; test exit code {code}",
         "none": "none",
     },
@@ -230,7 +231,8 @@ def check_sales_top(work, final, orig, turns):
     told = "杭州" in final or (LANG == "en" and "hangzhou" in final.lower())
     num = "9250" in (final.replace(",", "") if LANG == "en" else final)
     ok = told and num and bool(ran)
-    return ok, m("chk_sales", ran=m("ran_yes") if ran else m("ran_no"), told=m("told_yes") if told else m("told_no"))
+    return ok, m("chk_sales", ran=m("ran_yes") if ran else m("ran_no"), told=m("told_yes") if told else m("told_no"),
+                 num=m("num_yes") if num else m("num_no"))
 
 
 def check_rename(work, final, orig, turns):
@@ -711,6 +713,7 @@ def main():
     ap.add_argument("--dry", action="store_true", help="只打印，不写文件")
     ap.add_argument("--chips-only", action="store_true", help="只用分词器重建 manifest 里的输入法候选，不跑模型")
     ap.add_argument("--lang", default="zh", choices=["zh", "en"], help="en：英文提示与任务，输出到 data/en/")
+    ap.add_argument("--resume", action="store_true", help="已经录好并通过检查的任务（输出目录里有完整的 JSON）不再重录，直接收进 manifest")
     args = ap.parse_args()
     global OUT, LANG, TASKS
     if args.lang == "en":
@@ -735,9 +738,36 @@ def main():
     if LANG == "en":
         manifest["lang"] = "en"
     by_id = {t["id"]: t for t in manifest.get("tasks", [])}
+
+    def entry(task, r, raw, gz):
+        last = r["turns"][-1]
+        return {
+            "id": task["id"], "title": task["title"], "prompt": task["prompt"], "icon": task["icon"], "blurb": task["blurb"],
+            "chips": make_chips(rec.tok, task["prompt"]),
+            "turns": len(r["turns"]), "calls": sum(len(t["calls"]) for t in r["turns"]),
+            "ctxEnd": last["ctx"]["n"] + last["gen"]["n"],
+            "attempts": r["attempts"], "bytes": gz, "rawBytes": raw,
+        }
+
+    def flush():   # 每录完一个任务就写一次 manifest，中途崩溃也不丢已录好的
+        manifest["tasks"] = [by_id[t["id"]] for t in TASKS if t["id"] in by_id]
+        write_json(man_path, manifest)
+
     for task in TASKS:
         if args.only and task["id"] != args.only:
             continue
+        done = OUT / f"{task['id']}.json"
+        if args.resume and done.exists():
+            try:
+                r = json.loads(done.read_text())
+            except ValueError:
+                r = None
+            if r and r.get("check", {}).get("ok") and r.get("prompt") == task["prompt"] and r.get("attempts"):
+                print(f"== {task['id']} 已录好（种子 {r['seed']}，检查通过），直接收进 manifest", flush=True)
+                by_id[task["id"]] = entry(task, r, done.stat().st_size, (OUT / (done.name + ".gz")).stat().st_size)
+                if not args.dry:
+                    flush()
+                continue
         tries = []
         rec_ok = None
         for seed in seeds:
@@ -755,17 +785,10 @@ def main():
         if args.dry:
             continue
         raw, gz = write_json(OUT / f"{task['id']}.json", rec_ok)
-        last = rec_ok["turns"][-1]
-        by_id[task["id"]] = {
-            "id": task["id"], "title": task["title"], "prompt": task["prompt"], "icon": task["icon"], "blurb": task["blurb"],
-            "chips": make_chips(rec.tok, task["prompt"]),
-            "turns": len(rec_ok["turns"]), "calls": sum(len(t["calls"]) for t in rec_ok["turns"]),
-            "ctxEnd": last["ctx"]["n"] + last["gen"]["n"],
-            "attempts": tries, "bytes": gz, "rawBytes": raw,
-        }
-    manifest["tasks"] = [by_id[t["id"]] for t in TASKS if t["id"] in by_id]
+        by_id[task["id"]] = entry(task, rec_ok, raw, gz)
+        flush()
     if not args.dry:
-        write_json(man_path, manifest)
+        flush()
         print("写入", man_path, flush=True)
 
 
