@@ -41,6 +41,10 @@
   font-variant-ligatures: none;   /* JetBrains Mono 会把 <| |> 连写成三角形 */
   -webkit-tap-highlight-color: transparent;
 }
+/* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的） */
+.pb-root .pb-nr, .pb-root.pb-narrow .pb-wd { display: none; }
+.pb-root.pb-narrow .pb-nr { display: inline; }
+html[lang="en"] .pb-root { --pb-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
 .pb-root *, .pb-root *::before, .pb-root *::after { box-sizing: border-box; }
 .pb-root [hidden] { display: none !important; }
 .pb-root button { font: inherit; color: inherit; }

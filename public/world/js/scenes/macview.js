@@ -5,6 +5,7 @@ import { COL, rr, text, hexA, ease, clamp } from '../../../train/js/draw.js';
 import { Pix, featGrid, divRGB, vecGrid } from '../pix.js';
 import { ENC, DEC } from '../nn.js';
 import { OP_LABEL } from '../explain.js';
+import { L as Lx } from '../../../js/i18n.js';
 
 // 要拆的那个输出：深色外框 + 琥珀色框，格子再小也看得见
 function mark(g, x, y, sc) {
@@ -83,8 +84,8 @@ export class MacView {
     const k = ['pick', 'mul', 'sum', 'act'].indexOf(s.mi);
     const G = this.grids(mac, det);
     // ---- 输入、输出在哪
-    this.tensor(g, B.inp, G.inp, '输入', mac, 'in', env);
-    this.tensor(g, B.out, G.out, '输出', mac, 'out', env);
+    this.tensor(g, B.inp, G.inp, Lx('输入', 'Input'), mac, 'in', env);
+    this.tensor(g, B.out, G.out, Lx('输出', 'Output'), mac, 'out', env);
     // ---- n 项：x、w、x·w
     const n = mac.n, cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols);
     let mx = 0, mw = 0, mp = 0;
@@ -105,11 +106,11 @@ export class MacView {
         g.fillRect(x + 0.5, y + 0.5, Math.max(0.6, cs - 1), Math.max(0.6, cs - 1));
         if (top.has(i) && k >= 1 && cs > 2.5) { g.strokeStyle = hexA(COL.amber, 0.9); g.lineWidth = 1; g.strokeRect(x, y, cs, cs); }
       }
-      env.hit(r.x, r.y, r.w, r.h, { tipAt: (wx, wy) => { const i = Math.floor((wy - r.y) / cs) * cols + Math.floor((wx - r.x) / cs); const t = mac.terms[i]; if (!t) return ''; return `<span class="k">第 ${i} 项 · ${t.lab}</span>x = <span class="v">${t.x.toFixed(4)}</span><br>w = <span class="v">${t.w.toFixed(4)}</span><br>x·w = <span class="v">${t.p.toFixed(5)}</span>`; } });
+      env.hit(r.x, r.y, r.w, r.h, { tipAt: (wx, wy) => { const i = Math.floor((wy - r.y) / cs) * cols + Math.floor((wx - r.x) / cs); const t = mac.terms[i]; if (!t) return ''; return Lx(`<span class="k">第 ${i} 项 · ${t.lab}</span>x = <span class="v">${t.x.toFixed(4)}</span><br>w = <span class="v">${t.w.toFixed(4)}</span><br>x·w = <span class="v">${t.p.toFixed(5)}</span>`, `<span class="k">Term ${i} · ${t.lab}</span>x = <span class="v">${t.x.toFixed(4)}</span><br>w = <span class="v">${t.w.toFixed(4)}</span><br>x·w = <span class="v">${t.p.toFixed(5)}</span>`); } });
     };
-    draw3(B.x, 'x', mx, `输入 x（${n} 个）`, COL.ink, 1);
-    draw3(B.w, 'w', mw, `权重 w（${n} 个）`, COL.ink, 1);
-    draw3(B.p, 'p', mp, '乘积 x·w', k >= 1 ? COL.ink : COL.faint, reveal);
+    draw3(B.x, 'x', mx, Lx(`输入 x（${n} 个）`, `Inputs x (${n})`), COL.ink, 1);
+    draw3(B.w, 'w', mw, Lx(`权重 w（${n} 个）`, `Weights w (${n})`), COL.ink, 1);
+    draw3(B.p, 'p', mp, Lx('乘积 x·w', 'Products x·w'), k >= 1 ? COL.ink : COL.faint, reveal);
     if (!pt) {
       text(g, '×', (B.x.x + B.x.w + B.w.x) / 2, B.x.y + B.x.h / 2 + 6, { size: 18, color: COL.dim, align: 'center' });
       text(g, '=', (B.w.x + B.w.w + B.p.x) / 2, B.x.y + B.x.h / 2 + 6, { size: 18, color: COL.dim, align: 'center' });
@@ -119,7 +120,7 @@ export class MacView {
     rr(g, r.x, r.y, r.w, r.h, 10);
     g.fillStyle = k >= 2 ? 'rgba(94,240,212,0.06)' : 'rgba(10,17,31,0.82)'; g.fill();
     g.strokeStyle = k >= 2 ? hexA(COL.cyan, 0.5) : COL.line2; g.lineWidth = 1; g.stroke();
-    const sumTxt = k >= 2 ? `b + Σ x·w = ${mac.bias.toFixed(4)} + ${mac.sum.toFixed(4)} = ${mac.pre.toFixed(4)}` : k === 1 ? `正 ${mac.pos.toFixed(3)} · 负 ${mac.neg.toFixed(3)}` : `y = b + Σ x·w，${n} 项`;
+    const sumTxt = k >= 2 ? `b + Σ x·w = ${mac.bias.toFixed(4)} + ${mac.sum.toFixed(4)} = ${mac.pre.toFixed(4)}` : k === 1 ? Lx(`正 ${mac.pos.toFixed(3)} · 负 ${mac.neg.toFixed(3)}`, `pos ${mac.pos.toFixed(3)} · neg ${mac.neg.toFixed(3)}`) : Lx(`y = b + Σ x·w，${n} 项`, `y = b + Σ x·w, ${n} terms`);
     text(g, sumTxt, r.x + 14, r.y + (pt ? 24 : 22), { size: pt ? 10.5 : 13, kind: 'mono', color: COL.ink, max: r.w - 28 });
     if (k >= 3) text(g, mac.actFormula().replace(/<[^>]+>/g, ''), r.x + 14, r.y + (pt ? 44 : 40), { size: pt ? 10 : 12, kind: 'mono', color: COL.cyan, max: r.w - 28 });
     else text(g, mac.where, r.x + 14, r.y + (pt ? 44 : 40), { size: pt ? 9.5 : 11, color: COL.dim, max: r.w - 28 });
@@ -128,13 +129,14 @@ export class MacView {
   // 张量网格：输入时标出参与这一次乘加的位置，输出时标出这一格
   tensor(g, r, Gr, title, mac, which, env) {
     const pt = this.portrait;
-    const label = which === 'in' ? `${title}${mac.op === 'e1' ? '：真实画面' : ''}` : `${title}：${mac.op === 'd4' ? '梦见的画面' : OP_LABEL[mac.op]}`;
+    const label = Lx(which === 'in' ? `${title}${mac.op === 'e1' ? '：真实画面' : ''}` : `${title}：${mac.op === 'd4' ? '梦见的画面' : OP_LABEL[mac.op]}`,
+      which === 'in' ? `${title}${mac.op === 'e1' ? ': real frame' : ''}` : `${title}: ${mac.op === 'd4' ? 'dreamed frame' : OP_LABEL[mac.op]}`);
     text(g, label, r.x, r.y - 9, { size: pt ? 10 : 12, kind: 'serif', weight: 600, color: COL.ink2 });
     rr(g, r.x - 2, r.y - 2, r.w + 4, r.h + 4, 5); g.fillStyle = 'rgba(4,8,16,0.92)'; g.fill(); g.strokeStyle = COL.line2; g.lineWidth = 1; g.stroke();
     if (!Gr) {
       // 向量（全连接、LSTM 的门、MDN）：画成方格
       const n = which === 'in' ? mac.n : 1;
-      text(g, which === 'in' ? `${mac.n} 个输入（右边 x 方格里就是全部）` : mac.where, r.x + r.w / 2, r.y + r.h / 2, { size: 10.5, color: COL.dim, align: 'center', max: r.w - 16 });
+      text(g, which === 'in' ? Lx(`${mac.n} 个输入（右边 x 方格里就是全部）`, `${mac.n} inputs (all of them are in the x grid on the right)`) : mac.where, r.x + r.w / 2, r.y + r.h / 2, { size: 10.5, color: COL.dim, align: 'center', max: r.w - 16 });
       return;
     }
     const sc = Math.min(r.w / Gr.cw, r.h / Gr.ch);
@@ -146,7 +148,7 @@ export class MacView {
     g.strokeStyle = COL.amber; g.lineWidth = 1.2;
     if (Gr.vec) {
       if (which === 'out' && Gr.idx >= 0) { const [x, y] = cell(0, Math.floor(Gr.idx / Gr.cols), Gr.idx % Gr.cols); mark(g, x, y, sc); }
-      if (which === 'in') text(g, `全部 ${mac.n} 个都参与`, r.x + r.w / 2, r.y + r.h + 14, { size: 9.5, color: COL.dim, align: 'center' });
+      if (which === 'in') text(g, Lx(`全部 ${mac.n} 个都参与`, `all ${mac.n} take part`), r.x + r.w / 2, r.y + r.h + 14, { size: 9.5, color: COL.dim, align: 'center' });
       return;
     }
     if (which === 'out') {

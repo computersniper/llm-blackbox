@@ -33,21 +33,29 @@
 </head>
 <body>
 <main class="dev">
-  <header class="dev-h"><h1>大模型里的世界地图</h1><span>开发页 · 单独测试 probe/probe.js 的 mountProbe()</span></header>
+  <header class="dev-h"><h1 data-i18n="dev.h1">大模型里的世界地图</h1><span data-i18n="dev.sub">开发页 · 单独测试 probe/probe.js 的 mountProbe()</span><span id="langSwitch"></span></header>
   <div class="dev-box" id="box"></div>
   <aside class="dev-side">
     <div class="dev-ctl">
-      <span>外部调试器：</span>
-      <input id="lay" type="number" min="0" max="27" value="12" aria-label="层">
+      <span data-i18n="dev.ext">外部调试器：</span>
+      <input id="lay" type="number" min="0" max="27" value="12" aria-label="层" data-i18n-attr="aria-label:dev.layer">
       <button id="set">setLayer</button>
       <button id="kill">destroy</button>
-      <button id="again">重新挂载</button>
+      <button id="again" data-i18n="dev.again">重新挂载</button>
     </div>
     <div class="dev-ex" id="ex" aria-live="polite"></div>
   </aside>
 </main>
 <script type="module">
   import { mountProbe } from './probe.js';
+  import { isEn, L, addDict, applyDom, mountLangSwitch } from '../../js/i18n.js';
+  addDict({
+    zh: { 'dev.h1': '大模型里的世界地图', 'dev.sub': '开发页 · 单独测试 probe/probe.js 的 mountProbe()', 'dev.ext': '外部调试器：', 'dev.layer': '层', 'dev.again': '重新挂载' },
+    en: { 'dev.h1': 'The world map inside an LLM', 'dev.sub': 'Dev page · tests mountProbe() from probe/probe.js on its own', 'dev.ext': 'External debugger:', 'dev.layer': 'Layer', 'dev.again': 'Remount' },
+  });
+  applyDom();
+  mountLangSwitch(document.getElementById('langSwitch'));
+  if (isEn) document.title = 'World map probe · dev page';
   const box = document.getElementById('box'), ex = document.getElementById('ex');
   let api = null;
   async function mount() {
@@ -56,7 +64,7 @@
     window.__probe = api;
   }
   document.getElementById('set').onclick = () => api?.setLayer(Number(document.getElementById('lay').value));
-  document.getElementById('kill').onclick = () => { api?.destroy(); api = null; ex.innerHTML = '<p class="dim">已销毁</p>'; };
+  document.getElementById('kill').onclick = () => { api?.destroy(); api = null; ex.innerHTML = `<p class="dim">${L('已销毁', 'Destroyed')}</p>`; };
   document.getElementById('again').onclick = mount;
   mount();
 </script>

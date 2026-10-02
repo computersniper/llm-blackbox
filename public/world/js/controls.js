@@ -1,6 +1,7 @@
 // 调试器界面：面包屑、深度、播放控制、倍速、步骤轨道、伪代码高亮、讲解、变量监视。
 // 从 ../../js/controls.js 改来：步骤换成世界模型的一帧。
 import { $, $$, esc } from '../../js/ui.js';
+import { L } from '../../js/i18n.js';
 import { DEPTH_NAMES, MAX_DEPTH } from './timeline.js';
 import { renderCode, linesFor, explain, watch, renderWatch, stepLabel, crumbs, shapeOf } from './explain.js';
 
@@ -64,7 +65,7 @@ export class Controls {
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top: first.offsetTop - box.clientHeight * 0.2, behavior: tl.depth === 1 ? 'auto' : 'smooth' });
     }
     const shape = shapeOf(s);
-    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, F))}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, ctx)}`;
+    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">${L('这一步', 'This step')} · ${esc(stepLabel(s, F))}</div>${shape ? `<div class="shape">${shape}</div>` : ''}${explain(s, ctx)}`;
     renderWatch($('#watch'), watch(s, ctx));
     this.renderTrack(tl, F);
     this.updatePlay(tl);
@@ -76,19 +77,20 @@ export class Controls {
     if (tl.depth === 1) {
       // D1：最近 60 帧，每帧一格
       const sim = tl.sim, a = Math.max(0, sim.idx - 59);
-      for (let i = a; i <= sim.idx; i++) h += `<i data-i="${i - sim.idx}" data-l="第 ${sim.hist[i].t} 帧" class="${i < sim.idx ? 'done' : 'cur'}"></i>`;
+      for (let i = a; i <= sim.idx; i++) h += `<i data-i="${i - sim.idx}" data-l="${L(`第 ${sim.hist[i].t} 帧`, `Frame ${sim.hist[i].t}`)}" class="${i < sim.idx ? 'done' : 'cur'}"></i>`;
     } else {
       const n = tl.list.length;
       const a = n <= 90 ? 0 : Math.max(0, Math.min(n - 80, tl.i - 40)), b = n <= 90 ? n : a + 80;
       for (let i = a; i < b; i++) h += `<i data-i="${i}" data-l="${esc(stepLabel(tl.list[i], F))}" class="${i < tl.i ? 'done' : i === tl.i ? 'cur' : ''}"></i>`;
     }
     tr.innerHTML = h;
-    $('#pos').innerHTML = tl.depth === 1 ? `第 <b>${F.gameNo}</b> 局<br>里程 <b>${F.t}</b>` : `里程 <b>${F.t}</b><br>步骤 <b>${tl.i + 1}</b>/${tl.list.length}`;
+    $('#pos').innerHTML = L(tl.depth === 1 ? `第 <b>${F.gameNo}</b> 局<br>里程 <b>${F.t}</b>` : `里程 <b>${F.t}</b><br>步骤 <b>${tl.i + 1}</b>/${tl.list.length}`,
+      tl.depth === 1 ? `Game <b>${F.gameNo}</b><br>Dist <b>${F.t}</b>` : `Dist <b>${F.t}</b><br>Step <b>${tl.i + 1}</b>/${tl.list.length}`);
   }
 
   updatePlay(tl) {
     $('#btnPlay').textContent = tl.playing ? '❚❚' : '▶';
-    $('#btnPlay').title = tl.playing ? '暂停（空格）' : '播放（空格）';
+    $('#btnPlay').title = tl.playing ? L('暂停（空格）', 'Pause (Space)') : L('播放（空格）', 'Play (Space)');
     $$('#speeds button').forEach((b) => { b.classList.toggle('on', Number(b.dataset.s) === tl.speed); b.setAttribute('aria-checked', Number(b.dataset.s) === tl.speed); });
   }
 }

@@ -105,3 +105,9 @@ body.has-board .pad { display: none; }
   .seg button { padding: 0 7px; }
   #segAuto button { padding: 0 6px; }
 }
+/* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的，夹在英文里会空出一大块）；衬线标题里的英文用直引号 */
+html[lang="en"] { --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
+@media (max-width: 900px) {
+  html[lang="en"] .chap button { min-width: 0; }
+  html[lang="en"] .chap button b { font-size: 11.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}

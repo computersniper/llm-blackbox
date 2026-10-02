@@ -3,10 +3,13 @@
 import { COL, rr, text, card, hexA, line, ease, clamp } from '../../../train/js/draw.js';
 import { vecGrid } from '../pix.js';
 import { ACTIONS } from '../game.js';
-import { dimOrder, dimMeaning, dimShort, used as isUsed } from '../explain.js';
+import { dimOrder, dimMeaning, dimShort, used as isUsed, actName } from '../explain.js';
+import { isEn, L as Lx } from '../../../js/i18n.js';
 import { Z, KMIX } from '../nn.js';
 
-const GATES = [['gi', 'i', '输入门', 'σ'], ['gf', 'f', '遗忘门', 'σ'], ['gg', 'g', '候选记忆', 'tanh'], ['go', 'o', '输出门', 'σ']];
+const GATES = Lx([['gi', 'i', '输入门', 'σ'], ['gf', 'f', '遗忘门', 'σ'], ['gg', 'g', '候选记忆', 'tanh'], ['go', 'o', '输出门', 'σ']],
+  [['gi', 'i', 'Input gate', 'σ'], ['gf', 'f', 'Forget gate', 'σ'], ['gg', 'g', 'Candidate', 'tanh'], ['go', 'o', 'Output gate', 'σ']]);
+const WAIT_MDN = Lx('算到“混合密度”这一步才有', 'Appears at the “Mixture density” step');
 const KCOL = ['#5ef0d4', '#ffb65c', '#b39dff', '#ff6b93', '#6b9bff'];
 
 export class MemView {
@@ -74,10 +77,10 @@ export class MemView {
     const sel = this.app.sel;
 
     // ---- 输入：z、动作、上一步的记忆
-    this.zRow(g, B.z, rec.z, rec.src === 'dream' ? 'z（闭眼：上一步的 ẑ）' : 'z（这一帧的编码）', stOf('cat') === 'on', env);
+    this.zRow(g, B.z, rec.z, rec.src === 'dream' ? Lx('z（闭眼：上一步的 ẑ）', "z (eyes closed: last step's ẑ)") : Lx('z（这一帧的编码）', "z (this frame's encoding)"), stOf('cat') === 'on', env);
     this.actRow(g, B.a, rec.a, stOf('cat') === 'on');
-    this.grid(g, B.h, 'h', '记忆 h', 'tanh 范围 −1…1', 'done', env);
-    this.grid(g, B.c, 'c', '细胞 c', '长期记忆', 'done', env);
+    this.grid(g, B.h, 'h', Lx('记忆 h', 'Memory h'), Lx('tanh 范围 −1…1', 'tanh range −1…1'), 'done', env);
+    this.grid(g, B.c, 'c', Lx('细胞 c', 'Cell c'), Lx('长期记忆', 'long-term memory'), 'done', env);
     // ---- 四个门
     for (const [id, , name, act] of GATES) {
       const state = stOf(id);
@@ -89,10 +92,10 @@ export class MemView {
     }
     // ---- 细胞状态、隐状态
     const cs = stOf('cell'), hs = stOf('hid');
-    this.grid(g, B.fc, 'fc', 'f ⊙ c', '留下的旧记忆', cs, env, cs === 'on' ? ease(p) : 1);
-    this.grid(g, B.ig, 'ig', 'i ⊙ g', '写进去的新内容', cs, env, cs === 'on' ? ease(p) : 1);
-    this.grid(g, B.c2, 'c2', "c' = f⊙c + i⊙g", '新的细胞状态', cs, env, cs === 'on' ? ease(clamp(p * 1.5 - 0.5, 0, 1)) : 1);
-    this.grid(g, B.h2, 'h2', "h' = o ⊙ tanh(c')", '新的记忆', hs, env, hs === 'on' ? ease(p) : 1);
+    this.grid(g, B.fc, 'fc', 'f ⊙ c', Lx('留下的旧记忆', 'old memory kept'), cs, env, cs === 'on' ? ease(p) : 1);
+    this.grid(g, B.ig, 'ig', 'i ⊙ g', Lx('写进去的新内容', 'new content written'), cs, env, cs === 'on' ? ease(p) : 1);
+    this.grid(g, B.c2, 'c2', "c' = f⊙c + i⊙g", Lx('新的细胞状态', 'new cell state'), cs, env, cs === 'on' ? ease(clamp(p * 1.5 - 0.5, 0, 1)) : 1);
+    this.grid(g, B.h2, 'h2', "h' = o ⊙ tanh(c')", Lx('新的记忆', 'new memory'), hs, env, hs === 'on' ? ease(p) : 1);
     if (!pt) {
       const y = B.fc.y + B.fc.h / 2;
       text(g, '+', (B.fc.x + B.fc.w + B.ig.x) / 2, y + 6, { size: 18, color: COL.dim, align: 'center' });
@@ -115,17 +118,17 @@ export class MemView {
       g.fillStyle = isUsed(meta, d) ? hexA(COL.violet, 0.85) : 'rgba(122,133,158,0.4)';
       g.fillRect(r.x + pad + i * bw + 0.5, Math.min(mid, mid - v), Math.max(1, bw - 1), Math.max(0.8, Math.abs(v)));
     });
-    env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">输入 x 的前 32 个数</span>这一帧的 z（按 KL 排序显示）' });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx('<span class="k">输入 x 的前 32 个数</span>这一帧的 z（按 KL 排序显示）', '<span class="k">First 32 numbers of input x</span>This frame’s z (shown sorted by KL)') });
   }
 
   actRow(g, r, a, on) {
-    text(g, '动作 one-hot', r.x, r.y - 9, { size: this.portrait ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, Lx('动作 one-hot', 'Action one-hot'), r.x, r.y - 9, { size: this.portrait ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     const w = r.w / 3;
     for (let k = 0; k < 3; k++) {
       rr(g, r.x + k * w + 2, r.y, w - 4, r.h, 5);
       g.fillStyle = k === a ? hexA(COL.amber, 0.25) : 'rgba(255,255,255,0.03)'; g.fill();
       g.strokeStyle = k === a ? hexA(COL.amber, 0.8) : COL.line2; g.lineWidth = 1; g.stroke();
-      text(g, `${ACTIONS[k]} ${k === a ? 1 : 0}`, r.x + k * w + w / 2, r.y + r.h / 2 + 4, { size: this.portrait ? 9.5 : 11, color: k === a ? COL.amber : COL.dim, align: 'center' });
+      text(g, `${isEn ? (this.portrait ? ['↑', '←', '→'][k] : actName(k)) : ACTIONS[k]} ${k === a ? 1 : 0}`, r.x + k * w + w / 2, r.y + r.h / 2 + 4, { size: this.portrait ? 9.5 : 11, color: k === a ? COL.amber : COL.dim, align: 'center' });
     }
   }
 
@@ -144,7 +147,7 @@ export class MemView {
     }
     const isGate = id[0] === 'g' && id.length === 2;
     env.hit(r.x, r.y, r.w, r.h, {
-      tipAt: (wx, wy) => { const j = clamp(Math.floor((wy - r.y) / cs), 0, 15) * 16 + clamp(Math.floor((wx - r.x) / cs), 0, 15); return `<span class="k">${title} · 第 ${j} 维</span><span class="v">${this.raw[id][j].toFixed(4)}</span>${isGate ? '<br><span class="v">点一下选中，按 ＋ 看它的 291 项乘加</span>' : ''}`; },
+      tipAt: (wx, wy) => { const j = clamp(Math.floor((wy - r.y) / cs), 0, 15) * 16 + clamp(Math.floor((wx - r.x) / cs), 0, 15); return Lx(`<span class="k">${title} · 第 ${j} 维</span><span class="v">${this.raw[id][j].toFixed(4)}</span>${isGate ? '<br><span class="v">点一下选中，按 ＋ 看它的 291 项乘加</span>' : ''}`, `<span class="k">${title} · dim ${j}</span><span class="v">${this.raw[id][j].toFixed(4)}</span>${isGate ? '<br><span class="v">Click to select, then press ＋ to see its 291-term multiply-add</span>' : ''}`); },
       clickAt: isGate ? (wx, wy) => { const j = clamp(Math.floor((wy - r.y) / cs), 0, 15) * 16 + clamp(Math.floor((wx - r.x) / cs), 0, 15); this.app.select(id, { j }); } : null,
     });
   }
@@ -153,9 +156,9 @@ export class MemView {
   mdn(g, r, rec, shown, on, env) {
     const { meta } = this.app;
     const pt = this.portrait;
-    text(g, '下一帧 z 的分布（每一维 5 个高斯）', r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, Lx('下一帧 z 的分布（每一维 5 个高斯）', 'Distribution of the next z (5 Gaussians per dim)'), r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     card(g, r.x, r.y, r.w, r.h, { r: 8, active: on });
-    if (!shown) { text(g, '算到“混合密度”这一步才有', r.x + r.w / 2, r.y + r.h / 2, { size: 11, color: COL.faint, align: 'center' }); return; }
+    if (!shown) { text(g, WAIT_MDN, r.x + r.w / 2, r.y + r.h / 2, { size: 11, color: COL.faint, align: 'center' }); return; }
     const order = dimOrder(meta);
     const cols = 4, rows = 8, pad = 6;
     const cw = (r.w - pad * 2) / cols, ch = (r.h - pad * 2) / rows;
@@ -166,7 +169,7 @@ export class MemView {
       if (d === selD) { rr(g, x + 1, y + 1, cw - 2, ch - 2, 3); g.strokeStyle = hexA(COL.amber, 0.8); g.lineWidth = 1; g.stroke(); }
       this.density(g, { x: x + 3, y: y + 3, w: cw - 6, h: ch - 8 }, rec, d, used ? 1 : 0.35, false);
       text(g, `${d}`, x + 4, y + 10, { size: 7.5, kind: 'mono', color: COL.faint });
-      env.hit(x, y, cw, ch, { tip: `<span class="k">z<sub>${d}</sub> 的下一帧分布</span>${dimMeaning(meta, d)}<br>采样到 <span class="v">${rec.S.z[d].toFixed(3)}</span>（第 ${rec.S.k[d]} 个高斯）<br><span class="v">点一下放大</span>`, click: true, act: () => { this.app.sel.mdnDim = d; } });
+      env.hit(x, y, cw, ch, { tip: Lx(`<span class="k">z<sub>${d}</sub> 的下一帧分布</span>${dimMeaning(meta, d)}<br>采样到 <span class="v">${rec.S.z[d].toFixed(3)}</span>（第 ${rec.S.k[d]} 个高斯）<br><span class="v">点一下放大</span>`, `<span class="k">Next-frame distribution of z<sub>${d}</sub></span>${dimMeaning(meta, d)}<br>sampled <span class="v">${rec.S.z[d].toFixed(3)}</span> (Gaussian #${rec.S.k[d]})<br><span class="v">Click to enlarge</span>`), click: true, act: () => { this.app.sel.mdnDim = d; } });
     });
   }
 
@@ -250,9 +253,9 @@ export class MemView {
     const d = this.selDim(rec);
     const on = op === 'mdn' || op === 'pick' || op === 'draw';
     const shown = ['mdn', 'done', 'pick', 'draw'].includes(op);
-    text(g, `放大：z${d}（${dimMeaning(meta, d)}）`, r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, Lx(`放大：z${d}（${dimMeaning(meta, d)}）`, `Enlarged: z${d} (${dimMeaning(meta, d)})`), r.x, r.y - 9, { size: pt ? 10 : 11.5, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     card(g, r.x, r.y, r.w, r.h, { r: 8, active: on });
-    if (!shown) { text(g, '算到“混合密度”这一步才有', r.x + r.w / 2, r.y + r.h / 2, { size: 11, color: COL.faint, align: 'center' }); return; }
+    if (!shown) { text(g, WAIT_MDN, r.x + r.w / 2, r.y + r.h / 2, { size: 11, color: COL.faint, align: 'center' }); return; }
     // 睁眼时，下一帧真实画面的编码作参照（白色虚线）
     const G = sim.next;
     const truth = rec.mode === 'open' && G ? sim.encOf(G).mu[d] : null;
@@ -264,11 +267,11 @@ export class MemView {
     text(g, geo.lo.toFixed(2), P.x, P.y + P.h + 13, { size: 9, kind: 'mono', color: COL.dim });
     text(g, geo.hi.toFixed(2), P.x + P.w, P.y + P.h + 13, { size: 9, kind: 'mono', color: COL.dim, align: 'right' });
     if (op === 'draw' && p > 0.4) text(g, `ẑ = ${rec.S.z[d].toFixed(3)}`, geo.X(rec.S.z[d]) + 6, P.y + 12, { size: 11, kind: 'mono', color: COL.amber });
-    if (truth != null) text(g, '真实下一帧', geo.X(truth) + 5, P.y + 26, { size: 9.5, color: COL.ink2 });
+    if (truth != null) text(g, Lx('真实下一帧', 'real next frame'), geo.X(truth) + 5, P.y + 26, { size: 9.5, color: COL.ink2 });
     // 右侧：5 个分量的 π、μ、σ
     if (!pt) {
       const tx = r.x + r.w - 176;
-      text(g, '分量   π      π(τ)   μ       σ', tx, r.y + 22, { size: 9.5, kind: 'mono', color: COL.dim });
+      text(g, Lx('分量   π      π(τ)   μ       σ', 'comp   π      π(τ)   μ       σ'), tx, r.y + 22, { size: 9.5, kind: 'mono', color: COL.dim });
       for (let kk = 0; kk < KMIX; kk++) {
         const pi = Math.exp(rec.M.logpi[d * KMIX + kk]), pit = rec.S.pi[d * KMIX + kk];
         const yy = r.y + 40 + kk * 17;
@@ -277,24 +280,24 @@ export class MemView {
         g.fillStyle = KCOL[kk]; g.fillRect(tx, yy - 7, 8, 8);
         text(g, `${(pi * 100).toFixed(1).padStart(5)}% ${(pit * 100).toFixed(1).padStart(5)}% ${rec.M.mu[d * KMIX + kk].toFixed(2).padStart(6)} ${Math.exp(rec.M.logsig[d * KMIX + kk]).toFixed(3)}`, tx + 14, yy, { size: 9.5, kind: 'mono', color: hl ? COL.amber : COL.ink2 });
       }
-      text(g, `τ = ${rec.tau.toFixed(2)} · 挑中第 ${k} 个`, tx, r.y + 140, { size: 10, color: COL.dim });
+      text(g, Lx(`τ = ${rec.tau.toFixed(2)} · 挑中第 ${k} 个`, `τ = ${rec.tau.toFixed(2)} · picked #${k}`), tx, r.y + 140, { size: 10, color: COL.dim });
       text(g, `ε = ${rec.S.eps[d].toFixed(3)}`, tx, r.y + 156, { size: 10, kind: 'mono', color: COL.dim });
     }
-    env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">z<sub>${d}</sub> 的分布</span>紫色：M 给出的 5 个高斯的混合；琥珀色：按温度 τ 调过之后真正拿来采样的；琥珀竖线：采样结果${truth != null ? '；白色虚线：真实下一帧编码出来的值' : ''}。` });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx(`<span class="k">z<sub>${d}</sub> 的分布</span>紫色：M 给出的 5 个高斯的混合；琥珀色：按温度 τ 调过之后真正拿来采样的；琥珀竖线：采样结果${truth != null ? '；白色虚线：真实下一帧编码出来的值' : ''}。`, `<span class="k">Distribution of z<sub>${d}</sub></span>Violet: M’s mixture of 5 Gaussians; amber: what is actually sampled from, after adjusting for temperature τ; amber line: the sample${truth != null ? '; white dashed line: the encoding of the real next frame' : ''}.`) });
   }
 
   doneGauge(g, r, rec, state, env) {
     const on = state === 'on';
     const pd = rec.M.done;
     card(g, r.x, r.y, r.w, r.h, { r: 8, active: on, accent: COL.rose });
-    text(g, '这一步撞车了吗', r.x + 12, r.y + 20, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, Lx('这一步撞车了吗', 'Crash this step?'), r.x + 12, r.y + 20, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     const shown = state !== 'todo';
     text(g, shown ? `${(pd * 100).toFixed(pd < 0.1 ? 2 : 1)}%` : '—', r.x + r.w - 12, r.y + 21, { size: 14, kind: 'mono', color: pd > 0.5 ? COL.rose : COL.ink, align: 'right' });
     const w = r.w - 24;
     rr(g, r.x + 12, r.y + 32, w, 6, 3); g.fillStyle = 'rgba(255,255,255,0.06)'; g.fill();
     if (shown) { rr(g, r.x + 12, r.y + 32, w * Math.min(1, pd), 6, 3); g.fillStyle = COL.rose; g.fill(); }
     g.strokeStyle = COL.line3; g.beginPath(); g.moveTo(r.x + 12 + w / 2, r.y + 28); g.lineTo(r.x + 12 + w / 2, r.y + 42); g.stroke();
-    if (r.h > 60) text(g, `logit ${rec.M.doneLogit.toFixed(2)} · 超过 50%（竖线）梦就“撞车”`, r.x + 12, r.y + 60, { size: 9.5, color: COL.dim });
-    env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">撞车概率</span>σ(w·h + b)。训练时只有每局最后一步是 1。' });
+    if (r.h > 60) text(g, Lx(`logit ${rec.M.doneLogit.toFixed(2)} · 超过 50%（竖线）梦就“撞车”`, `logit ${rec.M.doneLogit.toFixed(2)} · above 50% (the tick) the dream “crashes”`), r.x + 12, r.y + 60, { size: 9.5, color: COL.dim });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx('<span class="k">撞车概率</span>σ(w·h + b)。训练时只有每局最后一步是 1。', '<span class="k">Crash probability</span>σ(w·h + b). In training, only the last step of each game is 1.') });
   }
 }

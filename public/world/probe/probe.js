@@ -6,10 +6,13 @@
 // 接口：mountProbe(el, { onExplain(html), onLayer(L) }) → { setLayer(L), destroy() }
 //   el 是一个空容器（自适应大小）；onExplain 把当前讲解推给页面右侧；setLayer 由外部调试器驱动（0–27）。
 
+import { isEn, L as Lx } from '../../js/i18n.js';
+
 const URL_CSS = new URL('./probe.css', import.meta.url).href;
 const URL_DATA = new URL('./data/', import.meta.url).href;
 
 const NL = 28;
+const PLAY_LABEL = Lx('播放：从第 0 层到第 27 层', 'Play: from layer 0 to layer 27');
 const LAT_TOP = 80, LAT_BOT = -58;                // 地图显示的纬度范围（等距圆柱投影：经纬度就是平面坐标，和线性探针的读数一一对应）
 const ASPECT = 360 / (LAT_TOP - LAT_BOT);
 const TWEEN_MS = 620, STEP_MS = 820;
@@ -19,12 +22,17 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 // 大洲配色（深色背景上压暗过的站点色相；按这个固定顺序做过色觉辨识检查）
 const CT_COL = ['#5097d0', '#d57327', '#05a891', '#b18c00', '#e05b8b', '#957ede'];
 // 四组探针：真实模型 · 问坐标 / 只给名字，对照 · 打乱标签 / 未训练
-const VAR = {
+const VAR = Lx({
   coords: { label: '问坐标', short: '问坐标', tag: '', col: '#4fd8be' },
   name: { label: '只给名字', short: '只给名字', tag: '', col: '#6f93e8' },
   shuffled: { label: '打乱标签', short: '打乱标签', tag: '对照', col: '#e0688c' },
   random: { label: '未训练', short: '未训练', tag: '对照', col: '#a08ae6' },
-};
+}, {
+  coords: { label: 'Ask for coordinates', short: 'Ask coords', tag: '', col: '#4fd8be' },
+  name: { label: 'Name only', short: 'Name only', tag: '', col: '#6f93e8' },
+  shuffled: { label: 'Shuffled labels', short: 'Shuffled', tag: 'control', col: '#e0688c' },
+  random: { label: 'Untrained model', short: 'Untrained', tag: 'control', col: '#a08ae6' },
+});
 // 误差着色：单一色相由暗到亮（越亮错得越远）
 const ERR_STEPS = [500, 1000, 1500, 2000, 3000, 4500, 7000, Infinity];
 const ERR_COL = ['#653e02', '#7b4c00', '#925b00', '#a76b13', '#ba7e2d', '#ce9042', '#e2a356', '#f6b669'];
@@ -46,7 +54,7 @@ async function fetchData(url, signal) {
 
 // 算式只存了 .gz（只有展开算式面板时才取）
 async function fetchGzJSON(url, signal) {
-  if (typeof DecompressionStream === 'undefined') throw new Error('当前浏览器不支持解压，无法显示算式');
+  if (typeof DecompressionStream === 'undefined') throw new Error(Lx('当前浏览器不支持解压，无法显示算式', 'This browser can’t decompress the data, so the formula can’t be shown'));
   const r = await fetch(`${url}.gz`, { signal });
   if (!r.ok || !r.body) throw new Error(`${url}.gz ${r.status}`);
   return JSON.parse(await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).text());
@@ -56,8 +64,13 @@ let dataPromise = null;     // 同一页面里多次挂载（比如切走再回�
 function loadData() {
   if (!dataPromise) {
     dataPromise = (async () => {
-      const [mb, pb] = await Promise.all([fetchData(`${URL_DATA}probe.json`), fetchData(`${URL_DATA}pred.bin`)]);
+      // 英文模式另取国家、大洲的英文名（names_en.json，由 tools/world/probe_names_en.py 从 GeoNames countryInfo.txt 生成）
+      const [mb, pb, ne] = await Promise.all([fetchData(`${URL_DATA}probe.json`), fetchData(`${URL_DATA}pred.bin`), isEn ? fetch(`${URL_DATA}names_en.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null) : null]);
       const meta = JSON.parse(new TextDecoder().decode(mb));
+      if (ne) {
+        meta.continents = meta.continents.map((zh, c) => ne.continents[c] || zh);
+        meta.countries = meta.countries.map(([cc, zh]) => [cc, ne.countries[cc] || cc]);
+      }
       return { meta, pred: decodePred(pb, meta.pred) };
     })();
     dataPromise.catch(() => { dataPromise = null; });
@@ -70,7 +83,7 @@ function decodePred(buf, spec) {
   const [V, L, n] = spec.shape;
   const u8 = new Uint8Array(buf);
   const M = V * L * n * 2;
-  if (u8.length !== 2 * M) throw new Error('pred.bin 大小不对');
+  if (u8.length !== 2 * M) throw new Error(Lx('pred.bin 大小不对', 'pred.bin has the wrong size'));
   const out = [];
   const acc = new Int32Array(n * 2);
   for (let v = 0; v < V; v++) {
@@ -99,12 +112,12 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const fmtInt = (v) => Math.round(v).toLocaleString('en-US');
 const sgn = (v, d) => `${v < 0 ? MINUS : '+'}${Math.abs(v).toFixed(d)}`;
 const num = (v, d) => `${v < 0 ? MINUS : ''}${Math.abs(v).toFixed(d)}`;
-const latTxt = (v, d = 1) => `${v >= 0 ? '北纬' : '南纬'} ${Math.abs(v).toFixed(d)}°`;
+const latTxt = (v, d = 1) => (isEn ? `${Math.abs(v).toFixed(d)}°${v >= 0 ? 'N' : 'S'}` : `${v >= 0 ? '北纬' : '南纬'} ${Math.abs(v).toFixed(d)}°`);
 const lonTxt = (v, d = 1) => {
   const w = ((v + 540) % 360) - 180;          // 探针的经度可能超出 ±180°，换回地图上的读法
-  return `${w >= 0 ? '东经' : '西经'} ${Math.abs(w).toFixed(d)}°`;
+  return isEn ? `${Math.abs(w).toFixed(d)}°${w >= 0 ? 'E' : 'W'}` : `${w >= 0 ? '东经' : '西经'} ${Math.abs(w).toFixed(d)}°`;
 };
-const popTxt = (p) => (p >= 1e8 ? `${(p / 1e8).toFixed(1)} 亿` : p >= 1e4 ? `${fmtInt(p / 1e4)} 万` : fmtInt(p));
+const popTxt = (p) => (isEn ? (p >= 1e6 ? `${(p / 1e6).toFixed(1)} million` : fmtInt(p)) : p >= 1e8 ? `${(p / 1e8).toFixed(1)} 亿` : p >= 1e4 ? `${fmtInt(p / 1e4)} 万` : fmtInt(p));
 // 隐状态差值 / 权重 / 乘积按量级取位数
 const fx3 = (v) => { const a = Math.abs(v); return sgn(v, a >= 100 ? 1 : a >= 10 ? 2 : 3); };
 const fw = (v) => { const a = Math.abs(v); return `${v < 0 ? MINUS : '+'}${a >= 0.01 ? a.toFixed(4) : a.toPrecision(3)}`; };
@@ -116,7 +129,7 @@ function haversine(la1, lo1, la2, lo2) {
   return 2 * 6371 * Math.asin(Math.sqrt(clamp(h, 0, 1)));
 }
 
-const FONT_SANS = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
+const FONT_SANS = isEn ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif' : '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif';
 const FONT_MONO = '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace';
 
 let cssRefs = 0;
@@ -149,46 +162,49 @@ export async function mountProbe(el, opts = {}) {
   root.className = 'pb-root';
   root.tabIndex = 0;
   root.setAttribute('role', 'region');
-  root.setAttribute('aria-label', '大模型里的世界地图：线性探针从 Qwen3-0.6B 的隐状态里读出城市的经纬度');
+  root.setAttribute('aria-label', Lx('大模型里的世界地图：线性探针从 Qwen3-0.6B 的隐状态里读出城市的经纬度', 'The world map inside an LLM: a linear probe reads cities’ latitude and longitude out of Qwen3-0.6B’s hidden states'));
   root.innerHTML = `
     <header class="pb-head">
       <div class="pb-read" aria-live="polite">
-        <span class="pb-L">第 <b data-k="L">0</b> 层</span>
+        ${Lx('<span class="pb-L">第 <b data-k="L">0</b> 层</span>', '<span class="pb-L">Layer <b data-k="L">0</b></span>')}
         <span class="pb-kv">R² <b data-k="r2">—</b></span>
-        <span class="pb-kv">平均误差 <b data-k="km">—</b> km</span>
-        <span class="pb-kv">中位 <b data-k="med">—</b> km</span>
+        <span class="pb-kv">${Lx('平均误差', '<span class="pb-wd">mean error</span><span class="pb-nr">mean</span>')} <b data-k="km">—</b> km</span>
+        <span class="pb-kv">${Lx('中位', 'median')} <b data-k="med">—</b> km</span>
       </div>
-      <div class="pb-seg" role="radiogroup" aria-label="探针">
-        ${Object.entries(VAR).map(([k, v], i) => `<button type="button" role="radio" data-v="${i}" style="--pb-c:${v.col}" title="${k === 'coords' ? '提示：What are the lat/lon coordinates of 城市名' : k === 'name' ? '只把城市名喂给模型（论文的主实验）' : k === 'shuffled' ? '对照：训练时把城市和坐标随机配对' : '对照：同样结构、权重随机初始化的模型'}">${v.tag ? `<i>${v.tag}</i>` : ''}${v.short}</button>`).join('')}
+      <div class="pb-seg" role="radiogroup" aria-label="${Lx('探针', 'Probe')}">
+        ${Object.entries(VAR).map(([k, v], i) => `<button type="button" role="radio" data-v="${i}" style="--pb-c:${v.col}" title="${Lx(k === 'coords' ? '提示：What are the lat/lon coordinates of 城市名' : k === 'name' ? '只把城市名喂给模型（论文的主实验）' : k === 'shuffled' ? '对照：训练时把城市和坐标随机配对' : '对照：同样结构、权重随机初始化的模型', k === 'coords' ? 'Prompt: What are the lat/lon coordinates of <city>' : k === 'name' ? 'Feed the model only the city name (the paper’s main experiment)' : k === 'shuffled' ? 'Control: cities and coordinates randomly re-paired for training' : 'Control: same architecture with randomly initialized weights')}">${v.tag ? `<i>${v.tag}</i>` : ''}${v.short}</button>`).join('')}
       </div>
     </header>
     <div class="pb-stage">
       <canvas class="pb-map" aria-hidden="true"></canvas>
       <div class="pb-feed"></div>
-      <div class="pb-credit">城市：GeoNames（CC BY 4.0）· 海岸线：Natural Earth</div>
+      <div class="pb-credit">${Lx('城市：GeoNames（CC BY 4.0）· 海岸线：Natural Earth', 'Cities: GeoNames (CC BY 4.0) · Coastlines: Natural Earth')}</div>
       <div class="pb-tip" hidden></div>
-      <div class="pb-loading"><span>正在载入探针数据…</span></div>
+      <div class="pb-loading"><span>${Lx('正在载入探针数据…', 'Loading probe data…')}</span></div>
     </div>
     <div class="pb-ctrl">
-      <button type="button" class="pb-play" aria-label="播放：从第 0 层到第 27 层">
+      <button type="button" class="pb-play" aria-label="${PLAY_LABEL}">
         <svg class="pb-ic-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9.5-5.5z"/></svg>
         <svg class="pb-ic-pause" viewBox="0 0 16 16"><path d="M3.5 2.5h3v11h-3zM9.5 2.5h3v11h-3z"/></svg>
       </button>
       <div class="pb-scrub">
         <canvas aria-hidden="true"></canvas>
-        <input class="pb-range" type="range" min="0" max="${NL - 1}" step="1" value="0" aria-label="层">
+        <input class="pb-range" type="range" min="0" max="${NL - 1}" step="1" value="0" aria-label="${Lx('层', 'Layer')}">
         <div class="pb-focus"></div>
       </div>
     </div>
     <div class="pb-foot">
       <div class="pb-legend"></div>
       <div class="pb-opts">
-        <button type="button" class="pb-tog" data-o="color" title="按大洲 / 按误差着色">按误差着色</button>
+        ${Lx(`<button type="button" class="pb-tog" data-o="color" title="按大洲 / 按误差着色">按误差着色</button>
         <button type="button" class="pb-tog on" data-o="lines" title="把预测位置和真实位置连起来">连线</button>
-        <button type="button" class="pb-tog pb-fxbtn" data-o="fx" title="一个城市在这一层的读数是怎么乘加出来的">算式 ƒ</button>
+        <button type="button" class="pb-tog pb-fxbtn" data-o="fx" title="一个城市在这一层的读数是怎么乘加出来的">算式 ƒ</button>`,
+        `<button type="button" class="pb-tog" data-o="color" title="Color by continent / by error">Color by error</button>
+        <button type="button" class="pb-tog on" data-o="lines" title="Connect each prediction to the true position">Lines</button>
+        <button type="button" class="pb-tog pb-fxbtn" data-o="fx" title="How one city’s reading at this layer is multiplied and added up">Formula ƒ</button>`)}
       </div>
     </div>
-    <aside class="pb-fx" hidden aria-label="算式"></aside>`;
+    <aside class="pb-fx" hidden aria-label="${Lx('算式', 'Formula')}"></aside>`;
   el.replaceChildren(root);
   const $ = (s) => root.querySelector(s);
   const stage = $('.pb-stage'), cv = $('.pb-map'), g = cv.getContext('2d');
@@ -215,7 +231,7 @@ export async function mountProbe(el, opts = {}) {
   try {
     ({ meta, pred: D } = await loadData());
   } catch (e) {
-    if (!dead) $('.pb-loading').innerHTML = `<span>数据载入失败：${esc(e.message)}</span>`;
+    if (!dead) $('.pb-loading').innerHTML = Lx(`<span>数据载入失败：${esc(e.message)}</span>`, `<span>Failed to load data: ${esc(e.message)}</span>`);
     return { setLayer() {}, destroy };
   }
   if (dead) return { setLayer() {}, destroy };
@@ -224,6 +240,7 @@ export async function mountProbe(el, opts = {}) {
   n = meta.n;
   const C = meta.cities;
   const featured = new Map(C.featured.map(([i, zh]) => [i, zh]));
+  const zhOf = (i) => (isEn ? '' : featured.get(i));   // 知名城市的中文名：英文模式不显示（城市名本来就是 GeoNames 的英文写法）
   const meanLat = C.lat.reduce((a, b) => a + b, 0) / n, meanLon = C.lon.reduce((a, b) => a + b, 0) / n;
   disp = new Float32Array(D[S.v][S.L]);
   from = new Float32Array(n * 2);
@@ -231,8 +248,8 @@ export async function mountProbe(el, opts = {}) {
   // 每个城市属于哪个大洲（按颜色分组画，一组一条路径）
   const byCt = meta.continents.map((_, c) => { const a = []; for (let i = 0; i < n; i++) if (C.ct[i] === c) a.push(i); return a; });
 
-  legend.innerHTML = meta.continents.map((name, c) => `<button type="button" class="pb-chip" data-c="${c}" style="--pb-c:${CT_COL[c]}" title="只看${name}"><i></i>${name}<span style="opacity:.55">${byCt[c].length}</span></button>`).join('');
-  const rampHTML = `<span class="pb-ramp">误差 &lt;500<i style="background:linear-gradient(to right,${ERR_COL.join(',')})"></i>7,000+ km</span>`;
+  legend.innerHTML = meta.continents.map((name, c) => `<button type="button" class="pb-chip" data-c="${c}" style="--pb-c:${CT_COL[c]}" title="${Lx(`只看${name}`, `Show only ${name}`)}"><i></i>${name}<span style="opacity:.55">${byCt[c].length}</span></button>`).join('');
+  const rampHTML = Lx(`<span class="pb-ramp">误差 &lt;500<i style="background:linear-gradient(to right,${ERR_COL.join(',')})"></i>7,000+ km</span>`, `<span class="pb-ramp">error &lt;500<i style="background:linear-gradient(to right,${ERR_COL.join(',')})"></i>7,000+ km</span>`);
 
   /* ---------- 尺寸 ---------- */
 
@@ -395,7 +412,7 @@ export async function mountProbe(el, opts = {}) {
     g.strokeStyle = 'rgba(233,239,249,0.9)'; g.lineWidth = 1;
     g.beginPath(); g.arc(x1, y1, r + 4.6, 0, Math.PI * 2); g.stroke();
     // 名字
-    const zh = featured.get(i);
+    const zh = zhOf(i);
     const label = zh ? `${zh} ${C.name[i]}` : C.name[i];
     g.font = `600 ${S.narrow ? 11 : 12}px ${FONT_SANS}`;
     const tw = g.measureText(label).width;
@@ -447,7 +464,7 @@ export async function mountProbe(el, opts = {}) {
     if (!S.narrow) {
       sg.fillStyle = '#7a859e';
       sg.textAlign = 'left';
-      sg.fillText(`论文 Llama-2-7B ${pr.toFixed(2)}`, P.x + P.w + 8, Y(pr));
+      sg.fillText(Lx(`论文 Llama-2-7B ${pr.toFixed(2)}`, `paper Llama-2-7B ${pr.toFixed(2)}`), P.x + P.w + 8, Y(pr));
     }
     // 当前层：竖线
     const xL = X(dispL);
@@ -516,7 +533,7 @@ export async function mountProbe(el, opts = {}) {
       if (major && Math.abs(L - S.L) > 1) { sg.fillStyle = '#4b5572'; sg.fillText(String(L), x, CH - 2); }
     }
     // 当前层号的小标签
-    const lab = `第 ${S.L} 层`;
+    const lab = Lx(`第 ${S.L} 层`, `Layer ${S.L}`);
     sg.font = `600 10.5px ${FONT_SANS}`;
     const tw = sg.measureText(lab).width + 10;
     const lx = clamp(xL - tw / 2, 0, CW - tw);
@@ -587,7 +604,7 @@ export async function mountProbe(el, opts = {}) {
   function setPlaying(p) {
     S.playing = p;
     root.classList.toggle('pb-playing', p);
-    $('.pb-play').setAttribute('aria-label', p ? '暂停' : '播放：从第 0 层到第 27 层');
+    $('.pb-play').setAttribute('aria-label', p ? Lx('暂停', 'Pause') : PLAY_LABEL);
     if (p) {
       if (S.L >= NL - 1) go(0);
       lastStep = performance.now();
@@ -601,7 +618,7 @@ export async function mountProbe(el, opts = {}) {
     root.querySelector('[data-k="r2"]').textContent = num(m.r2, 3);
     root.querySelector('[data-k="km"]').textContent = fmtInt(m.km);
     root.querySelector('[data-k="med"]').textContent = fmtInt(m.kmMed);
-    range.setAttribute('aria-valuetext', `第 ${S.L} 层，R² ${num(m.r2, 2)}，平均误差 ${fmtInt(m.km)} km`);
+    range.setAttribute('aria-valuetext', Lx(`第 ${S.L} 层，R² ${num(m.r2, 2)}，平均误差 ${fmtInt(m.km)} km`, `Layer ${S.L}, R² ${num(m.r2, 2)}, mean error ${fmtInt(m.km)} km`));
     root.querySelectorAll('.pb-seg button').forEach((b) => {
       const on = Number(b.dataset.v) === S.v;
       b.classList.toggle('on', on);
@@ -625,11 +642,11 @@ export async function mountProbe(el, opts = {}) {
   function updateFeed() {
     const vn = VN[S.v];
     const i = S.hover >= 0 ? S.hover : S.sel >= 0 ? S.sel : -1;
-    const nm = `<em>${esc(i >= 0 ? C.name[i] : '城市名')}</em>`;
+    const nm = `<em>${esc(i >= 0 ? C.name[i] : Lx('城市名', 'city name'))}</em>`;
     const tmpl = vn === 'name' ? nm : `${esc(meta.templates.coords.replace('{}', ''))}${nm}`;
-    let h = `<span>模型读到</span><code>${tmpl}</code>`;
-    if (vn === 'shuffled') h = `<span class="pb-ctl">对照</span><code>${tmpl}</code><span>训练时坐标被随机打乱</span>`;
-    if (vn === 'random') h = `<span class="pb-ctl">对照</span><span>未训练的 Qwen3-0.6B（权重随机初始化）读</span><code>${tmpl}</code>`;
+    let h = Lx(`<span>模型读到</span><code>${tmpl}</code>`, `<span>The model reads</span><code>${tmpl}</code>`);
+    if (vn === 'shuffled') h = Lx(`<span class="pb-ctl">对照</span><code>${tmpl}</code><span>训练时坐标被随机打乱</span>`, `<span class="pb-ctl">control</span><code>${tmpl}</code><span>coordinates shuffled for training</span>`);
+    if (vn === 'random') h = Lx(`<span class="pb-ctl">对照</span><span>未训练的 Qwen3-0.6B（权重随机初始化）读</span><code>${tmpl}</code>`, `<span class="pb-ctl">control</span><span>an untrained Qwen3-0.6B (random weights) reads</span><code>${tmpl}</code>`);
     feed.innerHTML = h;
   }
 
@@ -649,13 +666,17 @@ export async function mountProbe(el, opts = {}) {
     const p = D[S.v][S.L];
     const la = p[2 * i], lo = p[2 * i + 1];
     const km = errs(S.v, S.L)[i];
-    const zh = featured.get(i);
+    const zh = zhOf(i), feat = featured.has(i);
     const country = meta.countries[C.cc[i]][1];
     return `<div class="pb-tip-h"><i style="background:${CT_COL[C.ct[i]]}"></i><b>${esc(C.name[i])}</b><span>${zh ? `${zh} · ` : ''}${esc(country)} · ${meta.continents[C.ct[i]]}</span></div>
-      <dl><dt>真实位置</dt><dd>${latTxt(C.lat[i])} ${lonTxt(C.lon[i])}</dd>
+      ${Lx(`<dl><dt>真实位置</dt><dd>${latTxt(C.lat[i])} ${lonTxt(C.lon[i])}</dd>
       <dt>模型以为</dt><dd>${latTxt(la)} ${lonTxt(lo)}</dd>
       <dt>误差</dt><dd class="pb-err">${fmtInt(km)} km</dd></dl>
-      <small>人口 ${popTxt(C.pop[i])} · 第 ${C.fold[i] + 1} 折的探针预测（训练时没见过它）${zh ? ' · 点一下看算式' : ''}</small>`;
+      <small>人口 ${popTxt(C.pop[i])} · 第 ${C.fold[i] + 1} 折的探针预测（训练时没见过它）${feat ? ' · 点一下看算式' : ''}</small>`,
+      `<dl><dt>True position</dt><dd>${latTxt(C.lat[i])} ${lonTxt(C.lon[i])}</dd>
+      <dt>Model thinks</dt><dd>${latTxt(la)} ${lonTxt(lo)}</dd>
+      <dt>Error</dt><dd class="pb-err">${fmtInt(km)} km</dd></dl>
+      <small>Population ${popTxt(C.pop[i])} · predicted by the fold-${C.fold[i] + 1} probe, which never saw it in training${feat ? ' · click to see the formula' : ''}</small>`)}`;
   }
   function placeTip(i) {
     if (i < 0) return hideTip();
@@ -700,10 +721,13 @@ export async function mountProbe(el, opts = {}) {
     draw();
   }
   function fxHeader() {
-    const opts = [...C.featured].sort((a, b) => C.ct[a[0]] - C.ct[b[0]]).map(([i, zh]) => `<option value="${i}"${i === fx.city ? ' selected' : ''}>${zh} ${esc(C.name[i])}</option>`).join('');
-    return `<div class="pb-fx-h"><b>${S.narrow ? '' : '算式 · '}第 ${S.L} 层</b><select aria-label="城市">${opts}</select>
+    const opts = [...C.featured].sort((a, b) => C.ct[a[0]] - C.ct[b[0]]).map(([i, zh]) => `<option value="${i}"${i === fx.city ? ' selected' : ''}>${isEn ? '' : `${zh} `}${esc(C.name[i])}</option>`).join('');
+    return Lx(`<div class="pb-fx-h"><b>${S.narrow ? '' : '算式 · '}第 ${S.L} 层</b><select aria-label="城市">${opts}</select>
       <div class="pb-fx-tabs"><button type="button" data-t="lat" class="${fx.tab === 'lat' ? 'on' : ''}">纬度</button><button type="button" data-t="lon" class="${fx.tab === 'lon' ? 'on' : ''}">经度</button></div>
-      <button type="button" class="pb-fx-x" aria-label="关闭算式">×</button></div><div class="pb-fx-b"></div>`;
+      <button type="button" class="pb-fx-x" aria-label="关闭算式">×</button></div><div class="pb-fx-b"></div>`,
+      `<div class="pb-fx-h"><b>${S.narrow ? '' : 'Formula · '}Layer ${S.L}</b><select aria-label="City">${opts}</select>
+      <div class="pb-fx-tabs"><button type="button" data-t="lat" class="${fx.tab === 'lat' ? 'on' : ''}">Lat</button><button type="button" data-t="lon" class="${fx.tab === 'lon' ? 'on' : ''}">Lon</button></div>
+      <button type="button" class="pb-fx-x" aria-label="Close formula">×</button></div><div class="pb-fx-b"></div>`);
   }
   async function renderFx() {
     const i = fx.city;
@@ -715,7 +739,7 @@ export async function mountProbe(el, opts = {}) {
     const body = fxEl.querySelector('.pb-fx-b');
     let d = fx.data.get(id);
     if (!d) {
-      body.innerHTML = '<div class="pb-fx-wait">正在载入这个城市的算式…</div>';
+      body.innerHTML = Lx('<div class="pb-fx-wait">正在载入这个城市的算式…</div>', '<div class="pb-fx-wait">Loading this city’s formula…</div>');
       d = fetchGzJSON(`${URL_DATA}formula/${id}.json`, ac.signal);
       fx.data.set(id, d);
       d.catch(() => fx.data.delete(id));
@@ -732,17 +756,18 @@ export async function mountProbe(el, opts = {}) {
   function fxBody(F, i) {
     const t = F.layers[S.L][fx.tab];
     const isLat = fx.tab === 'lat';
-    const word = isLat ? '纬度' : '经度';
+    const word = isLat ? Lx('纬度', 'latitude') : Lx('经度', 'longitude');
     const truth = isLat ? C.lat[i] : C.lon[i];
     const toks = F.tokens.map((s, k) => `<span class="${k === F.tokens.length - 1 ? 'last' : ''}">${esc(s)}</span>`).join('');
     const maxp = Math.max(...t.p.map(Math.abs), Math.abs(t.rest), 1e-9);
     const bar = (p) => `<span class="pb-bar"><i class="${p >= 0 ? 'pos' : 'neg'}" style="width:${(Math.abs(p) / maxp) * 50}%"></i></span>`;
-    const rows = t.i.map((dim, k) => `<div class="pb-tr" style="--k:${k}" title="h[${dim}] = ${num(t.h[k], 3)}，训练城市的平均 h̄ = ${num(t.h[k] - t.x[k], 3)}"><span class="i">${dim}</span><span class="pb-cx">${fx3(t.x[k])}</span><span class="o">×</span><span class="pb-cw">${fw(t.w[k])}</span><span class="o">=</span><span class="pb-cp">${fx3(t.p[k])}</span>${bar(t.p[k])}</div>`).join('');
+    const rows = t.i.map((dim, k) => `<div class="pb-tr" style="--k:${k}" title="${Lx(`h[${dim}] = ${num(t.h[k], 3)}，训练城市的平均 h̄ = ${num(t.h[k] - t.x[k], 3)}`, `h[${dim}] = ${num(t.h[k], 3)}, mean over training cities h̄ = ${num(t.h[k] - t.x[k], 3)}`)}"><span class="i">${dim}</span><span class="pb-cx">${fx3(t.x[k])}</span><span class="o">×</span><span class="pb-cw">${fw(t.w[k])}</span><span class="o">=</span><span class="pb-cp">${fx3(t.p[k])}</span>${bar(t.p[k])}</div>`).join('');
     const nrest = meta.dModel - t.i.length;
     const sum = t.y - t.b;
     const top12 = t.p.reduce((a, b) => a + b, 0);
     const mark16 = t.b + t.cum[4];
-    const other = S.v !== 0 ? `<p class="pb-fx-note" style="color:var(--pb-amber)">算式用的是「问坐标」这组真实探针（地图上现在显示的是「${VAR[VN[S.v]].label}」）。</p>` : '';
+    const other = S.v !== 0 ? Lx(`<p class="pb-fx-note" style="color:var(--pb-amber)">算式用的是「问坐标」这组真实探针（地图上现在显示的是「${VAR[VN[S.v]].label}」）。</p>`, `<p class="pb-fx-note" style="color:var(--pb-amber)">The formula uses the real “${VAR.coords.label}” probe (the map is currently showing “${VAR[VN[S.v]].label}”).</p>`) : '';
+    if (isEn) return fxBodyEn(F, i, { t, isLat, word, truth, toks, bar, rows, nrest, sum, top12, mark16, other });
     return `${other}
       <p class="pb-toks">${esc('<|endoftext|>')}${esc(meta.templates.coords.replace('{}', '').trimEnd())} ${toks}
         <small>取城市名最后一个词元 <b class="pb-cx">${esc(F.tokens[F.tokens.length - 1].trim())}</b> 在第 ${S.L} 层的隐状态 h（${meta.dModel} 维）</small></p>
@@ -764,6 +789,29 @@ export async function mountProbe(el, opts = {}) {
         正乘积合计 ${fx3(t.pos)}，负乘积合计 ${fx3(t.neg)}——大部分互相抵消，答案藏在差额里。</figcaption></figure>
       <p class="pb-fx-note">h̄ 和 w 来自第 ${F.fold + 1} 折的探针：它训练时没见过${esc(featured.get(i) || C.name[i])}（λ = ${fmtInt(F.lam[S.L])}，留一交叉验证选的）。数字全部来自真实的 Qwen3-0.6B 前向计算。</p>`;
   }
+  function fxBodyEn(F, i, { t, isLat, word, truth, toks, bar, rows, nrest, sum, top12, mark16, other }) {
+    const Word = word[0].toUpperCase() + word.slice(1);
+    return `${other}
+      <p class="pb-toks">${esc('<|endoftext|>')}${esc(meta.templates.coords.replace('{}', '').trimEnd())} ${toks}
+        <small>Take the hidden state h (${meta.dModel} dims) of the city name’s last token <b class="pb-cx">${esc(F.tokens[F.tokens.length - 1].trim())}</b> at layer ${S.L}</small></p>
+      <div class="pb-eq">${Word} = <span class="pb-cy">b</span> + Σ <span class="pb-cx">(h[i] − h̄[i])</span> × <span class="pb-cw">w[i]</span>
+        <small>The probe is a single multiply-add: 1,024 dims multiplied term by term and summed. h̄ is the mean hidden state of the training cities and b is their mean ${word}. The table lists the 12 dims that contribute most.</small></div>
+      <div class="pb-acc">
+        <div class="pb-acc-k">b (mean ${word} of the training cities) + all ${fmtInt(meta.dModel)} products</div>
+        <div class="pb-acc-v">${num(t.b, 3)} <span class="eq">${sum < 0 ? MINUS : '+'}</span> ${Math.abs(sum).toFixed(3)} <span class="eq">=</span> <b data-count>${num(t.y, 3)}</b></div>
+        <p>→ ${isLat ? latTxt(t.y) : lonTxt(t.y)}; the truth is ${isLat ? latTxt(truth) : lonTxt(truth)}, off by ${Math.abs(t.y - truth).toFixed(1)}°.
+        The top 12 dims add up to ${fx3(top12)}; the other ${fmtInt(nrest)} dims add up to ${fx3(t.rest)}.</p>
+      </div>
+      <div class="pb-tbl">
+        <div class="pb-tr pb-th"><span>dim</span><span class="pb-cx">h − h̄</span><span></span><span class="pb-cw">w</span><span></span><span class="pb-cp">product</span><span></span></div>
+        ${rows}
+        <div class="pb-tr pb-rest" style="--k:${t.i.length}"><span class="i">…</span><span class="t">other ${fmtInt(nrest)} dims</span><span class="pb-cp">${fx3(t.rest)}</span>${bar(t.rest)}</div>
+      </div>
+      <figure class="pb-cum">${cumSVG(t, truth)}
+        <figcaption>Adding terms from the largest |product| down (x axis: number of terms added, log scale): after 16 terms it is ${num(mark16, 1)}°; with all 1,024 it is ${num(t.y, 1)}°.
+        Positive products total ${fx3(t.pos)}, negative ones ${fx3(t.neg)} — most of it cancels out, and the answer hides in the difference.</figcaption></figure>
+      <p class="pb-fx-note">h̄ and w come from the fold-${F.fold + 1} probe, which never saw ${esc(C.name[i])} in training (λ = ${fmtInt(F.lam[S.L])}, chosen by leave-one-out cross-validation). Every number comes from a real Qwen3-0.6B forward pass.</p>`;
+  }
   function cumSVG(t, truth) {
     const w = 320, h = 92, l = 34, r = 10, tp = 8, bt = 16;
     const vals = t.cum.map((c) => t.b + c);
@@ -773,10 +821,10 @@ export async function mountProbe(el, opts = {}) {
     const X = (k) => l + (k / 10) * (w - l - r);
     const pts = [`${X(0) - 0.001},${Y(t.b)}`].concat(vals.map((v, k) => `${X(k)},${Y(v)}`));
     const ticks = [0, 4, 8, 10].map((k) => `<text x="${X(k)}" y="${h - 3}" text-anchor="middle">${2 ** k}</text>`).join('');
-    return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="累计和曲线">
+    return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${Lx('累计和曲线', 'Cumulative sum curve')}">
       <line class="ax" x1="${l}" x2="${w - r}" y1="${h - bt}" y2="${h - bt}"/>
       <line class="tr" x1="${l}" x2="${w - r}" y1="${Y(truth)}" y2="${Y(truth)}"/>
-      <text x="${l - 4}" y="${Y(truth) + 3}" text-anchor="end">真实</text>
+      <text x="${l - 4}" y="${Y(truth) + 3}" text-anchor="end">${Lx('真实', 'true')}</text>
       <text x="${l - 4}" y="${Y(t.b) + 3}" text-anchor="end">b</text>
       <polyline class="ln" points="${pts.join(' ')}"/>
       <circle class="fin" cx="${X(10)}" cy="${Y(vals[10])}" r="3.2"/>${ticks}</svg>`;
@@ -806,33 +854,33 @@ export async function mountProbe(el, opts = {}) {
     const bc = meta.best.coords, bn = meta.best.name, br = meta.best.random;
     const ct = meta.byContinent[S.L];
     const hs = meta.holdout.summary;
-    const meanTxt = `${latTxt(meanLat, 0)}、${lonTxt(meanLon, 0)}`;
+    const meanTxt = `${latTxt(meanLat, 0)}${Lx('、', ', ')}${lonTxt(meanLon, 0)}`;
     const out = [];
-    out.push(`<p>Qwen3-0.6B 从没见过地图，只读过文字。我们把 ${fmtInt(n)} 个城市一个个喂给它，不看它回答什么，只取它读完城市名那一刻、城市名最后一个词元的<b>隐状态</b>（每层 1,024 个数），再给每一层训练一个<b>线性探针</b>：每个数乘一个权重、加起来，直接读出纬度和经度。地图上每个点都是探针对一个<b>训练时没见过</b>的城市的预测，细线连到它的真实位置。</p>`);
-    let p = `<p><b>第 ${S.L} 层</b>（${VAR[vn].tag ? `对照 · ${VAR[vn].label}` : VAR[vn].label}）：R² = <b>${num(m.r2, 3)}</b>（纬度 ${num(m.r2Lat, 2)}、经度 ${num(m.r2Lon, 2)}），预测点离真实位置平均 <b>${fmtInt(m.km)} km</b>，一半城市在 ${fmtInt(m.kmMed)} km 以内。`;
+    out.push(Lx(`<p>Qwen3-0.6B 从没见过地图，只读过文字。我们把 ${fmtInt(n)} 个城市一个个喂给它，不看它回答什么，只取它读完城市名那一刻、城市名最后一个词元的<b>隐状态</b>（每层 1,024 个数），再给每一层训练一个<b>线性探针</b>：每个数乘一个权重、加起来，直接读出纬度和经度。地图上每个点都是探针对一个<b>训练时没见过</b>的城市的预测，细线连到它的真实位置。</p>`, `<p>Qwen3-0.6B has never seen a map — it has only read text. We feed it ${fmtInt(n)} cities one at a time and ignore whatever it answers; we only take the <b>hidden state</b> of the city name’s last token at the moment it finishes reading the name (1,024 numbers per layer), then train a <b>linear probe</b> for each layer: multiply each number by a weight, add them up, and read off latitude and longitude directly. Every dot on the map is the probe’s prediction for a city it <b>never saw in training</b>; a thin line connects it to the true location.</p>`));
+    let p = Lx(`<p><b>第 ${S.L} 层</b>（${VAR[vn].tag ? `对照 · ${VAR[vn].label}` : VAR[vn].label}）：R² = <b>${num(m.r2, 3)}</b>（纬度 ${num(m.r2Lat, 2)}、经度 ${num(m.r2Lon, 2)}），预测点离真实位置平均 <b>${fmtInt(m.km)} km</b>，一半城市在 ${fmtInt(m.kmMed)} km 以内。`, `<p><b>Layer ${S.L}</b> (${VAR[vn].tag ? `control · ${VAR[vn].label}` : VAR[vn].label}): R² = <b>${num(m.r2, 3)}</b> (latitude ${num(m.r2Lat, 2)}, longitude ${num(m.r2Lon, 2)}). Predictions land <b>${fmtInt(m.km)} km</b> from the true location on average, and half the cities are within ${fmtInt(m.kmMed)} km.`);
     if (vn === 'coords' || vn === 'name') {
       const r3 = ms[3].r2, r10 = ms[10].r2;
-      if (S.L <= 3) p += ` 还很浅：隐状态里主要还是“这几个词元是什么”，地理信息不多，点大多挤在所有城市的平均位置（${meanTxt}）附近。`;
-      else if (S.L < 10) p += ` 从第 4 层起 R² 明显上升（第 3 层 ${num(r3, 2)} → 第 10 层 ${num(r10, 2)}）：模型在这几层把“这个名字指的是哪儿”调了出来，各大洲的城市开始分开、往各自的位置移动。`;
-      else p += ` 第 10 层之后进入平台：R² 在 ${num(Math.min(...ms.slice(10).map((x) => x.r2)), 2)}–${num(ms[best].r2, 2)} 之间，第 ${best} 层最高。论文在 Llama-2 上看到的也是这样——前一半的层迅速变好，然后进入平台。`;
+      if (S.L <= 3) p += Lx(` 还很浅：隐状态里主要还是“这几个词元是什么”，地理信息不多，点大多挤在所有城市的平均位置（${meanTxt}）附近。`, ` Still shallow: the hidden state mostly says “which tokens these are”, with little geography in it, so the dots crowd around the average position of all cities (${meanTxt}).`);
+      else if (S.L < 10) p += Lx(` 从第 4 层起 R² 明显上升（第 3 层 ${num(r3, 2)} → 第 10 层 ${num(r10, 2)}）：模型在这几层把“这个名字指的是哪儿”调了出来，各大洲的城市开始分开、往各自的位置移动。`, ` From layer 4 on, R² climbs clearly (layer 3: ${num(r3, 2)} → layer 10: ${num(r10, 2)}): in these layers the model brings up “where this name refers to”, and cities on different continents start to separate and move toward their places.`);
+      else p += Lx(` 第 10 层之后进入平台：R² 在 ${num(Math.min(...ms.slice(10).map((x) => x.r2)), 2)}–${num(ms[best].r2, 2)} 之间，第 ${best} 层最高。论文在 Llama-2 上看到的也是这样——前一半的层迅速变好，然后进入平台。`, ` After layer 10 it plateaus: R² stays between ${num(Math.min(...ms.slice(10).map((x) => x.r2)), 2)} and ${num(ms[best].r2, 2)}, peaking at layer ${best}. The paper saw the same on Llama-2 — the first half of the layers improve fast, then it levels off.`);
     }
     out.push(p + '</p>');
     if (vn === 'coords') {
-      out.push(`<p>这组用的是论文里问坐标的提示 <code>What are the lat/lon coordinates of …</code>，取的仍是城市名的最后一个词元（模型还没开始回答）。只给名字（论文的主实验）的话，最好的一层 R² 是 ${num(nm[bn].r2, 2)}，比加提示低（${num(co[bc].r2, 2)}）：论文说提示对 Llama-2-70B 几乎没有影响，这个小模型却要先明白“这是个地名”，地理信息才更清楚。</p>`);
+      out.push(Lx(`<p>这组用的是论文里问坐标的提示 <code>What are the lat/lon coordinates of …</code>，取的仍是城市名的最后一个词元（模型还没开始回答）。只给名字（论文的主实验）的话，最好的一层 R² 是 ${num(nm[bn].r2, 2)}，比加提示低（${num(co[bc].r2, 2)}）：论文说提示对 Llama-2-70B 几乎没有影响，这个小模型却要先明白“这是个地名”，地理信息才更清楚。</p>`, `<p>This set uses the paper’s coordinate prompt <code>What are the lat/lon coordinates of …</code>, still reading the city name’s last token (before the model starts answering). With the name alone (the paper’s main experiment), the best layer reaches R² ${num(nm[bn].r2, 2)}, lower than with the prompt (${num(co[bc].r2, 2)}): the paper found the prompt made almost no difference for Llama-2-70B, but this small model first has to realize “this is a place name” before the geography comes through clearly.</p>`));
     } else if (vn === 'name') {
-      out.push(`<p>只给城市名（论文的主实验）：最好的是第 ${bn} 层，R² ${num(nm[bn].r2, 2)}；加上问坐标的提示能到 ${num(co[bc].r2, 2)}。论文说提示对 Llama-2-70B 几乎没有影响，这个 6 亿参数的小模型差别明显。</p>`);
+      out.push(Lx(`<p>只给城市名（论文的主实验）：最好的是第 ${bn} 层，R² ${num(nm[bn].r2, 2)}；加上问坐标的提示能到 ${num(co[bc].r2, 2)}。论文说提示对 Llama-2-70B 几乎没有影响，这个 6 亿参数的小模型差别明显。</p>`, `<p>City name only (the paper’s main experiment): the best is layer ${bn}, R² ${num(nm[bn].r2, 2)}; adding the coordinate prompt reaches ${num(co[bc].r2, 2)}. The paper found the prompt barely mattered for Llama-2-70B; for this 0.6-billion-parameter model the difference is clear.</p>`));
     } else if (vn === 'shuffled') {
-      out.push(`<p><b>对照 · 打乱标签</b>：把训练集里的城市和坐标随机配对，别的都不变。探针学不到任何规律，每一层的 R² 都在 0 附近（这一层 ${num(m.r2, 3)}），所有点塌向平均位置。说明地图不是探针自己“背”出来的：一个线性探针没有这个本事，能读出来的，是隐状态里本来就有的东西。</p>`);
+      out.push(Lx(`<p><b>对照 · 打乱标签</b>：把训练集里的城市和坐标随机配对，别的都不变。探针学不到任何规律，每一层的 R² 都在 0 附近（这一层 ${num(m.r2, 3)}），所有点塌向平均位置。说明地图不是探针自己“背”出来的：一个线性探针没有这个本事，能读出来的，是隐状态里本来就有的东西。</p>`, `<p><b>Control · shuffled labels</b>: the cities and coordinates in the training set are randomly re-paired, with everything else unchanged. The probe can’t learn any pattern: R² stays near 0 at every layer (this layer: ${num(m.r2, 3)}), and all the dots collapse onto the average position. So the map isn’t something the probe “memorizes” by itself — a linear probe can’t do that. What it reads out was already there in the hidden states.</p>`));
     } else {
-      out.push(`<p><b>对照 · 未训练的模型</b>：结构一样、权重随机初始化的 Qwen3-0.6B，同样的提示、同样的探针。它只能读到名字的字面（拼写）带来的一点线索——最好的一层 R² 也只有 ${num(rd[br].r2, 2)}，地图不成形。真实模型里的地理信息是从训练文本里学来的。</p>`);
+      out.push(Lx(`<p><b>对照 · 未训练的模型</b>：结构一样、权重随机初始化的 Qwen3-0.6B，同样的提示、同样的探针。它只能读到名字的字面（拼写）带来的一点线索——最好的一层 R² 也只有 ${num(rd[br].r2, 2)}，地图不成形。真实模型里的地理信息是从训练文本里学来的。</p>`, `<p><b>Control · untrained model</b>: a Qwen3-0.6B with the same architecture but randomly initialized weights, the same prompt and the same probe. All it can pick up are a few hints from the surface form (spelling) of the names — even the best layer only reaches R² ${num(rd[br].r2, 2)}, and no map takes shape. The geography in the real model was learned from its training text.</p>`));
     }
     if (vn === 'coords' || vn === 'name') {
       const order = ct.map((v, c) => [v[0], c]).sort((a, b) => a[0] - b[0]);
       const nameOf = (c) => meta.continents[c];
-      out.push(`<p>哪里准、哪里不准（这一层的中位误差，「问坐标」这组）：${nameOf(order[0][1])}最准（${fmtInt(order[0][0])} km），其次${nameOf(order[1][1])}（${fmtInt(order[1][0])} km）；${nameOf(order[5][1])}最差（${fmtInt(order[5][0])} km）。读不准的时候，岭回归的预测会被拉向所有城市的平均位置（${meanTxt}，撒哈拉一带）：离这里越远、城市越少的地方（大洋洲只有 ${C.ct.filter((c) => c === 5).length} 个城市），被拉得越远。</p>`);
+      out.push(Lx(`<p>哪里准、哪里不准（这一层的中位误差，「问坐标」这组）：${nameOf(order[0][1])}最准（${fmtInt(order[0][0])} km），其次${nameOf(order[1][1])}（${fmtInt(order[1][0])} km）；${nameOf(order[5][1])}最差（${fmtInt(order[5][0])} km）。读不准的时候，岭回归的预测会被拉向所有城市的平均位置（${meanTxt}，撒哈拉一带）：离这里越远、城市越少的地方（大洋洲只有 ${C.ct.filter((c) => c === 5).length} 个城市），被拉得越远。</p>`, `<p>Where it is accurate and where it isn’t (median error at this layer, “${VAR.coords.label}” set): ${nameOf(order[0][1])} is best (${fmtInt(order[0][0])} km), then ${nameOf(order[1][1])} (${fmtInt(order[1][0])} km); ${nameOf(order[5][1])} is worst (${fmtInt(order[5][0])} km). When the probe can’t read a city well, ridge regression pulls the prediction toward the average position of all cities (${meanTxt}, around the Sahara): the farther a place is from there and the fewer cities it has (Oceania has only ${C.ct.filter((c) => c === 5).length}), the harder it gets pulled.</p>`));
     }
-    out.push(`<p class="dim">要注意：线性探针能读出来，不等于模型真的在用它（论文另做了干预实验，这里没有）。而且 0.6B 的小模型读得并不准：最好的一层 R² ${num(co[bc].r2, 2)}、平均误差约 ${fmtInt(co[bc].km)} km，论文里 70 亿参数的 Llama-2-7B 是 ${meta.paper.r2_7b}。把一个国家的城市全部藏起来不给探针看，对这些国家的平均误差从 ${fmtInt(hs.kmNominal)} km 涨到 ${fmtInt(hs.kmHeld)} km——探针学到的有一部分是“这个国家大概在哪”。</p>`);
-    out.push(`<p class="dim">复现：Gurnee &amp; Tegmark 2023《Language Models Represent Space and Time》（arXiv:2310.02207）。城市数据 GeoNames（CC BY 4.0），海岸线 Natural Earth（公共领域）。</p>`);
+    out.push(Lx(`<p class="dim">要注意：线性探针能读出来，不等于模型真的在用它（论文另做了干预实验，这里没有）。而且 0.6B 的小模型读得并不准：最好的一层 R² ${num(co[bc].r2, 2)}、平均误差约 ${fmtInt(co[bc].km)} km，论文里 70 亿参数的 Llama-2-7B 是 ${meta.paper.r2_7b}。把一个国家的城市全部藏起来不给探针看，对这些国家的平均误差从 ${fmtInt(hs.kmNominal)} km 涨到 ${fmtInt(hs.kmHeld)} km——探针学到的有一部分是“这个国家大概在哪”。</p>`, `<p class="dim">A caveat: being linearly readable doesn’t mean the model actually uses it (the paper ran separate intervention experiments; we didn’t). And the 0.6B model isn’t precise: its best layer gets R² ${num(co[bc].r2, 2)} with a mean error of about ${fmtInt(co[bc].km)} km, versus ${meta.paper.r2_7b} for the 7-billion-parameter Llama-2-7B in the paper. Hiding all of a country’s cities from the probe raises the mean error for those countries from ${fmtInt(hs.kmNominal)} km to ${fmtInt(hs.kmHeld)} km — part of what the probe learns is “roughly where this country is”.</p>`));
+    out.push(Lx(`<p class="dim">复现：Gurnee &amp; Tegmark 2023《Language Models Represent Space and Time》（arXiv:2310.02207）。城市数据 GeoNames（CC BY 4.0），海岸线 Natural Earth（公共领域）。</p>`, `<p class="dim">Reproduces Gurnee &amp; Tegmark 2023, “Language Models Represent Space and Time” (arXiv:2310.02207). City data: GeoNames (CC BY 4.0); coastlines: Natural Earth (public domain).</p>`));
     return out.join('');
   }
   function pushExplain(now = false) {

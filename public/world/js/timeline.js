@@ -9,8 +9,10 @@
 // V 的层在 D3 就展开，M 的在 D4 才展开：某一步在某个深度没有新东西时，＋ / − 会直接跳过那一层，
 // 面包屑也只列出这一步真正经过的深度。“＋”= 单步进入，“−”= 跳出，上一步 / 下一步 = 在当前深度逐步执行。
 
+import { L } from '../../js/i18n.js';
+
 export const MAX_DEPTH = 5;
-export const DEPTH_NAMES = ['', '玩', '循环', 'V 的内部', 'M 的内部', '一次乘加'];
+export const DEPTH_NAMES = L(['', '玩', '循环', 'V 的内部', 'M 的内部', '一次乘加'], ['', 'Play', 'Loop', 'Inside V', 'Inside M', 'One multiply-add']);
 export const STAGES = ['obs', 'enc', 'rnn', 'sample', 'dec', 'cmp'];
 export const ENC_OPS = ['e1', 'e2', 'e3', 'e4', 'mu', 'z'];
 export const DEC_OPS = ['dfc', 'd1', 'd2', 'd3', 'd4'];
