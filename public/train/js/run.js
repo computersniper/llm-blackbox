@@ -1,11 +1,12 @@
 // 把两段训练记录包成同一套接口，让“一步之内”往下的各个视图不用关心是哪个模型。
+import { L } from './lang.js';
 
 const TENSOR = {
   q: 'self_attn.q_proj.weight', k: 'self_attn.k_proj.weight', v: 'self_attn.v_proj.weight', o: 'self_attn.o_proj.weight',
   gate: 'mlp.gate_proj.weight', up: 'mlp.up_proj.weight', down: 'mlp.down_proj.weight',
   ln1: 'input_layernorm.weight', ln2: 'post_attention_layernorm.weight', qn: 'self_attn.q_norm.weight', kn: 'self_attn.k_norm.weight',
 };
-export const TENSOR_NAME = { q: 'W_q', k: 'W_k', v: 'W_v', o: 'W_o', gate: 'W_gate', up: 'W_up', down: 'W_down', ln1: 'RMSNorm γ（注意力前）', ln2: 'RMSNorm γ（前馈前）', qn: 'q_norm γ', kn: 'k_norm γ' };
+export const TENSOR_NAME = { q: 'W_q', k: 'W_k', v: 'W_v', o: 'W_o', gate: 'W_gate', up: 'W_up', down: 'W_down', ln1: L('RMSNorm γ（注意力前）', 'RMSNorm γ (pre-attention)'), ln2: L('RMSNorm γ（前馈前）', 'RMSNorm γ (pre-FFN)'), qn: 'q_norm γ', kn: 'k_norm γ' };
 
 // 矩阵形状 [输入维, 输出维]
 export function shapes(M) {
@@ -19,7 +20,7 @@ export function wrapTiny(D) {
   return {
     kind: 'tiny', D, K: D.K, NL: D.NL, NB: D.NB, R: D.R,
     model: { ...m.model, headDim: m.model.headDim },
-    name: '唐宋诗小模型',
+    name: L('唐宋诗小模型', 'Tiny poetry model'),
     rowLen: D.R,
     stepNo: (k) => m.ckpts[k].t + 1,
     lr: (k) => m.ckpts[k].lr,
@@ -49,7 +50,7 @@ export function wrapTiny(D) {
     featHist: (f) => D.feat(f),
     // 一步之内（D2–D4）的数据分块到了没有
     stepReady: (k) => D.has('st', k),
-    batchShape: `${m.train.batch} 行 × ${m.train.seq + 1} 字`,
+    batchShape: L(`${m.train.batch} 行 × ${m.train.seq + 1} 字`, `${m.train.batch} rows × ${m.train.seq + 1}`),
     tokensSeen: (k) => m.ckpts[k].t * m.train.tokensPerStep,
   };
 }
@@ -88,7 +89,7 @@ export function wrapQwen(D) {
     adam: (k, f) => ({ t: k + 1, ...m.steps[k].feats[f] }),
     featHist: null,
     stepReady: (k) => D.has('st', k),
-    batchShape: `1 条对话 × ${N} 个词元`,
+    batchShape: L(`1 条对话 × ${N} 个词元`, `1 chat × ${N} tokens`),
     tokensSeen: (k) => k * N,
   };
 }

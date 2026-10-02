@@ -19,6 +19,9 @@ import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc } from '../../js/ui.js';
 import { initPanes } from '../../js/resize.js';
+import { initLang, isEn, L } from './lang.js';
+
+initLang();
 
 const KEY = 'blackbox:train';
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
@@ -60,7 +63,7 @@ async function boot() {
     runs = { tiny: wrapTiny(t), qwen: wrapQwen(q) };
   } catch (e) {
     console.error(e);
-    $('#loading').innerHTML = `<span style="color:var(--rose)">数据加载失败：${esc(e.message)}</span>`;
+    $('#loading').innerHTML = `<span style="color:var(--rose)">${L('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}</span>`;
     return;
   }
   ctx.tiny = runs.tiny;
@@ -338,7 +341,7 @@ function onFrame(dt, clock) {
     else {
       st.k = kd;
       st.step = { ...tl.step, k: kd };
-      st.stale = { since: wait.since, label: `第 ${R.stepNo(tl.k)} 步的数据还在路上，先显示第 ${R.stepNo(kd)} 步` };
+      st.stale = { since: wait.since, label: L(`第 ${R.stepNo(tl.k)} 步的数据还在路上，先显示第 ${R.stepNo(kd)} 步`, `Data for step ${R.stepNo(tl.k)} is still on its way — showing step ${R.stepNo(kd)} for now`) };
     }
   }
   return st;
@@ -404,7 +407,7 @@ function discover(id) {
   const t = document.createElement('button');
   t.type = 'button';
   t.className = 'toast';
-  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span></span>`;
+  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">${L('发现知识碎片', 'INSIGHT FOUND')} · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
   const maxToasts = matchMedia('(max-width: 900px)').matches ? 1 : 3;
@@ -423,7 +426,7 @@ function openCodex() {
   const c = $('#codex');
   $('.cx-grid', c).innerHTML = INSIGHTS.map((x) => (store.found.has(x.id)
     ? `<article class="cx-card found"><div class="where">${esc(x.where)}</div><h4>✦ ${esc(x.title)}</h4><p>${esc(x.text)}</p></article>`
-    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>在「${esc(x.where)}」附近找找。</p></article>`)).join('');
+    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>${L('？？？', '???')}</h4><p>${L(`在「${esc(x.where)}」附近找找。`, `Look around “${esc(x.where)}”.`)}</p></article>`)).join('');
   $('.cx-progress b', c).textContent = `${store.found.size} / ${INSIGHTS.length}`;
   $('.cx-bar i', c).style.width = `${(store.found.size / INSIGHTS.length) * 100}%`;
   c.classList.add('on');
@@ -459,9 +462,9 @@ function bindChrome() {
   $('#btnCodex').addEventListener('click', openCodex);
   $('.cx-close').addEventListener('click', closeCodex);
   $('#codex').addEventListener('click', (e) => { if (e.target.id === 'codex') closeCodex(); });
-  $('#btnReset').addEventListener('click', () => { if (!confirm('清空已收集的知识碎片？')) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
+  $('#btnReset').addEventListener('click', () => { if (!confirm(L('清空已收集的知识碎片？', 'Clear all the insights you have collected?'))) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
   const sb = $('#btnSound');
-  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? '关闭声音' : '打开声音'; };
+  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? L('关闭声音', 'Turn sound off') : L('打开声音', 'Turn sound on'); };
   sb.addEventListener('click', () => { setSound(!soundOn()); renderSound(); save(); sfx.click(); });
   renderSound();
   $('#btnFollow').addEventListener('click', () => { stage.exitFree(); sfx.click(); });
@@ -474,6 +477,18 @@ function bindChrome() {
   });
   new ResizeObserver(() => updateInsets()).observe($('#dbg'));
   initPanes('train', { right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 640 });
+  if (isEn) enGrip();
+}
+
+// 调试器左边的拖动手柄：共用的 ../../js/resize.js 只写了中文的提示和读数，英文模式下在这里换掉
+function enGrip() {
+  const gr = $('#dbg .pane-grip');
+  if (!gr) return;
+  gr.setAttribute('aria-label', 'Resize the debugger');
+  gr.title = 'Drag to resize, double-click to reset';
+  const fix = () => { const v = gr.getAttribute('aria-valuetext'); if (v && v.includes('像素')) gr.setAttribute('aria-valuetext', v.replace(' 像素', ' px')); };
+  fix();
+  new MutationObserver(fix).observe(gr, { attributes: true, attributeFilter: ['aria-valuetext'] });
 }
 
 function bindKeys() {

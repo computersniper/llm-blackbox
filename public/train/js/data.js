@@ -5,6 +5,8 @@
 //   分块：tiny/ckNN（D1 第 NN 个检查点的诗概率、注意力、嵌入、权重局部）、tiny/stNN（D2–D4 一步之内）、tiny/feat（权重轨迹）、
 //         qwen/stN（D2–D4）。进入对应视图、播放或拖到对应检查点时才去取，空闲时在后台慢慢预取（见 Loader）。
 
+import { L } from './lang.js';
+
 // float16 → float32（不依赖 Float16Array）
 const f16tab = (() => {
   const t = new Float32Array(65536);
@@ -58,7 +60,7 @@ async function fetchData(url) {
 }
 
 // 分块只存了 .gz：浏览器不支持解压时直接失败（err.unsupported），不去请求不存在的原始文件
-export const NO_GUNZIP = '当前浏览器不支持解压，这部分数据无法显示';
+export const NO_GUNZIP = L('当前浏览器不支持解压，这部分数据无法显示', 'This browser can’t decompress gzip, so this part of the data can’t be shown');
 async function fetchGz(url) {
   if (typeof DecompressionStream === 'undefined') throw Object.assign(new Error(NO_GUNZIP), { unsupported: true });
   const r = await fetch(`${url}.gz`);

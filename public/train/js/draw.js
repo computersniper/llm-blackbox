@@ -1,4 +1,5 @@
 // 画布上的小工具：颜色、字体、圆角卡片、文字、色带、坐标轴。所有尺寸都是世界坐标。
+import { isEn, L } from './lang.js';
 
 export const COL = {
   bg: '#060d1a', ink: '#e9eff9', ink2: '#b4bed2', dim: '#7a859e', faint: '#4b5572',
@@ -7,7 +8,8 @@ export const COL = {
   cyan: '#5ef0d4', amber: '#ffb65c', rose: '#ff6b93', blue: '#6b9bff', violet: '#b39dff', green: '#8ee07a',
 };
 export const FONT = {
-  sans: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif',
+  // 英文模式拉丁字体在前（理由见 train.css 末尾）
+  sans: isEn ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif' : '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif',
   mono: '"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace',
   serif: '"BB Serif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif',
 };
@@ -44,12 +46,19 @@ export function measure(g, s, size = 13, kind = 'sans', weight = 400) {
   return g.measureText(String(s)).width;
 }
 
-// 自动换行（中文按字、英文按词），返回行数
+// 自动换行（中文按字、英文按词），返回行数。中文模式逐字折行；英文模式把连续的拉丁字母当成一个词，不在词中间断开
+const UNIT_EN = /\n|[\u3000-\u9fff\uff00-\uffef][ \t]*|[^\s\u3000-\u9fff\uff00-\uffef]+[ \t]*|[ \t]+/g;
 export function wrap(g, s, x, y, w, lh, opt = {}) {
   font(g, opt.size || 13, opt.kind || 'sans', opt.weight || 400);
   const lines = [];
   let cur = '';
-  for (const ch of String(s)) {
+  if (isEn) {
+    for (const u of String(s).match(UNIT_EN) || []) {
+      if (u === '\n') { lines.push(cur.trimEnd()); cur = ''; continue; }
+      if (g.measureText((cur + u).trimEnd()).width > w && cur) { lines.push(cur.trimEnd()); cur = u.trim() ? u : ''; } else cur += u;
+    }
+    cur = cur.trimEnd();
+  } else for (const ch of String(s)) {
     if (ch === '\n') { lines.push(cur); cur = ''; continue; }
     if (g.measureText(cur + ch).width > w && cur) { lines.push(cur); cur = ch.trim() ? ch : ''; } else cur += ch;
   }
@@ -88,7 +97,7 @@ export function card(g, x, y, w, h, { title = '', eyebrow = '', accent = null, a
   let ty = y + 22;
   if (eyebrow) { text(g, eyebrow, x + 14, y + 19, { size: 9.5, kind: 'mono', color: COL.dim }); ty = y + 39; }
   if (title) text(g, title, x + 14, ty, { size: 15, kind: 'serif', weight: 600, color: COL.ink, max: w - 28 });
-  if (demo) badge(g, x + w - 14, y + 13, '示意', COL.amber, 'right');
+  if (demo) badge(g, x + w - 14, y + 13, L('示意', 'illustrative'), COL.amber, 'right');
 }
 
 export function badge(g, x, y, s, color = COL.cyan, align = 'left', size = 10) {
@@ -216,7 +225,7 @@ export const fmtInt = (n) => Math.round(n).toLocaleString('zh-CN');
 export const waitFade = (age) => clamp((age - 0.25) / 0.3, 0, 1);
 
 // 占位：可选的卡片底 + 居中的转圈和一行小字。wait = { since, err }（since 是开始等待时舞台的时钟，err 是载入失败的原因）
-export function waitBox(g, x, y, w, h, env, wait, { label = '正在载入这部分真实记录…', withCard = false, size = 12 } = {}) {
+export function waitBox(g, x, y, w, h, env, wait, { label = L('正在载入这部分真实记录…', 'Loading this part of the real record…'), withCard = false, size = 12 } = {}) {
   if (withCard) {
     rr(g, x, y, w, h, 14);
     g.fillStyle = COL.panel;
@@ -233,7 +242,7 @@ export function waitBox(g, x, y, w, h, env, wait, { label = '正在载入这部�
   g.globalAlpha = prev * a;
   if (err) {
     const tw = Math.min(w - 32, 280);
-    wrap(g, err.unsupported ? err.message : '这部分数据没有载入成功，稍后会自动重试…', cx, cy, tw, size + 6, { size, color: COL.rose, align: 'center' });
+    wrap(g, err.unsupported ? err.message : L('这部分数据没有载入成功，稍后会自动重试…', 'This part of the data failed to load; retrying automatically…'), cx, cy, tw, size + 6, { size, color: COL.rose, align: 'center' });
   } else {
     const r = size * 0.62, tw = measure(g, label, size);
     const sx = cx - (tw + r * 2 + 10) / 2 + r, sy = cy - size * 0.33;

@@ -2,6 +2,7 @@
 import { $, $$, esc } from '../../js/ui.js';
 import { DEPTH_NAMES, MAX_DEPTH } from './timeline.js';
 import { codeFor, linesFor, explain, watch, stepLabel, crumbs, shapeOf } from './explain.js';
+import { L } from './lang.js';
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 
@@ -63,7 +64,7 @@ export class Controls {
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top: first.offsetTop - box.clientHeight * 0.2, behavior: 'smooth' });
     }
     const ex = $('#explain'), wt = $('#watch');
-    const head = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, R, tl.depth))}</div>`;
+    const head = `<div class="eyebrow" style="margin-bottom:4px">${L('这一步', 'This step')} · ${esc(stepLabel(s, R, tl.depth))}</div>`;
     let stale = false;
     if (ready) {
       const shape = shapeOf(s, R, tl.depth);
@@ -72,7 +73,7 @@ export class Controls {
       this.shown = `${tl.depth}:${R.kind}`;
     } else if (err || this.shown !== `${tl.depth}:${R.kind}`) {
       // 上一次显示的是别的深度 / 别的训练，留着没意义：直接说正在载入（或者为什么载入不了）
-      const msg = err ? (err.unsupported ? err.message : '这一步的数据没有载入成功，稍后会自动重试…') : '正在载入这一步的真实记录…';
+      const msg = err ? (err.unsupported ? err.message : L('这一步的数据没有载入成功，稍后会自动重试…', 'This step’s data failed to load; retrying automatically…')) : L('正在载入这一步的真实记录…', 'Loading the real record of this step…');
       ex.innerHTML = `${head}<span class="${err ? 'err' : 'dimmed'}">${esc(msg)}</span>`;
       wt.innerHTML = '';
       this.shown = '';
@@ -88,19 +89,20 @@ export class Controls {
     const tr = $('#track');
     let h = '';
     if (tl.depth === 1) {
-      for (let k = 0; k < tl.K; k++) h += `<i data-i="${k}" data-kind="ck" data-l="第 ${R.stepNo(k)} 步" class="${k < tl.k ? 'done' : k === tl.k ? 'cur' : ''}"></i>`;
+      for (let k = 0; k < tl.K; k++) h += `<i data-i="${k}" data-kind="ck" data-l="${L(`第 ${R.stepNo(k)} 步`, `Step ${R.stepNo(k)}`)}" class="${k < tl.k ? 'done' : k === tl.k ? 'cur' : ''}"></i>`;
     } else {
       const n = tl.list.length;
       const a = n <= 90 ? 0 : Math.max(0, Math.min(n - 80, tl.i - 40)), b = n <= 90 ? n : a + 80;
       for (let i = a; i < b; i++) h += `<i data-i="${i}" data-l="${esc(stepLabel(tl.list[i], R, tl.depth))}" class="${i < tl.i ? 'done' : i === tl.i ? 'cur' : ''}"></i>`;
     }
     tr.innerHTML = h;
-    $('#pos').innerHTML = tl.depth === 0 ? `阶段 <b>${tl.i + 1}</b>/3` : `${R.kind === 'tiny' ? '检查点' : '第'} <b>${tl.k + 1}</b>/${tl.K}${R.kind === 'tiny' ? '' : ' 步'}<br>步骤 <b>${tl.i + 1}</b>/${tl.list.length}`;
+    $('#pos').innerHTML = L(tl.depth === 0 ? `阶段 <b>${tl.i + 1}</b>/3` : `${R.kind === 'tiny' ? '检查点' : '第'} <b>${tl.k + 1}</b>/${tl.K}${R.kind === 'tiny' ? '' : ' 步'}<br>步骤 <b>${tl.i + 1}</b>/${tl.list.length}`,
+      tl.depth === 0 ? `Stage <b>${tl.i + 1}</b>/3` : `${R.kind === 'tiny' ? 'Checkpoint' : 'SFT step'} <b>${tl.k + 1}</b>/${tl.K}<br>Substep <b>${tl.i + 1}</b>/${tl.list.length}`);
   }
 
   updatePlay(tl) {
     $('#btnPlay').textContent = tl.playing ? '❚❚' : '▶';
-    $('#btnPlay').title = tl.playing ? '暂停（空格）' : tl.done ? '播放完了，再按一次从头开始' : '播放（空格）';
+    $('#btnPlay').title = tl.playing ? L('暂停（空格）', 'Pause (Space)') : tl.done ? L('播放完了，再按一次从头开始', 'Finished — press again to start over') : L('播放（空格）', 'Play (Space)');
     $$('#speeds button').forEach((b) => { b.classList.toggle('on', Number(b.dataset.s) === tl.speed); b.setAttribute('aria-checked', Number(b.dataset.s) === tl.speed); });
   }
 }
