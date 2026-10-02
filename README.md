@@ -52,6 +52,7 @@
 - 点 ＋ 单步进入，**D1 黑箱 → D7 比特**一共七层；播放 / 单步 / 0.25×–8× 倍速，伪代码高亮、变量监视
 - **算式板**把一个数写成 y[j] = Σ x[i] × W[i, j]：前 12 项逐项相乘，其余项合成一行，正负乘积之和、累计和曲线
 - **全部 28 层**、每个生成的词元都有真实乘加；D7 点任意一个 bf16 比特翻转，精确重算
+- **英文版**：顶栏 中 / EN 切换（或网址加 `?lang=en`），界面、讲解、知识碎片都有英文；英文的 14 个问题是 Qwen3-0.6B 用英文系统提示**另跑的一批真实运行**（`export_qwen.py --lang en` → `public/data/en/`，采样参数和种子规则同中文），不是把中文回答翻译过去
 
 </td>
 <td width="50%" valign="top">
@@ -489,8 +490,9 @@ cd public && python3 -m http.server 8765
 需要 GPU、torch、transformers（5.x 已测试）。模型可从 ModelScope 或 Hugging Face 下载。
 
 ```bash
-# 推理 → public/data/（另需 safetensors）
+# 推理 → public/data/（另需 safetensors）；英文问题 → public/data/en/
 python tools/export_qwen.py --model /path/to/Qwen3-0.6B
+python tools/export_qwen.py --model /path/to/Qwen3-0.6B --lang en
 
 # 训练 → public/train/data/（另需 numpy、opencc）
 python tools/train/prep_corpus.py --src /path/to/chinese-poetry --out /path/to/poetry-train
