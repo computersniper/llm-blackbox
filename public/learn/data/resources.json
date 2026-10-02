@@ -1,5 +1,5 @@
 {
-  "checked": "2026-10-02",
+  "checked": "2026-10-03",
   "note": "每条链接都用 tools/learn/check_links.py 走代理实际打开过；标题、作者、年份以页面上的内容为准（B 站取发布日期，arXiv 取首次提交日期）。英文模式用 *_en 字段（title_en、why_en、author_en，以及 name_en、levels_en、platforms_en）；标了 enOnly 的条目只在英文模式出现——它们是中文模式里已有中文版的同一内容的英文原版，或者替换中文讲解的英文资料。",
   "topics": [
     { "id": "start", "name": "起步", "name_en": "Getting started", "hue": 168 },
