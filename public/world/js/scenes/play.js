@@ -46,10 +46,10 @@ export class PlayView {
     this.dream.chw(y, y);
     const pt = this.portrait;
     // ---- 两块屏幕
-    this.screen(g, this.R, this.real, Lx('真实世界', 'Real world'), Lx('game.js · 和训练数据同一个游戏', 'game.js · the same game as the training data'), COL.cyan, env);
+    this.screen(g, this.R, this.real, Lx('真实世界', 'Real world'), Lx('game.js · 和训练数据同一个游戏', 'game.js · the training game'), COL.cyan, env);
     const closed = sim.mode === 'closed';
     const eyeTxt = closed ? (F.dreamAge > 0 ? Lx(`闭眼 · 自己想了 ${F.dreamAge} 步`, pt ? `Eyes closed · ${F.dreamAge} steps alone` : `Eyes closed · dreaming alone for ${F.dreamAge} steps`) : Lx('闭眼', 'Eyes closed')) : Lx('睁眼 · 每步看着真实画面预测', pt ? 'Eyes open · sees the real frame' : 'Eyes open · predicting from the real frame each step');
-    this.screen(g, this.D, this.dream, Lx('模型的梦', "The model's dream"), pt ? Lx('V 解码 M 的预测', 'V decodes M’s prediction') : Lx('V.decode(M 预测的 z) · 浏览器现场算', 'V.decode(z predicted by M) · computed live'), closed ? COL.amber : COL.violet, env, eyeTxt);
+    this.screen(g, this.D, this.dream, Lx('模型的梦', "The model's dream"), pt ? Lx('V 解码 M 的预测', 'V decodes M’s prediction') : Lx('V.decode(M 预测的 z) · 浏览器现场算', 'V.decode(ẑ) · live'), closed ? COL.amber : COL.violet, env, eyeTxt);
     // 里程、撞车
     text(g, Lx(`里程 ${F.t}${sim.best > F.t ? `  最远 ${sim.best}` : ''}`, `Dist ${F.t}${sim.best > F.t ? `  best ${sim.best}` : ''}`), this.R.x + 8, this.R.y + this.R.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: 'rgba(233,239,249,0.75)' });
     if (F.realDone) this.flash(g, this.R, F.why === 'offroad' ? Lx('冲出路面', 'Off the road') : Lx('撞车了', 'Crashed'), Lx('下一步换一条新路', 'New road next step'), env);
@@ -95,7 +95,8 @@ export class PlayView {
     if (chip) {
       const fs = pt ? 9 : 10.5;
       g.font = `${fs}px ${'-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif'}`;
-      const w = g.measureText(chip).width + 14;
+      // 英文用和下面 text() 同一套字体量宽度（英文模式拉丁字体排在前面，用中文字体量会短一截）
+      const w = (isEn ? measure(g, chip, fs) : g.measureText(chip).width) + 14;
       rr(g, r.x + 6, r.y + 6, w, fs + 9, (fs + 9) / 2);
       g.fillStyle = 'rgba(6,12,24,0.82)'; g.fill();
       g.strokeStyle = hexA(accent, 0.6); g.stroke();
@@ -197,7 +198,7 @@ export class PlayView {
     const ttl = Lx('梦此刻的 z：32 个数', "The dream's z now: 32 numbers");
     text(g, ttl, r.x, r.y + 2, { size: pt ? 12 : 14, kind: 'serif', weight: 600 });
     const sx = isEn ? Math.ceil(measure(g, ttl, pt ? 12 : 14, 'serif', 600)) + (pt ? 10 : 16) : (pt ? 128 : 160);
-    text(g, pt ? Lx('拖动柱子改梦（会自动闭眼）', 'drag a bar to edit (closes eyes)') : Lx('拖动柱子改梦里的画面（会自动闭眼）· 白色刻度 = 真实画面编码出来的 z · 按“用得多不多”（KL）排序', 'Drag a bar to edit the dream (its eyes close automatically) · white tick = z encoded from the real frame · sorted by how much each is used (KL)'), r.x + sx, r.y + 2, { size: pt ? 9 : 10.5, color: COL.dim, max: r.w - sx });
+    text(g, pt ? Lx('拖动柱子改梦（会自动闭眼）', 'drag a bar to edit (closes eyes)') : Lx('拖动柱子改梦里的画面（会自动闭眼）· 白色刻度 = 真实画面编码出来的 z · 按“用得多不多”（KL）排序', 'Drag a bar to edit the dream (its eyes close) · white tick = z encoded from the real frame · sorted by usage (KL)'), r.x + sx, r.y + 2, { size: pt ? 9 : 10.5, color: COL.dim, max: r.w - sx });
     const top = r.y + 14, bh = r.h - (pt ? 34 : 40);
     const gap = pt ? 2 : 4, bw = (r.w - gap * 31) / 32;
     const mid = top + bh / 2;

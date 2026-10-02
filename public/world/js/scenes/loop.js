@@ -1,7 +1,7 @@
 // D2 循环：一帧之内，真实画面 → V 编码 → z → M（LSTM + MDN）→ 采样 ẑ → V 解码 → 梦见的下一帧，
 // 上面一条是真实世界自己走一步。闭眼时从真实画面进来的那条路熄灭，ẑ 从下面绕回来当下一步的 z。
 // 底下三张卡片是 V、M、C 真实的训练记录。
-import { COL, rr, text, card, hexA, line, clamp, ease, seg, font } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, clamp, ease, seg, font, measure } from '../../../train/js/draw.js';
 import { Pix, vecGrid } from '../pix.js';
 import { toCHW } from '../game.js';
 import { dimOrder, used as isUsed, fmtMSE, actName, byTag } from '../explain.js';
@@ -219,7 +219,7 @@ export class LoopView {
 
   chip(g, x, y, s, color, active) {
     g.font = '11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-    const w = g.measureText(s).width + 16;
+    const w = (isEn ? measure(g, s, 11) : g.measureText(s).width) + 16;   // 英文用 text() 的字体量宽度
     rr(g, x - w / 2, y - 10, w, 20, 10);
     g.fillStyle = active ? hexA(color, 0.2) : 'rgba(10,17,31,0.9)'; g.fill();
     g.strokeStyle = hexA(color, active ? 0.8 : 0.45); g.lineWidth = 1; g.stroke();
