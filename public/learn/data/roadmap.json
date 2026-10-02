@@ -3,7 +3,7 @@
   "stages": [
     {
       "id": "surface", "no": "01", "title": "浮出水面", "sub": "大模型到底在做什么",
-      "title_en": "Coming up for air", "sub_en": "What an LLM actually does",
+      "title_en": "The surface", "sub_en": "What an LLM actually does",
       "nodes": [
         { "id": "next-token", "title": "它只是在接龙", "goal": "大模型每一步只做一件事：看着前面的所有词元，给词表里每个词元打一个分，再从中抽一个出来。",
           "title_en": "It's just a word-chain game", "goal_en": "At every step an LLM does just one thing: look at all the tokens so far, give every token in the vocabulary a score, and draw one.",
