@@ -89,7 +89,7 @@ export function wrapQwen(D) {
     adam: (k, f) => ({ t: k + 1, ...m.steps[k].feats[f] }),
     featHist: null,
     stepReady: (k) => D.has('st', k),
-    batchShape: L(`1 条对话 × ${N} 个词元`, `1 chat × ${N} tokens`),
+    batchShape: L(`1 条对话 × ${N} 个词元`, `1 × ${N} tokens`),
     tokensSeen: (k) => k * N,
   };
 }

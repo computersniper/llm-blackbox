@@ -78,7 +78,7 @@ export class Loop {
       fwd: L(`${R.model.layers} 层 · 并行`, `${R.model.layers} layers`),
       loss: R.loss(k).toFixed(3),
       bwd: `‖g‖ ${R.gradNorm(k).toFixed(T ? 3 : 1)}`,
-      upd: L(`${fmtInt(R.model.params / 1e4)} 万个权重`, `${compact(R.model.params)} weights`),
+      upd: L(`${fmtInt(R.model.params / 1e4)} 万个权重`, `${compact(R.model.params, 1)} weights`),
     };
     NODES.forEach((n, i) => {
       const [x, y] = this.pos(i);

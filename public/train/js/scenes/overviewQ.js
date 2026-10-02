@@ -129,7 +129,7 @@ export class OverviewQ {
 
   drawBars(g, st, env, R, m, k, f) {
     const C = this.bars;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('P(TARGET) · 4 个时刻的真实概率', 'P(TARGET) · REAL PROBABILITIES AT 4 MOMENTS'), title: L('回答里每个词元的概率', 'Probability of each answer token'), accent: COL.cyan, active: st.depth === 1 });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('P(TARGET) · 4 个时刻的真实概率', this.portrait ? 'P(TARGET) · REAL' : 'P(TARGET) · REAL PROBABILITIES AT 4 MOMENTS'), title: L('回答里每个词元的概率', 'Probability of each answer token'), accent: COL.cyan, active: st.depth === 1 });
     const pos = R.D.sftPos;
     const n = pos.length;
     const x0 = C.x + 50, x1 = C.x + C.w - 18, y0 = C.y + 72, y1 = C.y + C.h - 54;
@@ -143,7 +143,7 @@ export class OverviewQ {
     // 图例
     let lx = C.x + C.w - 18;
     for (let s = 3; s >= 0; s--) {
-      const lab = s === 0 ? L('训练前', 'before') : L(`第 ${s} 步后`, `after step ${s}`);
+      const lab = s === 0 ? L('训练前', 'before') : L(`第 ${s} 步后`, this.portrait ? `step ${s}` : `after step ${s}`);
       const w = measure(g, lab, 10) + 18;
       lx -= w;
       text(g, '■', lx, C.y + 24, { size: 10, color: STATE_COL[s] });

@@ -162,7 +162,7 @@ export class Overview {
     const lr = this.D.lr[ti], gn = this.D.gnorm[ti];
     const tiles = isEn ? [
       { k: 'STEP', v: `${fmtInt(ti + 1)}`, s: `/ ${fmtInt(this.S)} steps`, c: COL.ink },
-      { k: 'TOKENS · CHARACTERS READ', v: compact(tokens, 1), s: `epoch ${epoch.toFixed(2)} (corpus: ${compact(m.corpus.chars.train, 1)} chars)`, c: COL.ink },
+      { k: 'TOKENS · CHARS READ', v: compact(tokens, 1), s: `epoch ${epoch.toFixed(2)} · corpus ${compact(m.corpus.chars.train, 1)} chars`, c: COL.ink },
       { k: 'LOSS', v: this.ema[ti].toFixed(3), s: `val ${val.toFixed(3)} · start ln ${m.model.vocab} = ${Math.log(m.model.vocab).toFixed(2)}`, c: COL.cyan },
       { k: 'LR · LEARNING RATE', v: sciSup(lr, 3), s: ti < m.train.warmup ? `warming up (linear over ${m.train.warmup} steps)` : 'cosine annealing', c: COL.amber },
       { k: 'GRAD · GRADIENT NORM', v: gn.toFixed(3), s: gn > m.train.clip ? `above ${m.train.clip}, clipped ×${(m.train.clip / gn).toFixed(2)}` : `≤ ${m.train.clip}, not clipped`, c: gn > m.train.clip ? COL.rose : COL.violet },

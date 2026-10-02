@@ -57,7 +57,7 @@ export class LossView {
     }
     const ry = 78 + rows.height + 36;
     // 累计
-    text(g, L(`已经累计 ${cnt} 个位置，平均 −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`, `${cnt} positions so far, mean −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`), 0, ry, { size: 12, kind: 'mono', color: COL.ink2 });
+    text(g, L(`已经累计 ${cnt} 个位置，平均 −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`, `${cnt} position${cnt === 1 ? '' : 's'} so far, mean −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`), 0, ry, { size: 12, kind: 'mono', color: COL.ink2 });
     text(g, isEn ? (T ? `mean over all ${fmtInt(R.D.meta.train.tokensPerStep)} positions in the batch (the actual loss) = ${R.loss(k).toFixed(4)}` : `mean over the ${R.D.sftPos.length} answer positions (the actual loss) = ${R.loss(k).toFixed(4)}`) : T ? `整批 ${fmtInt(R.D.meta.train.tokensPerStep)} 个位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}` : `${R.D.sftPos.length} 个回答位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}`, P ? 0 : W, P ? ry + 20 : ry, { size: 12, kind: 'mono', color: COL.amber, align: P ? 'left' : 'right' });
     this.detailY = ry + (P ? 44 : 28);
     this.drawDetail(g, st, env, this.detailY);
