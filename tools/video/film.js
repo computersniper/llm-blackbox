@@ -22,7 +22,8 @@ const QID = params.get('q') || 'q01';
 const PREVIEW = params.has('preview');
 const $ = (s) => document.querySelector(s);
 
-let E, M, Q, MAN, SC, OPENING, QR_SVG = '';
+let E, M, Q, MAN, SC, OPENING, QR_SVG = '', CAP = null;
+const SITE = new Map();
 const extras = {};
 const EVENTS = []; // 给配乐 / 音效用的事件（时间点），渲染脚本会把它导出成 events.json
 
@@ -68,7 +69,10 @@ async function boot() {
   Q = await loadQuestion(QID, MAN);
   await Promise.all(Array.from({ length: Q.NL }, (_, L) => Q.ensureMicro(L)));
   const thumbs = await loadThumbs();
-  SC = buildScore(Q);
+  // 片尾的推理页录屏（sitecap.mjs 录好放在 D 盘）：只预载片子里用得到的那些帧
+  CAP = await fetch('/ext/sitecap/meta.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  SC = buildScore(Q, CAP);
+  if (CAP && SC.endSite) await preloadSite();
 
   E = new FilmEngine($('#gl'), { pixelRatio: Number(params.get('pr') || 1.5) });
   E.shiftY = 56; // 主体整体上移，给字幕留位置
@@ -268,11 +272,12 @@ function buildOverlays() {
   OV.replyKey = '';
   // 片尾
   OV.end = el('div', 'endcard', '', ov);
-  OV.end2 = el('div', 'endcard', '', ov);
-  // 继续探索：一句引子 → 站内另外几页 → 延伸学习 + 二维码（二维码由 make_qr.py 在本地生成）
-  OV.end3 = el('div', 'endcard', '<div class="lead">这只是一个字的旅程。想继续看？</div>', ov);
-  OV.end4 = el('div', 'endcard', `<div class="more">${[['训练', '模型是怎么学会的'], ['多模态', '它怎么看图'], ['智能体', '它怎么动手干活'], ['世界模型', '它脑子里的世界']].map(([a, b]) => `<b>${a}</b><span>${b}</span>`).join('')}</div>`, ov);
-  OV.end5 = el('div', 'endcard fin', `<div class="qr">${QR_SVG}</div><div class="fin-t"><div class="k">延伸学习</div><div class="url">caijiechao.com/blackbox/learn/</div><div class="hint">扫码打开网站 · caijiechao.com/blackbox/</div><div class="cred">Qwen3-0.6B 真实离线运行数据 · 画面与音乐均由程序生成</div></div>`, ov);
+  // 片尾：推理页录屏放在一个干净的窗口框里（不模仿任何浏览器），鼠标和点击是叠加上去的；最后落版网址 + 二维码
+  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">caijiechao.com/blackbox/</span></div><canvas width="1920" height="1080"></canvas>`, ov);
+  OV.winCtx = OV.win.querySelector('canvas').getContext('2d');
+  OV.winIdx = -1;
+  OV.cur = el('div', 'cur', `<span class="rip"></span><svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 2.5v17.2l4.6-4.3 3 6.6 2.9-1.3-3-6.5h6.2z" fill="#fff" stroke="#05080f" stroke-width="1.4" stroke-linejoin="round"/></svg>`, ov);
+  OV.fin = el('div', 'fin7', `<div class="url">caijiechao.com/blackbox/</div><div class="qr">${QR_SVG}</div><div class="hint">扫码打开推理页，亲手一层层看</div>`, ov);
 
   // v5 讲解层：章节进度、术语标签、注意力公式、6 个头的小图、指示环
   OV.terms = new CueLayer(ov, 'term', SC.terms, { rise: 6, fin: 0.3, fout: 0.3 });
@@ -419,6 +424,49 @@ function focusMlp(which, k = 1) {
   P.din.segs.forEach((s) => { s.material.opacity = 0.95 * dim('din'); });
 }
 
+// 片尾录屏：按时间表换帧；窗口最后缩到左边，右边落版网址 + 二维码
+async function preloadSite() {
+  const need = new Set();
+  for (const sg of SC.endSite.segs) for (let f = sg.f0; f <= sg.f1 + 1e-6; f += 1 / 60) need.add(Math.min(CAP.n - 1, Math.max(0, Math.round(lerp(sg.c0, sg.c1, (f - sg.f0) / (sg.f1 - sg.f0)) * CAP.fps))));
+  await Promise.all([...need].map((k) => new Promise((res) => { const im = new Image(); im.onload = () => res(); im.onerror = () => res(); im.src = `/ext/sitecap/f${String(k).padStart(4, '0')}.jpg`; SITE.set(k, im); })));
+}
+function cursorAt(ct) {
+  const acts = CAP.actions.filter((a) => a.x != null);
+  let prev = acts[0], next = null;
+  for (const a of acts) { if (a.t <= ct) prev = a; else { next = a; break; } }
+  if (next && next.t - ct < 0.55 && prev !== next) { const k = easeInOut(1 - (next.t - ct) / 0.55); return { x: lerp(prev.x, next.x, k), y: lerp(prev.y, next.y, k), click: 0 }; }
+  const click = ct >= prev.t && ct < prev.t + 0.45 ? 1 - (ct - prev.t) / 0.45 : 0;
+  return { x: prev.x, y: prev.y, click };
+}
+function updateSite(S) {
+  const on = S && S.a > 0.001 && CAP;
+  OV.win.style.display = on ? 'block' : 'none';
+  OV.cur.style.display = on && S.cursor > 0.01 ? 'block' : 'none';
+  OV.fin.style.display = on && S.finA > 0.001 ? 'flex' : 'none';
+  if (!on) return;
+  const idx = Math.min(CAP.n - 1, Math.max(0, Math.round(S.ct * CAP.fps)));
+  if (idx !== OV.winIdx && SITE.get(idx)?.complete) { OV.winCtx.drawImage(SITE.get(idx), 0, 0, 1920, 1080); OV.winIdx = idx; }
+  // 窗口：画面中间 → 落版时缩到左边
+  const k = S.fin ?? 0;
+  const cx = lerp(960, 600, k), cy = lerp(474, 482, k), sc = lerp(1, 0.6, k);
+  OV.win.style.opacity = S.a.toFixed(3);
+  OV.win.style.left = `${cx.toFixed(1)}px`;
+  OV.win.style.top = `${cy.toFixed(1)}px`;
+  OV.win.style.transform = `translate(-50%, -50%) scale(${sc.toFixed(4)}) translateY(${((1 - easeOut(Math.min(1, S.a * 1.2))) * 18).toFixed(1)}px)`;
+  if (S.cursor > 0.01) {
+    const c = cursorAt(S.ct);
+    const W = 1440, H = 810, BAR = 40;
+    const x = cx + (-W / 2 + (c.x / CAP.viewport.w) * W) * sc, y = cy + (-(H + BAR) / 2 + BAR + (c.y / CAP.viewport.h) * H) * sc;
+    OV.cur.style.left = `${x.toFixed(1)}px`;
+    OV.cur.style.top = `${y.toFixed(1)}px`;
+    OV.cur.style.opacity = S.cursor.toFixed(3);
+    const rip = OV.cur.firstChild;
+    rip.style.opacity = (c.click * 0.9).toFixed(3);
+    rip.style.transform = `translate(-50%, -50%) scale(${(0.4 + 1.2 * (1 - c.click)).toFixed(3)})`;
+  }
+  if (S.finA > 0.001) { OV.fin.style.opacity = S.finA.toFixed(3); OV.fin.style.transform = `translateY(-50%) translateY(${((1 - easeOut(S.finA)) * 14).toFixed(1)}px)`; }
+}
+
 // 注意力的三块矩阵：讲到哪个，哪个亮，另外两块和它们的标签压暗 / 收起
 function focusAttn(which, k = 1) {
   const A = M.mats.attn;
@@ -512,6 +560,7 @@ function updateOverlays(t, f) {
   updateFormula(o.formula);
   updateHeads6(o.heads6);
   updateFfnMap(o.ffnmap);
+  updateSite(o.site);
   updateRings(o.rings);
 }
 
@@ -618,9 +667,8 @@ function updateReply(R) {
 }
 
 function updateEnd(D) {
-  const a1 = D?.a1 ?? 0, a2 = D?.a2 ?? 0;
+  const a1 = D?.a1 ?? 0;
   OV.end.style.display = a1 > 0.001 ? 'block' : 'none';
-  OV.end2.style.display = a2 > 0.001 ? 'block' : 'none';
   if (a1 > 0.001) {
     if (!OV.end.innerHTML) {
       // 回答按逗号断成几行（每行不超过 22 个字），不在词中间折行
@@ -632,19 +680,6 @@ function updateEnd(D) {
     OV.end.style.opacity = a1.toFixed(3);
     OV.end.querySelector('.stat').style.opacity = (D.k1 ?? 1).toFixed(3);
   }
-  if (a2 > 0.001) {
-    if (!OV.end2.innerHTML) OV.end2.innerHTML = `<div class="brand">在线体验</div><div class="url">caijiechao.com/blackbox/</div>`;
-    OV.end2.style.opacity = a2.toFixed(3);
-    OV.end2.style.transform = `translate(-50%, -50%) translateY(${((1 - easeOut(D.k2 ?? 1)) * 12).toFixed(2)}px)`;
-  }
-  // 继续探索
-  const a3 = D?.a3 ?? 0, a4 = D?.a4 ?? 0, a5 = D?.a5 ?? 0;
-  for (const [e, a] of [[OV.end3, a3], [OV.end4, a4], [OV.end5, a5]]) {
-    e.style.display = a > 0.001 ? (e === OV.end5 ? 'flex' : 'block') : 'none';
-    if (a > 0.001) { e.style.opacity = a.toFixed(3); e.style.transform = `translate(-50%, -50%) translateY(${((1 - easeOut(Math.min(1, a * 1.3))) * 14).toFixed(2)}px)`; }
-  }
-  if (a4 > 0.001) [...OV.end4.querySelectorAll('.more > *')].forEach((c, i) => { const k = smooth(clamp((D.k4 ?? 1) * 4 - Math.floor(i / 2) * 0.9)); c.style.opacity = k.toFixed(3); });
-  if (a5 > 0.001) { const k = D.k5 ?? 1; OV.end5.querySelector('.qr').style.opacity = smooth(seg(k, 0, 0.5)).toFixed(3); OV.end5.querySelector('.hint').style.opacity = smooth(seg(k, 0.4, 0.9)).toFixed(3); OV.end5.querySelector('.cred').style.opacity = (0.8 * smooth(seg(k, 0.6, 1))).toFixed(3); }
 }
 
 /* ================================================================ 算式板 */

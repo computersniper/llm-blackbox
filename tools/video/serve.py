@@ -25,6 +25,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if p.startswith("/ext/fonts/") and self.fonts_dir:
             name = posixpath.basename(p)
             return os.path.join(self.fonts_dir, name)
+        # 片尾用的推理页录屏帧（sitecap.mjs 生成，放在字体目录旁边的 sitecap/）
+        if p.startswith("/ext/sitecap/") and self.fonts_dir:
+            name = posixpath.basename(p)
+            return os.path.join(os.path.dirname(self.fonts_dir.rstrip("/")), "sitecap", name)
         return super().translate_path(path)
 
     def end_headers(self):
