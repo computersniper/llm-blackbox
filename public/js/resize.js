@@ -3,7 +3,11 @@
 // 控制条、提示、算式板、舞台边距这些依赖它的东西自己跟着走；改完调一次 onChange（重新算舞台的遮挡边距）。
 // 手柄什么时候出现交给样式表（app.css / train.css 末尾）：聊天模式、调试器收起、窄屏（≤900px，面板是覆盖式的）都藏起来。
 
-import { L as tr } from './i18n.js';
+import { L as tr, isEn } from './i18n.js';
+
+// 各页面传进来的面板名是中文，英文模式下在这里统一翻译
+const NAME_EN = { '聊天栏': 'chat panel', '调试器': 'debugger', '对话栏': 'conversation panel', '面板': 'panel' };
+const paneName = (n) => (isEn ? NAME_EN[n] || n : n);
 
 const NARROW = matchMedia('(max-width: 900px)');
 const STEP = 16;
@@ -66,7 +70,7 @@ export function initPanes(page, { left, right, reserve = 500, onChange } = {}) {
     g.tabIndex = 0;
     g.setAttribute('role', 'separator');
     g.setAttribute('aria-orientation', 'vertical');
-    g.setAttribute('aria-label', tr(`调整${p.name || '面板'}宽度`, `Resize the ${p.name || 'panel'}`));
+    g.setAttribute('aria-label', tr(`调整${p.name || '面板'}宽度`, `Resize the ${paneName(p.name || '面板')}`));
     if (p.el.id) g.setAttribute('aria-controls', p.el.id);
     g.title = tr('拖动调整宽度，双击恢复默认', 'Drag to resize, double-click to reset');
     p.el.append(g);

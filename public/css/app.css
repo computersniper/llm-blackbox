@@ -44,6 +44,11 @@
   --ease: cubic-bezier(.16, 1, .3, 1);
   color-scheme: dark;
 }
+/* 英文模式：拉丁字体排在中文字体前面（全站统一；否则英文里的弯引号、撇号会落到中文字体上显示成全角） */
+:root:lang(en) {
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "DejaVu Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --serif: Georgia, "Times New Roman", "Noto Serif", "DejaVu Serif", "BB Serif", "Noto Serif SC", serif;
+}
 
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -205,7 +210,7 @@ body.mode-inspect .chat-head, body.mode-inspect .chat-log, body.mode-inspect .co
 .gl canvas { display: block; width: 100%; height: 100%; outline: none; }
 .gl.grab { cursor: grab; }
 .gl.grabbing { cursor: grabbing; }
-.css2d { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.css2d { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }   /* z-index 让标签层自成一层：CSS2DRenderer 给每个标签设的排序 z-index 不会再压过调试器 / 算式板 */
 .stage-top { position: absolute; top: 12px; left: 14px; right: calc(var(--dbg-w) + 28px); display: flex; justify-content: flex-start; pointer-events: none; }
 .stage-strip { display: none; }
 .stage-top { gap: 8px; align-items: flex-start; }
@@ -342,6 +347,8 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .bd-wait .spin { width: 16px; height: 16px; border-width: 2px; }
 .bd-h { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border-bottom: 1px solid var(--line); }
 .bd-where { min-width: 0; flex: 0 1 auto; font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 英文标题比中文长：放不下时折成两行，不截断 */
+:root:lang(en) .bd-where { white-space: normal; line-height: 1.3; }
 .bd-steps { display: flex; gap: 4px; margin: 0 0 0 auto; padding: 0; list-style: none; flex: none; }
 .bd-steps li { display: flex; align-items: center; gap: 5px; padding: 2px 9px 2px 3px; border-radius: 999px; border: 1px solid var(--line2); font-size: 11.5px; color: var(--dim); white-space: nowrap; transition: background .3s, color .3s, border-color .3s; }
 .bd-steps li b { width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; font-family: var(--mono); font-size: 10px; background: rgba(255, 255, 255, .06); }
