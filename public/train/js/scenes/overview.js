@@ -368,13 +368,12 @@ export class Overview {
       hit(x, y, tw, th, { tip: () => {
         const top = D.valTop(k, i).map((tt) => `<tr><td class="${tt.id === m.held.ids[i + 1] ? 'tg' : ''}">${esc(tt.id === 0 ? '⏎' : D.ch(tt.id))}</td><td>${fmtP(tt.p)}</td></tr>`).join('');
         const ctxs = m.held.text.slice(0, i) || L('（只有开头标记）', '(only the start marker)');
-        if (isEn) return `<span class="k">after “${esc(ctxs.slice(-8))}”</span>probability of the correct answer “<b>${esc(textS[i])}</b>”: <span class="v">${fmtP(p)}</span><table>${top}</table>`;
+        if (isEn) return `<span class="k">after “${esc(ctxs.slice(-8))}”</span>probability of the correct answer “<b>${esc(textS[i])}</b>”: <span class="v">${fmtP(p)}</span><table>${top}</table><span style="color:var(--dim)">${POEM_EN}</span>`;
         return `<span class="k">看到「${esc(ctxs.slice(-8))}」之后</span>正确答案「<b>${esc(textS[i])}</b>」的概率 <span class="v">${fmtP(p)}</span><table>${top}</table>`;
       } });
     }
     const n = D.Lv;
-    if (isEn && !this.portrait) text(g, `Poem: ${POEM_EN}`, C.x + 14, C.y + C.h - 30, { size: 9.5, color: COL.dim, max: C.w - 28 });
-    text(g, L(`平均损失 ${(mean / n).toFixed(2)}（每个字 −ln p 的平均）`, `mean loss ${(mean / n).toFixed(2)} (average −ln p per character)`), C.x + 14, C.y + C.h - 14, { size: 10, color: COL.dim, max: isEn ? C.w - 28 : 0 });
+    text(g, L(`平均损失 ${(mean / n).toFixed(2)}（每个字 −ln p 的平均）`, `mean loss ${(mean / n).toFixed(2)} (avg −ln p per char)`), C.x + 14, C.y + C.h - 14, { size: 10, color: COL.dim, max: isEn ? C.w - 28 : 0 });
     this.staleEnd(g, C, s);
   }
 
