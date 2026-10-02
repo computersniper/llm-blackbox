@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 分享用的小体积版本：1080p、30fps，两遍编码控制码率，目标 ≤150 MB（305 秒 × (3.6 Mbps 视频 + 192 kbps 音频) ≈ 145 MB）。
+# 分享用的小体积版本：1080p、30fps，两遍编码控制码率，目标 ≤150 MB（215 秒 × (4.8 Mbps 视频 + 192 kbps 音频) ≈ 134 MB）。
 # 音频不降到 128k：低码率的 AAC 在密集段落会冲出 0 dBFS 以上的峰值
 #   tools/video/share.sh [帧目录] [配乐 wav] [输出 mp4] [视频码率]
 set -euo pipefail
@@ -7,7 +7,7 @@ OUT_DIR=/mnt/d/cjc/videos/llm-inference
 FRAMES=${1:-$OUT_DIR/frames60}
 SCORE=${2:-$OUT_DIR/score.wav}
 MP4=${3:-$OUT_DIR/qwen3-inference-v4-share.mp4}
-VB=${4:-3600k}
+VB=${4:-4800k}
 LOG=$OUT_DIR/x264-share
 
 # 60fps 的帧序列按 30fps 取（隔一帧取一帧）

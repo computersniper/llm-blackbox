@@ -291,6 +291,15 @@ function buildOverlays() {
   OV.fKey = '';
   OV.heads6 = el('div', 'heads6', '', ov);
   OV.h6Key = '';
+  OV.ffn = el('div', 'ffnmap', `<div class="row">
+      <div class="b in" data-k="in"><b>1024</b><span>这个词的理解</span></div><i class="ar">→</i>
+      <div class="stack"><div class="b g" data-k="gate"><b>门 gate</b><span>3072 个：放不放行、放多少</span></div><div class="b u" data-k="up"><b>内容 up</b><span>3072 份内容</span></div></div><i class="ar">→</i>
+      <div class="b mul" data-k="mul"><b>×</b></div><i class="ar">→</i>
+      <div class="b d" data-k="down"><b>down</b><span>收回 1024</span></div><i class="ar">→</i>
+      <div class="b add" data-k="add"><b>⊕</b><span>加回去</span></div>
+    </div><div class="cap"></div>`, ov);
+  OV.ffnCap = OV.ffn.querySelector('.cap');
+  OV.ffnKey = '';
   OV.rings = [];
 }
 
@@ -372,6 +381,42 @@ function updateRings(R) {
     const lb = e.firstChild;
     if (lb.innerHTML !== (r.label || '')) lb.innerHTML = r.label || '';
   });
+}
+
+// 前馈的结构图：1024 → 门 / 内容（各 3072）→ 相乘 → down → 1024 → 加回去。hi = 正在讲的部分，cap = 下面一行（文字或 SiLU 曲线）
+const SILU_SVG = (() => {
+  const W = 340, H = 120, x0 = -6, x1 = 4, y0 = -0.6, y1 = 4;
+  const X = (x) => ((x - x0) / (x1 - x0)) * W, Y = (y) => H - ((y - y0) / (y1 - y0)) * H;
+  let d = '';
+  for (let i = 0; i <= 80; i++) { const x = x0 + ((x1 - x0) * i) / 80; d += `${i ? 'L' : 'M'}${X(x).toFixed(1)},${Y(x / (1 + Math.exp(-x))).toFixed(1)} `; }
+  return `<svg width="${W}" height="${H + 6}" viewBox="0 -3 ${W} ${H + 6}"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="rgba(150,180,230,.35)"/><line x1="${X(0)}" x2="${X(0)}" y1="0" y2="${H}" stroke="rgba(150,180,230,.35)"/><path d="${d}" fill="none" stroke="#5ef0d4" stroke-width="3"/></svg>`;
+})();
+function updateFfnMap(F) {
+  OV.ffn.style.display = F && F.a > 0.001 ? 'block' : 'none';
+  if (!F || F.a <= 0.001) return;
+  OV.ffn.style.opacity = F.a.toFixed(3);
+  const key = `${F.hi}|${F.cap}`;
+  if (key === OV.ffnKey) return;
+  OV.ffnKey = key;
+  const LIT = { shape: ['in', 'gate', 'up', 'mul', 'down', 'add'], gate: ['gate'], up: ['up'], mul: ['gate', 'up', 'mul'], silu: ['gate'], act: ['mul'], down: ['down', 'add'] }[F.hi] || [];
+  OV.ffn.querySelectorAll('[data-k]').forEach((e) => e.classList.toggle('on', LIT.includes(e.dataset.k)));
+  OV.ffnCap.innerHTML = F.cap === 'silu' ? `<span class="l">小于 0：基本关上</span>${SILU_SVG}<span class="r">大于 0：照常通过</span>` : (F.cap || '');
+}
+
+// 前馈的三块矩阵：讲到哪块，哪块亮；'din' = 门 × 内容之后的那根向量
+function focusMlp(which, k = 1) {
+  const P = M.mats.mlp;
+  if (!P || !P.visible) return;
+  const D = { g: { g: 1, u: 0.12, d: 0.12, din: 0.12 }, u: { g: 0.12, u: 1, d: 0.12, din: 0.12 }, din: { g: 0.4, u: 0.4, d: 0.12, din: 1 }, d: { g: 0.12, u: 0.12, d: 1, din: 0.5 } }[which];
+  const dim = (key) => (D ? 1 - (1 - D[key]) * k : 1);
+  for (const [key, pn, vec] of [['g', P.g, P.go], ['u', P.u, P.uo], ['d', P.d, P.dout]]) {
+    const a = dim(key);
+    pn.mat.opacity *= a;
+    pn.edge.material.opacity *= a;
+    pn.scan.material.opacity *= a;
+    vec.segs.forEach((s) => { s.material.opacity = 0.95 * a; });
+  }
+  P.din.segs.forEach((s) => { s.material.opacity = 0.95 * dim('din'); });
 }
 
 // 注意力的三块矩阵：讲到哪个，哪个亮，另外两块和它们的标签压暗 / 收起
@@ -466,6 +511,7 @@ function updateOverlays(t, f) {
   updateProg(t);
   updateFormula(o.formula);
   updateHeads6(o.heads6);
+  updateFfnMap(o.ffnmap);
   updateRings(o.rings);
 }
 
@@ -660,6 +706,7 @@ function renderAt(t, { render = true } = {}) {
     if (f.after) f.after(M);
     // v5：讲到 Q / K / V 中的哪一个，哪块矩阵亮；打分那一步先不显示弧线上的权重（softmax 之后才有）
     focusAttn(f.attnFocus ?? null, f.attnFocusK ?? 1);
+    focusMlp(f.mlpFocus ?? null, f.mlpFocusK ?? 1);
     for (const b of M.beamList || []) b.m.children.forEach((c) => { if (c.el) c.visible = f.beamLabels !== false; });
     // 层板展开时的部件标签：只留正在讲的那一个（exOnly），其余收起
     if (f.exOnly !== undefined) for (const [k, lb] of Object.entries(M.exLabels)) if (k !== f.exOnly) lb.visible = false;

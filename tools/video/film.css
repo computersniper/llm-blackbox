@@ -280,3 +280,31 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .endcard .fin-t .url { margin-top: 22px; font-family: var(--mono); font-size: 36px; letter-spacing: .04em; color: var(--cyan); }
 .endcard .fin-t .hint { margin-top: 26px; font-size: 26px; font-weight: 600; letter-spacing: .06em; color: var(--ink2); }
 .endcard .fin-t .cred { margin-top: 40px; font-size: 19px; font-weight: 600; letter-spacing: .08em; color: var(--dim); }
+
+/* v6：前馈的结构图（1024 → 门 / 内容 3072 → 相乘 → down 1024 → 加回去），正在讲的部分亮 */
+.ffnmap { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 18px 28px 14px; border-radius: 18px; background: rgba(3, 7, 15, .84); border: 1px solid var(--line2); backdrop-filter: blur(8px); white-space: nowrap; }
+.ffnmap .row { display: flex; align-items: center; gap: 12px; }
+.ffnmap .stack { display: flex; flex-direction: column; gap: 10px; }
+.ffnmap .b { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 16px; border-radius: 12px; border: 1.5px solid rgba(150, 180, 230, .25); color: rgba(176, 186, 205, .55); }
+.ffnmap .b b { font-size: 26px; font-weight: 600; letter-spacing: .04em; }
+.ffnmap .b span { font-size: 19px; font-weight: 600; }
+.ffnmap .b.in { width: 150px; height: 128px; }
+.ffnmap .b.g, .ffnmap .b.u { width: 330px; }
+.ffnmap .b.mul, .ffnmap .b.add { width: 74px; height: 74px; border-radius: 50%; padding: 0; }
+.ffnmap .b.mul b, .ffnmap .b.add b { font-size: 34px; }
+.ffnmap .b.add { width: 96px; height: 96px; }
+.ffnmap .b.add span { font-size: 16px; }
+.ffnmap .b.d { width: 150px; height: 128px; }
+.ffnmap .ar { font-style: normal; font-size: 26px; color: rgba(150, 180, 230, .35); }
+.ffnmap .b.on { color: #fff; background: rgba(94, 240, 212, .1); border-color: rgba(94, 240, 212, .75); box-shadow: 0 0 22px rgba(94, 240, 212, .22); }
+.ffnmap .b.g.on { border-color: #5ef0d4; }
+.ffnmap .b.u.on { border-color: #b39dff; background: rgba(179, 157, 255, .1); box-shadow: 0 0 22px rgba(179, 157, 255, .22); }
+.ffnmap .b.d.on { border-color: #ffb65c; background: rgba(255, 182, 92, .1); box-shadow: 0 0 22px rgba(255, 182, 92, .22); }
+.ffnmap .b.on span { color: var(--ink2); }
+.ffnmap .cap { margin-top: 12px; min-height: 30px; display: flex; align-items: center; justify-content: center; gap: 18px; font-size: 24px; font-weight: 600; color: var(--ink2); letter-spacing: .03em; }
+.ffnmap .cap .m { color: #5ef0d4; }
+.ffnmap .cap .l, .ffnmap .cap .r { font-size: 22px; }
+.ffnmap .cap .l { color: rgba(176, 186, 205, .7); }
+.ffnmap .cap .r { color: #9ff3e2; }
+.ring.violet { border-color: rgba(179, 157, 255, .95); box-shadow: 0 0 18px rgba(179, 157, 255, .45), inset 0 0 12px rgba(179, 157, 255, .2); }
+.ring.violet .rl { color: #e6dcff; }
