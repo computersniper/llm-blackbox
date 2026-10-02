@@ -677,8 +677,8 @@ export function buildScore(Q, cap = null) {
     if (dv.length) {
       const r = segs.find((s) => s.note === 'reveal');
       sub(T0 + r.f0 + 0.1, T0 + dv[dv.length - 1].f1 - 0.15, '在网页上，每点一次 ＋，就往里钻一层');
-      term(T0 + r.f0 + 0.2, T0 + dv[0].f0, `${m('01')} 黑箱`);
-      dv.forEach((s, k) => term(T0 + s.f0 + 0.05, T0 + s.f1 - (k === dv.length - 1 ? 0.15 : 0), `${m(String(k + 2).padStart(2, '0'))} ${depthNames[k] ?? ''}`)); // 和网页顶栏的深度编号一致
+      // 一路钻下去的层次：一个标签从头到尾挂着（和网页顶栏的面包屑一致）
+      term(T0 + r.f0 + 0.2, T0 + dv[dv.length - 1].f1 - 0.15, '黑箱 → 结构 → 层塔 → 一层之内 → 注意力 → 一次乘加');
       const dbg = segs.find((s) => s.note === 'debug');
       sub(T0 + dbg.f0 + 0.1, T0 + FIN - 0.15, '暂停、单步、倍速，像调试程序一样看它思考');
       term(T0 + dbg.f0 + 0.2, T0 + FIN - 0.15, '播放 · 倍速 · 暂停 · 单步');
