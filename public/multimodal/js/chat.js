@@ -3,6 +3,7 @@
 // 回答完以后，把鼠标放在回复里的某个字上，就能在你发的那张图上看到：生成这个字时模型在看哪里（真实注意力）。
 import { $, $$, esc, tokHTML, tokInner, sleep } from '../../js/ui.js';
 import { drawHeat } from './paint.js';
+import { isEn, L } from '../../js/i18n.js';
 
 export class Chat {
   constructor(manifest, { onSend, onPeek, onPlus, heatFor, onPickImage }) {
@@ -45,7 +46,11 @@ export class Chat {
     const m = this.M.model, v = m.vision, t = m.text;
     const el = document.createElement('div');
     el.className = 'msg intro-card';
-    el.innerHTML = `
+    el.innerHTML = isEn ? `
+      <h1>How it sees an image</h1>
+      This is <b>Qwen3-VL-2B</b>, an open vision-language model from Alibaba. Its “eyes” are a 24-layer vision encoder; its “mouth” is a 28-layer language model from the same family as Qwen3. Every answer and every number below comes from one real run of this model (recorded offline, so nothing lags and nothing costs money).<br>
+      First <b>pick an image</b>, then build a question from the <b>tokens</b> below. To see how it looks at the image and comes up with each word, press the <span class="key">＋</span> next to a message: each press goes one level deeper, stepping through it like a debugger.
+      <div class="spec"><span><b>${v.patch}×${v.patch}</b>-pixel patches</span><span>vision encoder <b>${v.depth}</b> layers · <b>${v.hidden}</b> dims</span><span><b>${v.merge}×${v.merge}</b> merged into one token</span><span>language model <b>${t.layers}</b> layers · <b>${t.hidden}</b> dims</span><span>vocabulary <b>${t.vocab.toLocaleString('en-US')}</b></span><span><b>${(m.params.total / 1e9).toFixed(2)}</b>B parameters</span></div>` : `
       <h1>它怎么看图</h1>
       这是阿里开源的视觉语言模型 <b>Qwen3-VL-2B</b>。它的“眼睛”是一个 24 层的视觉编码器，“嘴”是和 Qwen3 同一家族的 28 层语言模型。下面每个回答、每个数字，都来自这个真实模型的一次运行（离线录制，所以不会卡，也不花钱）。<br>
       先<b>选一张图</b>，再用下方的<b>词元</b>拼出问题。想看它是怎么看图、怎么想出每一个字的，就点消息旁的 <span class="key">＋</span>：每按一次，往里钻一层，像调试程序一样单步执行。
@@ -56,7 +61,7 @@ export class Chat {
   /* ---------------- 选图 ---------------- */
 
   renderPics() {
-    this.picsEl.innerHTML = `<span class="lab">先选一张图</span><div class="pic-row">${this.M.images.map((im, i) => `
+    this.picsEl.innerHTML = `<span class="lab">${L('先选一张图', 'Pick an image')}</span><div class="pic-row">${this.M.images.map((im, i) => `
       <button type="button" class="pic ${this.img === im ? 'on' : ''}" data-i="${i}" style="animation-delay:${i * 40}ms" title="${esc(im.title)}">
         <img src="data/${im.file}" alt="${esc(im.title)}" loading="lazy" width="${im.size[0]}" height="${im.size[1]}">
         <span>${esc(im.title)}</span>
@@ -74,7 +79,7 @@ export class Chat {
     }
     this.attachBtn.innerHTML = `<img src="data/${im.file}" alt="">`;
     this.attachBtn.classList.add('has');
-    this.attachBtn.title = `已选：${im.title}（点击换一张图）`;
+    this.attachBtn.title = L(`已选：${im.title}（点击换一张图）`, `Selected: ${im.title} (click to pick another image)`);
     this.renderPics();
     this.picsEl.classList.remove('open');
     this.renderInput();
@@ -99,7 +104,7 @@ export class Chat {
   renderInput() {
     this.inputEl.innerHTML = this.chosen.length
       ? this.chosen.map((c) => tokHTML(c.s, 'r-user')).join('') + '<span class="cur"></span>'
-      : `<span class="ph">${this.img ? '点下面的词元，拼出你的问题' : '先在下面选一张图'}</span>`;
+      : `<span class="ph">${this.img ? L('点下面的词元，拼出你的问题', 'Tap the tokens below to build your question') : L('先在下面选一张图', 'First pick an image below')}</span>`;
     const ready = !!this.node?.end && !this.busy;
     this.sendBtn.disabled = !ready;
     this.sendBtn.classList.toggle('glow', ready);
@@ -108,15 +113,15 @@ export class Chat {
   renderCands() {
     const total = this.M.images.reduce((a, im) => a + im.questions.length, 0);
     let html = '';
-    if (!this.img) html += `<span class="lab">还没有选图</span>`;
+    if (!this.img) html += `<span class="lab">${L('还没有选图', 'No image yet')}</span>`;
     else {
       const kids = [...this.node.kids.values()];
-      html += `<span class="lab">${this.chosen.length ? '接下来' : '候选词元'}</span>`;
+      html += `<span class="lab">${this.chosen.length ? L('接下来', 'Next') : L('候选词元', 'Candidate tokens')}</span>`;
       html += kids.map((k, i) => `<button type="button" class="cand" data-id="${k.chip.id}" style="animation-delay:${i * 30}ms">${tokInner(k.chip.s)}<i>${k.chip.id}</i></button>`).join('');
-      if (this.node.end && !kids.length) html += `<span class="cand done" aria-hidden="true">✓ 拼好了，按 ↑ 发送</span>`;
-      else if (this.node.end) html += `<span class="lab" style="color:var(--acc)">✓ 已是完整问题</span>`;
+      if (this.node.end && !kids.length) html += `<span class="cand done" aria-hidden="true">${L('✓ 拼好了，按 ↑ 发送', '✓ Done — press ↑ to send')}</span>`;
+      else if (this.node.end) html += `<span class="lab" style="color:var(--acc)">${L('✓ 已是完整问题', '✓ Already a complete question')}</span>`;
     }
-    html += `<button type="button" class="cand-more">${this.showList ? '收起问题库' : `问题库（${total}）`}</button>`;
+    html += `<button type="button" class="cand-more">${this.showList ? L('收起问题库', 'Hide question list') : L(`问题库（${total}）`, `Question list (${total})`)}</button>`;
     if (this.showList) {
       html += `<div class="qlist">${this.M.images.map((im, ii) => im.questions.map((q, qi) => `<button type="button" data-im="${ii}" data-q="${qi}"><img src="data/${im.file}" alt="">${esc(q.text)}</button>`).join('')).join('')}</div>`;
     }
@@ -199,9 +204,9 @@ export class Chat {
       <div class="bot-body">
         <div class="bot-text"><span class="typing"><i></i><i></i><i></i></span></div>
         <div class="bot-meta" hidden>
-          <button type="button" class="peek" title="单步进入：看它怎么看图、怎么想出这句话"><b>＋</b>揭开这条回复</button>
-          <span class="stat">${q.replyTokens.length} 个词元</span>
-          <span class="hover-tip">把鼠标放在字上：看它生成这个字时在看图的哪里</span>
+          <button type="button" class="peek" title="${L('单步进入：看它怎么看图、怎么想出这句话', 'Step into it: see how it looks at the image and comes up with this reply')}"><b>＋</b>${L('揭开这条回复', 'Open up this reply')}</button>
+          <span class="stat">${L(`${q.replyTokens.length} 个词元`, `${q.replyTokens.length} token${q.replyTokens.length === 1 ? "" : "s"}`)}</span>
+          <span class="hover-tip">${L('把鼠标放在字上：看它生成这个字时在看图的哪里', 'Hover over a word: see where it was looking in the image when it wrote it')}</span>
         </div>
       </div>`;
     this.log.append(el);
@@ -257,7 +262,7 @@ export class Chat {
     if (!h || msg.want !== i) return;
     const g = cv.getContext('2d');
     drawHeat(g, h.img, cv.width, cv.height, h.values, h.rows, h.cols, { dim: 0.5 });
-    cap.innerHTML = `生成「${esc(msg.q.replyTokens[i].s)}」时在看哪 <small>${esc(h.label)}</small>`;
+    cap.innerHTML = isEn ? `Where it looked while writing “${esc(msg.q.replyTokens[i].s)}” <small>${esc(h.label)}</small>` : `生成「${esc(msg.q.replyTokens[i].s)}」时在看哪 <small>${esc(h.label)}</small>`;
     box.classList.add('on');
   }
 

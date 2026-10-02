@@ -1,6 +1,7 @@
 // 调试器里的“代码 / 这一步 / 变量”三块内容，全部用真实导出的数值填充。
 import { esc, tokHTML, fmtPct } from '../../js/ui.js';
 import { DEPTH_NAMES } from './timeline.js';
+import { isEn, L } from '../../js/i18n.js';
 
 const K = (s) => `<span class="kw">${s}</span>`;
 const F = (s) => `<span class="fn">${s}</span>`;
@@ -12,28 +13,29 @@ export function renderCode(el, M, V) {
   const g = V ? `${V.gh}×${V.gw}` : 'h×w';
   const CODE = [
     `${K('def')} ${F('chat')}(image, question):`,
-    `    px = ${F('resize')}(image, ${N(32)} ${K('的倍数')})       ${C(V ? `${V.gw * 16}×${V.gh * 16}` : '缩放')}`,
-    `    x = ${F('patchify')}(px, ${N(16)})            ${C(V ? `${g} = ${V.Np} 块` : '切块')}`,
-    `    x = (x - ${N('0.5')}) / ${N('0.5')}               ${C('像素 → [-1, 1]，复制成 2 帧')}`,
+    isEn ? `    px = ${F('resize')}(image, ${K('multiple_of')}=${N(32)})  ${C(V ? `${V.gw * 16}×${V.gh * 16}` : 'resize')}`
+      : `    px = ${F('resize')}(image, ${N(32)} ${K('的倍数')})       ${C(V ? `${V.gw * 16}×${V.gh * 16}` : '缩放')}`,
+    `    x = ${F('patchify')}(px, ${N(16)})            ${C(V ? L(`${g} = ${V.Np} 块`, `${g} = ${V.Np} patches`) : L('切块', 'patchify'))}`,
+    `    x = (x - ${N('0.5')}) / ${N('0.5')}               ${C(L('像素 → [-1, 1]，复制成 2 帧', 'pixels → [-1, 1], copied into 2 frames'))}`,
     `    v = x @ W_patch + b               ${C(`${v.inDim} → ${v.hidden}`)}`,
-    `    v = v + ${F('interp')}(pos_embed, ${g})   ${C(`${v.posGrid}×${v.posGrid} 位置表`)}`,
-    `    ${K('for')} i, blk ${K('in')} ${F('enumerate')}(vit):       ${C(`${v.depth} 层`)}`,
+    `    v = v + ${F('interp')}(pos_embed, ${g})   ${C(L(`${v.posGrid}×${v.posGrid} 位置表`, `${v.posGrid}×${v.posGrid} position table`))}`,
+    `    ${K('for')} i, blk ${K('in')} ${F('enumerate')}(vit):       ${C(L(`${v.depth} 层`, `${v.depth} layers`))}`,
     `        h = ${F('layer_norm')}(v)`,
-    `        v = v + ${F('attn')}(h, ${F('rope_2d')})     ${C(`${v.heads} 头，图块两两互看`)}`,
+    `        v = v + ${F('attn')}(h, ${F('rope_2d')})     ${C(L(`${v.heads} 头，图块两两互看`, `${v.heads} heads, every patch sees every patch`))}`,
     `        v = v + ${F('mlp')}(${F('layer_norm')}(v))     ${C(`${v.hidden}→${v.ffn}→${v.hidden}`)}`,
     `        ${K('if')} i ${K('in')} (${v.deepstack.join(', ')}): deep += [${F('merger_i')}(v)]`,
     `    img = ${F('merger')}(v)                  ${C(`2×2 → ${v.hidden * 4} → ${v.out}`)}`,
     `    ids = ${F('template')}(system, img, question)`,
-    `    pos = ${F('mrope_ids')}(ids)               ${C('每个词元 (t, h, w)')}`,
+    `    pos = ${F('mrope_ids')}(ids)               ${C(L('每个词元 (t, h, w)', '(t, h, w) per token'))}`,
     `    ${K('while')} True:`,
-    `        x = ${F('embed')}(ids); x[图片] = img`,
-    `        ${K('for')} L, layer ${K('in')} ${F('enumerate')}(llm):   ${C(`${t.layers} 层`)}`,
+    L(`        x = ${F('embed')}(ids); x[图片] = img`, `        x = ${F('embed')}(ids); x[image] = img`),
+    `        ${K('for')} L, layer ${K('in')} ${F('enumerate')}(llm):   ${C(L(`${t.layers} 层`, `${t.layers} layers`))}`,
     `            h = ${F('rms_norm')}(x)`,
-    `            x = x + ${F('attn')}(h, ${F('mrope')}(pos))  ${C(`${t.heads} Q / ${t.kvHeads} KV 头`)}`,
+    `            x = x + ${F('attn')}(h, ${F('mrope')}(pos))  ${C(L(`${t.heads} Q / ${t.kvHeads} KV 头`, `${t.heads} Q / ${t.kvHeads} KV heads`))}`,
     `            x = x + ${F('swiglu')}(${F('rms_norm')}(x))  ${C(`${t.hidden}→${t.ffn}`)}`,
-    `            ${K('if')} L < ${N(3)}: x[图片] += deep[L]   ${C('DeepStack')}`,
+    L(`            ${K('if')} L < ${N(3)}: x[图片] += deep[L]   ${C('DeepStack')}`, `            ${K('if')} L < ${N(3)}: x[image] += deep[L]  ${C('DeepStack')}`),
     `        logits = ${F('rms_norm')}(x[-${N(1)}]) @ embed.T`,
-    `        nxt = ${F('argmax')}(logits)            ${C('贪心解码')}`,
+    `        nxt = ${F('argmax')}(logits)            ${C(L('贪心解码', 'greedy decoding'))}`,
     `        ${K('if')} nxt == <span class="nu">"&lt;|im_end|&gt;"</span>: ${K('break')}`,
     `        ids.${F('append')}(nxt)`,
   ];
@@ -65,12 +67,18 @@ export function linesFor(s, Q) {
   return [];
 }
 
-const STAGE = { see: '看图', pass: '想一个词', prep: '预处理', vit: '视觉编码器', merge: '合并器', splice: '拼进对话', read: '读入', llm: '语言模型', head: '输出' };
-const SUBL = { resize: '缩放', patch: '切成图块', norm: '归一化', embed: '图块嵌入', pos: '位置嵌入', group: '2×2 拼接', mlp: 'MLP 投影', deep: 'DeepStack', template: '聊天模板', mrope: 'M-RoPE 位置', logits: '打分', pick: '选词' };
-const OPL = { ln1: '归一化', attn: '注意力', add1: '残差 +', ln2: '归一化', mlp: '前馈', add2: '残差 +', deep: '+ DeepStack' };
-const MIL = { conv: '一组卷积核', pick: '选一个图块', mul: '逐项相乘', sum: '求和', heads: '16 个头' };
+const STAGE = L({ see: '看图', pass: '想一个词', prep: '预处理', vit: '视觉编码器', merge: '合并器', splice: '拼进对话', read: '读入', llm: '语言模型', head: '输出' },
+  { see: 'Look at the image', pass: 'Think of a token', prep: 'Preprocessing', vit: 'Vision encoder', merge: 'Merger', splice: 'Into the chat', read: 'Read in', llm: 'Language model', head: 'Output' });
+const SUBL = L({ resize: '缩放', patch: '切成图块', norm: '归一化', embed: '图块嵌入', pos: '位置嵌入', group: '2×2 拼接', mlp: 'MLP 投影', deep: 'DeepStack', template: '聊天模板', mrope: 'M-RoPE 位置', logits: '打分', pick: '选词' },
+  { resize: 'Resize', patch: 'Cut into patches', norm: 'Normalize', embed: 'Patch embedding', pos: 'Position embedding', group: '2×2 concat', mlp: 'MLP projection', deep: 'DeepStack', template: 'Chat template', mrope: 'M-RoPE positions', logits: 'Scores', pick: 'Pick a token' });
+const OPL = L({ ln1: '归一化', attn: '注意力', add1: '残差 +', ln2: '归一化', mlp: '前馈', add2: '残差 +', deep: '+ DeepStack' },
+  { ln1: 'Norm', attn: 'Attention', add1: 'Residual +', ln2: 'Norm', mlp: 'Feed-forward', add2: 'Residual +', deep: '+ DeepStack' });
+const MIL = L({ conv: '一组卷积核', pick: '选一个图块', mul: '逐项相乘', sum: '求和', heads: '16 个头' },
+  { conv: 'A bank of kernels', pick: 'Pick one patch', mul: 'Multiply term by term', sum: 'Sum', heads: '16 heads' });
 
 export function stepLabel(s) {
+  if (isEn && s.ph === 'vit' && s.L !== undefined) return `ViT layer ${s.L}${s.op ? ' · ' + OPL[s.op] : ''}`;
+  if (isEn && s.ph === 'layer') return `LLM layer ${s.L}${s.op ? ' · ' + OPL[s.op] : ''}${s.mi ? ' · ' + MIL[s.mi] : ''}`;
   if (s.ph === 'vit' && s.L !== undefined) return `ViT 第 ${s.L} 层${s.op ? ' · ' + OPL[s.op] : ''}`;
   if (s.ph === 'layer') return `LLM 第 ${s.L} 层${s.op ? ' · ' + OPL[s.op] : ''}${s.mi ? ' · ' + MIL[s.mi] : ''}`;
   if (s.mi) return `${SUBL[s.sub]} · ${MIL[s.mi]}`;
@@ -79,11 +87,11 @@ export function stepLabel(s) {
 }
 
 export function crumbs(depth, s) {
-  const out = [{ d: 0, label: DEPTH_NAMES[0] }, { d: 1, label: `第 ${s.g + 1} 个词元` }];
+  const out = [{ d: 0, label: DEPTH_NAMES[0] }, { d: 1, label: L(`第 ${s.g + 1} 个词元`, `Token ${s.g + 1}`) }];
   if (depth >= 2) out.push({ d: 2, label: STAGE[s.ph === 'layer' ? 'llm' : s.ph] });
   if (depth >= 3) {
-    if (s.ph === 'vit' && s.L !== undefined) out.push({ d: 3, label: `第 ${s.L} 层` });
-    else if (s.ph === 'layer') out.push({ d: 3, label: `第 ${s.L} 层` });
+    if (s.ph === 'vit' && s.L !== undefined) out.push({ d: 3, label: L(`第 ${s.L} 层`, `Layer ${s.L}`) });
+    else if (s.ph === 'layer') out.push({ d: 3, label: L(`第 ${s.L} 层`, `Layer ${s.L}`) });
     else if (s.sub) out.push({ d: 3, label: SUBL[s.sub] });
   }
   if (depth >= 4 && s.op) out.push({ d: 4, label: OPL[s.op] });
@@ -113,6 +121,7 @@ export function lensWords(V, L, top = 4) {
 }
 
 export function explain(s, Q, ctx = {}) {
+  if (isEn) return explainEn(s, Q, ctx);
   const V = Q.V, M = Q.manifest.model, v = M.vision, t = M.text;
   const g = s.g, st = Q.steps[g], i = Q.row(g);
   const nxt = tokHTML(st.chosenS, 'r-assistant');
@@ -168,6 +177,122 @@ export function explain(s, Q, ctx = {}) {
 }
 
 const fmtPos = (p) => `(${p[0]}, ${p[1]}, ${p[2]})`;
+
+// 英文讲解：和中文版一一对应，数字全部取自英文数据（data/en/）这次真实运行
+function explainEn(s, Q, ctx) {
+  const V = Q.V, M = Q.manifest.model, v = M.vision, t = M.text;
+  const g = s.g, st = Q.steps[g], i = Q.row(g);
+  const nxt = tokHTML(st.chosenS, 'r-assistant');
+  const im = V.spec;
+  const tokPerImg = `${V.mh}×${V.mw} = <b>${V.Nv}</b>`;
+  switch (s.ph) {
+    case 'see':
+      return `The image goes into the black box: it is cut into ${V.Np} small patches and passed through the vision encoder, becoming <b>${V.Nv}</b> “vision tokens” that line up with your question in one sequence.<br>This happens only once; for every later token the image is already in the cache.`;
+    case 'pass':
+      return g === 0
+        ? `Token <b>1</b>: the language model reads <b>${Q.P}</b> tokens (${V.Nv} of them are the image), runs all ${t.layers} layers over them, and outputs ${nxt}.`
+        : `Token <b>${g + 1}</b>: the K and V of the previous ${Q.P + g} tokens are already in the cache, so the ${t.layers} layers only have to run for the new position. Out comes ${nxt}.`;
+    case 'prep': {
+      if (!s.sub) return `<b>Preprocessing</b>: the ${im.orig[0]}×${im.orig[1]} original is resized to <b>${V.gw * 16}×${V.gh * 16}</b> (sides are multiples of 32), cut into ${V.gh}×${V.gw} patches of 16×16, and pixel values are mapped to [-1, 1].`;
+      if (s.sub === 'resize') return `The processor rounds each side to the nearest <b>multiple of 32</b> (16-pixel patches × 2×2 merging) while keeping the total pixel count under ${Q.manifest.pixels.max.toLocaleString('en-US')}.<br>${im.orig[0]}×${im.orig[1]} → <b>${V.gw * 16}×${V.gh * 16}</b>. A bigger image means more tokens and slower answers.`;
+      if (s.sub === 'patch') return `Cut into <b>${V.gh} rows × ${V.gw} columns = ${V.Np}</b> patches of 16×16. Each patch has 3 color channels × 256 pixels = 768 numbers.<br>They will be grouped 2×2 and finally merged into ${tokPerImg} tokens.`;
+      return `Each pixel value p becomes (p/255 − 0.5) / 0.5, landing in [-1, 1]. Each patch is then <b>copied into 2 frames</b>: Qwen3-VL’s vision encoder also handles video, with a temporal patch size of 2, so a single image is treated as a video of two identical frames. That gives each patch 3 × 2 × 16 × 16 = <b>${v.inDim}</b> inputs.`;
+    }
+    case 'vit': return vitExplainEn(s, Q, ctx);
+    case 'merge': {
+      const ds = v.deepstack;
+      if (!s.sub) return `<b>Merger</b>: the features of each 2×2 block of neighboring patches are concatenated (4 × ${v.hidden} = ${v.hidden * 4} dims), passed through a two-layer MLP and projected to the language model’s <b>${v.out}</b> dims. ${V.Np} patches → ${tokPerImg} vision tokens.`;
+      if (s.sub === 'group') return `Every 2×2 group of neighboring patches is concatenated into one <b>${v.hidden * 4}</b>-dim vector. The token count drops to a quarter: ${V.Np} → <b>${V.Nv}</b>. The language model’s cost grows with the square of the token count, so this step saves a lot.`;
+      if (s.sub === 'mlp') return `LayerNorm → ${v.hidden * 4}×${v.hidden * 4} linear → GELU → ${v.hidden * 4}×${v.out} linear. The resulting ${V.Nv} vectors of ${v.out} dims are “the image” as the language model sees it. The monitor colors them by their principal components.`;
+      let mean = 0;
+      for (let m = 0; m < V.Nv; m++) mean += V.dsNorm(0, m) / V.Nv;
+      return `<b>DeepStack</b>: intermediate features from vision-encoder layers ${ds.join(', ')} each go through their own merger and are <b>added to the image positions in the outputs of the language model’s first 3 layers</b>. Shallow layers see texture, deep layers see meaning; both are handed to the language model. The vectors in the layer-${ds[0]} path have an average length of ${mean.toFixed(1)}.`;
+    }
+    case 'splice': {
+      const p0 = Q.pos(V.vs), pl = Q.pos(V.vs + V.Nv - 1), pa = Q.pos(V.vs + V.Nv + 1);
+      if (!s.sub) return `Following the chat template, the vision tokens are inserted between <b>&lt;|vision_start|&gt;</b> and <b>&lt;|vision_end|&gt;</b>, followed by your question. Every token also gets a 3-D position (t, h, w).`;
+      if (s.sub === 'template') return `The chat template: system prompt, <b>&lt;|vision_start|&gt;</b>, ${V.Nv} &lt;|image_pad|&gt; placeholders, <b>&lt;|vision_end|&gt;</b>, your question — <b>${Q.P}</b> tokens in all. The placeholders’ embeddings are simply replaced by the merger’s output. The image comes <b>before</b> the question: under causal attention the image tokens cannot see the question, so whatever you ask about the same image, they are exactly the same inside the language model.`;
+      return `<b>M-RoPE</b>: a text token’s position is (n, n, n); an image token’s is (${p0[0]}, ${p0[1]}+row, ${p0[2]}+column), from ${fmtPos(p0)} to ${fmtPos(pl)}. The ${V.Nv} vision tokens take up only <b>${pa[0] - p0[0] - 1}</b> position numbers, and the question continues counting from ${fmtPos(pa)}. The 64 rotary frequency pairs are interleaved across t, h and w (${t.mrope.join(' / ')}).`;
+    }
+    case 'read': {
+      const pp = Q.pos(i);
+      return `The ${T(Q, i)} chosen in the previous step is appended to the sequence at position ${fmtPos(pp)}. <b>Autoregression</b>: the output immediately becomes the next input. The image’s ${V.Nv} tokens have long been in the KV cache; the original image is never looked at again.`;
+    }
+    case 'llm': {
+      const [a, b] = Q.manifest.groundLayers;
+      return `The language model’s <b>${t.layers}</b> layers are exactly the same as in a text-only model (Qwen3 architecture: RMSNorm, attention with ${t.heads} Q / ${t.kvHeads} KV heads, SwiGLU). The image is just a run of special tokens. While generating ${nxt}, layers ${a}–${b} give ${fmtPct(avgMass(Q, g, a, b))} of their attention to the image.`;
+    }
+    case 'layer': return layerExplainEn(s, Q, ctx);
+    case 'head': {
+      const top = st.top.slice(0, 3).map(([, p, tt]) => `${tokHTML(tt, 'r-assistant')} ${P(p)}`).join(', ');
+      if (!s.sub) return `The vector at the last position goes through RMSNorm and is multiplied by the output matrix shared with the embedding table (${t.hidden} × ${t.vocab.toLocaleString('en-US')}); softmax turns the scores into probabilities: ${top}… and the top one is taken.`;
+      if (s.sub === 'logits') return `Every token in the vocabulary gets a score (${t.vocab.toLocaleString('en-US')} of them); softmax turns them into probabilities. The leaders: ${top}.`;
+      const end = st.chosenS === '<|im_end|>' ? ' It picked the end-of-turn token, so the reply stops here.' : '';
+      return `<b>Greedy decoding</b>: simply take the most likely token, ${nxt} (${P(st.p)}). No random numbers — the same image and question always give the same answer.${end}`;
+    }
+  }
+  return '';
+}
+
+function vitExplainEn(s, Q, ctx) {
+  const V = Q.V, v = Q.manifest.model.vision, mic = V.micro;
+  if (s.sub === 'embed') {
+    if (!s.mi) return `<b>Patch embedding</b>: each patch’s ${v.inDim} numbers are multiplied by a ${v.inDim} × ${v.hidden} matrix (implemented as a 3-D convolution whose stride equals its kernel size), giving a ${v.hidden}-dim vector. All ${V.Np} patches do this independently.`;
+    if (s.mi === 'conv') return `${v.hidden} output channels = ${v.hidden} kernels, each also 3 × 2 × 16 × 16. The monitor shows the 16 kernels that respond most strongly to this patch (both frames summed, red/green/blue colored by the real weights): some look for edges, some for a particular color.`;
+    const where = `the patch at row ${mic.row}, column ${mic.col}`;
+    if (s.mi === 'pick') return `Zoom in on ${where} (it belongs to ${cell(V, mic.token)}, the vision token that received the most attention over all the questions about this image) and see how <b>dimension ${mic.ch}</b> of its embedding is computed: ${v.inDim} pixel values, each multiplied by the matching weight in kernel ${mic.ch}, then added up.`;
+    if (s.mi === 'mul') return `Multiply term by term. The 12 largest contributions are listed below (the two frames have identical pixels but different weights, so the same pixel can appear twice). Orange is positive, blue negative; every term is tiny — the absolute values of all ${v.inDim} terms add up to ${mic.absSum.toFixed(2)}.`;
+    return `Add up all ${v.inDim} terms, plus the bias b = ${mic.bias.toFixed(4)}: <b>${mic.conv.toFixed(4)}</b> (recomputed in float32 it is ${mic.mine.toFixed(4)}; the difference is rounding in the bf16 convolution). Then the position embedding adds ${f(mic.pos, 4)}, so this number enters layer 0 as <b>${mic.after.toFixed(4)}</b>.`;
+  }
+  if (s.sub === 'pos') return `<b>Position embedding</b>: the model stores a ${v.posGrid}×${v.posGrid} position table, bilinearly interpolated to this image’s ${V.gh}×${V.gw} and added to each patch. On top of that, every attention layer uses <b>2-D RoPE</b>: part of q and k is rotated by the patch’s row and part by its column.`;
+  if (s.L === undefined) return `<b>Vision encoder (ViT)</b>: ${v.depth} Transformer layers, ${v.hidden} dims, ${v.heads} heads. Unlike the language model there is <b>no causal mask</b>: all ${V.Np} patches see each other. The monitor colors each layer’s features by their top three principal components: higher up, patches of the same object get more and more similar colors.`;
+  const L0 = s.L, dist = V.vitDist[L0], dmean = dist.reduce((a, b) => a + b, 0) / dist.length;
+  const [xn, an, mn] = V.vitStats[L0];
+  const has = V.vitAttnLayers.includes(L0);
+  const q = ctx.vq ?? mic.token;
+  const ds = v.deepstack.includes(L0) ? ' DeepStack also takes a copy of this layer’s output and sends it straight to the language model.' : '';
+  if (!s.op) return `ViT layer <b>${L0}</b>: on average the 16 heads look <b>${dmean.toFixed(1)}</b> patches away (mean attention distance). ${has ? `The monitor shows attention from token ${cell(V, q)} (click the monitor to pick another).` : 'The monitor shows the principal-component colors of this layer’s output features.'}${ds}`;
+  if (s.op === 'ln1' || s.op === 'ln2') return `<b>LayerNorm</b>: subtract the mean, divide by the standard deviation, then scale and shift (the vision encoder uses LayerNorm; the language model uses RMSNorm). Incoming vectors have an average length of ${xn.toFixed(1)}.`;
+  if (s.op === 'attn') {
+    if (!has) return `<b>Self-attention</b>: ${v.heads} heads of ${v.hidden / v.heads} dims each. q and k carry 2-D rotary position encoding, so up/down/left/right can be told apart. The heads’ mean attention distances range from ${Math.min(...dist).toFixed(1)} to ${Math.max(...dist).toFixed(1)} patches (monitor).`;
+    const a = V.vattn(L0, q), self = V.vattnSelf(L0, q);
+    const top = argmax(a);
+    return `Attention from token ${cell(V, q)} (mean of 16 heads, shown at 2×2-merged resolution): ${P(self)} on itself; the most goes to ${cell(V, top)} (${P(a[top])}). Click any cell on the monitor to change the query position.`;
+  }
+  if (s.op === 'add1') return `The attention output is added back to the residual stream (average length ${an.toFixed(1)}).`;
+  if (s.op === 'mlp') return `<b>Feed-forward network</b>: ${v.hidden} → ${v.ffn} → ${v.hidden}, with a GELU activation (tanh approximation). Each patch is processed on its own, without talking to the others.`;
+  return `The feed-forward output is added back to the residual stream (average length ${mn.toFixed(1)}); layer ${L0} is done.${ds}`;
+}
+
+function layerExplainEn(s, Q, ctx) {
+  const V = Q.V, M = Q.manifest.model, t = M.text;
+  const { L: L0, g } = s, i = Q.row(g);
+  const lens = Q.lensAt(g, L0);
+  const guess = `${tokHTML(lens[0][0], 'r-assistant')} ${P(lens[0][1])}`;
+  const mass = Q.mass(g, L0);
+  const a = Q.attImg(g, L0), top = argmax(a);
+  const words = lensWords(V, L0).map(([w]) => `“${esc(w)}”`).join(' ');
+  const [ga, gb] = Q.manifest.groundLayers;
+  const grounded = L0 >= ga && L0 <= gb;
+  if (!s.op) return `Layer <b>${L0}</b>: ${T(Q, i)} gives <b>${fmtPct(mass)}</b> of its attention to the image, most of it on ${cell(V, top)}. ${grounded ? 'This is one of the “grounded” layers: attention concentrates on the object related to the current token.' : L0 < ga ? 'At such a shallow layer the model mostly just “glances” at the image and doesn’t really lock onto objects.' : ''} Logit lens: if it stopped at this layer, it would say ${guess}.${words ? `<br>At this layer the image tokens read like: ${words}` : ''}`;
+  if (s.op === 'ln1') return `<b>RMSNorm</b>: divide the vector by its root mean square, then multiply by a set of learned weights.`;
+  if (s.op === 'ln2') return `Another <b>RMSNorm</b>, getting ready for the feed-forward network.`;
+  if (s.op === 'attn') {
+    if (s.mi === 'heads') {
+      const hs = [...Array(t.heads).keys()].map((h) => ({ h, m: Q.headMass(g, L0, h) })).sort((x, y) => y.m - x.m);
+      return `The <b>${t.heads}</b> heads of layer ${L0} each look at their own thing: some look almost only at text, others give most of their attention to the image. The heads that look at the image the most are head ${hs[0].h} (${P(hs[0].m)}) and head ${hs[1].h} (${P(hs[1].m)}). The monitor shows each head’s attention on the image, normalized separately.`;
+    }
+    const txt = Q.txt(g, L0).slice(0, 2).map((x) => `${T(Q, x.j)} ${P(x.w)}`).join(', ');
+    return `<b>Attention</b>: the q of ${T(Q, i)} is dotted with the k of every earlier token (positions rotated by M-RoPE; image tokens by their (t, h, w)). The image gets <b>${fmtPct(mass)}</b>; among the text, the most attention goes to ${txt}. The ${M.text.heads} query heads share ${t.kvHeads} key/value groups.`;
+  }
+  const [da, dm] = Q.delta(g, L0);
+  if (s.op === 'add1') return `The attention output (length ${da.toFixed(1)}) is added back to the residual stream. This is how information read from the image gets “moved” into the current position.`;
+  if (s.op === 'mlp') return `<b>SwiGLU feed-forward</b>: ${t.hidden} → ${t.ffn} → ${t.hidden}, working on the current position alone. It adds a vector of length ${dm.toFixed(1)} to the residual stream.`;
+  if (s.op === 'add2') return `The feed-forward output is added back to the residual stream; layer ${L0} is done. The logit lens now reads ${guess}.`;
+  let mean = 0, base = 0;
+  for (let m = 0; m < V.Nv; m++) { mean += V.dsNorm(L0, m) / V.Nv; base += V.vnorm(L0 + 1, m) / V.Nv; }
+  return `<b>DeepStack</b>: features from vision-encoder layer ${M.vision.deepstack[L0]} (through their own merger, average length ${mean.toFixed(1)}) are <b>added at the image positions</b>; afterwards the residual stream at the image positions has an average length of ${base.toFixed(1)}. Only image positions change; text positions are untouched. This happens only once, during prefill.`;
+}
 
 export function avgMass(Q, g, a, b) {
   let m = 0;
@@ -243,28 +368,28 @@ export function shapeOf(s, Q) {
     case 'prep':
       if (s.sub === 'resize') return `image ${Q.V.spec.orig.join('×')} → ${b(`${V.gw * 16}×${V.gh * 16}`)}`;
       if (s.sub === 'patch') return `${V.gh * 16}×${V.gw * 16}×3 → ${b(`${V.Np} × 16×16×3`)}`;
-      if (s.sub === 'norm') return `x ${b(`[${V.Np} × ${v.inDim}]`)} = 3 通道 × 2 帧 × 16 × 16`;
+      if (s.sub === 'norm') return `x ${b(`[${V.Np} × ${v.inDim}]`)} = ${L('3 通道 × 2 帧 × 16 × 16', '3 channels × 2 frames × 16 × 16')}`;
       return null;
     case 'vit':
       if (s.sub === 'embed') return `x [${V.Np}×${v.inDim}] @ W ${b(`[${v.inDim}×${v.hidden}]`)} + b → v [${V.Np}×${v.hidden}]`;
-      if (s.sub === 'pos') return `pos [${v.posGrid}×${v.posGrid}×${v.hidden}] → 插值 ${b(`[${V.gh}×${V.gw}×${v.hidden}]`)}`;
-      if (s.op === 'attn') return `qkv [${V.Np}×${v.hidden * 3}] → ${v.heads} 头 × ${v.hidden / v.heads} · 分数 ${b(`[${v.heads}×${V.Np}×${V.Np}]`)}`;
+      if (s.sub === 'pos') return `pos [${v.posGrid}×${v.posGrid}×${v.hidden}] → ${L('插值', 'interp')} ${b(`[${V.gh}×${V.gw}×${v.hidden}]`)}`;
+      if (s.op === 'attn') return L(`qkv [${V.Np}×${v.hidden * 3}] → ${v.heads} 头 × ${v.hidden / v.heads} · 分数 ${b(`[${v.heads}×${V.Np}×${V.Np}]`)}`, `qkv [${V.Np}×${v.hidden * 3}] → ${v.heads} heads × ${v.hidden / v.heads} · scores ${b(`[${v.heads}×${V.Np}×${V.Np}]`)}`);
       if (s.op === 'mlp') return `[${V.Np}×${v.hidden}] → ${b(`[${V.Np}×${v.ffn}]`)} → [${V.Np}×${v.hidden}]`;
       if (s.L !== undefined) return `v ${b(`[${V.Np}×${v.hidden}]`)}`;
       return null;
     case 'merge':
       if (s.sub === 'group') return `[${V.Np}×${v.hidden}] → ${b(`[${V.Nv}×${v.hidden * 4}]`)}`;
       if (s.sub === 'mlp') return `[${V.Nv}×${v.hidden * 4}] → [${V.Nv}×${v.hidden * 4}] → ${b(`[${V.Nv}×${v.out}]`)}`;
-      if (s.sub === 'deep') return `3 × ${b(`[${V.Nv}×${v.out}]`)} → LLM 第 0–2 层`;
+      if (s.sub === 'deep') return `3 × ${b(`[${V.Nv}×${v.out}]`)} → ${L('LLM 第 0–2 层', 'LLM layers 0–2')}`;
       return null;
     case 'splice':
-      if (s.sub === 'template') return `ids ${b(`[${Q.P}]`)} = 文字 ${Q.P - V.Nv} + 图片 ${V.Nv}`;
+      if (s.sub === 'template') return `ids ${b(`[${Q.P}]`)} = ${L(`文字 ${Q.P - V.Nv} + 图片 ${V.Nv}`, `text ${Q.P - V.Nv} + image ${V.Nv}`)}`;
       if (s.sub === 'mrope') return `pos ${b(`[3×${Q.P}]`)} (t, h, w)`;
       return null;
     case 'layer':
-      if (s.op === 'attn') return `q [${t.heads}×${t.headDim}] · K 缓存 ${b(`[${t.kvHeads}×${Q.row(s.g) + 1}×${t.headDim}]`)}`;
+      if (s.op === 'attn') return `q [${t.heads}×${t.headDim}] · ${L('K 缓存', 'K cache')} ${b(`[${t.kvHeads}×${Q.row(s.g) + 1}×${t.headDim}]`)}`;
       if (s.op === 'mlp') return `h [1×${t.hidden}] → ${b(`[1×${t.ffn}]`)} → [1×${t.hidden}]`;
-      if (s.op === 'deep') return `x[图片] ${b(`[${V.Nv}×${t.hidden}]`)} += deep[${s.L}]`;
+      if (s.op === 'deep') return `${L('x[图片]', 'x[image]')} ${b(`[${V.Nv}×${t.hidden}]`)} += deep[${s.L}]`;
       if (!s.op) return `x ${b(`[${Q.row(s.g) + 1}×${t.hidden}]`)}`;
       return null;
     case 'head':
@@ -302,11 +427,11 @@ export function watch(s, Q, ctx) {
       const [xn, an, mn] = V.vitStats[s.L];
       const dist = V.vitDist[s.L];
       add('layer', `${s.L} / ${v.depth - 1}`);
-      add('‖v‖ 平均', xn.toFixed(1));
+      add(L('‖v‖ 平均', '‖v‖ mean'), xn.toFixed(1));
       add('‖attn‖ / ‖mlp‖', `${an.toFixed(1)} / ${mn.toFixed(1)}`);
-      add('注意距离 头均', (dist.reduce((a, b) => a + b, 0) / dist.length).toFixed(2));
+      add(L('注意距离 头均', 'attn dist (head avg)'), (dist.reduce((a, b) => a + b, 0) / dist.length).toFixed(2));
       const pv = V.pcaVar[s.L + 1];
-      add('PCA 方差', pv.map((x) => (x * 100).toFixed(0) + '%').join(' '));
+      add(L('PCA 方差', 'PCA variance'), pv.map((x) => (x * 100).toFixed(0) + '%').join(' '));
     } else { add('blocks', v.depth); add('dim', v.hidden); add('heads', v.heads); add('patches', V.Np); }
   } else if (s.ph === 'merge') {
     add('in', `${V.Np} × ${v.hidden}`);
@@ -314,35 +439,35 @@ export function watch(s, Q, ctx) {
     add('out', `${V.Nv} × ${v.out}`);
     let mn = 0;
     for (let m = 0; m < V.Nv; m++) mn += V.vnorm(0, m) / V.Nv;
-    add('‖img‖ 平均', mn.toFixed(1));
+    add(L('‖img‖ 平均', '‖img‖ mean'), mn.toFixed(1));
     if (s.sub === 'deep') for (let d = 0; d < 3; d++) { let x = 0; for (let m = 0; m < V.Nv; m++) x += V.dsNorm(d, m) / V.Nv; add(`‖deep[${d}]‖`, x.toFixed(1)); }
   } else if (s.ph === 'splice') {
     add('len(ids)', Q.P);
     add('vision_start', `#${V.vs - 1}`);
     add('image_pad', `#${V.vs} … #${V.vs + V.Nv - 1}`);
-    add('pos 首个图片', fmtPos(Q.pos(V.vs)));
-    add('pos 末个图片', fmtPos(Q.pos(V.vs + V.Nv - 1)));
-    add('pos 问题开头', fmtPos(Q.pos(V.vs + V.Nv + 1)));
+    add(L('pos 首个图片', 'pos first image'), fmtPos(Q.pos(V.vs)));
+    add(L('pos 末个图片', 'pos last image'), fmtPos(Q.pos(V.vs + V.Nv - 1)));
+    add(L('pos 问题开头', 'pos question start'), fmtPos(Q.pos(V.vs + V.Nv + 1)));
   } else if (s.ph === 'layer' || s.ph === 'llm' || s.ph === 'pass' || s.ph === 'read') {
-    const L = s.L ?? null;
-    add('词元', `#${i}`);
+    const LY = s.L ?? null;
+    add(L('词元', 'token'), `#${i}`);
     add('pos (t,h,w)', fmtPos(Q.pos(i)));
-    if (L != null) {
-      const a = Q.attImg(g, L), m = argmax(a);
-      add('layer', `${L} / ${t.layers - 1}`);
-      add('看图比例', fmtPct(Q.mass(g, L)));
-      add('最受关注', `${cell(V, m)} ${fmtPct(a[m])}`);
-      const lens = Q.lensAt(g, L);
+    if (LY != null) {
+      const a = Q.attImg(g, LY), m = argmax(a);
+      add('layer', `${LY} / ${t.layers - 1}`);
+      add(L('看图比例', 'on image'), fmtPct(Q.mass(g, LY)));
+      add(L('最受关注', 'most attended'), `${cell(V, m)} ${fmtPct(a[m])}`);
+      const lens = Q.lensAt(g, LY);
       add('lens', `${lens[0][0].replace(/\n/g, '↵')} ${fmtPct(lens[0][1])}`);
-      const [da, dm] = Q.delta(g, L);
+      const [da, dm] = Q.delta(g, LY);
       add('‖Δattn‖ / ‖Δmlp‖', `${da.toFixed(1)} / ${dm.toFixed(1)}`);
       if (s.mi === 'heads') {
-        const hs = [...Array(t.heads).keys()].map((h) => ({ h, m: Q.headMass(g, L, h) })).sort((x, y) => y.m - x.m);
-        hs.slice(0, 4).forEach((x) => add(`头 ${x.h} 看图`, fmtPct(x.m)));
+        const hs = [...Array(t.heads).keys()].map((h) => ({ h, m: Q.headMass(g, LY, h) })).sort((x, y) => y.m - x.m);
+        hs.slice(0, 4).forEach((x) => add(L(`头 ${x.h} 看图`, `head ${x.h} on image`), fmtPct(x.m)));
       }
     } else {
       const [ga, gb] = Q.manifest.groundLayers;
-      add(`看图比例 L${ga}–${gb}`, fmtPct(avgMass(Q, g, ga, gb)));
+      add(L(`看图比例 L${ga}–${gb}`, `on image L${ga}–${gb}`), fmtPct(avgMass(Q, g, ga, gb)));
       add('nxt', st.chosenS.replace(/\n/g, '↵'));
     }
   } else if (s.ph === 'head') {

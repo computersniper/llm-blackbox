@@ -4,6 +4,7 @@
 import { $, esc, fmtPct } from '../../js/ui.js';
 import { drawHeat, drawGrid, gridCanvas, normMax, heatRGBA } from './paint.js';
 import { argmax, avgMass } from './explain.js';
+import { isEn, L as tr } from '../../js/i18n.js';
 
 const HEAT_VIEWS = new Set(['box', 'tower', 'layer', 'layerop', 'head', 'tray']);
 
@@ -104,14 +105,14 @@ export class Monitor {
     g.clearRect(0, 0, W, H);
     this.clickable = false;
     this.cellInfo = null;
-    let title = '监视器', cap = '', tools = '';
+    let title = tr('监视器', 'Monitor'), cap = '', tools = '';
     const p = st.p;
-    const heatTools = (layerOK) => `<div class="seg">${layerOK ? `<button type="button" data-k="heat" data-v="cur" class="${this.mode.heat === 'cur' ? 'on' : ''}">本层</button>` : ''}<button type="button" data-k="heat" data-v="ground" class="${this.mode.heat === 'ground' || (!layerOK && this.mode.heat === 'cur') ? 'on' : ''}">对准层平均</button><button type="button" data-k="heat" data-v="all" class="${this.mode.heat === 'all' ? 'on' : ''}">全部 28 层</button></div>${layerOK ? `<button type="button" data-k="lens" class="tog ${this.mode.lens ? 'on' : ''}">读数</button>` : ''}`;
+    const heatTools = (layerOK) => `<div class="seg">${layerOK ? `<button type="button" data-k="heat" data-v="cur" class="${this.mode.heat === 'cur' ? 'on' : ''}">${tr('本层', 'This layer')}</button>` : ''}<button type="button" data-k="heat" data-v="ground" class="${this.mode.heat === 'ground' || (!layerOK && this.mode.heat === 'cur') ? 'on' : ''}">${tr('对准层平均', 'Grounded avg')}</button><button type="button" data-k="heat" data-v="all" class="${this.mode.heat === 'all' ? 'on' : ''}">${tr('全部 28 层', 'All 28 layers')}</button></div>${layerOK ? `<button type="button" data-k="lens" class="tog ${this.mode.lens ? 'on' : ''}">${tr('读数', 'Readout')}</button>` : ''}`;
 
     if (view === 'image' || (view === 'box' && s.ph === 'see')) {
       g.drawImage(V.img, 0, 0, W, H);
       if (s.sub === 'resize') {
-        title = '缩放';
+        title = tr('缩放', 'Resize');
         const [ow, oh] = V.spec.orig;
         // 原图比例的虚线框（按同样的高度画）
         const sw = (ow / oh) * H;
@@ -120,27 +121,28 @@ export class Monitor {
         g.lineWidth = 1.5 * this.dpr;
         g.strokeRect((W - sw) / 2, 1, sw, H - 2);
         g.setLineDash([]);
-        cap = `原图 <b>${ow}×${oh}</b> → 模型看到 <b>${V.gw * 16}×${V.gh * 16}</b>（每边取整到 32 的倍数）`;
+        cap = tr(`原图 <b>${ow}×${oh}</b> → 模型看到 <b>${V.gw * 16}×${V.gh * 16}</b>（每边取整到 32 的倍数）`, `Original <b>${ow}×${oh}</b> → the model sees <b>${V.gw * 16}×${V.gh * 16}</b> (each side rounded to a multiple of 32)`);
       } else if (s.sub === 'norm') {
-        title = '归一化';
+        title = tr('归一化', 'Normalize');
         this.shade(0.35);
         const mic = V.micro, ps = W / V.gw;
         drawGrid(g, W, H, V.gh, V.gw, 'rgba(200,220,255,.12)');
         g.strokeStyle = '#ffb65c'; g.lineWidth = 2 * this.dpr;
         g.strokeRect(mic.col * ps, mic.row * ps, ps, ps);
-        cap = `像素 p → (p/255 − 0.5)/0.5 ∈ [−1, 1]。例：图块 (${mic.row}, ${mic.col}) 左上角 RGB = ${V.pix[0]}, ${V.pix[1]}, ${V.pix[2]} → ${V.px[0].toFixed(2)}, ${V.px[256].toFixed(2)}, ${V.px[512].toFixed(2)}`;
+        cap = tr(`像素 p → (p/255 − 0.5)/0.5 ∈ [−1, 1]。例：图块 (${mic.row}, ${mic.col}) 左上角 RGB = ${V.pix[0]}, ${V.pix[1]}, ${V.pix[2]} → ${V.px[0].toFixed(2)}, ${V.px[256].toFixed(2)}, ${V.px[512].toFixed(2)}`,
+          `Pixel p → (p/255 − 0.5)/0.5 ∈ [−1, 1]. Example: top-left RGB of patch (${mic.row}, ${mic.col}) = ${V.pix[0]}, ${V.pix[1]}, ${V.pix[2]} → ${V.px[0].toFixed(2)}, ${V.px[256].toFixed(2)}, ${V.px[512].toFixed(2)}`);
       } else {
         const k = s.sub === 'patch' ? Math.min(1, p * 1.6) : s.ph === 'see' ? p : view === 'image' ? Math.min(1, p * 1.4) : 1;
-        title = s.sub === 'patch' ? '切成图块' : s.ph === 'see' ? '看图' : '预处理';
+        title = s.sub === 'patch' ? tr('切成图块', 'Cut into patches') : s.ph === 'see' ? tr('看图', 'Look at the image') : tr('预处理', 'Preprocessing');
         const rows = Math.max(1, Math.round(V.gh * k));
         g.save();
         g.beginPath(); g.rect(0, 0, W, (rows / V.gh) * H); g.clip();
         drawGrid(g, W, H, V.gh, V.gw, 'rgba(210,225,255,.30)');
         drawGrid(g, W, H, V.mh, V.mw, 'rgba(255,182,92,.55)', 1.4 * this.dpr);
         g.restore();
-        cap = `${V.gh} × ${V.gw} = <b>${V.Np}</b> 个 16×16 图块（细线）；每 2×2 合并成一个词元，共 <b>${V.Nv}</b> 个（橙线）`;
+        cap = tr(`${V.gh} × ${V.gw} = <b>${V.Np}</b> 个 16×16 图块（细线）；每 2×2 合并成一个词元，共 <b>${V.Nv}</b> 个（橙线）`, `${V.gh} × ${V.gw} = <b>${V.Np}</b> patches of 16×16 (thin lines); every 2×2 merges into one token, <b>${V.Nv}</b> in all (orange lines)`);
       }
-      this.cellInfo = (c) => `<span class="k">图块 (${c.pr}, ${c.pc}) · 词元 (${c.row}, ${c.col})</span>像素 ${c.pc * 16}–${c.pc * 16 + 15}, ${c.pr * 16}–${c.pr * 16 + 15}`;
+      this.cellInfo = (c) => tr(`<span class="k">图块 (${c.pr}, ${c.pc}) · 词元 (${c.row}, ${c.col})</span>像素 ${c.pc * 16}–${c.pc * 16 + 15}, ${c.pr * 16}–${c.pr * 16 + 15}`, `<span class="k">patch (${c.pr}, ${c.pc}) · token (${c.row}, ${c.col})</span>pixels ${c.pc * 16}–${c.pc * 16 + 15}, ${c.pr * 16}–${c.pr * 16 + 15}`);
     } else if (view === 'embed' || view === 'vit' || view === 'vitlayer' || view === 'vitop') {
       const L = s.L;
       const lvl = view === 'embed' ? 0 : view === 'vit' ? Math.min(24, Math.floor(p * 25)) : (s.op === 'ln1' || s.op === 'attn' ? L : L + 1);
@@ -148,83 +150,91 @@ export class Monitor {
       const has = L !== undefined && V.vitAttnLayers.includes(L);
       const q = st.vq ?? V.micro.token;
       if (showAttn && has) {
-        title = `ViT 第 ${L} 层 · 注意力`;
+        title = tr(`ViT 第 ${L} 层 · 注意力`, `ViT layer ${L} · attention`);
         const a = V.vattn(L, q);
         drawHeat(g, V.img, W, H, a, V.mh, V.mw, { dim: 0.42, gamma: 0.7 });
         this.mark(q, '#5ef0d4');
         const top = argmax(a);
-        cap = `从 ${cellS(V, q)} 出发（青框），16 头平均。看自己 ${fmtPct(V.vattnSelf(L, q))}，最多看 ${cellS(V, top)} ${fmtPct(a[top])}。<b>点任意一格换查询位置。</b>`;
+        cap = tr(`从 ${cellS(V, q)} 出发（青框），16 头平均。看自己 ${fmtPct(V.vattnSelf(L, q))}，最多看 ${cellS(V, top)} ${fmtPct(a[top])}。<b>点任意一格换查询位置。</b>`, `From ${cellS(V, q)} (teal box), mean of 16 heads. ${fmtPct(V.vattnSelf(L, q))} on itself; most on ${cellS(V, top)} ${fmtPct(a[top])}. <b>Click any cell to change the query.</b>`);
         this.clickable = true;
-        this.cellInfo = (c) => `<span class="k">词元 (${c.row}, ${c.col})</span>被 ${cellS(V, q)} 看了 <span class="v">${fmtPct(a[c.m])}</span><br><span class="v">点击：从这里出发</span>`;
+        this.cellInfo = (c) => tr(`<span class="k">词元 (${c.row}, ${c.col})</span>被 ${cellS(V, q)} 看了 <span class="v">${fmtPct(a[c.m])}</span><br><span class="v">点击：从这里出发</span>`, `<span class="k">token (${c.row}, ${c.col})</span>gets <span class="v">${fmtPct(a[c.m])}</span> of ${cellS(V, q)}’s attention<br><span class="v">click: start from here</span>`);
       } else if (showAttn) {
-        title = `ViT 第 ${L} 层 · 注意距离`;
+        title = tr(`ViT 第 ${L} 层 · 注意距离`, `ViT layer ${L} · attention distance`);
         drawHeat(g, V.img, W, H, null, 1, 1, { dim: 0.28 });
         this.distChart(V.vitDist[L]);
-        cap = `这一层没有导出完整注意力图（只导出了第 ${V.vitAttnLayers.join('、')} 层）。柱子是 16 个头各自的<b>平均注意距离</b>（单位：图块），真实计算自 ${V.Np}×${V.Np} 的注意力矩阵。`;
+        cap = tr(`这一层没有导出完整注意力图（只导出了第 ${V.vitAttnLayers.join('、')} 层）。柱子是 16 个头各自的<b>平均注意距离</b>（单位：图块），真实计算自 ${V.Np}×${V.Np} 的注意力矩阵。`, `The full attention map wasn’t exported for this layer (only for layers ${V.vitAttnLayers.join(', ')}). The bars are each of the 16 heads’ <b>mean attention distance</b> (in patches), computed from the real ${V.Np}×${V.Np} attention matrix.`);
       } else {
-        title = view === 'embed' ? (s.sub === 'pos' ? '加上位置嵌入' : '图块嵌入') : `ViT ${lvl === 0 ? '输入' : `第 ${lvl - 1} 层之后`} · 特征`;
+        title = isEn ? (view === 'embed' ? (s.sub === 'pos' ? 'Add position embedding' : 'Patch embedding') : `ViT ${lvl === 0 ? 'input' : `after layer ${lvl - 1}`} · features`)
+          : view === 'embed' ? (s.sub === 'pos' ? '加上位置嵌入' : '图块嵌入') : `ViT ${lvl === 0 ? '输入' : `第 ${lvl - 1} 层之后`} · 特征`;
         const a = view === 'embed' ? Math.min(1, p * 1.5) : 0.92;
         this.pcaCells(V.pca(lvl), V.gh, V.gw, a);
         const v = V.pcaVar[lvl];
-        cap = `每个图块的 ${1024} 维特征投到前 3 个主成分上，当作红绿蓝（解释了 ${((v[0] + v[1] + v[2]) * 100).toFixed(0)}% 的方差）。颜色相近 = 模型觉得它们相似。${view === 'vit' ? `正在播放第 0 → 24 级。` : ''}`;
-        if (view === 'vitlayer' && has) tools = `<div class="seg"><button type="button" data-k="vit" data-v="pca" class="${this.mode.vit === 'pca' ? 'on' : ''}">特征</button><button type="button" data-k="vit" data-v="attn" class="${this.mode.vit === 'attn' ? 'on' : ''}">注意力</button></div>`;
-        this.cellInfo = (c) => `<span class="k">图块 (${c.pr}, ${c.pc})</span>第 ${lvl} 级特征的主成分颜色`;
+        cap = tr(`每个图块的 ${1024} 维特征投到前 3 个主成分上，当作红绿蓝（解释了 ${((v[0] + v[1] + v[2]) * 100).toFixed(0)}% 的方差）。颜色相近 = 模型觉得它们相似。${view === 'vit' ? `正在播放第 0 → 24 级。` : ''}`, `Each patch’s ${1024}-dim feature projected onto the top 3 principal components, used as red/green/blue (${((v[0] + v[1] + v[2]) * 100).toFixed(0)}% of the variance). Similar colors = the model thinks they’re similar.${view === 'vit' ? ` Playing levels 0 → 24.` : ''}`);
+        if (view === 'vitlayer' && has) tools = `<div class="seg"><button type="button" data-k="vit" data-v="pca" class="${this.mode.vit === 'pca' ? 'on' : ''}">${tr('特征', 'Features')}</button><button type="button" data-k="vit" data-v="attn" class="${this.mode.vit === 'attn' ? 'on' : ''}">${tr('注意力', 'Attention')}</button></div>`;
+        this.cellInfo = (c) => tr(`<span class="k">图块 (${c.pr}, ${c.pc})</span>第 ${lvl} 级特征的主成分颜色`, `<span class="k">patch (${c.pr}, ${c.pc})</span>principal-component color of level-${lvl} features`);
       }
     } else if (view === 'conv') {
-      title = '卷积核（1024 个里的 16 个）';
+      title = tr('卷积核（1024 个里的 16 个）', 'Kernels (16 of 1024)');
       this.bank();
-      cap = `对图块 (${V.micro.row}, ${V.micro.col}) 反应最强的 16 个输出通道的卷积核（两帧相加，灰色 = 0）。真实权重，每个 3×16×16。`;
+      cap = tr(`对图块 (${V.micro.row}, ${V.micro.col}) 反应最强的 16 个输出通道的卷积核（两帧相加，灰色 = 0）。真实权重，每个 3×16×16。`, `Kernels of the 16 output channels that respond most strongly to patch (${V.micro.row}, ${V.micro.col}) (both frames summed, gray = 0). Real weights, each 3×16×16.`);
     } else if (view === 'micro') {
-      title = `一次乘加 · 第 ${V.micro.ch} 维`;
+      title = tr(`一次乘加 · 第 ${V.micro.ch} 维`, `One multiply-add · dim ${V.micro.ch}`);
       this.microView(s, p);
       const mic = V.micro;
-      cap = s.mi === 'sum'
+      cap = isEn ? (s.mi === 'sum'
+        ? `Σ ${1536} terms + b = <b>${mic.conv.toFixed(4)}</b>, + position embedding ${mic.pos >= 0 ? '+' : '−'}${Math.abs(mic.pos).toFixed(4)} = <b>${mic.after.toFixed(4)}</b>`
+        : s.mi === 'mul' ? `Left: the patch’s real pixels; right: kernel ${mic.ch} (frame 0 / frame 1). The boxed cells are the largest contributions.` : `Patch (${mic.row}, ${mic.col}) enlarged to 16×16 pixels`)
+        : s.mi === 'sum'
         ? `Σ ${1536} 项 + b = <b>${mic.conv.toFixed(4)}</b>，+ 位置嵌入 ${mic.pos >= 0 ? '+' : '−'}${Math.abs(mic.pos).toFixed(4)} = <b>${mic.after.toFixed(4)}</b>`
         : s.mi === 'mul' ? `左：图块的真实像素；右：第 ${mic.ch} 个卷积核（第 0 帧 / 第 1 帧）。圈出的是贡献最大的几项。` : `图块 (${mic.row}, ${mic.col}) 放大成 16×16 个像素`;
     } else if (view === 'merge') {
-      title = s.sub === 'deep' ? 'DeepStack · 三路中间特征' : '合并成词元';
+      title = s.sub === 'deep' ? tr('DeepStack · 三路中间特征', 'DeepStack · three intermediate paths') : tr('合并成词元', 'Merge into tokens');
       if (s.sub === 'deep') this.deepView();
       else {
         const k = s.sub === 'group' ? p : 1;
         if (k < 0.5) this.pcaCells(V.pca(24), V.gh, V.gw, 0.9);
         else this.pcaCells(V.mergePca, V.mh, V.mw, 0.9);
         drawGrid(g, W, H, V.mh, V.mw, 'rgba(255,182,92,.5)', 1.2 * this.dpr);
-        cap = s.sub === 'group' ? `2×2 个图块（${V.Np} 个）→ 1 个词元（${V.Nv} 个）` : `合并器输出：${V.Nv} 个 ${2048} 维向量的主成分颜色。这就是语言模型“看到”的图片。`;
+        cap = isEn ? (s.sub === 'group' ? `2×2 patches (${V.Np}) → 1 token (${V.Nv})` : `Merger output: principal-component colors of ${V.Nv} vectors of ${2048} dims. This is the image the language model “sees”.`)
+          : s.sub === 'group' ? `2×2 个图块（${V.Np} 个）→ 1 个词元（${V.Nv} 个）` : `合并器输出：${V.Nv} 个 ${2048} 维向量的主成分颜色。这就是语言模型“看到”的图片。`;
       }
-      this.cellInfo = (c) => `<span class="k">视觉词元 (${c.row}, ${c.col})</span>第 ${c.m} 个 &lt;|image_pad|&gt;`;
+      this.cellInfo = (c) => tr(`<span class="k">视觉词元 (${c.row}, ${c.col})</span>第 ${c.m} 个 &lt;|image_pad|&gt;`, `<span class="k">vision token (${c.row}, ${c.col})</span>&lt;|image_pad|&gt; #${c.m}`);
     } else if (view === 'splice') {
-      title = s.sub === 'mrope' ? 'M-RoPE 位置 (t, h, w)' : '插进对话';
+      title = s.sub === 'mrope' ? tr('M-RoPE 位置 (t, h, w)', 'M-RoPE positions (t, h, w)') : tr('插进对话', 'Into the chat');
       drawHeat(g, V.img, W, H, null, 1, 1, { dim: 0.45 });
       drawGrid(g, W, H, V.mh, V.mw, 'rgba(255,182,92,.45)', 1.2 * this.dpr);
       this.coords(s.sub === 'mrope' ? 'pos' : 'idx');
       const p0 = this.Q.pos(V.vs);
-      cap = s.sub === 'mrope'
+      cap = isEn ? (s.sub === 'mrope'
+        ? `Every image token has t = ${p0[0]}; h = ${p0[1]} + row, w = ${p0[2]} + column. Each cell shows (h, w).`
+        : `Each cell is one &lt;|image_pad|&gt; in the sequence, #${V.vs} to #${V.vs + V.Nv - 1} (row by row)`)
+        : s.sub === 'mrope'
         ? `所有图片词元 t = ${p0[0]}；h = ${p0[1]} + 行，w = ${p0[2]} + 列。格子里是 (h, w)。`
         : `每格对应序列里的一个 &lt;|image_pad|&gt;，编号 #${V.vs} 到 #${V.vs + V.Nv - 1}（按行展开）`;
-      this.cellInfo = (c) => { const pp = this.Q.pos(V.vs + c.m); return `<span class="k">词元 #${V.vs + c.m}</span>位置 (t, h, w) = <span class="v">(${pp[0]}, ${pp[1]}, ${pp[2]})</span>`; };
+      this.cellInfo = (c) => { const pp = this.Q.pos(V.vs + c.m); return tr(`<span class="k">词元 #${V.vs + c.m}</span>位置 (t, h, w) = <span class="v">(${pp[0]}, ${pp[1]}, ${pp[2]})</span>`, `<span class="k">token #${V.vs + c.m}</span>position (t, h, w) = <span class="v">(${pp[0]}, ${pp[1]}, ${pp[2]})</span>`); };
     } else if (view === 'heads') {
-      title = `第 ${s.L} 层 · 16 个头`;
+      title = tr(`第 ${s.L} 层 · 16 个头`, `Layer ${s.L} · 16 heads`);
       this.headsView(st);
-      cap = `每个小图是一个头在图片上的注意力（各自归一化），左上角是它分给图片的比例。`;
+      cap = tr(`每个小图是一个头在图片上的注意力（各自归一化），左上角是它分给图片的比例。`, `Each tile is one head’s attention on the image (normalized separately); top left is the share it gives to the image.`);
     } else if (HEAT_VIEWS.has(view)) {
       const Q = this.Q, gg = st.g;
       const layerOK = view === 'layer' || view === 'layerop';
       const mode = !layerOK && this.mode.heat === 'cur' ? 'ground' : this.mode.heat;
       const [ga, gb] = Q.manifest.groundLayers;
       let vals, lab;
-      if (mode === 'cur' && layerOK) { vals = Q.attImg(gg, s.L); lab = `第 ${s.L} 层`; }
-      else if (mode === 'all') { vals = Q.attAvg(gg, [0, Q.NL - 1]); lab = `全部 ${Q.NL} 层平均`; }
-      else { vals = Q.attAvg(gg, [ga, gb]); lab = `第 ${ga}–${gb} 层平均`; }
+      if (mode === 'cur' && layerOK) { vals = Q.attImg(gg, s.L); lab = tr(`第 ${s.L} 层`, `layer ${s.L}`); }
+      else if (mode === 'all') { vals = Q.attAvg(gg, [0, Q.NL - 1]); lab = tr(`全部 ${Q.NL} 层平均`, `mean of all ${Q.NL} layers`); }
+      else { vals = Q.attAvg(gg, [ga, gb]); lab = tr(`第 ${ga}–${gb} 层平均`, `mean of layers ${ga}–${gb}`); }
       drawHeat(g, V.img, W, H, vals, V.mh, V.mw, { dim: 0.45 });
       if (this.mode.lens && layerOK) this.lensWords(s.L);
       const tokS = Q.steps[gg].chosenS;
-      title = `生成「${tokS.replace(/\n/g, '↵')}」时在看哪`;
+      title = tr(`生成「${tokS.replace(/\n/g, '↵')}」时在看哪`, `“${tokS.replace(/\n/g, '↵')}” · where it looks`);
       const mass = mode === 'cur' && layerOK ? Q.mass(gg, s.L) : avgMass(Q, gg, mode === 'all' ? 0 : ga, mode === 'all' ? Q.NL - 1 : gb);
-      cap = `真实注意力（16 头平均，${lab}），按最大值归一化。图片一共分到 ${fmtPct(mass)} 的注意力。`;
+      cap = tr(`真实注意力（16 头平均，${lab}），按最大值归一化。图片一共分到 ${fmtPct(mass)} 的注意力。`, `Real attention (mean of 16 heads, ${lab}), normalized to its maximum. The image gets ${fmtPct(mass)} of the attention in total.`);
       tools = heatTools(layerOK);
       this.cellInfo = (c) => {
-        let h = `<span class="k">视觉词元 (${c.row}, ${c.col})</span>注意力 <span class="v">${fmtPct(vals[c.m])}</span>`;
-        if (layerOK) { const w = V.ilens(s.L, c.m); h += `<br>第 ${s.L} 层读数：<b>${esc(w.s.replace(/\n/g, '↵'))}</b> ${fmtPct(w.p)}`; }
+        let h = tr(`<span class="k">视觉词元 (${c.row}, ${c.col})</span>注意力 <span class="v">${fmtPct(vals[c.m])}</span>`, `<span class="k">vision token (${c.row}, ${c.col})</span>attention <span class="v">${fmtPct(vals[c.m])}</span>`);
+        if (layerOK) { const w = V.ilens(s.L, c.m); h += tr(`<br>第 ${s.L} 层读数：<b>${esc(w.s.replace(/\n/g, '↵'))}</b> ${fmtPct(w.p)}`, `<br>layer ${s.L} readout: <b>${esc(w.s.replace(/\n/g, '↵'))}</b> ${fmtPct(w.p)}`); }
         return h;
       };
     }
@@ -319,9 +329,9 @@ export class Monitor {
     g.imageSmoothingEnabled = true;
     g.font = `${10 * this.dpr}px "JetBrains Mono", monospace`;
     g.fillStyle = 'rgba(200,215,240,.75)';
-    g.fillText('像素', xs[0], y - 4 * this.dpr);
-    g.fillText('核·第0帧', xs[1], y - 4 * this.dpr);
-    g.fillText('核·第1帧', xs[2], y - 4 * this.dpr);
+    g.fillText(tr('像素', 'pixels'), xs[0], y - 4 * this.dpr);
+    g.fillText(tr('核·第0帧', 'kernel·frame 0'), xs[1], y - 4 * this.dpr);
+    g.fillText(tr('核·第1帧', 'kernel·frame 1'), xs[2], y - 4 * this.dpr);
     if (show) {
       const n = s.mi === 'mul' ? Math.max(1, Math.ceil(p * mic.top.length)) : mic.top.length;
       const cell = sz / 16;
