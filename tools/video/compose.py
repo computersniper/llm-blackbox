@@ -456,7 +456,8 @@ SEC_CHORDS = {
     'layersK': ['Bbmaj7', 'C', 'Dm9', 'Bbmaj7', 'C', 'A7sus4'],
     'sampleK': ['Gm9', 'Gm9', 'A7sus4', 'A'],
     'loop2': P1,
-    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Bbmaj9', 'FmajA', 'Gm9', 'Dsus2', 'D', 'D'],  # 答案卡 → 继续探索 → 收尾
+    'pick': ['Bbmaj7', 'Bbmaj7', 'Gm9', 'Gm9', 'A7sus4', 'A7sus4', 'A', 'A'],  # 选字：理解完之后怎么把词说出来
+    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Bbmaj9', 'FmajA', 'Dsus2', 'D'],  # 答案卡 → 继续探索 → 收尾
 }
 
 
@@ -474,7 +475,7 @@ def chord_plan(sections):
     plan = []
     for name, k, nb in bar_info(sections):
         seq = SEC_CHORDS.get(name, P1)
-        plan.append(seq[min(k, len(seq) - 1)] if name in ('end', 'sample1', 'sampleK', 'layersK', 'chat', 'fly', 'land') else seq[k % len(seq)])
+        plan.append(seq[min(k, len(seq) - 1)] if name in ('end', 'sample1', 'sampleK', 'layersK', 'chat', 'fly', 'land', 'pick') else seq[k % len(seq)])
     return plan
 
 
@@ -560,7 +561,7 @@ def compose(ev, out_wav, stems_dir=None):
                 continue
             if nm == 'ffn' and k % 2 == 1:
                 continue
-            if nm in ('sample1', 'sampleK') and k % 4 != 0:
+            if nm in ('sample1', 'sampleK', 'pick') and k % 4 != 0:
                 continue
             m = tones[pattern[(k + b * 3) % len(pattern)]]
             vel = (0.55 + 0.45 * (k % 4 == 0)) * (0.5 + 0.5 * en)
@@ -604,7 +605,7 @@ def compose(ev, out_wav, stems_dir=None):
     for b, c in enumerate(plan):
         t0 = b * BAR
         nm = sec(t0 + 0.1)
-        kind = {'chat': 'none', 'fly': 'heart', 'land': 'none', 'embed': 'heart', 'layers1': 'groove', 'attn': 'none', 'ffn': 'none',
+        kind = {'chat': 'none', 'fly': 'heart', 'land': 'none', 'embed': 'heart', 'layers1': 'groove', 'attn': 'none', 'ffn': 'none', 'pick': 'heart',
                 'sample1': 'heart', 'loop1': 'groove', 'layersK': 'four', 'sampleK': 'heart', 'loop2': 'full', 'end': 'none'}[nm]
         sname, k_in, nb_in = binfo[b]
         if nm == 'ffn' and k_in % 4 == 2 and k_in < nb_in - 2:
@@ -713,7 +714,7 @@ def compose(ev, out_wav, stems_dir=None):
         bus.x *= duck
 
     # 段落音量：冷开场、拆层段落更安静，28 层和最后的自回归最满
-    LEVEL = {'chat': 0.7, 'fly': 0.95, 'land': 0.78, 'embed': 0.78, 'layers1': 1.0, 'attn': 0.9, 'ffn': 0.95, 'sample1': 0.76,
+    LEVEL = {'chat': 0.7, 'fly': 0.95, 'land': 0.78, 'embed': 0.78, 'layers1': 1.0, 'attn': 0.9, 'ffn': 0.95, 'pick': 0.8, 'sample1': 0.76,
              'loop1': 0.9, 'layersK': 1.0, 'sampleK': 0.74, 'loop2': 1.0, 'end': 0.7}
     lvl = np.ones(pad.n)
     for s_ in sections:
