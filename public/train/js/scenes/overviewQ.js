@@ -50,7 +50,7 @@ export class OverviewQ {
     const tiles = isEn ? [
       { k: 'STEP', v: `${k + 1}`, s: `/ ${m.steps.length} steps (same chat)`, c: COL.ink },
       { k: 'LOSS · ON THE ANSWER', v: lerp(a, b, f).toFixed(3), s: `${a.toFixed(3)} → ${b.toFixed(4)}`, c: COL.cyan },
-      { k: 'GRAD · GRADIENT NORM', v: m.steps[k].gradNorm.toFixed(1), s: `clipped to 1.0 (×${m.steps[k].clip.toFixed(4)})`, c: COL.rose },
+      { k: 'GRAD · GRADIENT NORM', v: m.steps[k].gradNorm.toFixed(1), s: this.portrait ? `clipped ×${m.steps[k].clip.toFixed(4)}` : `clipped to 1.0 (×${m.steps[k].clip.toFixed(4)})`, c: COL.rose },
       { k: 'LR · LEARNING RATE', v: '1×10⁻⁵', s: 'AdamW β=(0.9, 0.95) λ=0.1', c: COL.amber },
       { k: 'TIME · 3 STEPS', v: `${m.train.seconds} s`, s: `fp32 · ${m.train.gpu.replace('NVIDIA GeForce ', '')}`, c: COL.violet },
     ] : [
