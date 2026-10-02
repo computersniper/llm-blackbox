@@ -488,7 +488,7 @@ def section_at(sections, t):
     return sections[-1]
 
 
-def compose(ev, out_wav, stems_dir=None):
+def compose(ev, out_wav, stems_dir=None, ceiling=-2.0):
     sections = ev['score']['sections']
     dur = ev['duration']
     plan = chord_plan(sections)
@@ -754,7 +754,7 @@ def compose(ev, out_wav, stems_dir=None):
     if stems_dir:
         for name, bus in (('pad', pad), ('arp', arp), ('bass', bass), ('drums', drums), ('fx', fx), ('bells', bells)):
             wavfile.write(f'{stems_dir}/stem_{name}.wav', SR, (np.clip(bus.x[:, :n_end].T, -1, 1) * 32767).astype(np.int16))
-    out = master(mix)
+    out = master(mix, ceiling=ceiling)
     wavfile.write(out_wav, SR, out.T.astype(np.float32))
     print(f'wrote {out_wav}: {out.shape[1] / SR:.2f}s, {lufs(out):.2f} LUFS, true peak {true_peak_db(out):.2f} dBTP')
 
@@ -806,12 +806,12 @@ def limit(x, ceiling_db=-2.0):
     return x * g
 
 
-def master(mix, target=-14.0):
+def master(mix, target=-14.0, ceiling=-2.0):
     # 轻微的软削波当“胶水”
     mix = np.tanh(mix * 0.9) / 0.9
     for _ in range(3):
         mix *= 10 ** ((target - lufs(mix)) / 20)
-        mix = limit(mix)
+        mix = limit(mix, ceiling)
     return mix
 
 
@@ -820,9 +820,11 @@ def main():
     ap.add_argument('--events', default='tools/video/events.json')
     ap.add_argument('--out', default='/mnt/d/cjc/videos/llm-inference/score.wav')
     ap.add_argument('--stems', default=None)
+    # 真峰值上限（dBTP）。AAC 解码后个别密集的瞬态会再冲高 2 dB 左右：英文版收尾蒙太奇那里用 −3.5 才压得住
+    ap.add_argument('--ceiling', type=float, default=-2.0)
     a = ap.parse_args()
     ev = json.load(open(a.events))
-    compose(ev, a.out, a.stems)
+    compose(ev, a.out, a.stems, a.ceiling)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,8 @@
 # 把逐帧渲染的 JPEG 和配乐合成成片：H.264（libx264 crf 18、preset slow、yuv420p、+faststart）+ AAC 192k。
 #   tools/video/encode.sh [帧目录] [配乐 wav] [输出 mp4] [帧率]
 set -euo pipefail
+# 片名写进 mp4 元数据；英文版用 TITLE 环境变量覆盖
+TITLE=${TITLE:-"AI 的一个字是怎么思考出来的 · 走进大模型推理的“黑箱”（Qwen3-0.6B 真实推理）"}
 OUT_DIR=/mnt/d/cjc/videos/llm-inference
 FRAMES=${1:-$OUT_DIR/frames60}
 SCORE=${2:-$OUT_DIR/score.wav}
@@ -16,6 +18,6 @@ ffmpeg -hide_banner -loglevel warning -stats -y \
   -color_primaries bt709 -color_trc bt709 -colorspace bt709 \
   -c:a aac -b:a 192k -ar 48000 \
   -shortest -movflags +faststart \
-  -metadata title="AI 的一个字是怎么思考出来的 · 走进大模型推理的“黑箱”（Qwen3-0.6B 真实推理）" \
+  -metadata title="$TITLE" \
   "$MP4"
 ffprobe -v error -show_entries format=duration,size:stream=codec_name,width,height,r_frame_rate -of compact "$MP4"

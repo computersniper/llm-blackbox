@@ -1,0 +1,1706 @@
+{
+ "events": [
+  {
+   "t": 1.775,
+   "type": "key",
+   "i": 0
+  },
+  {
+   "t": 1.907,
+   "type": "key",
+   "i": 1
+  },
+  {
+   "t": 2.050076923076923,
+   "type": "key",
+   "i": 2
+  },
+  {
+   "t": 2.050076923076923,
+   "type": "type",
+   "i": 0
+  },
+  {
+   "t": 2.204230769230769,
+   "type": "key",
+   "i": 3
+  },
+  {
+   "t": 2.455,
+   "type": "key",
+   "i": 4
+  },
+  {
+   "t": 2.636846153846154,
+   "type": "key",
+   "i": 5
+  },
+  {
+   "t": 2.636846153846154,
+   "type": "type",
+   "i": 1
+  },
+  {
+   "t": 2.8297692307692306,
+   "type": "key",
+   "i": 6
+  },
+  {
+   "t": 3.047307692307692,
+   "type": "key",
+   "i": 7
+  },
+  {
+   "t": 3.195923076923077,
+   "type": "key",
+   "i": 8
+  },
+  {
+   "t": 3.3556153846153847,
+   "type": "key",
+   "i": 9
+  },
+  {
+   "t": 3.3556153846153847,
+   "type": "type",
+   "i": 2
+  },
+  {
+   "t": 3.5263846153846155,
+   "type": "key",
+   "i": 10
+  },
+  {
+   "t": 3.782692307692308,
+   "type": "key",
+   "i": 11
+  },
+  {
+   "t": 3.9700769230769235,
+   "type": "key",
+   "i": 12
+  },
+  {
+   "t": 4.168538461538462,
+   "type": "key",
+   "i": 13
+  },
+  {
+   "t": 4.168538461538462,
+   "type": "type",
+   "i": 3
+  },
+  {
+   "t": 4.306076923076924,
+   "type": "key",
+   "i": 14
+  },
+  {
+   "t": 4.529153846153847,
+   "type": "key",
+   "i": 15
+  },
+  {
+   "t": 4.683307692307694,
+   "type": "key",
+   "i": 16
+  },
+  {
+   "t": 4.848538461538463,
+   "type": "key",
+   "i": 17
+  },
+  {
+   "t": 5.0248461538461555,
+   "type": "key",
+   "i": 18
+  },
+  {
+   "t": 5.0248461538461555,
+   "type": "type",
+   "i": 4
+  },
+  {
+   "t": 5.2122307692307706,
+   "type": "key",
+   "i": 19
+  },
+  {
+   "t": 5.2122307692307706,
+   "type": "type",
+   "i": 5
+  },
+  {
+   "t": 6.25,
+   "type": "send"
+  },
+  {
+   "t": 10.7,
+   "type": "whoosh",
+   "k": 0.8
+  },
+  {
+   "t": 10.7,
+   "type": "rise",
+   "d": 1.8000000000000007
+  },
+  {
+   "t": 12.5,
+   "type": "hit",
+   "k": 1
+  },
+  {
+   "t": 14.8,
+   "type": "rise",
+   "d": 2
+  },
+  {
+   "t": 16.8,
+   "type": "open"
+  },
+  {
+   "t": 20,
+   "type": "tick",
+   "i": 25,
+   "k": 1
+  },
+  {
+   "t": 20.08,
+   "type": "tick",
+   "i": 26,
+   "k": 1
+  },
+  {
+   "t": 20.16,
+   "type": "tick",
+   "i": 27,
+   "k": 1
+  },
+  {
+   "t": 20.24,
+   "type": "tick",
+   "i": 28,
+   "k": 1
+  },
+  {
+   "t": 20.32,
+   "type": "tick",
+   "i": 29,
+   "k": 1
+  },
+  {
+   "t": 20.4,
+   "type": "tick",
+   "i": 30,
+   "k": 1
+  },
+  {
+   "t": 21.015,
+   "type": "tick",
+   "i": 24,
+   "k": 0.4
+  },
+  {
+   "t": 21.015,
+   "type": "tick",
+   "i": 31,
+   "k": 0.4
+  },
+  {
+   "t": 21.08,
+   "type": "tick",
+   "i": 23,
+   "k": 0.4
+  },
+  {
+   "t": 21.08,
+   "type": "tick",
+   "i": 32,
+   "k": 0.4
+  },
+  {
+   "t": 21.145,
+   "type": "tick",
+   "i": 22,
+   "k": 0.4
+  },
+  {
+   "t": 21.145,
+   "type": "tick",
+   "i": 33,
+   "k": 0.4
+  },
+  {
+   "t": 21.21,
+   "type": "tick",
+   "i": 21,
+   "k": 0.4
+  },
+  {
+   "t": 21.21,
+   "type": "tick",
+   "i": 34,
+   "k": 0.4
+  },
+  {
+   "t": 21.275,
+   "type": "tick",
+   "i": 20,
+   "k": 0.4
+  },
+  {
+   "t": 21.275,
+   "type": "tick",
+   "i": 35,
+   "k": 0.4
+  },
+  {
+   "t": 21.34,
+   "type": "tick",
+   "i": 19,
+   "k": 0.4
+  },
+  {
+   "t": 21.34,
+   "type": "tick",
+   "i": 36,
+   "k": 0.4
+  },
+  {
+   "t": 21.404999999999998,
+   "type": "tick",
+   "i": 18,
+   "k": 0.4
+  },
+  {
+   "t": 21.404999999999998,
+   "type": "tick",
+   "i": 37,
+   "k": 0.4
+  },
+  {
+   "t": 21.47,
+   "type": "tick",
+   "i": 17,
+   "k": 0.4
+  },
+  {
+   "t": 21.47,
+   "type": "tick",
+   "i": 38,
+   "k": 0.4
+  },
+  {
+   "t": 21.535,
+   "type": "tick",
+   "i": 16,
+   "k": 0.4
+  },
+  {
+   "t": 21.535,
+   "type": "tick",
+   "i": 39,
+   "k": 0.4
+  },
+  {
+   "t": 21.599999999999998,
+   "type": "tick",
+   "i": 15,
+   "k": 0.4
+  },
+  {
+   "t": 21.665,
+   "type": "tick",
+   "i": 14,
+   "k": 0.4
+  },
+  {
+   "t": 21.73,
+   "type": "tick",
+   "i": 13,
+   "k": 0.4
+  },
+  {
+   "t": 21.794999999999998,
+   "type": "tick",
+   "i": 12,
+   "k": 0.4
+  },
+  {
+   "t": 21.86,
+   "type": "tick",
+   "i": 11,
+   "k": 0.4
+  },
+  {
+   "t": 21.925,
+   "type": "tick",
+   "i": 10,
+   "k": 0.4
+  },
+  {
+   "t": 21.99,
+   "type": "tick",
+   "i": 9,
+   "k": 0.4
+  },
+  {
+   "t": 22.055,
+   "type": "tick",
+   "i": 8,
+   "k": 0.4
+  },
+  {
+   "t": 22.12,
+   "type": "tick",
+   "i": 7,
+   "k": 0.4
+  },
+  {
+   "t": 22.185,
+   "type": "tick",
+   "i": 6,
+   "k": 0.4
+  },
+  {
+   "t": 22.25,
+   "type": "tick",
+   "i": 5,
+   "k": 0.4
+  },
+  {
+   "t": 22.314999999999998,
+   "type": "tick",
+   "i": 4,
+   "k": 0.4
+  },
+  {
+   "t": 22.38,
+   "type": "tick",
+   "i": 3,
+   "k": 0.4
+  },
+  {
+   "t": 22.445,
+   "type": "tick",
+   "i": 2,
+   "k": 0.4
+  },
+  {
+   "t": 22.509999999999998,
+   "type": "tick",
+   "i": 1,
+   "k": 0.4
+  },
+  {
+   "t": 22.575,
+   "type": "tick",
+   "i": 0,
+   "k": 0.4
+  },
+  {
+   "t": 26.6,
+   "type": "blip",
+   "i": 0
+  },
+  {
+   "t": 26.66,
+   "type": "blip",
+   "i": 2
+  },
+  {
+   "t": 26.72,
+   "type": "blip",
+   "i": 4
+  },
+  {
+   "t": 26.78,
+   "type": "blip",
+   "i": 6
+  },
+  {
+   "t": 26.84,
+   "type": "blip",
+   "i": 8
+  },
+  {
+   "t": 26.9,
+   "type": "blip",
+   "i": 10
+  },
+  {
+   "t": 26.96,
+   "type": "blip",
+   "i": 12
+  },
+  {
+   "t": 27.02,
+   "type": "blip",
+   "i": 14
+  },
+  {
+   "t": 27.08,
+   "type": "blip",
+   "i": 16
+  },
+  {
+   "t": 27.14,
+   "type": "blip",
+   "i": 18
+  },
+  {
+   "t": 27.2,
+   "type": "blip",
+   "i": 20
+  },
+  {
+   "t": 27.26,
+   "type": "blip",
+   "i": 22
+  },
+  {
+   "t": 27.32,
+   "type": "blip",
+   "i": 24
+  },
+  {
+   "t": 27.38,
+   "type": "blip",
+   "i": 26
+  },
+  {
+   "t": 27.44,
+   "type": "blip",
+   "i": 28
+  },
+  {
+   "t": 27.5,
+   "type": "blip",
+   "i": 30
+  },
+  {
+   "t": 27.560000000000002,
+   "type": "blip",
+   "i": 32
+  },
+  {
+   "t": 27.62,
+   "type": "blip",
+   "i": 34
+  },
+  {
+   "t": 27.68,
+   "type": "blip",
+   "i": 36
+  },
+  {
+   "t": 27.740000000000002,
+   "type": "blip",
+   "i": 38
+  },
+  {
+   "t": 31.25,
+   "type": "layer",
+   "L": 0,
+   "k": 0.6
+  },
+  {
+   "t": 32.07421875,
+   "type": "layer",
+   "L": 2,
+   "k": 0.6
+  },
+  {
+   "t": 32.47265625,
+   "type": "layer",
+   "L": 4,
+   "k": 0.6
+  },
+  {
+   "t": 32.87109375,
+   "type": "layer",
+   "L": 6,
+   "k": 0.6
+  },
+  {
+   "t": 33.26953125,
+   "type": "layer",
+   "L": 8,
+   "k": 0.6
+  },
+  {
+   "t": 33.66796875,
+   "type": "layer",
+   "L": 10,
+   "k": 0.6
+  },
+  {
+   "t": 34.265625,
+   "type": "layer",
+   "L": 12,
+   "k": 0.6
+  },
+  {
+   "t": 35.0625,
+   "type": "layer",
+   "L": 14,
+   "k": 0.6
+  },
+  {
+   "t": 35.4609375,
+   "type": "reveal",
+   "k": 0.7
+  },
+  {
+   "t": 37.0234375,
+   "type": "layer",
+   "L": 16,
+   "k": 0.6
+  },
+  {
+   "t": 37.421875,
+   "type": "layer",
+   "L": 17,
+   "k": 1
+  },
+  {
+   "t": 37.421875,
+   "type": "reveal",
+   "k": 1.1
+  },
+  {
+   "t": 39.921875,
+   "type": "layer",
+   "L": 18,
+   "k": 0.6
+  },
+  {
+   "t": 40.3203125,
+   "type": "layer",
+   "L": 19,
+   "k": 0.6
+  },
+  {
+   "t": 40.71875,
+   "type": "layer",
+   "L": 20,
+   "k": 0.6
+  },
+  {
+   "t": 41.1171875,
+   "type": "layer",
+   "L": 21,
+   "k": 0.6
+  },
+  {
+   "t": 41.515625,
+   "type": "layer",
+   "L": 22,
+   "k": 0.6
+  },
+  {
+   "t": 41.9140625,
+   "type": "layer",
+   "L": 23,
+   "k": 0.6
+  },
+  {
+   "t": 42.3125,
+   "type": "layer",
+   "L": 24,
+   "k": 0.6
+  },
+  {
+   "t": 42.7109375,
+   "type": "layer",
+   "L": 25,
+   "k": 0.6
+  },
+  {
+   "t": 43.109375,
+   "type": "layer",
+   "L": 26,
+   "k": 0.6
+  },
+  {
+   "t": 43.5078125,
+   "type": "layer",
+   "L": 27,
+   "k": 0.6
+  },
+  {
+   "t": 47.5,
+   "type": "hit",
+   "k": 0.7
+  },
+  {
+   "t": 51.25,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 55,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 61.25,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 65.625,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 70,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 74.375,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 74.375,
+   "type": "reveal",
+   "k": 0.5
+  },
+  {
+   "t": 80.625,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 80.625,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 80.91875,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 81.2125,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 81.50625,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 81.8,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 82.09375,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 82.3875,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 82.68125,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 82.975,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 83.26875,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 83.5625,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 83.85625,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 87.5,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 91.25,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 91.25,
+   "type": "reveal",
+   "k": 0.7
+  },
+  {
+   "t": 97.5,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 103.75,
+   "type": "reveal",
+   "k": 1
+  },
+  {
+   "t": 106.25,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 113.75,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 120,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 120,
+   "type": "hit",
+   "k": 0.5
+  },
+  {
+   "t": 125,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 128.75,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 132.5,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 136.25,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 140,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 143.75,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 143.75,
+   "type": "reveal",
+   "k": 0.6
+  },
+  {
+   "t": 147.5,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 152.5,
+   "type": "whoosh",
+   "k": 0.8
+  },
+  {
+   "t": 157.5,
+   "type": "step",
+   "k": 0.6
+  },
+  {
+   "t": 161.875,
+   "type": "reveal",
+   "k": 0.8
+  },
+  {
+   "t": 165.625,
+   "type": "step",
+   "k": 0.5
+  },
+  {
+   "t": 170.05,
+   "type": "dice"
+  },
+  {
+   "t": 172,
+   "type": "emit",
+   "g": 0,
+   "k": 1.2
+  },
+  {
+   "t": 173.0688,
+   "type": "emit",
+   "g": 1,
+   "k": 0.5,
+   "rank": 0
+  },
+  {
+   "t": 173.6688,
+   "type": "emit",
+   "g": 2,
+   "k": 0.5,
+   "rank": 0
+  },
+  {
+   "t": 174.2688,
+   "type": "emit",
+   "g": 3,
+   "k": 0.5,
+   "rank": 0
+  },
+  {
+   "t": 174.8688,
+   "type": "emit",
+   "g": 4,
+   "k": 0.5,
+   "rank": 0
+  },
+  {
+   "t": 180.35000000000002,
+   "type": "dice"
+  },
+  {
+   "t": 184.06,
+   "type": "emit",
+   "g": 5,
+   "k": 1.1,
+   "rank": 1
+  },
+  {
+   "t": 185.29794285714286,
+   "type": "emit",
+   "g": 6,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 185.9265142857143,
+   "type": "emit",
+   "g": 8,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 186.55508571428572,
+   "type": "emit",
+   "g": 10,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 187.18365714285716,
+   "type": "emit",
+   "g": 12,
+   "k": 0.45,
+   "rank": 1
+  },
+  {
+   "t": 187.8122285714286,
+   "type": "emit",
+   "g": 14,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 188.44080000000002,
+   "type": "emit",
+   "g": 16,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 189.06937142857146,
+   "type": "emit",
+   "g": 18,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 189.6979428571429,
+   "type": "emit",
+   "g": 20,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 190.32651428571432,
+   "type": "emit",
+   "g": 22,
+   "k": 0.45,
+   "rank": 1
+  },
+  {
+   "t": 190.95508571428576,
+   "type": "emit",
+   "g": 24,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 191.5836571428572,
+   "type": "emit",
+   "g": 26,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 192.21222857142862,
+   "type": "emit",
+   "g": 28,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 192.84080000000006,
+   "type": "emit",
+   "g": 30,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 193.4693714285715,
+   "type": "emit",
+   "g": 32,
+   "k": 0.45,
+   "rank": 0
+  },
+  {
+   "t": 194.93760000000006,
+   "type": "end",
+   "g": 34,
+   "k": 0.55
+  },
+  {
+   "t": 196.6,
+   "type": "hit",
+   "k": 0.5
+  },
+  {
+   "t": 201.642497714246,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 201.83601097161917,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 202.02952411336045,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 202.2240072912864,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 202.41800539330404,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 202.61200361095362,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 202.9272506857262,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 204.33658536585367,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 205.78,
+   "type": "step",
+   "k": 0.55
+  },
+  {
+   "t": 206.68,
+   "type": "step",
+   "k": 0.55
+  },
+  {
+   "t": 207.58,
+   "type": "step",
+   "k": 0.55
+  },
+  {
+   "t": 208.48,
+   "type": "step",
+   "k": 0.55
+  },
+  {
+   "t": 209.38,
+   "type": "step",
+   "k": 0.55
+  },
+  {
+   "t": 210.25632401606484,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 211.1593557697375,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 212.06238739917498,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 212.49748926376637,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 212.98313595716047,
+   "type": "tick",
+   "k": 0.3
+  },
+  {
+   "t": 213.4,
+   "type": "end",
+   "k": 0.4
+  }
+ ],
+ "score": {
+  "sections": [
+   {
+    "name": "chat",
+    "t0": 0,
+    "t1": 12.5,
+    "bars": 5,
+    "energy": 0.1
+   },
+   {
+    "name": "fly",
+    "t0": 12.5,
+    "t1": 20,
+    "bars": 3,
+    "energy": 0.55
+   },
+   {
+    "name": "land",
+    "t0": 20,
+    "t1": 25,
+    "bars": 2,
+    "energy": 0.4
+   },
+   {
+    "name": "embed",
+    "t0": 25,
+    "t1": 30,
+    "bars": 2,
+    "energy": 0.5
+   },
+   {
+    "name": "layers1",
+    "t0": 30,
+    "t1": 47.5,
+    "bars": 7,
+    "energy": 0.78
+   },
+   {
+    "name": "attn",
+    "t0": 47.5,
+    "t1": 120,
+    "bars": 29,
+    "energy": 0.4
+   },
+   {
+    "name": "ffn",
+    "t0": 120,
+    "t1": 152.5,
+    "bars": 13,
+    "energy": 0.45
+   },
+   {
+    "name": "pick",
+    "t0": 152.5,
+    "t1": 172.5,
+    "bars": 8,
+    "energy": 0.6
+   },
+   {
+    "name": "loop1",
+    "t0": 172.5,
+    "t1": 185,
+    "bars": 5,
+    "energy": 0.72
+   },
+   {
+    "name": "loop2",
+    "t0": 185,
+    "t1": 195,
+    "bars": 4,
+    "energy": 0.9
+   },
+   {
+    "name": "end",
+    "t0": 195,
+    "t1": 220,
+    "bars": 10,
+    "energy": 0.22
+   }
+  ],
+  "shots": [
+   {
+    "name": "opening",
+    "t0": 0,
+    "t1": 25
+   },
+   {
+    "name": "embed",
+    "t0": 25,
+    "t1": 30
+   },
+   {
+    "name": "layers1",
+    "t0": 30,
+    "t1": 47.5
+   },
+   {
+    "name": "dissect",
+    "t0": 47.5,
+    "t1": 152.5
+   },
+   {
+    "name": "pick",
+    "t0": 152.5,
+    "t1": 172.5
+   },
+   {
+    "name": "loop1",
+    "t0": 172.5,
+    "t1": 185
+   },
+   {
+    "name": "loop2",
+    "t0": 185,
+    "t1": 195
+   },
+   {
+    "name": "end",
+    "t0": 195,
+    "t1": 220
+   }
+  ],
+  "bpm": 96,
+  "end": 220,
+  "subs": [
+   {
+    "t0": 8.95,
+    "t1": 12.25,
+    "html": "First, your question is chopped into tokens."
+   },
+   {
+    "t0": 16.900000000000002,
+    "t1": 19.8,
+    "html": "The box opens, and the tokens drop into the tray."
+   },
+   {
+    "t0": 20.3,
+    "t1": 22.4,
+    "html": "A chat template wraps it in instructions and markers"
+   },
+   {
+    "t0": 22.6,
+    "t1": 24.8,
+    "html": "The model only sees numbers: <q>sky</q> = <span class=\"m\">12884</span>"
+   },
+   {
+    "t0": 25.3,
+    "t1": 29.8,
+    "html": "Each ID looks up its row: 1,024 numbers"
+   },
+   {
+    "t0": 30.2,
+    "t1": 32,
+    "html": "Next, it passes through 28 layers."
+   },
+   {
+    "t0": 32.2,
+    "t1": 35.3609375,
+    "html": "After each layer, we peek: what would it say right now?"
+   },
+   {
+    "t0": 35.5109375,
+    "t1": 37.321875,
+    "html": "Layer 15: its top pick is to stop and say nothing (<span class=\"m\">83%</span>)"
+   },
+   {
+    "t0": 37.471875,
+    "t1": 39.871875,
+    "html": "Layer 17: <q>The</q> takes the lead (<span class=\"m\">52%</span>)"
+   },
+   {
+    "t0": 39.971875,
+    "t1": 44.35,
+    "html": "Last layer: <q>The</q> at <span class=\"m\">100%</span>"
+   },
+   {
+    "t0": 44.5,
+    "t1": 47.35,
+    "html": "What happens inside layer 19? Let's open it up."
+   },
+   {
+    "t0": 47.7,
+    "t1": 51.1,
+    "html": "Inside layer 19: every layer runs the same steps"
+   },
+   {
+    "t0": 51.45,
+    "t1": 54.85,
+    "html": "First, the numbers are evened out to a standard volume"
+   },
+   {
+    "t0": 55.2,
+    "t1": 58.6,
+    "html": "Attention: look back at what came before"
+   },
+   {
+    "t0": 58.95,
+    "t1": 61.1,
+    "html": "Think of it as looking something up in a library"
+   },
+   {
+    "t0": 61.45,
+    "t1": 65.475,
+    "html": "Q is the question: what am I looking for?"
+   },
+   {
+    "t0": 65.825,
+    "t1": 69.85,
+    "html": "K is each word's label: what I'm about"
+   },
+   {
+    "t0": 70.2,
+    "t1": 74.225,
+    "html": "V is what the word actually has to offer"
+   },
+   {
+    "t0": 74.575,
+    "t1": 77.375,
+    "html": "Check the question against every label"
+   },
+   {
+    "t0": 77.575,
+    "t1": 80.475,
+    "html": "The better the match, the higher the score"
+   },
+   {
+    "t0": 80.825,
+    "t1": 84.225,
+    "html": "Zoom in on one: <span class=\"m\">128</span> pairs of numbers, multiplied"
+   },
+   {
+    "t0": 84.575,
+    "t1": 87.35,
+    "html": "Add them all up: <span class=\"cy\">178.3</span>"
+   },
+   {
+    "t0": 87.7,
+    "t1": 91.1,
+    "html": "Divide by √128 so the scores don't blow up"
+   },
+   {
+    "t0": 91.45,
+    "t1": 94.25,
+    "html": "Softmax turns the scores into weights that add up to 1"
+   },
+   {
+    "t0": 94.45,
+    "t1": 97.35,
+    "html": "<q>sky</q> alone takes <span class=\"m\">74%</span>"
+   },
+   {
+    "t0": 97.7,
+    "t1": 100.5,
+    "html": "Blend every word's V, by weight"
+   },
+   {
+    "t0": 100.7,
+    "t1": 103.6,
+    "html": "The result: a new understanding, informed by context"
+   },
+   {
+    "t0": 103.95,
+    "t1": 106.1,
+    "html": "That's the whole attention formula"
+   },
+   {
+    "t0": 106.45,
+    "t1": 109.65,
+    "html": "The same search runs in <span class=\"m\">16</span> heads at once"
+   },
+   {
+    "t0": 109.85,
+    "t1": 113.6,
+    "html": "Different heads, different targets: <q>sky</q>, <q>the</q>, the start"
+   },
+   {
+    "t0": 113.95,
+    "t1": 116.75,
+    "html": "Add the result back: a small edit, not a rewrite"
+   },
+   {
+    "t0": 116.95,
+    "t1": 119.85,
+    "html": "After this layer, its top pick is <q>The</q>"
+   },
+   {
+    "t0": 120.2,
+    "t1": 122.4,
+    "html": "Attention gathered what the context had to say"
+   },
+   {
+    "t0": 122.6,
+    "t1": 124.85,
+    "html": "Feed-forward: each word digests it on its own"
+   },
+   {
+    "t0": 125.2,
+    "t1": 128.6,
+    "html": "Expand into 3,072 features, filter them, fold back"
+   },
+   {
+    "t0": 128.95,
+    "t1": 132.35,
+    "html": "The gate: should this feature pass, and how much?"
+   },
+   {
+    "t0": 132.7,
+    "t1": 136.1,
+    "html": "The content: what this feature has to say"
+   },
+   {
+    "t0": 136.45,
+    "t1": 139.85,
+    "html": "Multiply: the wider the gate, the more content gets through"
+   },
+   {
+    "t0": 140.2,
+    "t1": 143.6,
+    "html": "SiLU: below zero it mostly shuts, above zero it lets through"
+   },
+   {
+    "t0": 143.95,
+    "t1": 147.35,
+    "html": "This time, only <span class=\"m\">157</span> of 3,072 light up"
+   },
+   {
+    "t0": 147.7,
+    "t1": 150.1,
+    "html": "Down: fold the filtered features back into 1,024 numbers"
+   },
+   {
+    "t0": 150.3,
+    "t1": 152.35,
+    "html": "…and add them to what it already knew"
+   },
+   {
+    "t0": 153.7,
+    "t1": 157.35,
+    "html": "After 28 layers, this position holds what it wants to say"
+   },
+   {
+    "t0": 157.7,
+    "t1": 159.6,
+    "html": "Compare it with every word in the vocabulary"
+   },
+   {
+    "t0": 159.8,
+    "t1": 161.725,
+    "html": "Closer means higher: all 151,936 get a score"
+   },
+   {
+    "t0": 162.075,
+    "t1": 165.475,
+    "html": "Softmax turns scores into odds: <q>The</q> <span class=\"m\">100%</span>"
+   },
+   {
+    "t0": 165.825,
+    "t1": 169.85,
+    "html": "Then a weighted draw, among only the likeliest few"
+   },
+   {
+    "t0": 170.2,
+    "t1": 172.35,
+    "html": "It draws <q>The</q>, and says it"
+   },
+   {
+    "t0": 172.8,
+    "t1": 176.60000000000002,
+    "html": "Append it, then run the whole thing again"
+   },
+   {
+    "t0": 176.9,
+    "t1": 180.10000000000002,
+    "html": "Word 6: <q>it</q> <span class=\"m\">49%</span>, <q>of</q> <span class=\"m\">38%</span>"
+   },
+   {
+    "t0": 180.4,
+    "t1": 184.8,
+    "html": "It drew <q>of</q>, not the top pick: it really is a draw"
+   },
+   {
+    "t0": 185.3,
+    "t1": 190.2,
+    "html": "And so on, one word after another"
+   },
+   {
+    "t0": 190.4,
+    "t1": 194.85,
+    "html": "until it picks the end marker, and the answer is done"
+   },
+   {
+    "t0": 201.6,
+    "t1": 204.1,
+    "html": "Want to open it up yourself, step by step?"
+   },
+   {
+    "t0": 204.29999999999998,
+    "t1": 209.95,
+    "html": "On the website, every ＋ takes you one level deeper"
+   },
+   {
+    "t0": 210.2,
+    "t1": 213.25,
+    "html": "Pause, step, speed up: debug its thinking like a program"
+   }
+  ],
+  "terms": [
+   {
+    "t0": 20.4,
+    "t1": 22.4,
+    "html": "chat template"
+   },
+   {
+    "t0": 22.7,
+    "t1": 24.8,
+    "html": "token ID"
+   },
+   {
+    "t0": 25.4,
+    "t1": 29.8,
+    "html": "embedding table · 151,936 rows × 1,024"
+   },
+   {
+    "t0": 30.3,
+    "t1": 32,
+    "html": "Transformer layers × 28"
+   },
+   {
+    "t0": 32.3,
+    "t1": 35.3609375,
+    "html": "logit lens"
+   },
+   {
+    "t0": 51.550000000000004,
+    "t1": 54.85,
+    "html": "RMSNorm · RMS <span class=\"m\">3.77</span> → <span class=\"m\">1</span>"
+   },
+   {
+    "t0": 55.300000000000004,
+    "t1": 58.6,
+    "html": "self-attention"
+   },
+   {
+    "t0": 61.550000000000004,
+    "t1": 65.475,
+    "html": "Query · q = h × W<sub>q</sub>"
+   },
+   {
+    "t0": 65.925,
+    "t1": 69.85,
+    "html": "Key · k = h × W<sub>k</sub>"
+   },
+   {
+    "t0": 70.3,
+    "t1": 74.225,
+    "html": "Value · v = h × W<sub>v</sub>"
+   },
+   {
+    "t0": 74.675,
+    "t1": 77.375,
+    "html": "dot product Q·K<sup>T</sup>"
+   },
+   {
+    "t0": 77.675,
+    "t1": 80.475,
+    "html": "dot product Q·K<sup>T</sup>"
+   },
+   {
+    "t0": 80.925,
+    "t1": 84.225,
+    "html": "head <span class=\"m\">13</span> · <span class=\"m\">128</span> dimensions per head"
+   },
+   {
+    "t0": 87.8,
+    "t1": 91.1,
+    "html": "d = <span class=\"m\">128</span> · √d ≈ <span class=\"m\">11.3</span>"
+   },
+   {
+    "t0": 91.55,
+    "t1": 94.25,
+    "html": "softmax"
+   },
+   {
+    "t0": 94.55,
+    "t1": 97.35,
+    "html": "softmax"
+   },
+   {
+    "t0": 97.8,
+    "t1": 100.5,
+    "html": "weighted sum Σ w × V"
+   },
+   {
+    "t0": 100.8,
+    "t1": 103.6,
+    "html": "weighted sum Σ w × V"
+   },
+   {
+    "t0": 106.55,
+    "t1": 109.65,
+    "html": "multi-head attention · <span class=\"m\">16</span> heads"
+   },
+   {
+    "t0": 109.94999999999999,
+    "t1": 113.6,
+    "html": "multi-head attention · <span class=\"m\">16</span> heads"
+   },
+   {
+    "t0": 114.05,
+    "t1": 116.75,
+    "html": "residual connection"
+   },
+   {
+    "t0": 117.05,
+    "t1": 119.85,
+    "html": "logit lens · <q>The</q> <span class=\"m\">98%</span>"
+   },
+   {
+    "t0": 122.69999999999999,
+    "t1": 124.85,
+    "html": "feed-forward network"
+   },
+   {
+    "t0": 125.3,
+    "t1": 128.6,
+    "html": "<span class=\"m\">1024</span> → <span class=\"m\">3072</span> → <span class=\"m\">1024</span>"
+   },
+   {
+    "t0": 129.04999999999998,
+    "t1": 132.35,
+    "html": "gate"
+   },
+   {
+    "t0": 132.79999999999998,
+    "t1": 136.1,
+    "html": "up (content)"
+   },
+   {
+    "t0": 136.54999999999998,
+    "t1": 139.85,
+    "html": "SwiGLU = SiLU(gate) × up"
+   },
+   {
+    "t0": 140.29999999999998,
+    "t1": 143.6,
+    "html": "SiLU activation"
+   },
+   {
+    "t0": 144.04999999999998,
+    "t1": 147.35,
+    "html": "most features stay quiet"
+   },
+   {
+    "t0": 147.79999999999998,
+    "t1": 150.1,
+    "html": "down"
+   },
+   {
+    "t0": 150.4,
+    "t1": 152.35,
+    "html": "residual connection"
+   },
+   {
+    "t0": 153.79999999999998,
+    "t1": 157.35,
+    "html": "last position · 1,024 numbers"
+   },
+   {
+    "t0": 157.79999999999998,
+    "t1": 159.6,
+    "html": "dot product · 151,936 tokens"
+   },
+   {
+    "t0": 159.9,
+    "t1": 161.725,
+    "html": "top score: <q>The</q> <span class=\"m\">29.58</span>"
+   },
+   {
+    "t0": 162.17499999999998,
+    "t1": 165.475,
+    "html": "softmax"
+   },
+   {
+    "t0": 165.92499999999998,
+    "t1": 169.85,
+    "html": "temperature <span class=\"m\">0.7</span> · top-k <span class=\"m\">20</span> · top-p <span class=\"m\">0.8</span>"
+   },
+   {
+    "t0": 172.9,
+    "t1": 176.60000000000002,
+    "html": "autoregression: one token at a time"
+   },
+   {
+    "t0": 190.5,
+    "t1": 194.85,
+    "html": "<span class=\"m\">&lt;|im_end|&gt;</span> <span class=\"m\">98%</span>"
+   },
+   {
+    "t0": 204.39999999999998,
+    "t1": 209.95,
+    "html": "black box → structure → layer tower → inside a layer → attention → one multiply-add"
+   },
+   {
+    "t0": 210.29999999999998,
+    "t1": 213.25,
+    "html": "play · speed · pause · step"
+   }
+  ]
+ },
+ "duration": 220,
+ "fps": 30
+}

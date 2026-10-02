@@ -2,7 +2,8 @@
 // （点选问题、发送、点 ＋ 揭开、一层层往里钻、播放 / 倍速 / 暂停 / 单步），用 CDP 的 screencast 录下来，
 // 再按 30 fps 等间隔重采样成 sitecap/f0000.jpg…，连同每次点击的时刻和位置写进 sitecap/meta.json。
 //
-//   node tools/video/sitecap.mjs [--out /mnt/d/cjc/videos/llm-inference/sitecap] [--dry]
+//   node tools/video/sitecap.mjs [--out /mnt/d/cjc/videos/llm-inference/sitecap] [--lang en] [--site http://127.0.0.1:8776/public/] [--dry]
+//   英文版：--lang en 打开 index.html?lang=en，用英文问题 e01 的候选词元拼出 “Why is the sky blue?”
 //
 // 录屏本身是实时的（和真人录屏一样），之后电影页按 meta.json 里的时间表剪辑、变速、叠加鼠标。
 import { createRequire } from 'node:module';
@@ -14,12 +15,16 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || '/home/mtzn/cjc/huma
 const args = process.argv.slice(2);
 const OUT = args.includes('--out') ? args[args.indexOf('--out') + 1] : '/mnt/d/cjc/videos/llm-inference/sitecap';
 const DRY = args.includes('--dry');
+const EN = args.includes('--lang') && args[args.indexOf('--lang') + 1] === 'en';
+const SITE = args.includes('--site') ? args[args.indexOf('--site') + 1] : 'http://127.0.0.1:8776/public/';
 const VW = 1280, VH = 720, DPR = 1.5, FPS = 30;
 const HOME = process.env.HOME;
 const env = { ...process.env, LD_LIBRARY_PATH: `/usr/lib/wsl/lib:${HOME}/.local/lib/chromium-deps/root/usr/lib/x86_64-linux-gnu`, GALLIUM_DRIVER: 'd3d12', MESA_D3D12_DEFAULT_ADAPTER_NAME: 'NVIDIA' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await chromium.launch({ env, args: ['--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist', '--hide-scrollbars', '--force-color-profile=srgb', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+// --cpu：用 swiftshader（不碰显卡），只适合 --dry 试走一遍流程；真正录屏要 GPU，否则帧率太低
+const GPU = args.includes('--cpu') ? ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist'];
+const browser = await chromium.launch({ env, args: [...GPU, '--hide-scrollbars', '--force-color-profile=srgb', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
 const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: DPR });
 const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
@@ -32,7 +37,7 @@ await page.addInitScript(() => {
     document.head.appendChild(st);
   });
 });
-await page.goto('http://127.0.0.1:8776/public/index.html', { waitUntil: 'load' });
+await page.goto(`${SITE}index.html${EN ? '?lang=en' : '?lang=zh'}`, { waitUntil: 'load' });
 await page.waitForSelector('.cand[data-id]', { timeout: 60000 });
 await sleep(1500);
 
@@ -69,7 +74,11 @@ async function click(name, sel) {
 
 await sleep(800);
 // 1. 用候选词元拼出「天空为什么是蓝色的？」
-const q01 = JSON.parse(fs.readFileSync(new URL('../../public/data/manifest.json', import.meta.url))).questions.find((q) => q.id === 'q01');
+//    英文版用 e01 的候选词元拼出 “Why is the sky blue?”（清单从网站自己读；网站上还没有英文数据时退回 D 盘的拷贝）
+let MAN;
+try { const r = await fetch(`${SITE}data/${EN ? 'en/' : ''}manifest.json`); if (!r.ok) throw new Error(r.status); MAN = await r.json(); }
+catch { MAN = JSON.parse(fs.readFileSync(EN ? '/mnt/d/cjc/videos/llm-inference/data-en/manifest.json' : new URL('../../public/data/manifest.json', import.meta.url))); }
+const q01 = MAN.questions.find((q) => q.id === (EN ? 'e01' : 'q01'));
 for (const c of q01.chips) { await click('chip', `.cand[data-id="${c.id}"]`); await sleep(260); }
 await sleep(250);
 await click('send', '#btnSend');

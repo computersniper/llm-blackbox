@@ -29,8 +29,9 @@ function pyPrefix(segd, n) {
 }
 
 export class Opening {
-  constructor({ E, M, Q, frame, T }) {
+  constructor({ E, M, Q, frame, T, lang = 'zh' }) {
     this.E = E; this.M = M; this.Q = Q; this.T = T;
+    this.en = lang === 'en';
     this.user = Q.tokens.map((t, i) => ({ ...t, i })).filter((t) => t.role === 'user' && !t.sp && t.s !== 'user' && t.s !== '\n');
     this.fog0 = { near: E.scene.fog.near, far: E.scene.fog.far };
     this.buildPage(frame);
@@ -47,16 +48,19 @@ export class Opening {
     this.bg = el('canvas', 'cp-bg', '', wrap);
     this.bg.width = 1920; this.bg.height = 1080;
     const page = (this.page = el('div', 'cpage', '', wrap));
-    const toks = this.user.map((t) => `<span class="tk">${esc(tokPlain(t.s))}</span>`).join('');
+    // 英文：词元前面的空格不画进块里，改成块前面的间距（裂开之前看起来就是正常的一句话）
+    this.lead = this.user.map((t) => this.en && /^\s/.test(t.s));
+    const toks = this.user.map((t) => `<span class="tk">${esc(this.en ? t.s.trim() : tokPlain(t.s))}</span>`).join('');
+    const L_ = (zh, en) => (this.en ? en : zh);
     page.innerHTML = `
       <div class="cp-model"><span class="cp-av"><i></i></span><b>Qwen3-0.6B</b></div>
-      <header class="cp-head"><div class="t">AI 的一个字是怎么思考出来的</div><div class="s">走进大模型推理的“黑箱”</div></header>
+      <header class="cp-head"><div class="t">${L_('AI 的一个字是怎么思考出来的', 'How Does AI Think Up a Single Word?')}</div><div class="s">${L_('走进大模型推理的“黑箱”', 'Inside the “black box” of LLM inference')}</div></header>
       <div class="cp-rule"></div>
-      <div class="cp-hello"><span class="cp-av"><i></i></span><div class="h">有什么想问的？</div><div class="s">Qwen3-0.6B · 阿里开源的 6 亿参数模型</div></div>
+      <div class="cp-hello"><span class="cp-av"><i></i></span><div class="h">${L_('有什么想问的？', 'What would you like to ask?')}</div><div class="s">${L_('Qwen3-0.6B · 阿里开源的 6 亿参数模型', 'Qwen3-0.6B · a 0.6-billion-parameter open model by Alibaba')}</div></div>
       <div class="cp-user"><div class="cp-bub">${toks}</div></div>
-      <div class="cp-bot"><span class="cp-av"><i></i></span><div><div class="n">Qwen3-0.6B</div><div class="th"><span class="tx">正在思考</span><span class="dots"><i></i><i></i><i></i></span></div></div></div>
-      <div class="cp-box"><div class="cp-in"><span class="cp-txt"></span><span class="cp-comp"></span><span class="cp-caret"></span><span class="cp-ph">给 Qwen3-0.6B 发消息</span></div><span class="cp-send">${SEND_SVG}</span></div>
-      <div class="cp-hint">回答来自真实模型的离线运行 · Enter 发送</div>
+      <div class="cp-bot"><span class="cp-av"><i></i></span><div><div class="n">Qwen3-0.6B</div><div class="th"><span class="tx">${L_('正在思考', 'Thinking')}</span><span class="dots"><i></i><i></i><i></i></span></div></div></div>
+      <div class="cp-box"><div class="cp-in"><span class="cp-txt"></span><span class="cp-comp"></span><span class="cp-caret"></span><span class="cp-ph">${L_('给 Qwen3-0.6B 发消息', 'Message Qwen3-0.6B')}</span></div><span class="cp-send">${SEND_SVG}</span></div>
+      <div class="cp-hint">${L_('回答来自真实模型的离线运行 · Enter 发送', 'Answers come from real, recorded runs of the model · Enter to send')}</div>
       <div class="cp-ime"><div class="py"></div><div class="cs"></div></div>`;
     const q = (s) => page.querySelector(s);
     Object.assign(this, {
@@ -79,6 +83,7 @@ export class Opening {
       for (const k of w.keys) if (t >= k) last = Math.max(last, k);
       if (t >= w.commit) { txt += w.s; last = Math.max(last, w.commit); continue; }
       const n = w.keys.filter((k) => t >= k).length;
+      if (w.chars) { txt += w.s.slice(0, n); break; }
       if (n > 0 && w.py) {
         comp = pyPrefix(w.seg, n);
         const kl = w.keys[w.keys.length - 1];
@@ -172,7 +177,7 @@ export class Opening {
       const e = easeInOut(seg(t, a, a + T.splitD));
       const g = smooth(seg(t, T.swapT - 0.6, T.swapT - 0.05));
       const gone = smooth(seg(t, T.swapT, T.swapT + 0.14));
-      s.style.marginLeft = k ? `${(18 * e).toFixed(2)}px` : '0';
+      s.style.marginLeft = k ? `${(this.lead[k] ? 11 + 7 * e : 18 * e).toFixed(2)}px` : '0';
       s.style.padding = `${(5 * e).toFixed(2)}px ${(14 * e).toFixed(2)}px`;
       s.style.borderColor = rgb([94, 228, 240], 0.55 * e + 0.35 * g);
       s.style.background = rgb([94, 228, 240], 0.14 * e + 0.08 * g);
@@ -274,7 +279,7 @@ export class Opening {
     this.tiles = this.user.map((t) => {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(TILE_GEO, mat));
-      const face = new THREE.Mesh(FACE_GEO, new THREE.MeshBasicMaterial({ map: textTexture(tokPlain(t.s), { color: '#5ee4f0', w: 512, h: 320, font: '600 152px "PingFang SC","Noto Sans SC",sans-serif' }), transparent: true }));
+      const face = new THREE.Mesh(FACE_GEO, new THREE.MeshBasicMaterial({ map: textTexture(this.en ? t.s.trim() : tokPlain(t.s), { color: '#5ee4f0', w: 512, h: 320, font: '600 152px "PingFang SC","Noto Sans SC",sans-serif' }), transparent: true }));
       face.position.z = 0.181;
       g.add(face);
       const top = face.clone();

@@ -8,7 +8,8 @@ const env = { ...process.env, LD_LIBRARY_PATH: `/usr/lib/wsl/lib:${HOME}/.local/
 const browser = await chromium.launch({ env, args: ['--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist', '--hide-scrollbars'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
 page.on('pageerror', (e) => console.log('ERR', String(e)));
-await page.goto('http://127.0.0.1:8776/tools/video/film.html?fps=60', { waitUntil: 'load' });
+page.on('response', (r) => { if (r.status() >= 400) console.log('HTTP', r.status(), r.url()); });
+await page.goto(`http://127.0.0.1:8776/tools/video/film.html?fps=60&lang=${process.env.FILM_LANG || 'zh'}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__film && (window.__film.ready || window.__film.error), null, { timeout: 120000 });
 await page.evaluate(([tt, pp]) => window.__film.seek(tt, pp), [Number(t), Number(pre)]);
 if (shotFile) await page.screenshot({ path: shotFile, type: 'jpeg', quality: 85 });

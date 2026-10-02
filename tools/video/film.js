@@ -12,17 +12,25 @@ import { buildScore } from './score.js';
 import { Opening } from './lib/opening.js';
 import { loadManifest, loadQuestion, loadThumbs } from '/public/js/data.js';
 import { viewOf } from '/public/js/timeline.js';
-import { label } from '/public/js/stage/engine.js';
+import { label, textTexture } from '/public/js/stage/engine.js';
 import { tokPlain, shortSpecial, fmtPct, esc } from '/public/js/ui.js';
 import { bf16Bits } from '/public/js/num.js';
 
 const params = new URLSearchParams(location.search);
 const FPS = Number(params.get('fps') || 30);
-const QID = params.get('q') || 'q01';
+// 语言：?lang=en 是英文版（问题 e01 “Why is the sky blue?”，真实的英文运行）；默认中文版（q01）
+const LANG = params.get('lang') === 'en' ? 'en' : 'zh';
+const EN = LANG === 'en';
+const L_ = (zh, en) => (EN ? en : zh);
+const QID = params.get('q') || (EN ? 'e01' : 'q01');
+document.documentElement.classList.toggle('en', EN);
+document.documentElement.lang = EN ? 'en' : 'zh-CN';
 const PREVIEW = params.has('preview');
 const $ = (s) => document.querySelector(s);
 
-let E, M, Q, MAN, SC, OPENING, QR_SVG = '', CAP = null;
+let E, M, Q, MAN, SC, OPENING, QR_SVG = '', CAP = null, CAP_DIR = 'sitecap';
+// 英文版戏剧点的手动覆盖（看过英文数据以后填）；空对象 = 全用 findDrama 自动找的
+const DRAMA_OV = {};
 const SITE = new Map();
 const extras = {};
 const EVENTS = []; // 给配乐 / 音效用的事件（时间点），渲染脚本会把它导出成 events.json
@@ -31,7 +39,7 @@ const EVENTS = []; // 给配乐 / 音效用的事件（时间点），渲染脚�
 
 const pct = (p) => fmtPct(p);
 const tk = (s) => esc(tokPlain(s));
-const q = (s) => `「${tk(s)}」`;
+const q = (s) => (EN ? `“${s === '<|endoftext|>' ? 'end-of-text' : esc(String(s).trim())}”` : `「${tk(s)}」`);
 const m = (s) => `<span class="m">${s}</span>`;
 const num = (v, d = 2) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
 function hash01(n) { let x = (n + 1) * 2654435761 >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822507) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; }
@@ -56,6 +64,7 @@ function schedule(list, t) {
 async function boot() {
   await Promise.all([
     document.fonts.load('900 100px "Film Serif"', 'AI 的一个字是怎么思考出来的'),
+    ...(EN ? [document.fonts.load('700 60px "Film Serif EN"', 'How Does AI'), document.fonts.load('600 38px "Film Serif EN"', 'Why is the sky blue?'), document.fonts.load('400 38px "Film Sans EN"', 'Why is the sky blue?'), document.fonts.load('600 38px "Film Sans EN"', 'Qwen')] : []),
     document.fonts.load('400 38px "Film Sans"', '天空为什么是蓝色的？'),
     document.fonts.load('600 38px "Film Sans"', 'Qwen'),
     document.fonts.load('600 40px "Film Serif"', '法国的首都是哪里'),
@@ -64,14 +73,17 @@ async function boot() {
     document.fonts.load('400 20px "JetBrains Mono"', '0123'),
     document.fonts.load('700 20px "JetBrains Mono"', '0123'),
   ]);
-  QR_SVG = await (await fetch('/tools/video/qr-blackbox.svg')).text();
+  QR_SVG = await (await fetch(EN ? '/tools/video/qr-blackbox-en.svg' : '/tools/video/qr-blackbox.svg')).text();
   MAN = await loadManifest();
   Q = await loadQuestion(QID, MAN);
   await Promise.all(Array.from({ length: Q.NL }, (_, L) => Q.ensureMicro(L)));
   const thumbs = await loadThumbs();
   // 片尾的推理页录屏（sitecap.mjs 录好放在 D 盘）：只预载片子里用得到的那些帧
-  CAP = await fetch('/ext/sitecap/meta.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  SC = buildScore(Q, CAP);
+  // 英文版录的是网站英文界面（sitecap-en/）；还没录好时先用中文界面的录屏占位
+  CAP_DIR = EN ? 'sitecap-en' : 'sitecap';
+  CAP = await fetch(`/ext/${CAP_DIR}/meta.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!CAP && EN) { CAP_DIR = 'sitecap'; CAP = await fetch('/ext/sitecap/meta.json').then((r) => (r.ok ? r.json() : null)).catch(() => null); }
+  SC = buildScore(Q, CAP, { lang: LANG, drama: DRAMA_OV });
   if (CAP && SC.endSite) await preloadSite();
 
   E = new FilmEngine($('#gl'), { pixelRatio: Number(params.get('pr') || 1.5) });
@@ -88,8 +100,9 @@ async function boot() {
   tameScene();
   buildExtras();
   buildOverlays();
-  OPENING = new Opening({ E, M, Q, frame: $('#frame'), T: SC.open });
-  window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
+  OPENING = new Opening({ E, M, Q, frame: $('#frame'), T: SC.open, lang: LANG });
+  if (EN) localizeStage();
+  window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end, subs: SC.subs, terms: SC.terms } };
   if (PREVIEW) startPreview();
 }
 
@@ -259,7 +272,7 @@ function buildOverlays() {
   OV.qcaret = el('div', 'qcaret', '', OV.qline);
 
   // 片名
-  OV.title = el('div', 'title', `<div class="eb">INSIDE A LANGUAGE MODEL</div><h1><span>AI 的一个字</span><span>是怎么思考出来的</span></h1><div class="rule"></div><div class="st">走进大模型推理的“黑箱”</div><div class="spec">QWEN3-0.6B · 28 LAYERS · ${MAN.model.params.toLocaleString('en-US')} PARAMETERS · BF16</div>`, ov);
+  OV.title = el('div', 'title', `<div class="eb">INSIDE A LANGUAGE MODEL</div><h1>${L_('<span>AI 的一个字</span><span>是怎么思考出来的</span>', '<span>How Does AI Think Up</span> <span>a Single Word?</span>')}</h1><div class="rule"></div><div class="st">${L_('走进大模型推理的“黑箱”', 'Inside the “black box” of LLM inference')}</div><div class="spec">QWEN3-0.6B · 28 LAYERS · ${MAN.model.params.toLocaleString('en-US')} PARAMETERS · BF16</div>`, ov);
 
   // 逻辑透镜面板
   OV.lens = el('div', 'lenspanel', '', ov);
@@ -273,11 +286,11 @@ function buildOverlays() {
   // 片尾
   OV.end = el('div', 'endcard', '', ov);
   // 片尾：推理页录屏放在一个干净的窗口框里（不模仿任何浏览器），鼠标和点击是叠加上去的；最后落版网址 + 二维码
-  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">caijiechao.com/blackbox/</span></div><canvas width="1920" height="1080"></canvas>`, ov);
+  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">${L_('caijiechao.com/blackbox/', 'caijiechao.com/blackbox/?lang=en')}</span></div><canvas width="1920" height="1080"></canvas>`, ov);
   OV.winCtx = OV.win.querySelector('canvas').getContext('2d');
   OV.winIdx = -1;
   OV.cur = el('div', 'cur', `<span class="rip"></span><svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 2.5v17.2l4.6-4.3 3 6.6 2.9-1.3-3-6.5h6.2z" fill="#fff" stroke="#05080f" stroke-width="1.4" stroke-linejoin="round"/></svg>`, ov);
-  OV.fin = el('div', 'fin7', `<div class="url">caijiechao.com/blackbox/</div><div class="qr">${QR_SVG}</div><div class="hint">扫码打开推理页，亲手一层层看</div>`, ov);
+  OV.fin = el('div', 'fin7', `<div class="url">${L_('caijiechao.com/blackbox/', 'caijiechao.com/blackbox/?lang=en')}</div><div class="qr">${QR_SVG}</div><div class="hint">${L_('扫码打开推理页，亲手一层层看', 'Scan to open it and explore, layer by layer')}</div>`, ov);
 
   // v5 讲解层：章节进度、术语标签、注意力公式、6 个头的小图、指示环
   OV.terms = new CueLayer(ov, 'term', SC.terms, { rise: 6, fin: 0.3, fout: 0.3 });
@@ -297,11 +310,11 @@ function buildOverlays() {
   OV.heads6 = el('div', 'heads6', '', ov);
   OV.h6Key = '';
   OV.ffn = el('div', 'ffnmap', `<div class="row">
-      <div class="b in" data-k="in"><b>1024</b><span>这个词的理解</span></div><i class="ar">→</i>
-      <div class="stack"><div class="b g" data-k="gate"><b>门 gate</b><span>3072 个：放不放行、放多少</span></div><div class="b u" data-k="up"><b>内容 up</b><span>3072 份内容</span></div></div><i class="ar">→</i>
+      <div class="b in" data-k="in"><b>1024</b><span>${L_('这个词的理解', "the word's meaning")}</span></div><i class="ar">→</i>
+      <div class="stack"><div class="b g" data-k="gate"><b>${L_('门 gate', 'gate')}</b><span>${L_('3072 个：放不放行、放多少', '3,072: let through? how much?')}</span></div><div class="b u" data-k="up"><b>${L_('内容 up', 'up · content')}</b><span>${L_('3072 份内容', '3,072 pieces of content')}</span></div></div><i class="ar">→</i>
       <div class="b mul" data-k="mul"><b>×</b></div><i class="ar">→</i>
-      <div class="b d" data-k="down"><b>down</b><span>收回 1024</span></div><i class="ar">→</i>
-      <div class="b add" data-k="add"><b>⊕</b><span>加回去</span></div>
+      <div class="b d" data-k="down"><b>down</b><span>${L_('收回 1024', 'back to 1,024')}</span></div><i class="ar">→</i>
+      <div class="b add" data-k="add"><b>⊕</b><span>${L_('加回去', 'add back')}</span></div>
     </div><div class="cap"></div>`, ov);
   OV.ffnCap = OV.ffn.querySelector('.cap');
   OV.ffnKey = '';
@@ -341,7 +354,7 @@ function updateFormula(F) {
 }
 
 // 6 个头的小图：每个头前 3 名（真实数据）。「天空」那一行用琥珀色
-const tokShort = (s) => ({ '<|im_start|>': '开头', '\n\n': '换行', '</think>': '思考结束', '\n': '换行' }[s] ?? tokPlain(s));
+const tokShort = (s) => (EN ? ({ '<|im_start|>': 'start', '\n\n': '↵↵', '</think>': '</think>', '\n': '↵' }[s] ?? s.trim()) : ({ '<|im_start|>': '开头', '\n\n': '换行', '</think>': '思考结束', '\n': '换行' }[s] ?? tokPlain(s)));
 function updateHeads6(H) {
   OV.heads6.style.display = H && H.a > 0.001 ? 'grid' : 'none';
   if (!H || H.a <= 0.001) return;
@@ -351,7 +364,7 @@ function updateHeads6(H) {
     const row = Q.row(H.g ?? 0);
     OV.heads6.innerHTML = H.list.map((h) => {
       const top = Q.att(H.L, h, row).slice(0, 3);
-      return `<div class="hd" data-h="${h}"><div class="hn">第 ${h} 个头<small>${esc(H.notes?.[h] ?? '')}</small></div>${top.map((r) => `<div class="r${Q.tokens[r.j].s === H.sky ? ' sky' : ''}"><span>「${esc(tokShort(Q.tokens[r.j].s))}」</span><span class="bar" style="width:${Math.max(3, r.w * 100).toFixed(1)}%"></span><span class="p">${pct(r.w)}</span></div>`).join('')}</div>`;
+      return `<div class="hd" data-h="${h}"><div class="hn">${L_(`第 ${h} 个头`, `Head ${h}`)}<small>${esc(H.notes?.[h] ?? '')}</small></div>${top.map((r) => `<div class="r${Q.tokens[r.j].s === H.sky ? ' sky' : ''}"><span>${L_('「', '“')}${esc(tokShort(Q.tokens[r.j].s))}${L_('」', '”')}</span><span class="bar" style="width:${Math.max(3, r.w * 100).toFixed(1)}%"></span><span class="p">${pct(r.w)}</span></div>`).join('')}</div>`;
     }).join('');
   }
   OV.heads6.querySelectorAll('.hd').forEach((d, k) => {
@@ -405,7 +418,7 @@ function updateFfnMap(F) {
   OV.ffnKey = key;
   const LIT = { shape: ['in', 'gate', 'up', 'mul', 'down', 'add'], gate: ['gate'], up: ['up'], mul: ['gate', 'up', 'mul'], silu: ['gate'], act: ['mul'], down: ['down', 'add'] }[F.hi] || [];
   OV.ffn.querySelectorAll('[data-k]').forEach((e) => e.classList.toggle('on', LIT.includes(e.dataset.k)));
-  OV.ffnCap.innerHTML = F.cap === 'silu' ? `<span class="l">小于 0：基本关上</span>${SILU_SVG}<span class="r">大于 0：照常通过</span>` : (F.cap || '');
+  OV.ffnCap.innerHTML = F.cap === 'silu' ? `<span class="l">${L_('小于 0：基本关上', 'below 0: mostly shut')}</span>${SILU_SVG}<span class="r">${L_('大于 0：照常通过', 'above 0: passes through')}</span>` : (F.cap || '');
 }
 
 // 前馈的三块矩阵：讲到哪块，哪块亮；'din' = 门 × 内容之后的那根向量
@@ -424,11 +437,40 @@ function focusMlp(which, k = 1) {
   P.din.segs.forEach((s) => { s.material.opacity = 0.95 * dim('din'); });
 }
 
+// 英文版：舞台里写死的中文标签换成英文（每帧对新出现 / 变过的标签做一次替换，有缓存）
+const STAGE_EN = [
+  [/真实权重分布/g, 'real weights'], [/(\d+) 头 × (\d+)/g, '$1 heads × $2'], [/→ 缓存/g, '→ cache'], [/(\d+) Q 头 \/ (\d+) KV 头/g, '$1 Q heads / $2 KV heads'],
+  [/GQA：每 2 个 Q 头共用 1 个 K\/V 头/g, 'GQA: every 2 Q heads share 1 K/V head'], [/注意力/g, 'Attention'], [/⊕ 残差/g, '⊕ residual'], [/SwiGLU 前馈/g, 'SwiGLU feed-forward'],
+  [/加回残差/g, 'add to residual'], [/拼接/g, 'concat'], [/第 (\d+) 层 · SwiGLU 的 3072 个神经元/g, 'Layer $1 · the 3,072 SwiGLU neurons'], [/只导出了最亮的 (\d+) 个/g, 'brightest $1 exported'],
+  [/完整导出/g, 'fully exported'], [/明显激活 (\d+) 个/g, '$1 clearly active'], [/第 (\d+) 号头/g, 'head $1'], [/128 维里乘积最大的 12 维/g, 'the 12 largest of 128 products'],
+  [/「([^」]*)」/g, '“$1”'], [/与嵌入表共享/g, 'shared with the embedding table'], [/其他/g, 'other'], [/嵌入表/g, 'embedding table'],
+  [/151936 行 × 1024 列 · 每个词元按编号取一行/g, '151,936 rows × 1,024 · each token takes its own row'], [/第 0 行/g, 'row 0'], [/第 151935 行/g, 'row 151,935'],
+  [/↓ 下一个词从这里接着写/g, '↓ the next word continues here'], [/第 (\d+) 层/g, 'layer $1'], [/输入/g, 'input'], [/输出/g, 'output'], [/个数/g, ' numbers'], [/词元/g, 'tokens'], [/打分/g, 'score'],
+];
+function localizeStage() {
+  // 黑箱正面的型号字是一张贴图：换成英文
+  const sub = M.cFront.children.find((c) => c.isMesh && c.material.map && Math.abs(c.geometry.parameters.height / c.geometry.parameters.width - 0.08) < 0.004);
+  if (sub) sub.material.map = textTexture('28 layers · 596M parameters · bfloat16', { color: '#7a859e', font: '500 60px "Film Sans EN","Film Sans",sans-serif', w: 1400, h: 112 });
+}
+function localizeLabels() {
+  // 走场景树而不是查 DOM：刚出现的标签这一帧才会被 CSS2D 渲染器挂进 DOM，查 DOM 会漏掉一帧
+  const els = [];
+  E.scene.traverse((o) => { if (o.isCSS2DObject && o.element) els.push(o.element); });
+  for (const el of els) {
+    if (el._en === el.innerHTML) continue;
+    let h = el.innerHTML;
+    if (/[\u4e00-\u9fff「」]/.test(h)) for (const [re, to] of STAGE_EN) h = h.replace(re, to);
+    h = h.replace(/&lt;\|endoftext\|&gt;/g, 'end-of-text');
+    if (h !== el.innerHTML) el.innerHTML = h;
+    el._en = el.innerHTML;
+  }
+}
+
 // 片尾录屏：按时间表换帧；窗口最后缩到左边，右边落版网址 + 二维码
 async function preloadSite() {
   const need = new Set();
   for (const sg of SC.endSite.segs) for (let f = sg.f0; f <= sg.f1 + 1e-6; f += 1 / 60) need.add(Math.min(CAP.n - 1, Math.max(0, Math.round(lerp(sg.c0, sg.c1, (f - sg.f0) / (sg.f1 - sg.f0)) * CAP.fps))));
-  await Promise.all([...need].map((k) => new Promise((res) => { const im = new Image(); im.onload = () => res(); im.onerror = () => res(); im.src = `/ext/sitecap/f${String(k).padStart(4, '0')}.jpg`; SITE.set(k, im); })));
+  await Promise.all([...need].map((k) => new Promise((res) => { const im = new Image(); im.onload = () => res(); im.onerror = () => res(); im.src = `/ext/${CAP_DIR}/f${String(k).padStart(4, '0')}.jpg`; SITE.set(k, im); })));
 }
 function cursorAt(ct) {
   const acts = CAP.actions.filter((a) => a.x != null);
@@ -596,17 +638,20 @@ function updateLens(L) {
     return `<path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/>${dots}`;
   };
   const cur = Math.floor(clip);
+  const topNow = Q.lensAt(g, cur).top[0][2];
+  // 英文版：榜首就是两条线之一时，直接在那一项后面标「top」，省得一行放不下
+  const topTag = (s) => (EN && s === topNow ? ' <span style="color:var(--dim);font-size:14px;letter-spacing:.08em">▲ top</span>' : '');
   const vc = pc.find(([l]) => l === cur)?.[1] ?? 0;
   const vo = po.find(([l]) => l === cur)?.[1];
   const grid = [0, 0.5, 1].map((p) => `<line x1="0" x2="${W}" y1="${y(p)}" y2="${y(p)}" stroke="rgba(150,180,230,${p === 0 ? 0.25 : 0.1})"/><text class="ax" x="-8" y="${y(p) + 4}" text-anchor="end">${p * 100}%</text>`).join('');
   const ticks = [0, 7, 14, 21, 27].map((l) => `<text class="ax" x="${x(l)}" y="${H + 18}" text-anchor="middle">L${String(l).padStart(2, '0')}</text>`).join('');
   const cursor = `<line x1="${x(clip)}" x2="${x(clip)}" y1="0" y2="${H}" stroke="rgba(255,182,92,.35)" stroke-dasharray="3 4"/>`;
-  OV.lens.innerHTML = `<div class="h">逻辑透镜 · 第 ${g + 1} 个词<small>每层直接接输出头：此刻开口会说什么</small></div>
+  OV.lens.innerHTML = `<div class="h">${L_(`逻辑透镜 · 第 ${g + 1} 个词<small>每层直接接输出头：此刻开口会说什么</small>`, `Logit lens · word ${g + 1}<small>each layer read out directly: what would it say now?</small>`)}</div>
     <svg width="${W}" height="${H + 24}" viewBox="0 0 ${W} ${H + 24}">${grid}${ticks}${cursor}${line(po, '#5ef0d4')}${line(pc, '#ffb65c')}</svg>
-    <div style="display:flex;gap:22px;margin-top:6px;font-size:19px">
-      <span style="color:var(--amber)">${q(chosen)} <span class="m" style="font-size:16px">${pct(vc)}</span></span>
-      <span style="color:var(--cyan)">${q(other)} <span class="m" style="font-size:16px">${vo != null ? pct(vo) : '—'}</span></span>
-      <span style="color:var(--dim);font-size:16px;margin-left:auto">榜首 ${q(Q.lensAt(g, cur).top[0][2])}</span>
+    <div style="display:flex;gap:22px;margin-top:6px;font-size:19px;white-space:nowrap">
+      <span style="color:var(--amber)">${q(chosen)} <span class="m" style="font-size:16px">${pct(vc)}</span>${topTag(chosen)}</span>
+      <span style="color:var(--cyan)">${q(other)} <span class="m" style="font-size:16px">${vo != null ? pct(vo) : '—'}</span>${topTag(other)}</span>
+      ${EN && (topNow === chosen || topNow === other) ? '' : `<span style="color:var(--dim);font-size:16px;margin-left:auto">${L_('榜首', 'top')} ${q(topNow)}</span>`}
     </div>`;
 }
 
@@ -659,11 +704,15 @@ function updateReply(R) {
     const newest = g === R.n - 1;
     const k = newest ? R.k ?? 1 : 1;
     const low = st.chosenRank > 0;
-    const html = `<span class="t${newest ? ' new' : ''}${sp ? ' sp' : ''}${g === R.hl ? ' hl' : ''}" style="opacity:${(0.2 + 0.8 * k).toFixed(3)}"><span class="s">${sp ? esc(shortSpecial(st.chosenS)) : tk(st.chosenS)}</span><i class="${low ? 'low' : ''}" style="width:${Math.max(6, st.chosenP1 * 100).toFixed(1)}%"></i></span>`;
-    if ((sp || /^[，。、！？；：,.!?]$/.test(st.chosenS)) && groups.length) groups[groups.length - 1].push(html);
+    const html = `<span class="t${newest ? ' new' : ''}${sp ? ' sp' : ''}${g === R.hl ? ' hl' : ''}" style="opacity:${(0.2 + 0.8 * k).toFixed(3)}"><span class="s">${sp ? esc(shortSpecial(st.chosenS)) : EN ? esc(st.chosenS.trim()) : tk(st.chosenS)}</span><i class="${low ? 'low' : ''}" style="width:${Math.max(6, st.chosenP1 * 100).toFixed(1)}%"></i></span>`;
+    // 英文版：前面带空格的词元才另起一块（块前留一个空格宽），子词和标点粘在前一块上，整词不会被拆到两行
+    if (EN) {
+      if (groups.length && (sp || !/^\s/.test(st.chosenS))) groups[groups.length - 1].push(html);
+      else { groups.push([html]); groups[groups.length - 1].lead = groups.length > 1; }
+    } else if ((sp || /^[，。、！？；：,.!?]$/.test(st.chosenS)) && groups.length) groups[groups.length - 1].push(html);
     else groups.push([html]);
   });
-  OV.reply.innerHTML = groups.map((g) => `<span class="c">${g.join('')}</span>`).join('') + (R.tag ? `<span class="tag">${R.tag}</span>` : '');
+  OV.reply.innerHTML = groups.map((g) => `<span class="c${g.lead ? ' lead' : ''}">${g.join('')}</span>`).join('') + (R.tag ? `<span class="tag">${R.tag}</span>` : '');
 }
 
 function updateEnd(D) {
@@ -672,9 +721,11 @@ function updateEnd(D) {
   if (a1 > 0.001) {
     if (!OV.end.innerHTML) {
       // 回答按逗号断成几行（每行不超过 22 个字），不在词中间折行
-      const parts = Q.manifest.questions.find((x) => x.id === QID).reply.split(/(?<=[，。！？])/);
+      const reply = Q.manifest.questions.find((x) => x.id === QID).reply;
+      const parts = EN ? reply.split(/(?<=\s)/) : reply.split(/(?<=[，。！？])/);
       const lines = [];
-      for (const p of parts) { if (lines.length && (lines[lines.length - 1] + p).length <= 22) lines[lines.length - 1] += p; else lines.push(p); }
+      const maxL = EN ? 46 : 22;
+      for (const p of parts) { if (lines.length && (lines[lines.length - 1] + p).trimEnd().length <= maxL) lines[lines.length - 1] += p; else lines.push(p); }
       OV.end.innerHTML = `<div class="ans">${lines.map((l) => `<div>${esc(l)}</div>`).join('')}</div><div class="stat">${SC.statLine}</div>`;
     }
     OV.end.style.opacity = a1.toFixed(3);
@@ -784,6 +835,7 @@ function renderAt(t, { render = true } = {}) {
   E.renderer.toneMappingExposure = f.exposure ?? 0.84;
   $('#fade').style.opacity = (f.fade ?? 0).toFixed(4);
   updateOverlays(t, f);
+  if (EN) localizeLabels();
   if (!render) return;
   drawGrain(Math.round(t * FPS));
   E.render();
