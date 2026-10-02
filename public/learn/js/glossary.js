@@ -1,9 +1,12 @@
 // 术语表：按主题分组，或者按英文名 A–Z 排；可以搜索中文、英文和解释。
+// 英文模式：标题用英文名，解释用 def_en；中文名不显示（缩写这类不含汉字、又和英文名不同的写法除外，比如 Q / K / V）。
 
 import { $, $$, esc } from '../../js/ui.js';
 import { highlight, searchTerms } from './library.js';
 import { loadGlMode, saveGlMode } from './store.js';
+import { isEn, L, tx } from './lang.js';
 
+const CJK = /[\u3400-\u9fff]/;
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 const letterOf = (t) => (t.en.match(/[A-Za-z]/)?.[0] || '#').toUpperCase();
 
@@ -13,7 +16,7 @@ export class Glossary {
     this.terms = GL.terms;
     this.groups = GL.groups;
     this.hues = hues;
-    this.groupName = new Map(this.groups.map((g) => [g.id, g.name]));
+    this.groupName = new Map(this.groups.map((g) => [g.id, tx(g, 'name')]));
     this.mode = loadGlMode();
     this.q = '';
     this.bind();
@@ -21,10 +24,14 @@ export class Glossary {
   }
 
   termHTML(t, i, terms) {
-    const where = t.where.map((w) => `<a class="site-chip" href="${esc(w.href)}">${esc(w.label)}</a>`).join('');
+    const where = t.where.map((w) => `<a class="site-chip" href="${esc(w.href)}">${esc(tx(w, 'label'))}</a>`).join('');
+    const alt = !CJK.test(t.term) && t.term.toLowerCase() !== t.en.toLowerCase() ? t.term : '';
+    const head = isEn
+      ? `<dfn>${highlight(t.en, terms)}</dfn>${alt ? `<span class="en">${highlight(alt, terms)}</span>` : ''}`
+      : `<dfn>${highlight(t.term, terms)}</dfn><span class="en">${highlight(t.en, terms)}</span>`;
     return `<div class="term" style="--h:${this.hues.get(t.group) ?? 186};--i:${Math.min(i, 30)}">
-      <div class="term-h"><dfn>${highlight(t.term, terms)}</dfn><span class="en">${highlight(t.en, terms)}</span>${this.mode === 'az' ? `<span class="g">${esc(this.groupName.get(t.group) || '')}</span>` : ''}</div>
-      <p>${highlight(t.def, terms)}</p>
+      <div class="term-h">${head}${this.mode === 'az' ? `<span class="g">${esc(this.groupName.get(t.group) || '')}</span>` : ''}</div>
+      <p>${highlight(tx(t, 'def'), terms)}</p>
       <div class="where">${where}</div>
     </div>`;
   }
@@ -32,7 +39,7 @@ export class Glossary {
   render() {
     const terms = searchTerms(this.q);
     const hits = this.terms.filter((t) => {
-      const h = `${t.term} ${t.en} ${t.def}`.toLowerCase();
+      const h = (isEn ? `${t.en} ${t.term} ${t.def_en}` : `${t.term} ${t.en} ${t.def}`).toLowerCase();
       return terms.every((k) => h.includes(k));
     });
     let i = 0;
@@ -51,13 +58,13 @@ export class Glossary {
       html = this.groups.map((g) => {
         const ts = hits.filter((t) => t.group === g.id);
         if (!ts.length) return '';
-        return `<section class="gl-group" aria-label="${esc(g.name)}">
-          <div class="gl-group-h"><h3>${esc(g.name)}</h3><i>${ts.length}</i></div>
+        return `<section class="gl-group" aria-label="${esc(tx(g, 'name'))}">
+          <div class="gl-group-h"><h3>${esc(tx(g, 'name'))}</h3><i>${ts.length}</i></div>
           <div class="gl-grid">${ts.map((t) => this.termHTML(t, i++, terms)).join('')}</div></section>`;
       }).join('');
       rail.hidden = true;
     }
-    $('#glossary-list').innerHTML = html || '<p class="empty">没有找到这个术语。试试英文名，或者换个说法。</p>';
+    $('#glossary-list').innerHTML = html || L('<p class="empty">没有找到这个术语。试试英文名，或者换个说法。</p>', '<p class="empty">No such term here. Try another word for it.</p>');
     $$('.seg button', this.root).forEach((b) => b.setAttribute('aria-checked', String(b.dataset.mode === this.mode)));
   }
 

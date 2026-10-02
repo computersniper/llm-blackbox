@@ -2,6 +2,7 @@
 // 代码文件就放在 snippets/ 里，按需取来；高亮是一个很小的手写词法着色，只认注释、字符串、数字、关键字和函数名。
 
 import { $, $$, esc } from '../../js/ui.js';
+import { L, tx } from './lang.js';
 
 const PY_KW = new Set('import from as for in with if elif else not and or is break continue def return None True False lambda while try except finally class pass yield'.split(' '));
 const SH_CMD = new Set('git cd pip python cp export'.split(' '));
@@ -51,8 +52,8 @@ export class TryIt {
     this.cache = new Map();
     this.cur = 0;
     const desc = $('#tryDesc');
-    desc.insertAdjacentHTML('afterend', `<p class="tested">${esc(SN.tested)}</p>`);
-    $('#tryTabs').innerHTML = this.items.map((s, i) => `<button class="try-tab" type="button" role="tab" id="tab-${esc(s.id)}" aria-controls="tryPanel" aria-selected="false" tabindex="-1" data-i="${i}"><span class="n">${esc(s.no)}</span><b>${esc(s.title)}</b><small>${esc(s.env.slice(0, 2).join(' · '))}</small></button>`).join('');
+    desc.insertAdjacentHTML('afterend', `<p class="tested">${esc(tx(SN, 'tested'))}</p>`);
+    $('#tryTabs').innerHTML = this.items.map((s, i) => `<button class="try-tab" type="button" role="tab" id="tab-${esc(s.id)}" aria-controls="tryPanel" aria-selected="false" tabindex="-1" data-i="${i}"><span class="n">${esc(s.no)}</span><b>${esc(tx(s, 'title'))}</b><small>${esc(tx(s, 'env').slice(0, 2).join(' · '))}</small></button>`).join('');
     this.bind();
     this.show(0, false);
   }
@@ -74,9 +75,9 @@ export class TryIt {
       const ok = await copyText(text);
       b.classList.remove('ok', 'err');
       b.classList.add(ok ? 'ok' : 'err');
-      $('span', b).textContent = ok ? '已复制' : '复制失败，请手动选择';
+      $('span', b).textContent = ok ? L('已复制', 'Copied') : L('复制失败，请手动选择', 'Copy failed — select it by hand');
       clearTimeout(b._t);
-      b._t = setTimeout(() => { b.classList.remove('ok', 'err'); $('span', b).textContent = '复制'; }, 1800);
+      b._t = setTimeout(() => { b.classList.remove('ok', 'err'); $('span', b).textContent = L('复制', 'Copy'); }, 1800);
     });
   }
 
@@ -102,26 +103,29 @@ export class TryIt {
     if (focus) $(`#tab-${s.id}`).focus();
     const panel = $('#tryPanel');
     panel.setAttribute('aria-labelledby', `tab-${s.id}`);
-    const env = s.env.map((e) => `<span class="${/CPU/.test(e) ? 'cpu' : /pip |install/.test(e) ? 'mono' : ''}">${esc(e)}</span>`).join('');
-    const boxes = s.files.map((f) => `<div class="codebox" data-path="${esc(f.path)}"><div class="codebox-h"><span class="fn">${esc(f.path.split('/').pop())}</span><span class="lang">${esc(f.lang)}</span><button class="copy" type="button" data-path="${esc(f.path)}" aria-label="复制 ${esc(f.path.split('/').pop())}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span>复制</span></button></div><pre><code>正在载入…</code></pre></div>`).join('');
-    panel.innerHTML = `<h3>${esc(s.no)} ${esc(s.title)}</h3>
-      <p class="try-goal">${esc(s.goal)}</p>
-      <div class="env">${env}<span class="time">⏱ ${esc(s.time)}</span></div>
-      ${s.note ? `<p class="try-note">${esc(s.note)}</p>` : ''}
+    const env = tx(s, 'env').map((e) => `<span class="${/CPU/.test(e) ? 'cpu' : /pip |install/.test(e) ? 'mono' : ''}">${esc(e)}</span>`).join('');
+    // 英文模式用 snippets/en/ 里注释和打印文字换成英文的版本（files_en），输出也是那一版重跑的（output_en）
+    const files = tx(s, 'files');
+    const boxes = files.map((f) => `<div class="codebox" data-path="${esc(f.path)}"><div class="codebox-h"><span class="fn">${esc(f.path.split('/').pop())}</span><span class="lang">${esc(f.lang)}</span><button class="copy" type="button" data-path="${esc(f.path)}" aria-label="${L('复制', 'Copy')} ${esc(f.path.split('/').pop())}"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="5" y="5" width="9" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span>${L('复制', 'Copy')}</span></button></div><pre><code>${L('正在载入…', 'Loading…')}</code></pre></div>`).join('');
+    const note = tx(s, 'note');
+    panel.innerHTML = `<h3>${esc(s.no)} ${esc(tx(s, 'title'))}</h3>
+      <p class="try-goal">${esc(tx(s, 'goal'))}</p>
+      <div class="env">${env}<span class="time">⏱ ${esc(tx(s, 'time'))}</span></div>
+      ${note ? `<p class="try-note">${esc(note)}</p>` : ''}
       ${boxes}
-      <div class="out"><div class="out-h">实测输出</div><pre>${esc(s.output)}</pre></div>
-      <p class="try-explain">${esc(s.explain)}</p>
-      <div class="try-site">对照本站：<a class="site-chip" href="${esc(s.site.href)}">${esc(s.site.label)}</a></div>`;
+      <div class="out"><div class="out-h">${L('实测输出', 'Actual output')}</div><pre>${esc(tx(s, 'output'))}</pre></div>
+      <p class="try-explain">${esc(tx(s, 'explain'))}</p>
+      <div class="try-site">${L('对照本站：', 'On this site: ')}<a class="site-chip" href="${esc(s.site.href)}">${esc(tx(s.site, 'label'))}</a></div>`;
     // 重新触发面板的浮现动画
     panel.style.animation = 'none'; void panel.offsetWidth; panel.style.animation = '';
-    for (const f of s.files) {
+    for (const f of files) {
       const box = $(`.codebox[data-path="${CSS.escape(f.path)}"] code`, panel);
       try {
         const t = await this.load(f.path);
         if (this.cur !== i) return;
         box.innerHTML = highlightCode(t.replace(/\n$/, ''), f.lang);
       } catch (e) {
-        box.textContent = `代码载入失败：${e.message}`;
+        box.textContent = `${L('代码载入失败：', "Couldn't load the code: ")}${e.message}`;
       }
     }
   }
