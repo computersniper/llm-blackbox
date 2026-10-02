@@ -5,6 +5,7 @@
 import { THREE, label, easeOut, easeInOut, seg } from './engine.js';
 import { esc, tokPlain } from '../ui.js';
 import { sums, neuronMM, ropePos } from './fields.js';
+import { isEn, L as tr } from '../i18n.js';
 
 const U = 0.7 / 1024;
 // 四种角色的颜色，算式板和讲解面板用同一套（app.css 里的 --c-x / --c-w / --c-p / --c-y）
@@ -37,28 +38,28 @@ export class Micro {
       const tok = esc(tokPlain(e.token));
       return {
         kind: 'head', e, sum: sums(e, 1024), panel: this.headPanel(st), inX: -0.14,
-        where: '输出头 · 给候选词元打分',
-        x: 'h', xDesc: '最后一层之后、最终 RMSNorm 之后的向量（1024 个数）',
-        w: 'E', wDesc: `嵌入表里「${tok}」那一行（输出矩阵和嵌入表共用）`, wIdx: (i) => `E[${e.j}, ${i}]`,
-        y: 'logit', yIdx: `logit[${e.j}]`, yDesc: `「${tok}」的分数`,
-        yLen: Q.M.vocab, ySegs: 0, yUnit: '词元',
-        dest: `「${tok}」在词表里的编号是 ${e.j}。模型给词表里全部 ${Q.M.vocab.toLocaleString('zh-CN')} 个词元都这样算一个分数，再用 softmax 变成概率。`,
+        where: tr('输出头 · 给候选词元打分', 'Output head · scoring a candidate token'),
+        x: 'h', xDesc: tr('最后一层之后、最终 RMSNorm 之后的向量（1024 个数）', 'the vector after the last layer and the final RMSNorm (1024 numbers)'),
+        w: 'E', wDesc: tr(`嵌入表里「${tok}」那一行（输出矩阵和嵌入表共用）`, `the row of “${tok}” in the embedding table (the output matrix shares it)`), wIdx: (i) => `E[${e.j}, ${i}]`,
+        y: 'logit', yIdx: `logit[${e.j}]`, yDesc: tr(`「${tok}」的分数`, `the score of “${tok}”`),
+        yLen: Q.M.vocab, ySegs: 0, yUnit: tr('词元', 'token'),
+        dest: tr(`「${tok}」在词表里的编号是 ${e.j}。模型给词表里全部 ${Q.M.vocab.toLocaleString('zh-CN')} 个词元都这样算一个分数，再用 softmax 变成概率。`, `“${tok}” has ID ${e.j} in the vocabulary. The model computes a score like this for every one of the ${Q.M.vocab.toLocaleString('en-US')} tokens, then softmax turns them into probabilities.`),
       };
     }
     if (s.ph !== 'layer' || !s.mi) return null;
     const mm = Q.mmAt(s.L, st.g);
-    const where = (t) => `第 ${s.L} 层 · ${t}`;
+    const where = (t) => `${tr(`第 ${s.L} 层`, `Layer ${s.L}`)} · ${t}`;
     if (s.sub === 'qkv') {
       if (!mm?.q) return null;
       const e = mm.q;
       return {
         kind: 'q', e, sum: sums(e, 1024), panel: mats.attn.q, outVec: mats.attn.qo, outSeg: e.head, inX: -0.14, rope: true,
-        where: where('注意力 · 算出 q 的一个数'),
-        x: 'h', xDesc: '这一层 RMSNorm 之后的向量（1024 个数）',
-        w: 'W<sub>q</sub>', wDesc: '训练好的查询矩阵，1024 × 2048', wIdx: (i) => `W<sub>q</sub>[${i}, ${e.j}]`,
-        y: 'q', yIdx: `q[${e.j}]`, yDesc: `第 ${e.head} 号头 · 第 ${e.dim} 维`,
-        yLen: 2048, ySegs: 16, ySeg: e.head, yUnit: '头',
-        dest: `q 一共 2048 个数 = 16 个头 × 每头 128 维；这是第 ${e.head} 号头的第 ${e.dim} 维。每一个都这样算一遍，k、v 也一样（换成 W<sub>k</sub>、W<sub>v</sub>）。`,
+        where: where(tr('注意力 · 算出 q 的一个数', 'Attention · one number of q')),
+        x: 'h', xDesc: tr('这一层 RMSNorm 之后的向量（1024 个数）', "the vector after this layer's RMSNorm (1024 numbers)"),
+        w: 'W<sub>q</sub>', wDesc: tr('训练好的查询矩阵，1024 × 2048', 'the trained query matrix, 1024 × 2048'), wIdx: (i) => `W<sub>q</sub>[${i}, ${e.j}]`,
+        y: 'q', yIdx: `q[${e.j}]`, yDesc: tr(`第 ${e.head} 号头 · 第 ${e.dim} 维`, `head ${e.head} · dim ${e.dim}`),
+        yLen: 2048, ySegs: 16, ySeg: e.head, yUnit: tr('头', 'head'),
+        dest: tr(`q 一共 2048 个数 = 16 个头 × 每头 128 维；这是第 ${e.head} 号头的第 ${e.dim} 维。每一个都这样算一遍，k、v 也一样（换成 W<sub>k</sub>、W<sub>v</sub>）。`, `q has 2048 numbers = 16 heads × 128 dims each; this is dim ${e.dim} of head ${e.head}. Every one of them is computed this way, and so are k and v (with W<sub>k</sub> and W<sub>v</sub>).`),
         ropePos: ropePos(e),
       };
     }
@@ -67,12 +68,12 @@ export class Micro {
       const e = mm.o;
       return {
         kind: 'o', e, sum: sums(e, 2048), panel: mats.attn.o, outVec: mats.attn.oo, outSeg: Math.floor(e.j / 128), inX: -0.14,
-        where: where('注意力 · 输出投影'),
-        x: 'z', xDesc: '16 个头各自加权求和的结果，拼成 2048 个数',
-        w: 'W<sub>o</sub>', wDesc: '训练好的输出矩阵，2048 × 1024', wIdx: (i) => `W<sub>o</sub>[${i}, ${e.j}]`,
-        y: 'Δx', yIdx: `Δx[${e.j}]`, yDesc: `注意力的输出 · 第 ${e.j} 维`,
-        yLen: 1024, ySegs: 8, ySeg: Math.floor(e.j / 128), yUnit: '段',
-        dest: `Δx 一共 1024 个数，会原样加回残差流（⊕）。这是其中第 ${e.j} 个。`,
+        where: where(tr('注意力 · 输出投影', 'Attention · output projection')),
+        x: 'z', xDesc: tr('16 个头各自加权求和的结果，拼成 2048 个数', 'the weighted sums of the 16 heads, joined into 2048 numbers'),
+        w: 'W<sub>o</sub>', wDesc: tr('训练好的输出矩阵，2048 × 1024', 'the trained output matrix, 2048 × 1024'), wIdx: (i) => `W<sub>o</sub>[${i}, ${e.j}]`,
+        y: 'Δx', yIdx: `Δx[${e.j}]`, yDesc: tr(`注意力的输出 · 第 ${e.j} 维`, `attention output · dim ${e.j}`),
+        yLen: 1024, ySegs: 8, ySeg: Math.floor(e.j / 128), yUnit: tr('段', 'segment'),
+        dest: tr(`Δx 一共 1024 个数，会原样加回残差流（⊕）。这是其中第 ${e.j} 个。`, `Δx has 1024 numbers, which are added straight back into the residual stream (⊕). This is number ${e.j}.`),
       };
     }
     if (s.sub === 'down') {
@@ -80,12 +81,12 @@ export class Micro {
       const e = mm.down;
       return {
         kind: 'down', e, sum: sums(e, 3072), panel: mats.mlp.d, outVec: mats.mlp.dout, outSeg: Math.floor(e.j / 128), inX: -0.08,
-        where: where('前馈 · 降维'),
-        x: 'a', xDesc: '3072 个神经元的输出 silu(g)·u',
-        w: 'W<sub>down</sub>', wDesc: '训练好的降维矩阵，3072 × 1024', wIdx: (i) => `W<sub>down</sub>[${i}, ${e.j}]`,
-        y: 'Δx', yIdx: `Δx[${e.j}]`, yDesc: `前馈网络的输出 · 第 ${e.j} 维`,
-        yLen: 1024, ySegs: 8, ySeg: Math.floor(e.j / 128), yUnit: '段',
-        dest: `Δx 一共 1024 个数，加回残差流（⊕）之后，第 ${s.L} 层就结束了。这是其中第 ${e.j} 个。`,
+        where: where(tr('前馈 · 降维', 'Feed-forward · down-projection')),
+        x: 'a', xDesc: tr('3072 个神经元的输出 silu(g)·u', 'the outputs silu(g)·u of the 3072 neurons'),
+        w: 'W<sub>down</sub>', wDesc: tr('训练好的降维矩阵，3072 × 1024', 'the trained down-projection matrix, 3072 × 1024'), wIdx: (i) => `W<sub>down</sub>[${i}, ${e.j}]`,
+        y: 'Δx', yIdx: `Δx[${e.j}]`, yDesc: tr(`前馈网络的输出 · 第 ${e.j} 维`, `feed-forward output · dim ${e.j}`),
+        yLen: 1024, ySegs: 8, ySeg: Math.floor(e.j / 128), yUnit: tr('段', 'segment'),
+        dest: tr(`Δx 一共 1024 个数，加回残差流（⊕）之后，第 ${s.L} 层就结束了。这是其中第 ${e.j} 个。`, `Δx has 1024 numbers; once they're added back into the residual stream (⊕), layer ${s.L} is done. This is number ${e.j}.`),
       };
     }
     if (s.sub === 'up') {
@@ -94,12 +95,12 @@ export class Micro {
       const { g, u } = neuronMM(n);
       return {
         kind: 'gate', e: g, e2: u, sum: g.sum, panel: mats.mlp.g, panel2: mats.mlp.u, outVec: mats.mlp.go, outVec2: mats.mlp.uo, outSeg: Math.floor(g.j / 256), inX: -0.14,
-        where: where(`前馈 · 升维（神经元 #${g.j}）`),
-        x: 'h', xDesc: '这一层第二次 RMSNorm 之后的向量（1024 个数）',
-        w: 'W<sub>gate</sub>', wDesc: '训练好的门控矩阵，1024 × 3072', wIdx: (i) => `W<sub>gate</sub>[${i}, ${g.j}]`,
-        y: 'g', yIdx: `g[${g.j}]`, yDesc: `神经元 #${g.j} 的门控值`,
-        yLen: 3072, ySegs: 12, ySeg: Math.floor(g.j / 256), yUnit: '段',
-        dest: `3072 个神经元，每个都有自己的一列。同一个神经元在 W<sub>up</sub> 里也有一列，同样乘加得到 u[${g.j}]。`,
+        where: where(tr(`前馈 · 升维（神经元 #${g.j}）`, `Feed-forward · up-projection (neuron #${g.j})`)),
+        x: 'h', xDesc: tr('这一层第二次 RMSNorm 之后的向量（1024 个数）', "the vector after this layer's second RMSNorm (1024 numbers)"),
+        w: 'W<sub>gate</sub>', wDesc: tr('训练好的门控矩阵，1024 × 3072', 'the trained gate matrix, 1024 × 3072'), wIdx: (i) => `W<sub>gate</sub>[${i}, ${g.j}]`,
+        y: 'g', yIdx: `g[${g.j}]`, yDesc: tr(`神经元 #${g.j} 的门控值`, `the gate value of neuron #${g.j}`),
+        yLen: 3072, ySegs: 12, ySeg: Math.floor(g.j / 256), yUnit: tr('段', 'segment'),
+        dest: tr(`3072 个神经元，每个都有自己的一列。同一个神经元在 W<sub>up</sub> 里也有一列，同样乘加得到 u[${g.j}]。`, `Each of the 3072 neurons has its own column. The same neuron also has a column in W<sub>up</sub>, and the same multiply-add gives u[${g.j}].`),
       };
     }
     return null;
@@ -116,7 +117,7 @@ export class Micro {
       const edge = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0xb39dff, transparent: true, opacity: 0.5 }));
       edge.position.copy(m.position);
       g.add(edge);
-      const lb = label('E<sup>T</sup><small>1024 × 151936 · 只画了其中一段</small>', 'lbl part');
+      const lb = label(`E<sup>T</sup><small>${tr('1024 × 151936 · 只画了其中一段', '1024 × 151936 · only a slice is drawn')}</small>`, 'lbl part');
       lb.position.set(0, -0.02, 0);
       lb.center.set(0, -0.2);
       g.add(lb);
@@ -170,7 +171,9 @@ export class Micro {
     this.rail = new THREE.Mesh(new THREE.PlaneGeometry(0.004, Math.max(0.01, oy - panel.h)), mat(ROLE.p, 0.35));
     this.rail.position.set(colX, (panel.h + oy) / 2, 0.003);
     R.add(this.colMesh, this.rail);
-    this.colLbl = label(src.kind === 'head' ? `<span class="cw">E<sup>T</sup></span> 的第 ${e.j} 列 = 嵌入表里「${esc(tokPlain(e.token))}」那一行` : `<span class="cw">${src.w}</span> 的第 ${e.j} 列`, 'lbl tag w');
+    this.colLbl = label(isEn
+      ? (src.kind === 'head' ? `column ${e.j} of <span class="cw">E<sup>T</sup></span> = the row of “${esc(tokPlain(e.token))}” in the embedding table` : `column ${e.j} of <span class="cw">${src.w}</span>`)
+      : (src.kind === 'head' ? `<span class="cw">E<sup>T</sup></span> 的第 ${e.j} 列 = 嵌入表里「${esc(tokPlain(e.token))}」那一行` : `<span class="cw">${src.w}</span> 的第 ${e.j} 列`), 'lbl tag w');
     this.colLbl.position.set(colX, 0, 0.01);
     this.colLbl.center.set(0.5, -0.35);
     R.add(this.colLbl);
@@ -182,7 +185,7 @@ export class Micro {
     this.outLbl.position.set(colX, oy + 0.04, 0.03);
     this.outLbl.center.set(0.5, 1.25);
     R.add(this.outLbl);
-    this.inLbl = label(`输入 <span class="cx">${src.x}</span><small>${src.sum.n} 个数</small>`, 'lbl tag x');
+    this.inLbl = label(tr(`输入 <span class="cx">${src.x}</span><small>${src.sum.n} 个数</small>`, `input <span class="cx">${src.x}</span><small>${src.sum.n} numbers</small>`), 'lbl tag x');
     this.inLbl.position.set(src.inX - 0.04, panel.h / 2, 0.03);
     this.inLbl.center.set(1, 0.5);
     R.add(this.inLbl);
@@ -214,7 +217,7 @@ export class Micro {
       const c2 = new THREE.Mesh(new THREE.PlaneGeometry(0.012, src.panel2.h), mat(ROLE.w, 0.6));
       c2.position.set(colX, src.panel2.h / 2, 0.003);
       this.up.add(c2);
-      this.upLbl = label(`<span class="cw">W<sub>up</sub></span> 的第 ${e.j} 列 → u[${e.j}]`, 'lbl tag w');
+      this.upLbl = label(tr(`<span class="cw">W<sub>up</sub></span> 的第 ${e.j} 列 → u[${e.j}]`, `column ${e.j} of <span class="cw">W<sub>up</sub></span> → u[${e.j}]`), 'lbl tag w');
       this.upLbl.position.set(colX, 0, 0.01);
       this.upLbl.center.set(0.5, -0.35);
       this.up.add(this.upLbl);
@@ -294,7 +297,7 @@ export class Micro {
     this.outCell.material.opacity = 0.35 + 0.6 * glow;
     this.outCell.scale.set(1, 1 + (mi === 'sum' ? 0.6 * Math.sin(p * Math.PI) : 0), 1);
     const name = this.src.yIdx;
-    const txt = at === 0 ? `${name} = ?` : at === 3 ? `${name} = ${fmt(e.total)} → 旋转后 ${fmt(e.qr, 4)}` : `${name} ${sumP >= 1 ? '=' : '≈'} ${fmt(val)}`;
+    const txt = at === 0 ? `${name} = ?` : at === 3 ? `${name} = ${fmt(e.total)} → ${tr('旋转后', 'after rotation')} ${fmt(e.qr, 4)}` : `${name} ${sumP >= 1 ? '=' : '≈'} ${fmt(val)}`;
     if (this.outLbl.el._t !== txt) { this.outLbl.el.innerHTML = txt; this.outLbl.el._t = txt; }
     if (this.up) {
       this.up.visible = true;

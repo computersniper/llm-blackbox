@@ -1,6 +1,7 @@
 // 聊天面板 + 点选输入法。输入法的候选就是问题的真实分词结果（Qwen3 的词元），
 // 按前缀一块块弹进输入框，所以只能拼出模型真的回答过的问题。
 import { $, $$, esc, tokHTML, tokInner, sleep } from './ui.js';
+import { isEn, L as tr } from './i18n.js';
 
 export class Chat {
   constructor(manifest, { onSend, onPeek, onPlus }) {
@@ -49,7 +50,11 @@ export class Chat {
     const m = this.M.model;
     const el = document.createElement('div');
     el.className = 'msg intro-card';
-    el.innerHTML = `
+    el.innerHTML = isEn ? `
+      <h1>Inside the Black Box</h1>
+      This is <b>Qwen3-0.6B</b>, an open-source model from Alibaba. Every answer and every number below comes from one real run of this model (recorded offline, so it never lags and costs nothing). It has only 0.6 billion parameters and sometimes says wrong things with a straight face; that is part of the real thing too.<br>
+      Build a question out of the <b>tokens</b> below and send it. To see how it comes up with each word, press the <span class="key">＋</span> next to its reply: every press takes you one level deeper into the black box, stepping through it like a program in a debugger.
+      <div class="spec"><span><b>${m.layers}</b> layers</span><span>hidden size <b>${m.hidden}</b></span><span><b>${m.heads}</b> Q heads / <b>${m.kvHeads}</b> KV heads</span><span>SwiGLU <b>${m.ffn}</b></span><span>vocab <b>${m.vocab.toLocaleString('en-US')}</b></span><span><b>${(m.params / 1e6).toFixed(0)}M</b> parameters</span></div>` : `
       <h1>揭开黑箱</h1>
       这是阿里开源的 <b>Qwen3-0.6B</b>。下面的每个回答、每个数字，都来自这个真实模型的一次运行（离线录制，所以不会卡，也不花钱）。它只有 6 亿参数，偶尔会一本正经地说错话，这也是真实的一部分。<br>
       用下方的<b>词元</b>拼出一个问题发给它。想看它是怎么想出每一个字的，就点消息旁的 <span class="key">＋</span>：每按一次，往黑箱里钻一层，像调试程序一样单步执行。
@@ -62,7 +67,7 @@ export class Chat {
   renderInput() {
     this.inputEl.innerHTML = this.chosen.length
       ? this.chosen.map((c) => tokHTML(c.s, 'r-user')).join('') + '<span class="cur"></span>'
-      : '<span class="ph">点下面的词元，拼出你的问题</span>';
+      : `<span class="ph">${tr('点下面的词元，拼出你的问题', 'Tap the tokens below to build your question')}</span>`;
     const ready = !!this.node.end && !this.busy;
     this.sendBtn.disabled = !ready;
     this.sendBtn.classList.toggle('glow', ready);
@@ -70,12 +75,12 @@ export class Chat {
 
   renderCands() {
     const kids = [...this.node.kids.values()];
-    const head = this.chosen.length ? '接下来' : '候选词元';
+    const head = this.chosen.length ? tr('接下来', 'Next') : tr('候选词元', 'Tokens');
     let html = `<span class="lab">${head}</span>`;
     html += kids.map((k, i) => `<button type="button" class="cand" data-id="${k.chip.id}" style="animation-delay:${i * 30}ms">${tokInner(k.chip.s)}<i>${k.chip.id}</i></button>`).join('');
-    if (this.node.end && !kids.length) html += `<span class="cand done" aria-hidden="true">✓ 拼好了，按 ↑ 发送</span>`;
-    else if (this.node.end) html += `<span class="lab" style="color:var(--acc)">✓ 已是完整问题</span>`;
-    html += `<button type="button" class="cand-more">${this.showList ? '收起问题库' : `问题库（${this.M.questions.length}）`}</button>`;
+    if (this.node.end && !kids.length) html += `<span class="cand done" aria-hidden="true">${tr('✓ 拼好了，按 ↑ 发送', '✓ Done! Press ↑ to send')}</span>`;
+    else if (this.node.end) html += `<span class="lab" style="color:var(--acc)">${tr('✓ 已是完整问题', '✓ Complete question')}</span>`;
+    html += `<button type="button" class="cand-more">${this.showList ? tr('收起问题库', 'Hide questions') : tr(`问题库（${this.M.questions.length}）`, `All questions (${this.M.questions.length})`)}</button>`;
     if (this.showList) html += `<div class="qlist">${this.M.questions.map((q, i) => `<button type="button" data-q="${i}">${esc(q.text)}</button>`).join('')}</div>`;
     this.candsEl.innerHTML = html;
     $$('.cand[data-id]', this.candsEl).forEach((b) => b.addEventListener('click', () => this.push(Number(b.dataset.id))));
@@ -143,8 +148,8 @@ export class Chat {
       <div class="bot-body">
         <div class="bot-text"><span class="typing"><i></i><i></i><i></i></span></div>
         <div class="bot-meta" hidden>
-          <button type="button" class="peek" title="单步进入：看它怎么想出这句话"><b>＋</b>揭开这条回复</button>
-          <span class="stat">${q.replyTokens.length} 个词元</span>
+          <button type="button" class="peek" title="${tr('单步进入：看它怎么想出这句话', 'Step into it: see how it came up with this reply')}"><b>＋</b>${tr('揭开这条回复', 'Open up this reply')}</button>
+          <span class="stat">${tr(`${q.replyTokens.length} 个词元`, `${q.replyTokens.length} tokens`)}</span>
         </div>
       </div>`;
     this.log.append(el);

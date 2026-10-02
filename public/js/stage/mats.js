@@ -1,6 +1,7 @@
 // 权重矩阵的实物：按真实形状等比例缩放的面板（1024 维 = 0.7 个单位），
 // 输入向量从左边进来，扫描线扫过矩阵，输出向量逐段填满。Q 分 16 段、K/V 各 8 段，直接看得出 GQA。
 import { THREE, label, easeOut, seg } from './engine.js';
+import { L as tr } from '../i18n.js';
 
 const U = 0.7 / 1024;           // 每一维的长度（1024 维 = 0.7 个单位）
 const C = { q: 0x5ef0d4, k: 0xffb65c, v: 0xb39dff, o: 0x8fb8ff, gate: 0x5ef0d4, up: 0xb39dff, down: 0xffb65c };
@@ -46,7 +47,7 @@ function panel(name, inDim, outDim, color, seed) {
   const scan = new THREE.Mesh(new THREE.PlaneGeometry(0.012, h), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
   scan.position.set(0, h / 2, 0.002);
   g.add(scan);
-  const lb = label(`${name}<small>${inDim} × ${outDim} · 真实权重分布</small>`, 'lbl part');
+  const lb = label(`${name}<small>${inDim} × ${outDim} · ${tr('真实权重分布', 'real weight distribution')}</small>`, 'lbl part');
   lb.position.set(0, h + 0.02, 0);
   lb.center.set(0, 1.15);
   g.add(lb);
@@ -107,9 +108,9 @@ export class Mats {
     A.ko.position.set(A.k.position.x, outY, 0);
     A.vo.position.set(A.v.position.x, outY, 0);
     const outL = (o, html) => { const l = label(html, 'lbl num'); l.position.set(o.len / 2, 0.06, 0); l.center.set(0.5, 1.1); o.add(l); o.lbl = l; };
-    outL(A.qo, `q<small>1 × ${qd} = ${Mo.heads} 头 × ${Mo.headDim}</small>`);
-    outL(A.ko, `k<small>${Mo.kvHeads} 头 × ${Mo.headDim} → 缓存</small>`);
-    outL(A.vo, `v<small>${Mo.kvHeads} 头 × ${Mo.headDim} → 缓存</small>`);
+    outL(A.qo, tr(`q<small>1 × ${qd} = ${Mo.heads} 头 × ${Mo.headDim}</small>`, `q<small>1 × ${qd} = ${Mo.heads} heads × ${Mo.headDim}</small>`));
+    outL(A.ko, tr(`k<small>${Mo.kvHeads} 头 × ${Mo.headDim} → 缓存</small>`, `k<small>${Mo.kvHeads} heads × ${Mo.headDim} → cache</small>`));
+    outL(A.vo, tr(`v<small>${Mo.kvHeads} 头 × ${Mo.headDim} → 缓存</small>`, `v<small>${Mo.kvHeads} heads × ${Mo.headDim} → cache</small>`));
     // GQA：每 2 个 Q 头连到同一个 KV 头
     const pts = [];
     const qs = (qd * U) / Mo.heads, ks = (kd * U) / Mo.kvHeads;
@@ -128,7 +129,7 @@ export class Mats {
     }
     A.gqa.geometry.dispose();
     A.gqa.geometry = new THREE.BufferGeometry().setFromPoints(arc);
-    A.gqaL = label('GQA：每 2 个 Q 头共用 1 个 K/V 头', 'lbl hint');
+    A.gqaL = label(tr('GQA：每 2 个 Q 头共用 1 个 K/V 头', 'GQA: every 2 Q heads share 1 K/V head'), 'lbl hint');
     A.gqaL.position.set(A.q.position.x + A.q.w + 0.1, outY + 0.42, 0);
     A.gqaL.center.set(0.5, 1);
     A.add(A.x, A.q, A.k, A.v, A.qo, A.ko, A.vo, A.gqa, A.gqaL);
@@ -137,10 +138,10 @@ export class Mats {
     A.o.visible = false;
     A.oo = vec(H * U, 8, C.o);
     A.oo.visible = false;
-    outL(A.oo, 'Δx<small>1 × 1024 → 加回残差</small>');
+    outL(A.oo, `Δx<small>${tr('1 × 1024 → 加回残差', '1 × 1024 → added to the residual')}</small>`);
     A.oin = vec(qd * U, Mo.heads, C.q, true);
     A.oin.visible = false;
-    const oinL = label(`拼接<small>${Mo.heads} × ${Mo.headDim} = 1 × ${qd}</small>`, 'lbl num');
+    const oinL = label(`${tr('拼接', 'concat')}<small>${Mo.heads} × ${Mo.headDim} = 1 × ${qd}</small>`, 'lbl num');
     oinL.position.set(-0.03, (qd * U) / 2, 0);
     oinL.center.set(1.1, 0.5);
     A.oin.add(oinL);
@@ -181,7 +182,7 @@ export class Mats {
     P.dinL = dinL;
     P.dout = vec(H * U, 8, C.down);
     P.dout.position.set(P.d.position.x, P.d.position.y + F * U + 0.1, 0);
-    outL(P.dout, 'Δx<small>1 × 1024 → 加回残差</small>');
+    outL(P.dout, `Δx<small>${tr('1 × 1024 → 加回残差', '1 × 1024 → added to the residual')}</small>`);
     P.add(P.x, P.x2, P.g, P.u, P.go, P.uo, P.d, P.din, P.dout);
     this.root.add(P);
     this.root.visible = true;

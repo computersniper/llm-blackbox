@@ -8,6 +8,7 @@ import { Detail } from './detail.js';
 import { Mats } from './mats.js';
 import { Micro } from './micro.js';
 import { Board } from './board.js';
+import { isEn, L as tr } from '../i18n.js';
 
 export const ROLE = { system: 0x8fa6d6, user: 0x5ee4f0, assistant: 0xffb65c, tpl: 0xb39dff };
 const S = 0.42;        // 词元间距
@@ -235,11 +236,11 @@ export class Machine {
     const L = (html, sub) => { const o = label(`${html}${sub ? `<small>${sub}</small>` : ''}`, 'lbl part'); o.center.set(0, 0.5); g.add(o); return o; };
     this.exLabels = {
       ln1: L('RMSNorm', 'input_layernorm'),
-      attn: L('注意力', 'GQA · 16 Q 头 / 8 KV 头'),
-      add1: L('⊕ 残差'),
+      attn: isEn ? L('Attention', 'GQA · 16 Q heads / 8 KV heads') : L('注意力', 'GQA · 16 Q 头 / 8 KV 头'),
+      add1: L(tr('⊕ 残差', '⊕ Residual')),
       ln2: L('RMSNorm', 'post_attention'),
-      mlp: L('SwiGLU 前馈', '1024 → 3072 → 1024'),
-      add2: L('⊕ 残差'),
+      mlp: L(tr('SwiGLU 前馈', 'SwiGLU feed-forward'), '1024 → 3072 → 1024'),
+      add2: L(tr('⊕ 残差', '⊕ Residual')),
     };
     g.visible = false;
   }
@@ -256,7 +257,7 @@ export class Machine {
     this.lm = new THREE.Mesh(new THREE.BoxGeometry(this.W - 0.3, 0.05, DEPTH), new THREE.MeshStandardMaterial({ color: 0xb39dff, emissive: 0xb39dff, emissiveIntensity: 0.04, transparent: true, opacity: 0.1, depthWrite: false }));
     this.lm.add(new THREE.LineSegments(new THREE.EdgesGeometry(this.lm.geometry), new THREE.LineBasicMaterial({ color: 0xb39dff, transparent: true, opacity: 0.5 })));
     g.add(this.lm);
-    this.lmLabel = label('lm_head<small>1024 × 151936 · 与嵌入表共享</small>', 'lbl part');
+    this.lmLabel = label(`lm_head<small>${tr('1024 × 151936 · 与嵌入表共享', '1024 × 151936 · shared with the embedding table')}</small>`, 'lbl part');
     this.lmLabel.center.set(0, 0.5);
     g.add(this.lmLabel);
 
@@ -321,7 +322,7 @@ export class Machine {
     this.cLight = new THREE.Mesh(new THREE.CircleGeometry(0.22, 32), new THREE.MeshBasicMaterial({ color: 0x5ef0d4 }));
     this.cLight.position.set(0, -H * 0.12, 0.035);
     this.cFront.add(this.cLight);
-    const sub = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.6, W * 0.6 * 0.08), new THREE.MeshBasicMaterial({ map: textTexture('28 层 · 5.96 亿参数 · bfloat16', { color: '#7a859e', font: '500 60px "PingFang SC",sans-serif', w: 1400, h: 112 }), transparent: true }));
+    const sub = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.6, W * 0.6 * 0.08), new THREE.MeshBasicMaterial({ map: textTexture(tr('28 层 · 5.96 亿参数 · bfloat16', '28 layers · 596M parameters · bfloat16'), { color: '#7a859e', font: '500 60px "PingFang SC",sans-serif', w: 1400, h: 112 }), transparent: true }));
     sub.position.set(0, H * 0.02, 0.035);
     this.cFront.add(sub);
     this.cTop = panel(W, 0.06, D);
@@ -648,7 +649,7 @@ export class Machine {
     const poolIds = new Set(stp.pool.map((x) => x[0]));
     const t07 = stp.temps['0.7'];
     const other1 = Math.max(0, 1 - stp.top.reduce((a, b) => a + b[1], 0));
-    const items = stp.top.map(([id, p1, str], k) => ({ id, str, p1, p7: t07[k] })).concat([{ id: -1, str: '其他', p1: other1, p7: t07[12] }]);
+    const items = stp.top.map(([id, p1, str], k) => ({ id, str, p1, p7: t07[k] })).concat([{ id: -1, str: tr('其他', 'other'), p1: other1, p7: t07[12] }]);
     items.forEach((it, k) => {
       const bar = this.bars[k];
       const pv = it.p1 + (it.p7 - it.p1) * temp;
@@ -664,7 +665,7 @@ export class Machine {
       bar.material.opacity = 0.25 + 0.7 * alive;
       bar.lbl.position.set(bar.position.x, barsY - 0.06, 0.05);
       bar.lbl.visible = rise > 0.2 && (st.view === 'head' || st.view === 'machine') && (k < 8 || it.id < 0);
-      const html = `<span class="t">${it.id < 0 ? '其他' : esc(tokPlain(it.str))}</span><span class="p">${fmtPct(pv)}</span>`;
+      const html = `<span class="t">${it.id < 0 ? tr('其他', 'other') : esc(tokPlain(it.str))}</span><span class="p">${fmtPct(pv)}</span>`;
       if (bar.lbl.el._t !== html) { bar.lbl.el.innerHTML = html; bar.lbl.el._t = html; }
       bar.lbl.el.classList.toggle('win', won);
       bar.lbl.el.classList.toggle('cut', cut > 0.5 && !inPool);

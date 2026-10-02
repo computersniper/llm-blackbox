@@ -10,6 +10,8 @@
 //
 // “＋”= 单步进入（step into），“−”= 跳出（step out），上一步 / 下一步 = 在当前深度逐步执行。
 
+import { isEn } from './i18n.js';
+
 export const OPS = ['ln1', 'attn', 'add1', 'ln2', 'mlp', 'add2'];
 const SUBS = { attn: ['qkv', 'score', 'softmax', 'mix'], mlp: ['up', 'act', 'down'] };
 // 微观步骤：一个输出元素是怎么乘加出来的（每一层都有）
@@ -17,7 +19,9 @@ const MICROS = { qkv: ['pick', 'mul', 'sum', 'rope'], score: ['mul', 'sum', 'sca
 const HEAD_MICRO = ['pick', 'mul', 'sum'];
 export const MAX_DEPTH = 7;
 
-export const DEPTH_NAMES = ['对话', '黑箱', '结构', '层塔', '一层之内', '算子', '一次乘加', '比特'];
+export const DEPTH_NAMES = isEn
+  ? ['Chat', 'Black box', 'Structure', 'Layer tower', 'Inside a layer', 'Operators', 'Multiply-add', 'Bits']
+  : ['对话', '黑箱', '结构', '层塔', '一层之内', '算子', '一次乘加', '比特'];
 
 const DUR = {
   pass: 1.6, read0: 2.4, read: 1.1, embed: 1.3, layers: 2.6, layer: 0.62, head: 1.5, sample: 2.4,

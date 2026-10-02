@@ -10,9 +10,22 @@ import { $, esc, tokPlain, tokHTML, fmtPct, fmtNum, sleep } from './ui.js';
 import { initPanes } from './resize.js';
 import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from './prefetch.js';
 import { countVisit, showVisits } from './visits.js';
+import { isEn, L as tr, t, applyDom, mountLangSwitch } from './i18n.js';
+import { seedZhFromDom } from './i18n/infer.js';
+
+// 界面语言：HTML 里的中文登记成中文词条，再按当前语言写回（中文模式下写回的是同样的内容）
+seedZhFromDom();
+applyDom();
+document.title = t('inf.title');
+document.querySelector('meta[name="description"]')?.setAttribute('content', t('inf.desc'));
+mountLangSwitch($('#langSwitch'));
 
 const KEY = 'blackbox:v2';
-const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记' };
+const ROLE_NAME = isEn
+  ? { system: 'system prompt', user: 'your question', assistant: "model's reply", tpl: 'template / special token' }
+  : { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记' };
+// 模型一本正经说错了的回答（聊天里发出后解锁“一本正经地胡说”）：中文是猫爱纸箱和“我是小乐”，英文是数错 strawberry 里的 r
+const WRONG = isEn ? ['e05'] : ['q03', 'q04'];
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
 const saved = load();
@@ -36,7 +49,7 @@ async function boot() {
   try {
     manifest = await loadManifest();
   } catch (e) {
-    $('#chatLog').innerHTML = `<p style="color:var(--rose)">数据加载失败：${esc(e.message)}</p>`;
+    $('#chatLog').innerHTML = `<p style="color:var(--rose)">${tr('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}</p>`;
     return;
   }
   controls = new Controls({
@@ -69,7 +82,7 @@ function onSend(q) {
   if (!saveData()) { loadQuestion(q.id, manifest).catch(() => { /* 揭开时再报错 */ }); warmEngine(); }
   if (mode === 'inspect') attach(msg);
   else streamNormal(msg, 0);
-  if (q.id === 'q03' || q.id === 'q04') setTimeout(() => discover('wrong'), 2500);
+  if (WRONG.includes(q.id)) setTimeout(() => discover('wrong'), 2500);
 }
 
 // 不揭开的时候，就像平常的 AI 一样流式输出
@@ -164,7 +177,7 @@ async function enterInspect(msg) {
     $('#loading').hidden = false;
     const t0 = performance.now();
     // 模块和这条回复的数据并行载入；数据失败由 attach 报错、重试
-    try { await Promise.all([ensureEngine(), loadQuestion(msg.q.id, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    try { await Promise.all([ensureEngine(), loadQuestion(msg.q.id, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `${tr('3D 舞台初始化失败：', 'Could not start the 3D stage: ')}${esc(e.message)}`; return; }
     measure('揭开·模块和数据', t0);
     engine.active = true;
     if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
@@ -179,7 +192,7 @@ async function attach(msg, from = null) {
   $('#loading').hidden = false;
   if (tl) tl.pause();
   let q;
-  try { q = await loadQuestion(msg.q.id, manifest); } catch (e) { $('#loading').innerHTML = `数据加载失败：${esc(e.message)}`; return; }
+  try { q = await loadQuestion(msg.q.id, manifest); } catch (e) { $('#loading').innerHTML = `${tr('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}`; return; }
   $('#loading').hidden = true;
   if (cur && cur !== msg && !cur.done) streamNormal(cur, cur.shown < 0 ? 0 : cur.shown); // 之前那条还没说完的，让它自己说完
   const fresh = Q !== q;
@@ -263,8 +276,8 @@ function microWaitShow(L, err = null) {
   microEl.style.cursor = retry ? 'pointer' : 'default';
   microEl.title = retry ? String(err.message || err) : '';
   microEl.innerHTML = !err
-    ? `<span class="spin" style="width:14px;height:14px;border-width:2px"></span>正在载入第 ${L} 层的乘加数据…`
-    : retry ? `第 ${L} 层的乘加数据没有载入成功，点这里重试` : esc(err.message);
+    ? `<span class="spin" style="width:14px;height:14px;border-width:2px"></span>${tr(`正在载入第 ${L} 层的乘加数据…`, `Loading the multiply-add data for layer ${L}…`)}`
+    : retry ? tr(`第 ${L} 层的乘加数据没有载入成功，点这里重试`, `Couldn't load the multiply-add data for layer ${L}. Click to retry`) : esc(err.message);
   clearTimeout(microTimer);
   // 缓存命中或网络很快时不闪一下
   if (err) microEl.style.display = 'flex';
@@ -384,17 +397,19 @@ function onHover(info, e) {
   const T = (i) => esc(tokPlain(Q.tokens[i].s));
   let h = '';
   switch (info.type) {
-    case 'tile': { const t = Q.tokens[info.i]; h = `<span class="k">词元 #${info.i} · ${ROLE_NAME[t.role] || ''}</span><b>${T(info.i)}</b>　编号 <span class="v">${t.id}</span>`; break; }
-    case 'slab': h = `<span class="k">第 ${info.L} 层 · Transformer 块</span>RMSNorm → 注意力（16 Q / 8 KV）→ 残差 → RMSNorm → SwiGLU → 残差<br>${fmtNum(manifest.model.paramsPerLayer)} 个参数<br><span class="v">点击跳到这一层</span>`; break;
-    case 'kv': h = `<span class="k">KV 缓存 · 第 ${info.L} 层</span>位置 ${info.j}「${T(info.j)}」的 ${info.kind}（8 组 × 128 维）<br>后面的词元会直接复用它`; break;
-    case 'bar': h = info.id < 0 ? `<span class="k">其余十五万个词元</span>加起来 <span class="v">${fmtPct(info.p)}</span>` : `<span class="k">候选词元</span><b>${esc(tokPlain(info.str))}</b>　<span class="v">${fmtPct(info.p)}</span>${info.inPool ? '<br>进入了最终候选池' : ''}`; break;
-    case 'seg': h = `<span class="k">候选池 · 最终概率</span><b>${esc(tokPlain(info.str))}</b>　<span class="v">${fmtPct(info.p)}</span>`; break;
-    case 'beam': h = `<span class="k">第 ${info.L} 层 · ${info.head == null ? '16 头平均' : `第 ${info.head} 头`}</span>${T(Q.row(tl.g))} → ${T(info.j)}　<span class="v">${fmtPct(info.w)}</span>`; break;
-    case 'bulb': h = `<span class="k">神经元 #${info.n}</span>SiLU(g)·u = <span class="v">${info.v.toFixed(3)}</span>${info.full ? '' : '<br><span style="color:var(--dim)">这一层只导出了最亮的 16 个</span>'}`; break;
-    case 'pin': h = `<span class="k">输入第 ${info.dim} 维</span>x = <span class="v">${info.x.toFixed(4)}</span><br>w<sub>gate</sub> = ${info.wg}<br>w<sub>up</sub> = ${info.wu}<br><span class="v">点击，看这个权重的比特</span>`; break;
-    case 'wire': h = `<span class="k">${info.which === 'gate' ? 'gate' : 'up'} 权重</span>x × w = ${info.x.toFixed(3)} × ${info.w.toFixed(4)} = <span class="v">${info.prod.toFixed(4)}</span>`; break;
-    case 'mmcell': h = `<span class="k">格子 (${info.d}, ${info.j})</span>x[${info.d}] × W[${info.d}, ${info.j}] = ${info.x.toFixed(4)} × ${info.w} = <span class="v">${info.prod.toFixed(4)}</span><br><span class="v">点击选中，再按 ＋ 看这个权重的比特</span>`; break;
-    case 'key': h = `<span class="k">第 ${info.i} 位 · ${info.i === 0 ? '符号' : info.i <= 8 ? '指数' : '尾数'}</span>点击翻转`; break;
+    case 'tile': { const t = Q.tokens[info.i]; h = isEn ? `<span class="k">Token #${info.i} · ${ROLE_NAME[t.role] || ''}</span><b>${T(info.i)}</b>&ensp;ID <span class="v">${t.id}</span>` : `<span class="k">词元 #${info.i} · ${ROLE_NAME[t.role] || ''}</span><b>${T(info.i)}</b>　编号 <span class="v">${t.id}</span>`; break; }
+    case 'slab': h = isEn ? `<span class="k">Layer ${info.L} · Transformer block</span>RMSNorm → attention (16 Q / 8 KV) → residual → RMSNorm → SwiGLU → residual<br>${fmtNum(manifest.model.paramsPerLayer)} parameters<br><span class="v">Click to jump to this layer</span>` : `<span class="k">第 ${info.L} 层 · Transformer 块</span>RMSNorm → 注意力（16 Q / 8 KV）→ 残差 → RMSNorm → SwiGLU → 残差<br>${fmtNum(manifest.model.paramsPerLayer)} 个参数<br><span class="v">点击跳到这一层</span>`; break;
+    case 'kv': h = isEn ? `<span class="k">KV cache · layer ${info.L}</span>The ${info.kind} of position ${info.j} “${T(info.j)}” (8 groups × 128 dims)<br>Later tokens reuse it as is` : `<span class="k">KV 缓存 · 第 ${info.L} 层</span>位置 ${info.j}「${T(info.j)}」的 ${info.kind}（8 组 × 128 维）<br>后面的词元会直接复用它`; break;
+    case 'bar': h = isEn
+      ? (info.id < 0 ? `<span class="k">The other ~150,000 tokens</span>together <span class="v">${fmtPct(info.p)}</span>` : `<span class="k">Candidate token</span><b>${esc(tokPlain(info.str))}</b>&ensp;<span class="v">${fmtPct(info.p)}</span>${info.inPool ? '<br>Made it into the final candidate pool' : ''}`)
+      : (info.id < 0 ? `<span class="k">其余十五万个词元</span>加起来 <span class="v">${fmtPct(info.p)}</span>` : `<span class="k">候选词元</span><b>${esc(tokPlain(info.str))}</b>　<span class="v">${fmtPct(info.p)}</span>${info.inPool ? '<br>进入了最终候选池' : ''}`); break;
+    case 'seg': h = isEn ? `<span class="k">Candidate pool · final probability</span><b>${esc(tokPlain(info.str))}</b>&ensp;<span class="v">${fmtPct(info.p)}</span>` : `<span class="k">候选池 · 最终概率</span><b>${esc(tokPlain(info.str))}</b>　<span class="v">${fmtPct(info.p)}</span>`; break;
+    case 'beam': h = isEn ? `<span class="k">Layer ${info.L} · ${info.head == null ? 'average of 16 heads' : `head ${info.head}`}</span>${T(Q.row(tl.g))} → ${T(info.j)}&ensp;<span class="v">${fmtPct(info.w)}</span>` : `<span class="k">第 ${info.L} 层 · ${info.head == null ? '16 头平均' : `第 ${info.head} 头`}</span>${T(Q.row(tl.g))} → ${T(info.j)}　<span class="v">${fmtPct(info.w)}</span>`; break;
+    case 'bulb': h = `<span class="k">${tr('神经元', 'Neuron')} #${info.n}</span>SiLU(g)·u = <span class="v">${info.v.toFixed(3)}</span>${info.full ? '' : `<br><span style="color:var(--dim)">${tr('这一层只导出了最亮的 16 个', 'Only the 16 brightest were exported for this layer')}</span>`}`; break;
+    case 'pin': h = `<span class="k">${tr(`输入第 ${info.dim} 维`, `Input dim ${info.dim}`)}</span>x = <span class="v">${info.x.toFixed(4)}</span><br>w<sub>gate</sub> = ${info.wg}<br>w<sub>up</sub> = ${info.wu}<br><span class="v">${tr('点击，看这个权重的比特', "Click to see this weight's bits")}</span>`; break;
+    case 'wire': h = `<span class="k">${info.which === 'gate' ? 'gate' : 'up'} ${tr('权重', 'weight')}</span>x × w = ${info.x.toFixed(3)} × ${info.w.toFixed(4)} = <span class="v">${info.prod.toFixed(4)}</span>`; break;
+    case 'mmcell': h = `<span class="k">${tr('格子', 'Cell')} (${info.d}, ${info.j})</span>x[${info.d}] × W[${info.d}, ${info.j}] = ${info.x.toFixed(4)} × ${info.w} = <span class="v">${info.prod.toFixed(4)}</span><br><span class="v">${tr('点击选中，再按 ＋ 看这个权重的比特', "Click to select it, then press ＋ to see this weight's bits")}</span>`; break;
+    case 'key': h = isEn ? `<span class="k">Bit ${info.i} · ${info.i === 0 ? 'sign' : info.i <= 8 ? 'exponent' : 'mantissa'}</span>Click to flip` : `<span class="k">第 ${info.i} 位 · ${info.i === 0 ? '符号' : info.i <= 8 ? '指数' : '尾数'}</span>点击翻转`; break;
     default: return hideTip();
   }
   showTip(h, e);
@@ -463,7 +478,7 @@ function discover(id) {
   const t = document.createElement('button');
   t.type = 'button';
   t.className = 'toast';
-  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
+  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">${tr('发现知识碎片', 'Insight found')} · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
   while (box.children.length > 3) box.lastElementChild.remove();
@@ -481,7 +496,7 @@ function openCodex() {
   const c = $('#codex');
   $('.cx-grid', c).innerHTML = INSIGHTS.map((x) => (store.found.has(x.id)
     ? `<article class="cx-card found"><div class="where">${esc(x.where)}</div><h4>✦ ${esc(x.title)}</h4><p>${esc(x.text)}</p></article>`
-    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>在「${esc(x.where)}」附近找找。</p></article>`)).join('');
+    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>${isEn ? `Look around “${esc(x.where)}”.` : `在「${esc(x.where)}」附近找找。`}</p></article>`)).join('');
   $('.cx-progress b', c).textContent = `${store.found.size} / ${INSIGHTS.length}`;
   $('.cx-bar i', c).style.width = `${(store.found.size / INSIGHTS.length) * 100}%`;
   c.classList.add('on');
@@ -494,23 +509,23 @@ function closeCodex() { const c = $('#codex'); c.classList.remove('on'); c.setAt
 function renderStrip() {
   if (!cur) return;
   const n = tl ? tl.g : cur.q.replyTokens.length;
-  $('#strip').innerHTML = `<span class="eyebrow" style="margin-right:6px">回复</span>${cur.q.replyTokens.slice(0, n).map((t) => esc(t.s)).join('')}<span class="caret" style="display:inline-block;width:6px;height:1em;background:var(--amber);margin-left:2px"></span>`;
+  $('#strip').innerHTML = `<span class="eyebrow" style="margin-right:6px">${tr('回复', 'Reply')}</span>${cur.q.replyTokens.slice(0, n).map((t) => esc(t.s)).join('')}<span class="caret" style="display:inline-block;width:6px;height:1em;background:var(--amber);margin-left:2px"></span>`;
 }
 
 function bindChrome() {
   $('#btnCodex').addEventListener('click', openCodex);
   $('.cx-close').addEventListener('click', closeCodex);
   $('#codex').addEventListener('click', (e) => { if (e.target.id === 'codex') closeCodex(); });
-  $('#btnReset').addEventListener('click', () => { if (!confirm('清空已收集的知识碎片？')) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
+  $('#btnReset').addEventListener('click', () => { if (!confirm(tr('清空已收集的知识碎片？', 'Clear all the insights you have collected?'))) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
   const sb = $('#btnSound');
-  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? '关闭声音' : '打开声音'; };
+  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? tr('关闭声音', 'Sound off') : tr('打开声音', 'Sound on'); };
   sb.addEventListener('click', () => { setSound(!soundOn()); renderSound(); save(); sfx.click(); });
   renderSound();
   $('#btnChatToggle').addEventListener('click', () => document.body.classList.remove('chat-open'));
   $('#strip').addEventListener('click', () => document.body.classList.add('chat-open'));
   $('#btnFollow').addEventListener('click', () => { engine?.exitFree(); sfx.click(); });
   $('#btnHint').addEventListener('click', () => showHint(!$('#stageHint').classList.contains('on')));
-  initPanes('infer', { left: { el: '#chat', v: '--chat-w', name: '聊天栏' }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, onChange: updateInsets });
+  initPanes('infer', { left: { el: '#chat', v: '--chat-w', name: tr('聊天栏', 'chat panel') }, right: { el: '#dbg', v: '--dbg-w', name: tr('调试器', 'debugger') }, onChange: updateInsets });
 }
 
 function bindKeys() {

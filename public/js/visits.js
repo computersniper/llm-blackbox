@@ -3,6 +3,8 @@
 
 export const REPO = 'https://github.com/computersniper/llm-blackbox';
 
+import { L as tr } from './i18n.js';
+
 const fmt = (n) => n.toLocaleString('zh-CN');
 
 export async function countVisit() {
@@ -22,7 +24,7 @@ export function showVisits(s) {
   const pill = document.getElementById('visits');
   if (pill) {
     pill.querySelector('b').textContent = fmt(s.total);
-    pill.title = `累计 ${fmt(s.total)} 人次来访（每人每天计一次）· 今天 ${fmt(s.today)} 人`;
+    pill.title = tr(`累计 ${fmt(s.total)} 人次来访（每人每天计一次）· 今天 ${fmt(s.today)} 人`, `${fmt(s.total)} visits in total (each visitor counted once a day) · ${fmt(s.today)} today`);
     pill.hidden = false;
   }
 }

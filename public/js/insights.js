@@ -1,5 +1,8 @@
 // 知识碎片：在黑箱里走到特定的地方才会解锁。
-export const INSIGHTS = [
+// 英文版（EN）里举的例子都来自英文问题那一批真实运行（public/data/en/），不套用中文数据的数字。
+import { isEn } from './i18n.js';
+
+const ZH = [
   { id: 'template', where: '结构 · 读入', title: '对话只是一串词元',
     text: '你看到的是一问一答，模型看到的却是一整串词元：<|im_start|>system … <|im_start|>user … <|im_start|>assistant。聊天模板把角色也编码成了特殊词元，模型只是在“续写”这串文字。' },
   { id: 'prefill', where: '结构 · 嵌入', title: '预填充',
@@ -40,4 +43,46 @@ export const INSIGHTS = [
     text: '6 亿参数的小模型知识有限，会编出听起来很合理的错误答案，比如说猫爱纸箱是为了“储存玩具和毛发”。每一步它都只是在挑概率高的下一个词，并不知道自己说得对不对。' },
 ];
 
+const EN = {
+  template: { where: 'Structure · Read input', title: 'A conversation is just a string of tokens',
+    text: 'You see a question and an answer; the model sees one long string of tokens: <|im_start|>system … <|im_start|>user … <|im_start|>assistant. The chat template turns even the roles into special tokens, and the model is simply "continuing" that text.' },
+  prefill: { where: 'Structure · Embedding', title: 'Prefill',
+    text: 'In the first step the model processes the whole prompt (a few dozen tokens) in parallel, all at once. This is called prefill. After that, each new token only needs computing for its one new position.' },
+  kvcache: { where: 'Layer tower', title: 'KV cache',
+    text: 'The K and V that each token produces in every layer are saved. When the next token is generated they are reused directly instead of recomputing everything before it. The price is memory: the longer the context, the bigger the cache.' },
+  autoregress: { where: 'Structure · Read input', title: 'Autoregression',
+    text: 'The model outputs just one token at a time, appends it to the end of the input, and runs the whole thing again. The smooth reply you read is "rolled out" one token after another like this.' },
+  lens: { where: 'Layer tower', title: 'Logit lens',
+    text: 'Hook a middle layer\'s vector straight up to the output head and you can read what the model "would say right now". In Qwen3 the shallow layers read as near-gibberish, and the answer only locks in around layer 20-something. For "Why is the sky blue?", the 4th reply token reads as "ments" at layer 0 and " light" at layer 20, then becomes " blue" at layer 22 (70%) and 98% by layer 24. The answer grows layer by layer.' },
+  rmsnorm: { where: 'Inside a layer', title: 'RMSNorm',
+    text: 'Before entering attention or the feed-forward network, the vector is divided by its own root mean square and multiplied by a set of learned factors. This keeps the numbers on the same scale, so stacking dozens of layers doesn\'t blow up.' },
+  residual: { where: 'Inside a layer', title: 'The residual stream',
+    text: 'The outputs of attention and of the feed-forward network are added back onto the original vector, not swapped in for it. Each layer only adds a little to this information highway, which is also why the logit lens can take a reading at any layer.' },
+  gqa: { where: 'Inside a layer · Attention', title: 'Grouped-query attention',
+    text: 'Qwen3-0.6B has 16 query heads but only 8 key-value heads: every 2 Q heads share one set of K and V. This is GQA. It cuts the KV cache in half with almost no loss in quality.' },
+  rope: { where: 'Operators · Q·K·V', title: 'Rotary position embedding',
+    text: 'Q and K are rotated by an angle that depends on the token\'s position (RoPE, θ = 10⁶). The dot product of two vectors then depends only on how far apart they are, which is how the model tells what came first.' },
+  causal: { where: 'Operators · softmax', title: 'Causal mask',
+    text: 'Each token can only see itself and the tokens before it. Later positions are set to minus infinity before the softmax: while the model is generating, the future doesn\'t exist yet.' },
+  sink: { where: 'Operators · attention heads', title: 'Attention sink',
+    text: 'Many heads put most of their attention on the very first token, <|im_start|>, even though it carries no content. Softmax forces the weights to add up to 1, so when there is nothing worth looking at, the attention has to "park" somewhere.' },
+  swiglu: { where: 'Operators · Gated activation', title: 'SwiGLU: a feed-forward network with valves',
+    text: 'The feed-forward network computes two sets of numbers at once: g goes through the SiLU activation and is then multiplied element by element with u. g acts like a valve that decides how much signal each neuron lets through. Llama, Qwen and DeepSeek all use this design.' },
+  sparse: { where: 'Operators · Neuron grid', title: 'Sparse activation',
+    text: 'Of the 3072 neurons, only a small fraction light up clearly at any one time. The same neuron reacts completely differently to different tokens.' },
+  neuron: { where: 'Multiply-add', title: 'One neuron',
+    text: 'What one neuron does: multiply 1024 inputs by one weight each and add them up to get g; do the same with another set of weights to get u; output SiLU(g) × u. The whole model is billions of multiply-adds like this.' },
+  bits: { where: 'Bits', title: 'bfloat16',
+    text: 'Every weight is stored in 16 bits: 1 sign bit, 8 exponent bits and 7 mantissa bits. Flip one exponent bit and the value can change by a factor of hundreds or thousands, and the neuron\'s output changes beyond recognition.' },
+  tied: { where: 'Structure · Output head', title: 'A shared output matrix',
+    text: 'In Qwen3-0.6B the output matrix and the input embedding table are the same weights (1024 × 151936). That saves about 156 million parameters, a quarter of the whole model.' },
+  sampling: { where: 'Structure · Sampling', title: 'Temperature, top-k, top-p',
+    text: 'The model only produces probabilities; which token actually comes next is a draw: divide the scores by a temperature of 0.7 → keep only the top 20 → cut off once the running total reaches 80% → roll a random number. Ask the same question with a different random number and you may get different wording.' },
+  imend: { where: 'Structure · Sampling', title: 'When to stop',
+    text: 'The model decides for itself when it\'s done: when it samples the special token <|im_end|>, the reply ends there.' },
+  wrong: { where: 'Chat', title: 'Wrong, with a straight face',
+    text: 'A 0.6-billion-parameter model knows little and can make up wrong answers that sound perfectly reasonable. Asked how many r\'s are in "strawberry", it said 2: it gave "2" a 46% chance and the correct "3" only 28%, and the dice landed on 2. To the model, " strawberry" is a single token (#72600); it never sees the letters. At every step it is just picking a likely next token, with no idea whether it is right.' },
+};
+
+export const INSIGHTS = isEn ? ZH.map((x) => ({ id: x.id, ...EN[x.id] })) : ZH;
 export const INSIGHT_BY_ID = new Map(INSIGHTS.map((x) => [x.id, x]));
