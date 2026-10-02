@@ -343,7 +343,7 @@ export function watch(s, ctx) {
   if (!rec || rec.kind !== 'step') return w;
   push('wh', Lx(`第 ${F.t} 帧`, `Frame ${F.t}`));
   push(Lx('a（动作）', 'a (action)'), `${actName(rec.a)}${byTag(rec.by)}`);
-  push(Lx('z 的来源', 'Source of z'), rec.src === 'enc' ? Lx('睁眼：编码真实画面', 'eyes open: encoded real frame') : rec.src === 'resync' ? Lx('重新睁眼对齐', 'eyes reopened to realign') : Lx('闭眼：上一步的 ẑ', 'eyes closed: last step’s ẑ'));
+  push(Lx('z 的来源', 'Source of z'), rec.src === 'enc' ? Lx('睁眼：编码真实画面', 'eyes open: real frame') : rec.src === 'resync' ? Lx('重新睁眼对齐', 'reopened to realign') : Lx('闭眼：上一步的 ẑ', 'eyes closed: last ẑ'));
   push('τ', rec.tau.toFixed(2));
   if (s.ph === 'enc' || s.ph === 'obs') {
     const e = det?.enc;

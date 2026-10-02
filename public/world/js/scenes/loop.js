@@ -1,11 +1,11 @@
 // D2 循环：一帧之内，真实画面 → V 编码 → z → M（LSTM + MDN）→ 采样 ẑ → V 解码 → 梦见的下一帧，
 // 上面一条是真实世界自己走一步。闭眼时从真实画面进来的那条路熄灭，ẑ 从下面绕回来当下一步的 z。
 // 底下三张卡片是 V、M、C 真实的训练记录。
-import { COL, rr, text, card, hexA, line, clamp, ease, seg } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, clamp, ease, seg, font } from '../../../train/js/draw.js';
 import { Pix, vecGrid } from '../pix.js';
 import { toCHW } from '../game.js';
 import { dimOrder, used as isUsed, fmtMSE, actName, byTag } from '../explain.js';
-import { L as Lx } from '../../../js/i18n.js';
+import { isEn, L as Lx } from '../../../js/i18n.js';
 
 const ENC_LABEL = Lx('编码', 'encode'), DEC_LABEL = Lx('解码', 'decode');
 
@@ -307,7 +307,10 @@ export class LoopView {
       card(g, x, y, w, h, { r: 10, accent: it.color });
       text(g, it.t, x + 14, y + 24, { size: pt ? 12 : 13.5, kind: 'serif', weight: 600 });
       text(g, it.a, x + 14, y + 42, { size: pt ? 9.5 : 10.5, kind: 'mono', color: COL.ink2, max: tw });
-      text(g, it.b, x + 14, y + 57, { size: pt ? 9.5 : 10.5, color: COL.dim, max: tw });
+      // 英文这一行更长（V 的卡片右边还有缩略图）：放不下时先把字号缩小一点，再不行才截断
+      let bs = pt ? 9.5 : 10.5;
+      if (isEn) { font(g, bs); while (bs > 8.5 && g.measureText(it.b).width > tw) font(g, bs -= 0.5); }
+      text(g, it.b, x + 14, y + 57, { size: bs, color: COL.dim, max: tw });
       if (ns) this.samples(g, x + w - 14 - ns * (ts + 6) + 6, y + 30, ts, ns, env);
       const P = { x: x + 14, y: y + (pt ? 64 : 70), w: w - 28 - (ns ? ns * (ts + 6) + 4 : 0), h: h - (pt ? 72 : 82) };
       if (P.h > 14) {

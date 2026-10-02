@@ -1,7 +1,7 @@
 // D3 V 的内部：上面一排是编码器（真实画面 → 4 层卷积 → μ / σ），右边经过 M，下面一排是解码器
 // （M 预测的 ẑ → 全连接 → 4 层反卷积 → 梦见的画面），排成一个 U。每一层的特征图都是这一帧真实算出来的；
 // 点任意一格选中它，按 ＋ 看它的一次乘加。走到 z 时，下面把用得最多的几维各扫一遍。
-import { COL, rr, text, card, hexA, line, ease, seg } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, ease, seg, font } from '../../../train/js/draw.js';
 import { Pix, featGrid } from '../pix.js';
 import { dimOrder, dimMeaning, used as isUsed, OP_LABEL, fmtMSE } from '../explain.js';
 import { ENC, DEC } from '../nn.js';
@@ -111,7 +111,7 @@ export class VaeView {
       text(g, rec.src === 'dream' ? Lx('闭眼：M 的输入是上一步的 ẑ', 'eyes closed: M’s input is last step’s ẑ') : 'z = μ', m.x - 10, m.y + 20, { size: 10, color: COL.dim, align: 'right' });
     }
     // ---- 解码器（M 预测的 ẑ）
-    this.zBox(g, B.zd, rec.S.z, Lx('ẑ（M 预测的下一帧）', 'ẑ (next frame predicted by M)'), curOp === 'dfc' || curOp === 'M', env);
+    this.zBox(g, B.zd, rec.S.z, Lx('ẑ（M 预测的下一帧）', "ẑ (M's prediction)"), curOp === 'dfc' || curOp === 'M', env);
     this.arrow(g, B.zd, B.dfc, st8('dfc') === 'on' ? p : st8('dfc') === 'done' ? 1 : 0, COL.amber, pt, true);
     this.gridBox(g, B.dfc, 'dfc', Lx('全连接', 'Fully connected'), '1×1×512', st8('dfc'), p, env, sel, true, true);
     prev = B.dfc;
@@ -135,7 +135,10 @@ export class VaeView {
   pixBox(g, r, pix, title, sub, accent, state, env, reveal = 1, selOp = null) {
     const on = state === 'on';
     text(g, title, r.x, r.y - 10, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
-    if (!this.portrait) text(g, sub, r.x + r.w, r.y - 10, { size: 9, kind: 'mono', color: COL.dim, align: 'right' });
+    // 英文标题更长（“Dreamed next frame ô”），会压到右边的尺寸标注：放不下就不画尺寸
+    let fits = true;
+    if (isEn) { const tw = g.measureText(title).width; font(g, 9, 'mono'); fits = tw + g.measureText(sub).width + 6 <= r.w; }
+    if (!this.portrait && fits) text(g, sub, r.x + r.w, r.y - 10, { size: 9, kind: 'mono', color: COL.dim, align: 'right' });
     rr(g, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
     g.fillStyle = 'rgba(4,8,16,0.92)'; g.fill();
     g.strokeStyle = hexA(on ? COL.amber : accent, on ? 0.85 : 0.35); g.lineWidth = on ? 1.6 : 1; g.stroke();
