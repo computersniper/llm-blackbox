@@ -1,6 +1,7 @@
 // D4 · 反向 · 一层之内：这一层 7 个矩阵各分到多少梯度。矩阵按真实形状等比例画出（宽 = 输出维，高 = 输入维）。
 import { COL, text, rr, card, hexA, clamp, sciSup, fmtInt, divColor, wrap, waitFade } from '../draw.js';
 import { shapes, TENSOR_NAME } from '../run.js';
+import { L as tr } from '../lang.js';
 
 const ORDER = ['q', 'k', 'v', 'o', 'gate', 'up', 'down'];
 const TCOL = { q: COL.cyan, k: COL.amber, v: COL.violet, o: '#8fb8ff', gate: COL.cyan, up: COL.violet, down: COL.amber };
@@ -69,9 +70,9 @@ export class LayerView {
     const R = this.R, k = st.k, s = st.step, T = R.kind === 'tiny', P = this.portrait;
     const L = s.i - 1;
     const sh = shapes(R.model);
-    text(g, `BACKWARD · LAYER ${L} · 7 个矩阵的梯度`, 0, 18, { size: 10, kind: 'mono', color: COL.dim });
-    text(g, `第 ${L} 层：梯度分到每个矩阵`, 0, 52, { size: P ? 19 : 24, kind: 'serif', weight: 900, color: COL.ink });
-    wrap(g, '一个矩阵的梯度 = 流进它的上游梯度 ⊗ 它的输入（外积），再把所有位置加起来。下面每块按真实形状等比例画出，越亮梯度越大。', 0, 80, P ? 380 : 900, 18, { size: 12, color: COL.ink2 });
+    text(g, tr(`BACKWARD · LAYER ${L} · 7 个矩阵的梯度`, `BACKWARD · LAYER ${L} · GRADIENTS OF 7 MATRICES`), 0, 18, { size: 10, kind: 'mono', color: COL.dim });
+    text(g, tr(`第 ${L} 层：梯度分到每个矩阵`, `Layer ${L}: the gradient, matrix by matrix`), 0, 52, { size: P ? 19 : 24, kind: 'serif', weight: 900, color: COL.ink });
+    wrap(g, tr('一个矩阵的梯度 = 流进它的上游梯度 ⊗ 它的输入（外积），再把所有位置加起来。下面每块按真实形状等比例画出，越亮梯度越大。', 'A matrix’s gradient = the upstream gradient flowing into it ⊗ its input (an outer product), summed over all positions. Each block below is drawn to scale in its real shape; brighter = bigger gradient.'), 0, 80, P ? 380 : 900, 18, { size: 12, color: COL.ink2 });
     const vals = ORDER.map((t) => R.tgrad(k, L, t));
     const mx = Math.max(...vals);
     ORDER.forEach((t, j) => {
@@ -94,11 +95,11 @@ export class LayerView {
           g.imageSmoothingEnabled = true;
           g.strokeStyle = COL.ink2;
           g.strokeRect(p.x, p.y, cs, cs);
-          text(g, '真实梯度 48×48', p.x + cs + 4, p.y + 10, { size: 8.5, color: COL.ink2 });
+          text(g, tr('真实梯度 48×48', 'real gradient 48×48'), p.x + cs + 4, p.y + 10, { size: 8.5, color: COL.ink2 });
         } else if (ci >= 0) {
           // 梯度局部在这个检查点的 D1 分块里，还没到
           g.globalAlpha = waitFade(env.t - st.wait.since);
-          text(g, '真实梯度 48×48 · 载入中…', p.x + 4, p.y + 12, { size: 8.5, color: COL.ink2 });
+          text(g, tr('真实梯度 48×48 · 载入中…', 'real gradient 48×48 · loading…'), p.x + 4, p.y + 12, { size: 8.5, color: COL.ink2 });
           g.globalAlpha = 1;
         }
       }
@@ -109,20 +110,20 @@ export class LayerView {
       env.hit(p.x, p.y, p.w, p.h, {
         click: true,
         act: () => this.app.seek((b) => b.ph === 'bwd' && b.i === s.i && b.mi === t),
-        tip: `<span class="k">第 ${L} 层 ${TENSOR_NAME[t]} · ${sh[t][0]} × ${sh[t][1]}</span>梯度范数 ‖∇W‖ = <span class="v">${sciSup(v, 4)}</span><br>平均每个权重 ${sciSup(per, 3)}（均方根）<br>${fmtInt(sh[t][0] * sh[t][1])} 个梯度`,
+        tip: tr(`<span class="k">第 ${L} 层 ${TENSOR_NAME[t]} · ${sh[t][0]} × ${sh[t][1]}</span>梯度范数 ‖∇W‖ = <span class="v">${sciSup(v, 4)}</span><br>平均每个权重 ${sciSup(per, 3)}（均方根）<br>${fmtInt(sh[t][0] * sh[t][1])} 个梯度`, `<span class="k">layer ${L} ${TENSOR_NAME[t]} · ${sh[t][0]} × ${sh[t][1]}</span>gradient norm ‖∇W‖ = <span class="v">${sciSup(v, 4)}</span><br>per weight ${sciSup(per, 3)} (RMS)<br>${fmtInt(sh[t][0] * sh[t][1])} gradients`),
       });
     });
     if (!P) {
       const a = this.pos.q, b = this.pos.o, c = this.pos.gate, d = this.pos.down;
-      text(g, '注意力', a.x, a.y - 52, { size: 11, kind: 'mono', color: COL.dim });
-      text(g, '前馈 SwiGLU', c.x, c.y - 52, { size: 11, kind: 'mono', color: COL.dim });
+      text(g, tr('注意力', 'attention'), a.x, a.y - 52, { size: 11, kind: 'mono', color: COL.dim });
+      text(g, tr('前馈 SwiGLU', 'feed-forward SwiGLU'), c.x, c.y - 52, { size: 11, kind: 'mono', color: COL.dim });
       g.strokeStyle = COL.line2;
       g.beginPath(); g.moveTo(a.x, a.y - 46); g.lineTo(b.x + b.w, a.y - 46); g.stroke();
       g.beginPath(); g.moveTo(c.x, c.y - 46); g.lineTo(d.x + d.w, c.y - 46); g.stroke();
     }
     // RMSNorm 的缩放 γ（向量）
     const ny = this.H - 120;
-    text(g, '同一层里还有 4 个向量参数（RMSNorm 的缩放 γ）：', 0, ny, { size: 11, color: COL.dim });
+    text(g, tr('同一层里还有 4 个向量参数（RMSNorm 的缩放 γ）：', 'The same layer also has 4 vector parameters (RMSNorm scales γ):'), 0, ny, { size: 11, color: COL.dim });
     ['ln1', 'qn', 'kn', 'ln2'].forEach((t, j) => {
       const v = R.tgrad(k, L, t);
       const x = P ? (j % 2) * 190 : j * 230, y = ny + 22 + (P ? Math.floor(j / 2) * 38 : 0);

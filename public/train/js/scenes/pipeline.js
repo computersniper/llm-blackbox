@@ -116,7 +116,7 @@ export class Pipeline {
       ['训练', `${fmtInt(tm.train.steps)} 步 · ${tm.train.seconds} 秒 · RTX 5090`],
       ['验证损失', `${tm.ckpts[0].valLoss.toFixed(2)} → ${tm.train.finalVal.toFixed(2)}`],
     ]);
-    text(g, L('对照（据 Qwen3 技术报告）：约 36 万亿词元，119 种语言', 'Qwen3 itself (tech report): ~36 trillion tokens, 119 languages'), c.x + 14, c.y + 178 + h + 22, { size: 10.5, color: COL.dim, max: c.w - 28 });
+    text(g, L('对照（据 Qwen3 技术报告）：约 36 万亿词元，119 种语言', 'Qwen3 itself: ~36 trillion tokens, 119 languages'), c.x + 14, c.y + 178 + h + 22, { size: 10.5, color: COL.dim, max: c.w - 28 });
     if (isEn) text(g, 'Trained on Chinese poems, so it writes Chinese.', c.x + 14, c.y + 178 + h + 40, { size: 10.5, color: COL.dim, max: c.w - 28 });
     this.button(g, c, L('＋ 进去，看它从乱码学会写诗', '+ Go in: from gibberish to poems'), on, env, () => this.app.enterRun('tiny'));
   }
@@ -124,7 +124,7 @@ export class Pipeline {
   sft(g, c, on, env) {
     const q = this.app.qwen.D, qm = q.meta;
     card(g, c.x, c.y, c.w, c.h, { eyebrow: 'STAGE 2 · SUPERVISED FINE-TUNING', title: L('监督微调 · 学会对话', 'Fine-tuning · learning to chat'), accent: COL.amber, active: on });
-    wrap(g, L('用一问一答的对话继续训练。损失函数不变，只是把提示部分遮掉：只对助手的回答算损失。', 'Keep training on Q&A chats. Same loss, but the prompt is masked out: only the assistant’s answer counts.'), c.x + 14, c.y + 70, c.w - 28, 19, { size: isEn ? 12 : 12.5, color: COL.ink2, maxLines: isEn ? 3 : 0 });
+    wrap(g, L('用一问一答的对话继续训练。损失函数不变，只是把提示部分遮掉：只对助手的回答算损失。', 'Keep training on Q&A chats. Same loss, but the prompt is masked: only the answer counts.'), c.x + 14, c.y + 70, c.w - 28, 19, { size: isEn ? 12 : 12.5, color: COL.ink2, maxLines: isEn ? 3 : 0 });
     // 聊天模板里的真实词元：只有回答下面有线
     let x = c.x + 14, y = c.y + 128;
     for (let i = 0; i < qm.ids.length; i++) {
@@ -187,7 +187,7 @@ export class Pipeline {
     }
     text(g, L(`L = −log σ(β·[提升(好) − 提升(坏)])`, `L = −log σ(β·[gain(good) − gain(bad)])`), c.x + 14, y + 12, { size: 11.5, kind: 'mono', color: COL.ink2 });
     text(g, `= −log σ(${d.beta} × ${d.margin.toFixed(1)}) = ${d.loss.toFixed(4)}`, c.x + 14, y + 32, { size: 11.5, kind: 'mono', color: COL.amber });
-    wrap(g, L('π = 走完 3 步 SFT 的模型，π_ref = 原模型。只算了这一次损失，没有真的做偏好训练。', 'π = the model after 3 SFT steps, π_ref = the original. Only this one loss was computed; no real preference training was done.'), c.x + 14, y + 54, c.w - 28, 16, { size: 10.5, color: COL.dim });
+    wrap(g, L('π = 走完 3 步 SFT 的模型，π_ref = 原模型。只算了这一次损失，没有真的做偏好训练。', 'π = model after 3 SFT steps, π_ref = original. Just this one loss — no real preference training.'), c.x + 14, y + 54, c.w - 28, 16, { size: 10.5, color: COL.dim });
     y += 100;
     const items = isEn ? [
       ['RLHF', 'Train a reward model, then reinforce with PPO'],

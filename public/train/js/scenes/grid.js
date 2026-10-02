@@ -5,6 +5,7 @@
 import { COL, text, rr, hexA, fmtP, clamp, ease, seg, seqColor, heatColor, sciSup, arrow } from '../draw.js';
 import { disp, short } from './row.js';
 import { esc } from '../../../js/ui.js';
+import { isEn, L } from '../lang.js';
 
 export class Grid {
   constructor(app, R, mode) { this.app = app; this.R = R; this.mode = mode; }
@@ -61,7 +62,7 @@ export class Grid {
     const bi = s.i;
     const n = R.rowLen, NB = R.NB;
     text(g, fwd ? 'FORWARD · LOGIT LENS ON THE RESIDUAL STREAM' : 'BACKWARD · ‖∂L/∂h‖ ON THE RESIDUAL STREAM', 0, 18, { size: 10, kind: 'mono', color: COL.dim });
-    text(g, fwd ? '前向：一层层算上去，每层都“读一下”它会猜什么' : '反向：梯度从输出头一层层流回来', 0, 52, { size: P ? 17 : 24, kind: 'serif', weight: 900, color: COL.ink });
+    text(g, fwd ? L('前向：一层层算上去，每层都“读一下”它会猜什么', 'Forward: layer by layer, reading its guess at each one') : L('反向：梯度从输出头一层层流回来', 'Backward: gradients flow back from the output head'), 0, 52, { size: P ? 17 : 24, kind: 'serif', weight: 900, color: COL.ink });
     let gmax = 1e-30;
     if (!fwd) for (let b = 0; b < NB; b++) for (let i = 0; i < n; i++) gmax = Math.max(gmax, R.residGrad(k, b, i));
     const pr = ease(seg(st.p, 0, 0.6));
@@ -94,7 +95,7 @@ export class Grid {
         }
         g.globalAlpha = 1;
       }
-      const lab = b === 0 ? '嵌入' : b === NB - 1 ? `第 ${b - 1} 层 → 输出` : `第 ${b - 1} 层`;
+      const lab = isEn ? (b === 0 ? 'Embedding' : b === NB - 1 ? `L${b - 1} → out` : `Layer ${b - 1}`) : b === 0 ? '嵌入' : b === NB - 1 ? `第 ${b - 1} 层 → 输出` : `第 ${b - 1} 层`;
       for (let blk = 0; blk < this.blocks; blk++) {
         const c0 = this.cell(b, blk * this.per);
         if (!P) text(g, lab, this.gx - 10, c0.y + c0.h / 2 + 4, { size: T ? 11.5 : 9.5, color: b === bi ? COL.amber : COL.dim, align: 'right' });
@@ -102,7 +103,7 @@ export class Grid {
           g.save();
           g.translate(c0.x + c0.w / 2 + 3, this.gy - 6);
           g.rotate(-Math.PI / 2.6);
-          text(g, b === 0 ? '嵌入' : `L${b - 1}`, 0, 0, { size: 9.5, color: b === bi ? COL.amber : COL.dim });
+          text(g, b === 0 ? L('嵌入', 'Emb') : `L${b - 1}`, 0, 0, { size: 9.5, color: b === bi ? COL.amber : COL.dim });
           g.restore();
         }
         const rowRect = P ? { x: c0.x, y: this.gy, w: this.cw, h: this.gh } : { x: 0, y: c0.y, w: this.gx + this.gw, h: this.ch };
@@ -112,8 +113,16 @@ export class Grid {
           act: !fwd && b >= 1 ? () => { this.app.seek((x) => x.ph === 'bwd' && x.i === b); this.app.into(); } : () => { this.app.seek((x) => x.ph === this.mode && x.i === b); },
           tipAt: (wx, wy) => {
             const i = P ? clamp(Math.floor((wy - this.gy) / this.ch), 0, n - 1) : clamp(i0 + Math.floor((wx - this.gx) / this.cw), 0, n - 1);
-            if (P ? wy < this.gy : wx < this.gx) return `<span class="k">${lab}</span>${!fwd && b >= 1 ? '点一下进去看这一层的 7 个矩阵' : '点一下跳到这一层'}`;
+            if (P ? wy < this.gy : wx < this.gx) return `<span class="k">${lab}</span>${!fwd && b >= 1 ? L('点一下进去看这一层的 7 个矩阵', 'Click to open this layer’s 7 matrices') : L('点一下跳到这一层', 'Click to jump to this layer')}`;
             const tgt = disp(R.tok(k, i + 1)), inp = disp(R.tok(k, i));
+            if (isEn) {
+              const note = R.counted(i) ? '' : `<br><span style="color:var(--dim)">this position doesn’t count toward the loss${fwd ? '' : ', but gradients still flow through it'}</span>`;
+              if (fwd) {
+                const lt = R.lensTop(k, b, i);
+                return `<span class="k">${lab} · position ${i}</span>input “${esc(inp)}”, correct answer “<b>${esc(tgt)}</b>”<br>top guess right now “${esc(disp(lt.s))}”${lt.ok ? ' (correct)' : ''}<br>probability of the correct answer <span class="v">${fmtP(R.lensP(k, b, i))}</span> · ‖h‖ = ${R.residNorm(k, b, i).toFixed(2)}${note}`;
+              }
+              return `<span class="k">${lab} · position ${i}</span>input “${esc(inp)}”<br>‖∂L/∂h‖ = <span class="v">${sciSup(R.residGrad(k, b, i), 3)}</span>${b >= 1 ? '<br>Click to open this layer’s 7 matrices' : ''}${note}`;
+            }
             const note = R.counted(i) ? '' : `<br><span style="color:var(--dim)">这个位置不计入损失${fwd ? '' : '，但梯度照样流过'}</span>`;
             if (fwd) {
               const lt = R.lensTop(k, b, i);
@@ -140,21 +149,21 @@ export class Grid {
     if (!P) {
       for (let blk = 0; blk < this.blocks; blk++) {
         const c0 = this.cell(0, blk * this.per), c1 = this.cell(NB - 1, blk * this.per);
-        text(g, '输入', this.gx - 10, c0.y + this.ch + 17, { size: 10, color: COL.dim, align: 'right' });
-        text(g, '正确答案', this.gx - 10, c1.y - 8, { size: 10, color: COL.amber, align: 'right' });
+        text(g, L('输入', 'input'), this.gx - 10, c0.y + this.ch + 17, { size: 10, color: COL.dim, align: 'right' });
+        text(g, L('正确答案', 'answer'), this.gx - 10, c1.y - 8, { size: 10, color: COL.amber, align: 'right' });
         const ax = 14;
         arrow(g, ax, fwd ? c0.y + this.ch : c1.y, ax, fwd ? c1.y + 6 : c0.y + this.ch - 6, fwd ? hexA(COL.cyan, 0.6) : hexA(COL.rose, 0.6), 1.5, 8);
       }
     }
     if (this.side) this.drawSide(g, st, env, fwd);
     const ly = this.gy + this.gh + (P ? 26 : 40);
-    text(g, fwd ? '格子 = 逻辑透镜在这一层读出的猜测；底色越亮，正确答案的概率越高；绿框 = 第一名就是正确答案' : '格子 = 梯度的大小（对数刻度，亮 = 大）；残差连接让梯度能直接抄近路流到底层', 0, ly, { size: 10.5, color: COL.dim, max: Math.max(360, this.W) });
-    if (!T) text(g, '灰掉的列是提示部分：不计入损失，但前向照算、梯度也照样流过它们', 0, ly + 18, { size: 10.5, color: COL.faint, max: Math.max(360, this.W) });
+    text(g, fwd ? L('格子 = 逻辑透镜在这一层读出的猜测；底色越亮，正确答案的概率越高；绿框 = 第一名就是正确答案', 'Cell = the logit lens’s guess at this layer; brighter = higher probability of the correct answer; green frame = top guess is right') : L('格子 = 梯度的大小（对数刻度，亮 = 大）；残差连接让梯度能直接抄近路流到底层', 'Cell = gradient size (log scale, bright = big); residual connections let gradients shortcut to the bottom layers'), 0, ly, { size: 10.5, color: COL.dim, max: Math.max(360, this.W) });
+    if (!T) text(g, L('灰掉的列是提示部分：不计入损失，但前向照算、梯度也照样流过它们', 'Grayed columns are the prompt: not in the loss, but still computed forward, and gradients still flow through them'), 0, ly + 18, { size: 10.5, color: COL.faint, max: Math.max(360, this.W) });
   }
 
   drawSide(g, st, env, fwd) {
     const R = this.R, k = st.k, NB = R.NB, n = R.rowLen, S = this.side;
-    text(g, fwd ? '这一层的平均 ‖h‖' : '这一层参数的梯度', S.x, this.gy - 10, { size: 10, color: COL.dim });
+    text(g, fwd ? L('这一层的平均 ‖h‖', 'mean ‖h‖ per layer') : L('这一层参数的梯度', 'gradient of layer params'), S.x, this.gy - 10, { size: 10, color: COL.dim });
     const vals = [];
     for (let b = 0; b < NB; b++) {
       if (fwd) { let s = 0; for (let i = 0; i < n; i++) s += R.residNorm(k, b, i); vals.push(s / n); }
@@ -173,6 +182,6 @@ export class Grid {
       g.fill();
       text(g, fwd ? v.toFixed(1) : sciSup(v, 2), S.x + w + 4, c.y + c.h / 2 + 3.5, { size: 9, kind: 'mono', color: COL.dim });
     });
-    if (!fwd) text(g, '最底下是嵌入（和输出矩阵共用一块）', S.x, this.cell(0, 0).y + this.ch + 17, { size: 9, color: COL.faint });
+    if (!fwd) text(g, L('最底下是嵌入（和输出矩阵共用一块）', 'bottom: embedding (shared with output)'), S.x, this.cell(0, 0).y + this.ch + 17, { size: 9, color: COL.faint });
   }
 }

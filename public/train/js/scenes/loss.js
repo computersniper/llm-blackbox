@@ -2,6 +2,7 @@
 import { COL, text, rr, card, hexA, fmtP, clamp, ease, seg, seqColor, line, dot, wrap, sciSup, fmtInt, lerp } from '../draw.js';
 import { rowLayout, tileBase, disp, short } from './row.js';
 import { esc } from '../../../js/ui.js';
+import { isEn, L } from '../lang.js';
 
 export class LossView {
   constructor(app, R) { this.app = app; this.R = R; }
@@ -24,8 +25,8 @@ export class LossView {
   draw(g, st, env) {
     const R = this.R, k = st.k, s = st.step, T = R.kind === 'tiny', P = this.portrait, W = this.W;
     const ci = s.i;
-    text(g, 'CROSS-ENTROPY · 每个位置 −ln p(正确答案)', 0, 18, { size: 10, kind: 'mono', color: COL.dim });
-    text(g, '损失：把每个位置猜错的程度加起来', 0, 50, { size: P ? 18 : 22, kind: 'serif', weight: 900, color: COL.ink });
+    text(g, L('CROSS-ENTROPY · 每个位置 −ln p(正确答案)', 'CROSS-ENTROPY · −ln p(CORRECT ANSWER) AT EVERY POSITION'), 0, 18, { size: 10, kind: 'mono', color: COL.dim });
+    text(g, L('损失：把每个位置猜错的程度加起来', 'Loss: add up how wrong each guess is'), 0, 50, { size: P ? 18 : 22, kind: 'serif', weight: 900, color: COL.ink });
     // 字块：第 j 块是位置 j−1 的目标
     const rows = rowLayout(g, R, k, 0, 78, W, T ? { tile: P ? 30 : 36, th: 40, gap: 4, lineGap: 26 } : { tile: 34, th: 40, gap: 5, lineGap: 28 });
     let sum = 0, cnt = 0;
@@ -51,13 +52,13 @@ export class LossView {
       if (has && counted) env.hit(r.x, r.y, r.w, r.h + 20, {
         click: true,
         act: () => { this.app.seek((b) => b.ph === 'loss' && b.i === pi); },
-        tip: `<span class="k">位置 ${pi} → 「${esc(disp(R.tok(k, r.j)))}」</span>p = <span class="v">${fmtP(p)}</span>　−ln p = ${nll.toFixed(3)}<br><span style="color:var(--dim)">点一下跳到这个位置</span>`,
+        tip: L(`<span class="k">位置 ${pi} → 「${esc(disp(R.tok(k, r.j)))}」</span>p = <span class="v">${fmtP(p)}</span>　−ln p = ${nll.toFixed(3)}<br><span style="color:var(--dim)">点一下跳到这个位置</span>`, `<span class="k">position ${pi} → “${esc(disp(R.tok(k, r.j)))}”</span>p = <span class="v">${fmtP(p)}</span> · −ln p = ${nll.toFixed(3)}<br><span style="color:var(--dim)">Click to jump to this position</span>`),
       });
     }
     const ry = 78 + rows.height + 36;
     // 累计
-    text(g, `已经累计 ${cnt} 个位置，平均 −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`, 0, ry, { size: 12, kind: 'mono', color: COL.ink2 });
-    text(g, T ? `整批 ${fmtInt(R.D.meta.train.tokensPerStep)} 个位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}` : `${R.D.sftPos.length} 个回答位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}`, P ? 0 : W, P ? ry + 20 : ry, { size: 12, kind: 'mono', color: COL.amber, align: P ? 'left' : 'right' });
+    text(g, L(`已经累计 ${cnt} 个位置，平均 −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`, `${cnt} positions so far, mean −ln p = ${cnt ? (sum / cnt).toFixed(3) : '—'}`), 0, ry, { size: 12, kind: 'mono', color: COL.ink2 });
+    text(g, isEn ? (T ? `mean over all ${fmtInt(R.D.meta.train.tokensPerStep)} positions in the batch (the actual loss) = ${R.loss(k).toFixed(4)}` : `mean over the ${R.D.sftPos.length} answer positions (the actual loss) = ${R.loss(k).toFixed(4)}`) : T ? `整批 ${fmtInt(R.D.meta.train.tokensPerStep)} 个位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}` : `${R.D.sftPos.length} 个回答位置的平均（真正的 loss）= ${R.loss(k).toFixed(4)}`, P ? 0 : W, P ? ry + 20 : ry, { size: 12, kind: 'mono', color: COL.amber, align: P ? 'left' : 'right' });
     this.detailY = ry + (P ? 44 : 28);
     this.drawDetail(g, st, env, this.detailY);
   }
@@ -76,14 +77,14 @@ export class LossView {
     // ① softmax
     {
       const b = boxes[0];
-      card(g, b.x, b.y, b.w, b.h, { eyebrow: '① SOFTMAX · 分数 → 概率', title: `位置 ${i} 的预测`, accent: COL.cyan, active: phase === 0 });
+      card(g, b.x, b.y, b.w, b.h, { eyebrow: L('① SOFTMAX · 分数 → 概率', '① SOFTMAX · SCORES → PROBABILITIES'), title: L(`位置 ${i} 的预测`, `Prediction at position ${i}`), accent: COL.cyan, active: phase === 0 });
       const ctxN = T ? 8 : 4;
       const ctx = Array.from({ length: Math.min(i + 1, ctxN) }, (_, j) => disp(R.tok(k, i - Math.min(i, ctxN - 1) + j))).join(T ? '' : '·');
-      text(g, `上文「…${ctx}」→ ？`, b.x + 14, b.y + 66, { size: 12, color: COL.ink2, max: b.w - 28 });
+      text(g, L(`上文「…${ctx}」→ ？`, `context “…${ctx}” → ?`), b.x + 14, b.y + 66, { size: 12, color: COL.ink2, max: b.w - 28 });
       const items = top.map((t) => ({ s: disp(t.s), p: t.p, tg: t.id === tid }));
       const rest = 1 - items.reduce((a, t) => a + t.p, 0);
       if (inTop < 0) items.push({ s: disp(tgt), p, tg: true, out: true });
-      items.push({ s: `其余 ${fmtInt(R.model.vocab - items.length)} 个`, p: Math.max(0, rest - (inTop < 0 ? p : 0)), rest: true });
+      items.push({ s: L(`其余 ${fmtInt(R.model.vocab - items.length)} 个`, `${fmtInt(R.model.vocab - items.length)} others`), p: Math.max(0, rest - (inTop < 0 ? p : 0)), rest: true });
       const grow = phase === 0 ? ease(seg(st.p, 0, 0.7)) : 1;
       const bx = b.x + 96, bw = b.w - 160;
       items.forEach((t, j) => {
@@ -98,24 +99,24 @@ export class LossView {
         text(g, fmtP(t.p), bx + Math.max(2, bw * t.p * grow) + 6, yy + 12, { size: 10.5, kind: 'mono', color: hl ? COL.amber : COL.dim });
         g.globalAlpha = 1;
       });
-      text(g, `${fmtInt(R.model.vocab)} 个分数 → e^z / Σe^z → 加起来等于 1`, b.x + 14, b.y + b.h - 14, { size: 10, color: COL.faint, max: b.w - 28 });
+      text(g, L(`${fmtInt(R.model.vocab)} 个分数 → e^z / Σe^z → 加起来等于 1`, `${fmtInt(R.model.vocab)} scores → e^z / Σe^z → sums to 1`), b.x + 14, b.y + b.h - 14, { size: 10, color: COL.faint, max: b.w - 28 });
     }
     // ② 取正确答案的概率
     {
       const b = boxes[1];
-      card(g, b.x, b.y, b.w, b.h, { eyebrow: '② PICK · 只看正确答案', title: `正确答案「${disp(tgt)}」`, accent: COL.amber, active: phase === 1 });
+      card(g, b.x, b.y, b.w, b.h, { eyebrow: L('② PICK · 只看正确答案', '② PICK · ONLY THE CORRECT ANSWER'), title: L(`正确答案「${disp(tgt)}」`, `Correct answer: ${disp(tgt)}`), accent: COL.amber, active: phase === 1 });
       const a = phase >= 1 ? 1 : 0.35;
       g.globalAlpha = a;
       text(g, short(tgt), b.x + b.w / 2, b.y + 150, { size: 54, color: COL.amber, align: 'center', weight: 600, max: b.w - 30 });
       text(g, `p = ${p < 1e-3 ? sciSup(p, 3) : p.toFixed(4)}`, b.x + b.w / 2, b.y + 200, { size: 20, kind: 'mono', color: COL.ink, align: 'center' });
-      text(g, inTop >= 0 ? `它是第 ${inTop + 1} 名` : '它不在前 5 名里', b.x + b.w / 2, b.y + 226, { size: 12, color: COL.dim, align: 'center' });
+      text(g, inTop >= 0 ? L(`它是第 ${inTop + 1} 名`, `it ranks #${inTop + 1}`) : L('它不在前 5 名里', 'it’s not in the top 5'), b.x + b.w / 2, b.y + 226, { size: 12, color: COL.dim, align: 'center' });
       g.globalAlpha = 1;
-      wrap(g, '其余词元不直接出现在损失里，但都在 softmax 的分母里：梯度会把它们统统压低一点，把正确答案抬高。', b.x + 14, b.y + b.h - 58, b.w - 28, 17, { size: 10.5, color: COL.dim });
+      wrap(g, L('其余词元不直接出现在损失里，但都在 softmax 的分母里：梯度会把它们统统压低一点，把正确答案抬高。', 'The other tokens don’t appear in the loss directly, but they all sit in softmax’s denominator: the gradient pushes them all down a little and lifts the correct answer.'), b.x + 14, b.y + b.h - 58, b.w - 28, 17, { size: 10.5, color: COL.dim });
     }
     // ③ −ln p
     {
       const b = boxes[2];
-      card(g, b.x, b.y, b.w, b.h, { eyebrow: '③ −LN P · 越没把握，罚得越重', title: `损失 = ${nll.toFixed(3)}`, accent: COL.rose, active: phase === 2 });
+      card(g, b.x, b.y, b.w, b.h, { eyebrow: L('③ −LN P · 越没把握，罚得越重', '③ −LN P · THE LESS SURE, THE BIGGER THE PENALTY'), title: L(`损失 = ${nll.toFixed(3)}`, `Loss = ${nll.toFixed(3)}`), accent: COL.rose, active: phase === 2 });
       const px = b.x + 40, pw = b.w - 64, py = b.y + 70, ph = b.h - 120;
       const maxL = 10;
       const X = (pp) => px + pp * pw, Y = (v) => py + ph - (Math.min(v, maxL) / maxL) * ph;
@@ -134,7 +135,7 @@ export class LossView {
       g.strokeStyle = 'rgba(255,107,147,0.3)';
       g.beginPath(); g.moveTo(px, Y(lv)); g.lineTo(px + pw, Y(lv)); g.stroke();
       g.setLineDash([]);
-      text(g, `瞎猜 ${lv.toFixed(2)}`, px + pw, Y(lv) - 4, { size: 9, color: 'rgba(255,107,147,0.7)', align: 'right' });
+      text(g, L(`瞎猜 ${lv.toFixed(2)}`, `blind guess ${lv.toFixed(2)}`), px + pw, Y(lv) - 4, { size: 9, color: 'rgba(255,107,147,0.7)', align: 'right' });
       const f = phase === 2 ? ease(seg(st.p, 0, 0.6)) : phase > 2 ? 1 : 0;
       if (f > 0) {
         const pp = lerp(1, Math.max(p, 1e-5), f);

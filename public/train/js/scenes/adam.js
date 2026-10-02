@@ -4,6 +4,7 @@ import { COL, text, rr, card, hexA, clamp, ease, seg, sciSup, fmtInt, line, dot,
 import { f32Bits, bf16Round } from '../explain.js';
 import { UPD_SUBS } from '../timeline.js';
 import { esc } from '../../../js/ui.js';
+import { isEn, L as tr, featLabel } from '../lang.js';
 
 const B1 = 0.9, B2 = 0.95, EPS = 1e-8;
 const num = (v, d = 4) => (v === 0 ? '0' : Math.abs(v) >= 1e-3 && Math.abs(v) < 1e4 ? Number(v.toPrecision(d + 1)).toString() : sciSup(v, d));
@@ -40,15 +41,16 @@ export class AdamView {
     const f = this.app.ctx.feat ?? 0;
     const ft = R.feats[f];
     const a = R.adam(k, f);
-    text(g, `ADAMW · 第 ${a.t} 步 · 一个权重的完整算式`, 0, 18, { size: 10, kind: 'mono', color: COL.dim });
-    text(g, '更新：每个权重各算各的', 0, 52, { size: P ? 19 : 24, kind: 'serif', weight: 900, color: COL.ink });
+    text(g, tr(`ADAMW · 第 ${a.t} 步 · 一个权重的完整算式`, `ADAMW · STEP ${a.t} · ONE WEIGHT, THE FULL FORMULA`), 0, 18, { size: 10, kind: 'mono', color: COL.dim });
+    text(g, tr('更新：每个权重各算各的', 'Update: every weight on its own'), 0, 52, { size: P ? 19 : 24, kind: 'serif', weight: 900, color: COL.ink });
     // 选权重
     let x = this.chips.x, y = this.chips.y;
     R.feats.forEach((ff, i) => {
-      const w = measure(g, ff.label, 11) + 22;
+      const lab = featLabel(ff, R.kind);
+      const w = measure(g, lab, 11) + 22;
       if (x + w > this.chips.x + this.chips.w) { x = this.chips.x; y += 32; }
-      pill(g, x, y, w, 26, ff.label, { on: i === f, color: COL.violet, size: 11 });
-      env.hit(x, y, w, 26, { click: true, act: () => { this.app.setFeat(i); this.app.sfx('click'); }, tip: `<span class="k">换一个权重看</span>${esc(ff.name)}[${ff.index.join(', ')}]${ff.decay ? '' : '<br>RMSNorm 的缩放：不做权重衰减'}` });
+      pill(g, x, y, w, 26, lab, { on: i === f, color: COL.violet, size: 11 });
+      env.hit(x, y, w, 26, { click: true, act: () => { this.app.setFeat(i); this.app.sfx('click'); }, tip: `<span class="k">${tr('换一个权重看', 'look at another weight')}</span>${esc(ff.name)}[${ff.index.join(', ')}]${ff.decay ? '' : tr('<br>RMSNorm 的缩放：不做权重衰减', '<br>RMSNorm scale: no weight decay')}` });
       x += w + 8;
     });
     this.drawForm(g, st, env, a, ft);
@@ -59,18 +61,18 @@ export class AdamView {
   drawForm(g, st, env, a, ft) {
     const R = this.R, k = st.k, s = st.step, C = this.form, P = this.portrait;
     const lr = R.lr(k);
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: `${ft.name}[${ft.index.join(', ')}]`, title: ft.label, accent: COL.violet, active: !!s.sub });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: `${ft.name}[${ft.index.join(', ')}]`, title: featLabel(ft, R.kind), accent: COL.violet, active: !!s.sub });
     const cur = s.sub ? UPD_SUBS.indexOf(s.sub) : UPD_SUBS.length;
     const t = a.t;
     const adamPart = -lr * a.mh / (Math.sqrt(a.vh) + EPS), decay = -lr * a.wd * a.w0;
     const L = [
-      { sub: 'clip', k: '裁剪', l: `‖g‖ = ${R.gradNorm(k).toFixed(4)} ${R.clip(k) < 1 ? `> 1，乘 ${R.clip(k).toPrecision(5)}` : '≤ 1，不变'}`, r: `g = ${par(a.gRaw)} × ${R.clip(k).toPrecision(4)}` },
-      { sub: 'g', k: '梯度', l: `g = ∂L/∂w`, r: `= ${num(a.g)}` },
-      { sub: 'm', k: '一阶动量', l: `m = 0.9 × ${par(a.m0)} + 0.1 × ${par(a.g)}`, r: `= ${num(a.m)}` },
-      { sub: 'v', k: '二阶动量', l: `v = 0.95 × ${par(a.v0)} + 0.05 × ${par(a.g)}²`, r: `= ${num(a.v)}` },
-      { sub: 'bc', k: '偏差校正', l: `m̂ = m / (1 − 0.9^${t}),  v̂ = v / (1 − 0.95^${t})`, r: `m̂ = ${num(a.mh)},  v̂ = ${num(a.vh)}` },
+      { sub: 'clip', k: tr('裁剪', 'clip'), l: `‖g‖ = ${R.gradNorm(k).toFixed(4)} ${R.clip(k) < 1 ? tr(`> 1，乘 ${R.clip(k).toPrecision(5)}`, `> 1, × ${R.clip(k).toPrecision(5)}`) : tr('≤ 1，不变', '≤ 1, unchanged')}`, r: `g = ${par(a.gRaw)} × ${R.clip(k).toPrecision(4)}` },
+      { sub: 'g', k: tr('梯度', 'gradient'), l: `g = ∂L/∂w`, r: `= ${num(a.g)}` },
+      { sub: 'm', k: tr('一阶动量', '1st moment'), l: `m = 0.9 × ${par(a.m0)} + 0.1 × ${par(a.g)}`, r: `= ${num(a.m)}` },
+      { sub: 'v', k: tr('二阶动量', '2nd moment'), l: `v = 0.95 × ${par(a.v0)} + 0.05 × ${par(a.g)}²`, r: `= ${num(a.v)}` },
+      { sub: 'bc', k: tr('偏差校正', 'bias corr.'), l: `m̂ = m / (1 − 0.9^${t}),  v̂ = v / (1 − 0.95^${t})`, r: `m̂ = ${num(a.mh)},  v̂ = ${num(a.vh)}` },
       { sub: 'dw', k: 'Δw', l: `−lr·m̂/(√v̂+ε) − lr·λ·w = ${sciSup(adamPart, 3)} ${decay >= 0 ? '+' : '−'} ${sciSup(Math.abs(decay), 3)}`, r: `Δw = ${sciSup(adamPart + decay, 4)}` },
-      { sub: 'write', k: '写回', l: `w′ = ${num(a.w0, 8)} + (${sciSup(a.w1 - a.w0, 3)})`, r: `= ${num(a.w1, 8)}` },
+      { sub: 'write', k: tr('写回', 'write'), l: `w′ = ${num(a.w0, 8)} + (${sciSup(a.w1 - a.w0, 3)})`, r: `= ${num(a.w1, 8)}` },
     ];
     const x0 = C.x + 16, lh = P ? 56 : 58;
     let y = C.y + 76;
@@ -87,19 +89,19 @@ export class AdamView {
       g.globalAlpha = 1;
       y += lh;
     });
-    if (t === 1 && cur >= 4) text(g, '第 1 步：m̂ = g、v̂ = g²，更新只剩下 g 的符号', x0, C.y + C.h - 16, { size: 10.5, color: COL.violet, max: C.w - 32 });
+    if (t === 1 && cur >= 4) text(g, tr('第 1 步：m̂ = g、v̂ = g²，更新只剩下 g 的符号', 'Step 1: m̂ = g and v̂ = g², so the update is just the sign of g'), x0, C.y + C.h - 16, { size: 10.5, color: COL.violet, max: C.w - 32 });
   }
 
   drawHist(g, st, env, a, ft, f) {
     const R = this.R, k = st.k, C = this.hist, T = R.kind === 'tiny', P = this.portrait;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: T ? `HISTORY · 全部 ${fmtInt(R.D.meta.train.steps)} 步（每 4 步一个点）` : 'HISTORY · 3 步', title: '这个权重的一生', accent: COL.cyan });
-    const series = [['w', '权重 w', COL.ink], ['g', '梯度 g（裁剪后）', COL.rose], ['m', '一阶动量 m', COL.amber], ['v', '√v（梯度的典型大小）', COL.violet]];
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: T ? tr(`HISTORY · 全部 ${fmtInt(R.D.meta.train.steps)} 步（每 4 步一个点）`, `HISTORY · ALL ${fmtInt(R.D.meta.train.steps)} STEPS (A POINT EVERY 4)`) : tr('HISTORY · 3 步', 'HISTORY · 3 STEPS'), title: tr('这个权重的一生', 'The life of this weight'), accent: COL.cyan });
+    const series = isEn ? [['w', 'weight w', COL.ink], ['g', 'gradient g (clipped)', COL.rose], ['m', 'first moment m', COL.amber], ['v', '√v (typical gradient size)', COL.violet]] : [['w', '权重 w', COL.ink], ['g', '梯度 g（裁剪后）', COL.rose], ['m', '一阶动量 m', COL.amber], ['v', '√v（梯度的典型大小）', COL.violet]];
     const x0 = C.x + 16, w = C.w - 32;
     const ch = (C.h - 80) / 4;
     const tNow = a.t;
     if (T && !R.D.has('feat')) {
       // 4 个权重的完整轨迹单独一块，还没到时先占位
-      waitBox(g, C.x + 14, C.y + 50, C.w - 28, C.h - 64, env, st.wait, { label: '正在载入这个权重的轨迹…' });
+      waitBox(g, C.x + 14, C.y + 50, C.w - 28, C.h - 64, env, st.wait, { label: tr('正在载入这个权重的轨迹…', 'Loading this weight’s history…') });
     } else if (T) {
       const H = R.featHist(f);
       const n = H.n, stride = H.stride;
@@ -122,18 +124,18 @@ export class AdamView {
         g.beginPath(); g.moveTo(cx, y0 + 14); g.lineTo(cx, y0 + 18 + h); g.stroke();
         dot(g, cx, Y(arr[ci]), 3, COL.amber);
         text(g, key === 'w' ? `${num(hi, 3)}` : sciSup(hi, 2), x0 + w, y0 + 10, { size: 9, kind: 'mono', color: COL.faint, align: 'right' });
-        env.hit(x0, y0, w, ch, { tipAt: (wx) => { const i = clamp(Math.round(((wx - x0) / w) * (n - 1)), 0, n - 1); return `<span class="k">第 ${fmtInt(i * stride + 1)} 步之后</span>${lab} = <span class="v">${num(arr[i], 5)}</span>`; } });
+        env.hit(x0, y0, w, ch, { tipAt: (wx) => { const i = clamp(Math.round(((wx - x0) / w) * (n - 1)), 0, n - 1); return `<span class="k">${tr(`第 ${fmtInt(i * stride + 1)} 步之后`, `after step ${fmtInt(i * stride + 1)}`)}</span>${lab} = <span class="v">${num(arr[i], 5)}</span>`; } });
       });
-      text(g, '梯度 g 噪声很大；m 把它平滑成一个稳定的方向；w 沿着 −m̂/√v̂ 慢慢挪', x0, C.y + C.h - 12, { size: 10, color: COL.dim, max: w });
+      text(g, tr('梯度 g 噪声很大；m 把它平滑成一个稳定的方向；w 沿着 −m̂/√v̂ 慢慢挪', 'g is very noisy; m smooths it into a steady direction; w creeps along −m̂/√v̂'), x0, C.y + C.h - 12, { size: 10, color: COL.dim, max: w });
     } else {
       // 只有 3 步：直接列成表
       const m = R.D.meta;
-      const rows = [['w（更新前）', 'w0'], ['g（裁剪后）', 'g'], ['m', 'm'], ['v', 'v'], ['m̂', 'mh'], ['v̂', 'vh'], ['Δw', 'dw'], ['w（更新后）', 'w1']];
+      const rows = [[tr('w（更新前）', 'w (before)'), 'w0'], [tr('g（裁剪后）', 'g (clipped)'), 'g'], ['m', 'm'], ['v', 'v'], ['m̂', 'mh'], ['v̂', 'vh'], ['Δw', 'dw'], [tr('w（更新后）', 'w (after)'), 'w1']];
       const cx0 = x0 + (P ? 70 : 110), cwid = (w - (cx0 - x0)) / 3;
       for (let t = 0; t < 3; t++) {
         const on = t === tNow - 1;
         if (on) { rr(g, cx0 + t * cwid + 2, C.y + 60, cwid - 4, rows.length * 44 + 30, 8); g.fillStyle = hexA(COL.amber, 0.07); g.fill(); }
-        text(g, `第 ${t + 1} 步`, cx0 + t * cwid + cwid - 10, C.y + 80, { size: 11, color: on ? COL.amber : COL.dim, align: 'right' });
+        text(g, tr(`第 ${t + 1} 步`, `step ${t + 1}`), cx0 + t * cwid + cwid - 10, C.y + 80, { size: 11, color: on ? COL.amber : COL.dim, align: 'right' });
       }
       rows.forEach(([lab, key], j) => {
         const yy = C.y + 116 + j * 44;
@@ -145,24 +147,24 @@ export class AdamView {
           text(g, key === 'w0' || key === 'w1' ? num(v, 7) : sciSup(v, 3), cx0 + t * cwid + cwid - 10, yy, { size: P ? 10 : 11.5, kind: 'mono', color: on ? COL.amber : COL.ink, align: 'right', max: cwid - 8 });
         }
       });
-      wrap(g, '第 1 步 m̂/√v̂ ≈ ±1：几乎每个权重都挪了整整一个 lr；之后 m、v 有了历史，步子开始各不相同。', x0, C.y + C.h - 30, w, 16, { size: 10.5, color: COL.dim });
+      wrap(g, tr('第 1 步 m̂/√v̂ ≈ ±1：几乎每个权重都挪了整整一个 lr；之后 m、v 有了历史，步子开始各不相同。', 'At step 1, m̂/√v̂ ≈ ±1: almost every weight moves exactly one lr; after that m and v have a history and the steps start to differ.'), x0, C.y + C.h - 30, w, 16, { size: 10.5, color: COL.dim });
     }
   }
 
   drawBits(g, st, env, a) {
     const s = st.step, C = this.bits, P = this.portrait;
     const sub = s.mi ? ['fp32a', 'fp32b', 'bf16'].indexOf(s.mi) : -1;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: 'BITS · 写回内存的那个数', title: '比特：为什么要 fp32 主权重', accent: COL.amber, active: sub >= 0 });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: tr('BITS · 写回内存的那个数', 'BITS · THE NUMBER WRITTEN BACK TO MEMORY'), title: tr('比特：为什么要 fp32 主权重', 'Bits: why fp32 master weights'), accent: COL.amber, active: sub >= 0 });
     const b0 = f32Bits(a.w0), b1 = f32Bits(a.w1);
     const r0 = bf16Round(a.w0), r1 = bf16Round(a.w1);
     const rb0 = f32Bits(r0) >>> 16, rb1 = f32Bits(r1) >>> 16;
     const kw = P ? 10.4 : 24, kh = P ? 22 : 32, gap = P ? 0.8 : 3;
     const x0 = C.x + (P ? 10 : 150);
     const rows = [
-      { lab: 'fp32 · 更新前', bits: b0, n: 32, val: a.w0, vis: sub < 0 || sub >= 0 },
-      { lab: 'fp32 · 更新后', bits: b1, n: 32, val: a.w1, vis: sub < 0 || sub >= 1, cmp: b0 },
-      { lab: 'bf16 · 更新前', bits: rb0, n: 16, val: r0, vis: sub < 0 || sub >= 2 },
-      { lab: 'bf16 · 更新后', bits: rb1, n: 16, val: r1, vis: sub < 0 || sub >= 2, cmp: rb0 },
+      { lab: tr('fp32 · 更新前', 'fp32 · before'), bits: b0, n: 32, val: a.w0, vis: sub < 0 || sub >= 0 },
+      { lab: tr('fp32 · 更新后', 'fp32 · after'), bits: b1, n: 32, val: a.w1, vis: sub < 0 || sub >= 1, cmp: b0 },
+      { lab: tr('bf16 · 更新前', 'bf16 · before'), bits: rb0, n: 16, val: r0, vis: sub < 0 || sub >= 2 },
+      { lab: tr('bf16 · 更新后', 'bf16 · after'), bits: rb1, n: 16, val: r1, vis: sub < 0 || sub >= 2, cmp: rb0 },
     ];
     rows.forEach((row, ri) => {
       const y = C.y + (P ? 80 : 72) + ri * (P ? 112 : 66) + (ri >= 2 ? (P ? 18 : 18) : 0);
@@ -187,13 +189,13 @@ export class AdamView {
       if (row.cmp != null) {
         let d = 0;
         for (let i = 0; i < row.n; i++) if (((row.bits ^ row.cmp) >>> i) & 1) d++;
-        text(g, d ? `变了 ${d} 个比特` : '一个比特都没变', vx + (P ? 130 : 0), P ? y + kh + 16 : y + kh / 2 + 22, { size: 10.5, color: d ? COL.amber : COL.rose });
+        text(g, d ? tr(`变了 ${d} 个比特`, `${d} bits changed`) : tr('一个比特都没变', 'no bit changed'), vx + (P ? 130 : 0), P ? y + kh + 16 : y + kh / 2 + 22, { size: 10.5, color: d ? COL.amber : COL.rose });
       }
       g.globalAlpha = 1;
     });
     // 字段说明
     const ly = C.y + C.h - (P ? 40 : 34);
-    const leg = [[COL.rose, '符号 1 位'], [COL.amber, '指数 8 位'], [COL.cyan, '尾数（fp32 23 位 / bf16 7 位）'], ['#ffffff', '白框 = 和更新前不同']];
+    const leg = isEn ? [[COL.rose, 'sign: 1 bit'], [COL.amber, 'exponent: 8 bits'], [COL.cyan, 'mantissa (fp32: 23 bits / bf16: 7)'], ['#ffffff', 'white frame = differs from before']] : [[COL.rose, '符号 1 位'], [COL.amber, '指数 8 位'], [COL.cyan, '尾数（fp32 23 位 / bf16 7 位）'], ['#ffffff', '白框 = 和更新前不同']];
     let lx = C.x + 16;
     for (const [c, sx] of leg) {
       if (P && lx + measure(g, sx, 10.5) + 24 > C.x + C.w) { lx = C.x + 16; }
@@ -203,7 +205,7 @@ export class AdamView {
     }
     if (sub === 2 || sub < 0) {
       const lost = r0 === r1;
-      text(g, lost ? '只用 bf16 存：更新前后是同一个数，这一步白走了' : '只用 bf16 存：这次恰好跨过了一个 bf16 的间隔', P ? C.x + 16 : x0, C.y + C.h - (P ? 18 : 12), { size: 11.5, color: lost ? COL.rose : COL.cyan, weight: 600, max: C.w - 32 });
+      text(g, lost ? tr('只用 bf16 存：更新前后是同一个数，这一步白走了', 'Stored only in bf16: the same number before and after — this step was wasted') : tr('只用 bf16 存：这次恰好跨过了一个 bf16 的间隔', 'Stored only in bf16: this time it happened to cross one bf16 spacing'), P ? C.x + 16 : x0, C.y + C.h - (P ? 18 : 12), { size: 11.5, color: lost ? COL.rose : COL.cyan, weight: 600, max: C.w - 32 });
     }
   }
 }

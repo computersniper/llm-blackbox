@@ -103,7 +103,7 @@ export function stepLabel(s, R, depth) {
 export function crumbs(depth, s, R) {
   const out = [{ d: 0, label: L('流水线', 'Pipeline') }];
   if (depth === 0) return out;
-  out.push({ d: 1, label: R.kind === 'tiny' ? L('预训练全程', 'Pretraining run') : L('SFT 三步', 'SFT, 3 steps') });
+  out.push({ d: 1, label: R.kind === 'tiny' ? L('预训练全程', 'Pretraining') : L('SFT 三步', 'SFT ×3') });
   if (depth >= 2) out.push({ d: 2, label: L(`第 ${fmtInt(R.stepNo(s.k))} 步`, `Step ${fmtInt(R.stepNo(s.k))}`) });
   if (depth >= 3 && s.sub) out.push({ d: 3, label: PH_NAME[s.ph] });
   if (depth >= 4 && s.mi) {
@@ -183,7 +183,7 @@ export function explain(s, R, ctx, depth) {
       const c = m.ckpts[k];
       if (isEn) {
         const ph = c.t < m.train.warmup ? `still warming up (rising linearly to ${m.train.peakLr} over the first ${m.train.warmup} steps)` : 'slowly shrinking under cosine annealing';
-        return `Step <b>${fmtInt(t)}</b> of ${fmtInt(m.train.steps)}. Loss on this batch <b>${c.loss.toFixed(3)}</b>, on the held-out validation set <b>${c.valLoss.toFixed(3)}</b>; learning rate ${sciSup(c.lr, 3)}, ${ph}.<br>${tinyNarrative(R, k)}<br><span class="dimmed">The model learns from classical Chinese poems, so what it reads and writes stays in Chinese. The held-out poem is Wang Zhihuan’s “On the Stork Tower” (translation: “The white sun sinks behind the hills, / the Yellow River flows into the sea…”).<br>Press + to open this step: batch → forward → loss → backward → update. Drag the loss curve to scrub.</span>`;
+        return `Step <b>${fmtInt(t)}</b> of ${fmtInt(m.train.steps)}. Loss on this batch <b>${c.loss.toFixed(3)}</b>, on the held-out validation set <b>${c.valLoss.toFixed(3)}</b>; learning rate ${sciSup(c.lr, 3)}, ${ph}.<br>${tinyNarrative(R, k)}<br><span class="dimmed">It learns from classical Chinese poems, so what it reads and writes is Chinese. Held-out poem: Wang Zhihuan’s “On the Stork Tower” (“The white sun sinks behind the hills, / the Yellow River flows into the sea…” — translation).<br>Press + to open this step: batch → forward → loss → backward → update. Drag the loss curve to scrub.</span>`;
       }
       const lrPhase = c.t < m.train.warmup ? `还在预热（前 ${m.train.warmup} 步线性升到 ${m.train.peakLr}）` : '在余弦退火中慢慢变小';
       return `第 <b>${fmtInt(t)}</b> 步（共 ${fmtInt(m.train.steps)} 步）。这一批的损失 <b>${c.loss.toFixed(3)}</b>，没训练过的验证集 <b>${c.valLoss.toFixed(3)}</b>；学习率 ${sciSup(c.lr, 3)}，${lrPhase}。<br>${tinyNarrative(R, k)}<br><span class="dimmed">按 ＋ 拆开这一步：批次 → 前向 → 损失 → 反向 → 更新。拖动损失曲线可以来回看。</span>`;
