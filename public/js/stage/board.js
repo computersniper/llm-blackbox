@@ -6,6 +6,7 @@ import { esc, tokPlain, fmtPct } from '../ui.js';
 import { bf16Value, fmtSci } from '../num.js';
 import { termAt, termsDone } from './micro.js';
 import { neuronId, sums } from './fields.js';
+import { isEn, L as tr } from '../i18n.js';
 
 const small = () => matchMedia('(max-width: 900px)').matches;
 const Q_ID = (M) => M.Q?.id ?? '';
@@ -21,7 +22,12 @@ const sci = (v) => fmtSci(v).replace(/10\^([−-]?\d+)/, '10<sup>$1</sup>');
 const sx = (v, d = 3) => (Number.isFinite(v) && Math.abs(v) < 1e5 && (Math.abs(v) >= 1e-3 || v === 0) ? sg(v, d) : (v > 0 ? '+' : '') + sci(v));
 const pct = (v) => (Number.isFinite(v) ? fmtPct(v) : '—');
 
-const STEPS = {
+const STEPS = isEn ? {
+  mm: [['pick', 'Pick a column'], ['mul', 'Multiply'], ['sum', 'Add up']],
+  q: [['pick', 'Pick a column'], ['mul', 'Multiply'], ['sum', 'Add up'], ['rope', 'Norm + rotate']],
+  dot: [['mul', 'Multiply'], ['sum', 'Add up'], ['scale', '÷√128 → weight']],
+  neuron: [['silu', 'SiLU'], ['gate', 'Times u']],
+} : {
   mm: [['pick', '选一列'], ['mul', '逐项相乘'], ['sum', '全部加起来']],
   q: [['pick', '选一列'], ['mul', '逐项相乘'], ['sum', '全部加起来'], ['rope', '归一化 + 旋转']],
   dot: [['mul', '逐维相乘'], ['sum', '加起来'], ['scale', '÷√128 → 权重']],
@@ -35,7 +41,7 @@ export class Board {
     const el = (this.el = document.createElement('section'));
     el.className = 'board';
     el.hidden = true;
-    el.setAttribute('aria-label', '算式板');
+    el.setAttribute('aria-label', tr('算式板', 'Formula board'));
     E.host.parentElement.append(el);
     this.key = '';
     this.fk = '';
@@ -63,7 +69,7 @@ export class Board {
       this.last = null;
       this.data = data;
       this.mode = data ? mode : 'wait';
-      this.el.innerHTML = data ? this.render(mode, data, st) : `<p class="bd-wait"><span class="spin"></span>正在载入第 ${s.L} 层的乘加数据…</p>`;
+      this.el.innerHTML = data ? this.render(mode, data, st) : `<p class="bd-wait"><span class="spin"></span>${tr(`正在载入第 ${s.L} 层的乘加数据…`, `Loading the multiply-add data for layer ${s.L}…`)}</p>`;
       this.el.classList.toggle('folded', this.folded);
       this.show();
     }
@@ -120,7 +126,7 @@ export class Board {
     return `<header class="bd-h">
       <span class="bd-where">${where}</span>
       ${steps ? `<ol class="bd-steps">${steps.map(([mi, t], i) => `<li data-mi="${mi}"><b>${i + 1}</b>${t}</li>`).join('')}</ol>` : ''}
-      <button class="bd-fold" type="button" title="收起 / 展开算式板" aria-label="收起 / 展开算式板">${this.folded ? '+' : '–'}</button>
+      <button class="bd-fold" type="button" title="${tr('收起 / 展开算式板', 'Collapse / expand the board')}" aria-label="${tr('收起 / 展开算式板', 'Collapse / expand the board')}">${this.folded ? '+' : '–'}</button>
     </header>`;
   }
 
@@ -137,22 +143,22 @@ export class Board {
       const w = Math.min(100, (Math.abs(v) / maxP) * 100);
       return `<span class="bar"><i class="${v >= 0 ? 'pos' : 'neg'}" style="width:${(w / 2).toFixed(1)}%"></i></span>`;
     };
-    const restPN = '<small>每一项都很小</small>';
+    const restPN = tr('<small>每一项都很小</small>', '<small>each one tiny</small>');
     return `<div class="bd-tbl">
       <div class="bd-tr bd-th"><span class="i">i</span><span class="cx">${xh}</span><span class="o"></span><span class="cw">${wh}</span><span class="o"></span><span class="cp">${ph}</span><span class="bar"></span></div>
-      ${rows.map((r) => `<div class="bd-tr" data-k="${r.k}" data-d="${r.d}" title="点一下：之后按 ＋ 看这个权重的比特"><span class="i">${r.d}</span><span class="cx">${sg(r.x, r.xd ?? 3)}</span><span class="o">×</span><span class="cw">${r.wf ? r.wf(r.w) : sw(r.w)}</span><span class="o">=</span><span class="cp" data-p>${sg(r.p, r.pd ?? 3)}</span>${bar(r.p)}</div>`).join('')}
-      <div class="bd-tr bd-rest"><span class="i">…</span><span class="rest-t">其余 ${restN.toLocaleString('zh-CN')} 项 ${restPN}</span><span class="cp" data-p>${sg(rest, 3)}</span>${bar(rest)}</div>
+      ${rows.map((r) => `<div class="bd-tr" data-k="${r.k}" data-d="${r.d}" title="${tr('点一下：之后按 ＋ 看这个权重的比特', "Click, then press ＋ to see this weight's bits")}"><span class="i">${r.d}</span><span class="cx">${sg(r.x, r.xd ?? 3)}</span><span class="o">×</span><span class="cw">${r.wf ? r.wf(r.w) : sw(r.w)}</span><span class="o">=</span><span class="cp" data-p>${sg(r.p, r.pd ?? 3)}</span>${bar(r.p)}</div>`).join('')}
+      <div class="bd-tr bd-rest"><span class="i">…</span><span class="rest-t">${tr(`其余 ${restN.toLocaleString('zh-CN')} 项 ${restPN}`, `the other ${restN.toLocaleString('en-US')} terms ${restPN}`)}</span><span class="cp" data-p>${sg(rest, 3)}</span>${bar(rest)}</div>
     </div>`;
   }
 
   // 累加器 + 正负两堆 + 累计曲线 + 结果落点
   accHTML(yHtml, pn) {
     return `<div class="bd-acc">
-        <div class="bd-acc-k"><span data-acck>累加器</span></div>
+        <div class="bd-acc-k"><span data-acck>${tr('累加器', 'Accumulator')}</span></div>
         <div class="bd-acc-v"><span class="cy" data-accy>${yHtml}</span> <span class="eq" data-acceq>≈</span> <b class="cp" data-accv>0</b></div>
         <div class="bd-meter"><i class="zero"></i><b data-meter></b></div>
       </div>
-      ${pn ? `<div class="bd-pn" data-pn><span>所有正乘积 <b class="cp">${sg(pn[0], 2)}</b></span><span>所有负乘积 <b class="cp">${sg(pn[1], 2)}</b></span><span class="bd-pn-bar"><i class="neg" style="width:${(Math.abs(pn[1]) / (Math.abs(pn[0]) + Math.abs(pn[1])) * 100).toFixed(1)}%"></i><i class="pos" style="width:${(pn[0] / (Math.abs(pn[0]) + Math.abs(pn[1])) * 100).toFixed(1)}%"></i></span><em>正负大量抵消，剩下的才是结果</em></div>` : ''}`;
+      ${pn ? `<div class="bd-pn" data-pn><span>${tr('所有正乘积', 'All positive products')} <b class="cp">${sg(pn[0], 2)}</b></span><span>${tr('所有负乘积', 'All negative products')} <b class="cp">${sg(pn[1], 2)}</b></span><span class="bd-pn-bar"><i class="neg" style="width:${(Math.abs(pn[1]) / (Math.abs(pn[0]) + Math.abs(pn[1])) * 100).toFixed(1)}%"></i><i class="pos" style="width:${(pn[0] / (Math.abs(pn[0]) + Math.abs(pn[1])) * 100).toFixed(1)}%"></i></span><em>${tr('正负大量抵消，剩下的才是结果', "Positives and negatives mostly cancel; what's left is the result")}</em></div>` : ''}`;
   }
 
   // 累计和随项数的变化（按 |乘积| 从大到小）。有导出的 cum 就画真实曲线，没有就画前几项 + 虚线连到总和
@@ -175,14 +181,14 @@ export class Board {
         <line x1="${X(R)}" x2="${X(R)}" y1="${pad - 2}" y2="${H - pad + 2}" class="ch-r"/>
         <g clip-path="url(#bdclip)"><polyline points="${line}" class="ch-line"/>${tail}</g>
         <circle cx="${X(n)}" cy="${Y(total)}" r="3" class="ch-end"/>
-      </svg><figcaption>累计和：按贡献从大到小一项项加（横轴是项数，对数刻度）。竖线是上面列出的前 ${R} 项，横线是最终结果</figcaption></figure>`;
+      </svg><figcaption>${tr(`累计和：按贡献从大到小一项项加（横轴是项数，对数刻度）。竖线是上面列出的前 ${R} 项，横线是最终结果`, `Running total, adding terms from the biggest contribution down (x axis: number of terms, log scale). The vertical line marks the ${R} terms listed above; the horizontal line is the final result`)}</figcaption></figure>`;
   }
 
   // 输出向量：一条长条，目标那一格亮起来
   vecHTML(src) {
     const segs = src.ySegs ? Array.from({ length: src.ySegs }, (_, i) => `<i class="${i === src.ySeg ? 'hot' : ''}"></i>`).join('') : '<i></i>';
     const at = ((src.e.j + 0.5) / src.yLen) * 100;
-    return `<div class="bd-vec" title="${src.y.replace(/<[^>]+>/g, '')} 一共 ${src.yLen} 个数"><span class="segs">${segs}</span><b style="left:${at.toFixed(2)}%"></b></div>`;
+    return `<div class="bd-vec" title="${tr(`${src.y.replace(/<[^>]+>/g, '')} 一共 ${src.yLen} 个数`, `${src.y.replace(/<[^>]+>/g, '')} has ${src.yLen} numbers`)}"><span class="segs">${segs}</span><b style="left:${at.toFixed(2)}%"></b></div>`;
   }
 
   renderMM(src, st) {
@@ -196,7 +202,12 @@ export class Board {
     this.calc = { rows, R, rest, total: e.total, n, shownR, scale: Math.max(Math.abs(e.total), Math.abs(shownR), ...(src.sum.cum || []).map((c) => Math.abs(c[1])), ...rows.map((_, k) => Math.abs(rows.slice(0, k + 1).reduce((a, r) => a + r.p, 0)))) * 1.15 || 1 };
     const yHtml = `${src.y}[${e.j}]`;
     const xi = `<span class="cx">${src.x}[i]</span>`, wi = `<span class="cw">${src.wIdx('i')}</span>`;
-    this.cap = {
+    this.cap = isEn ? {
+      pick: `To compute <b class="cy">${yHtml}</b>, you only need <b>column ${e.j}</b> of <b class="cw">${src.w}</b>: its ${n.toLocaleString('en-US')} weights pair up one-to-one with the ${n.toLocaleString('en-US')} numbers of the input <b class="cx">${src.x}</b>.<span class="dim"> <b class="cx">${src.x}</b>: ${esc(src.xDesc)}; <b class="cw">${src.w}</b>: ${esc(src.wDesc)}.</span>`,
+      mul: `Multiply term by term: the i-th input number × the i-th weight of this column. Below are the ${R} products with the largest absolute values; each one drops into the accumulator as soon as it is computed.<span class="dim"> Click a row, then press ＋ to see that weight's bits.</span>`,
+      sum: `Add it all up: each of the other ${(n - R).toLocaleString('en-US')} terms is tiny, but there are a lot of them, so together they can't be ignored. Once they're all in, that's <b class="cy">${yHtml}</b>.`,
+      rope: `Two more steps: the 128 numbers of the same head are <b>normalized</b> together (q_norm), then <b>rotated</b> according to the token's position (RoPE). Only then is it the q that gets compared with K.`,
+    } : {
       pick: `要算 <b class="cy">${yHtml}</b>，只需要 <b class="cw">${src.w}</b> 的<b>第 ${e.j} 列</b>：这一列的 ${n.toLocaleString('zh-CN')} 个权重，正好和输入 <b class="cx">${src.x}</b> 的 ${n.toLocaleString('zh-CN')} 个数一一配对。<span class="dim"><b class="cx">${src.x}</b>：${esc(src.xDesc)}；<b class="cw">${src.w}</b>：${esc(src.wDesc)}。</span>`,
       mul: `逐项相乘：输入的第 i 个数 × 这一列的第 i 个权重。下面列出乘积绝对值最大的 ${R} 项，每乘出一项就加进累加器。<span class="dim">点一行，再按 ＋ 看那个权重的比特。</span>`,
       sum: `全部加起来：其余 ${(n - R).toLocaleString('zh-CN')} 项每一项都很小，但数量多，合起来也不能忽略。加完就是 <b class="cy">${yHtml}</b>。`,
@@ -208,15 +219,15 @@ export class Board {
       <p class="bd-cap" data-cap></p>
       <div class="bd-body">
         <div class="bd-main">
-          <div class="bd-fx"><span class="cy">${yHtml}</span> = <span class="op">Σ</span><sub class="lim">i</sub> ${xi} × ${wi}<small>i 从 0 到 ${n - 1}，一共 ${n.toLocaleString('zh-CN')} 项</small></div>
-          ${this.table(rows, { xh: `${src.x}[i]`, wh: src.wIdx('i'), ph: '乘积', restN: n - R, rest, maxP })}
+          <div class="bd-fx"><span class="cy">${yHtml}</span> = <span class="op">Σ</span><sub class="lim">i</sub> ${xi} × ${wi}<small>${tr(`i 从 0 到 ${n - 1}，一共 ${n.toLocaleString('zh-CN')} 项`, `i from 0 to ${n - 1}, ${n.toLocaleString('en-US')} terms in all`)}</small></div>
+          ${this.table(rows, { xh: `${src.x}[i]`, wh: src.wIdx('i'), ph: tr('乘积', 'product'), restN: n - R, rest, maxP })}
           ${rope}
         </div>
         <div class="bd-side">
           ${this.accHTML(yHtml, pn)}
           ${this.chart(rows.map((r) => r.p), e.total, n, src.sum.cum, R)}
           <div class="bd-dest" data-dest>
-            <div class="bd-dest-h">结果落进 <b class="cy">${src.y}</b> 的第 ${e.j} 格 · ${esc(src.yDesc)}</div>
+            <div class="bd-dest-h">${tr(`结果落进 <b class="cy">${src.y}</b> 的第 ${e.j} 格`, `The result lands in slot ${e.j} of <b class="cy">${src.y}</b>`)} · ${esc(src.yDesc)}</div>
             ${this.vecHTML(src)}
             <p>${src.dest}</p>
           </div>
@@ -232,11 +243,13 @@ export class Board {
     const deg = (e.angle * 180) / Math.PI;
     const turns = Math.floor(deg / 360);
     return `<div class="bd-rope" data-rope>
-      <div class="bd-rp"><b>1 · 归一化（q_norm）</b>第 ${e.head} 号头的 128 个数一起除以它们的均方根，再乘一个训练好的缩放 γ：
+      <div class="bd-rp">${tr(`<b>1 · 归一化（q_norm）</b>第 ${e.head} 号头的 128 个数一起除以它们的均方根，再乘一个训练好的缩放 γ：`, `<b>1 · Normalize (q_norm)</b> All 128 numbers of head ${e.head} are divided by their root mean square, then multiplied by a trained scale γ:`)}
         <code><span class="cy">${sg(e.total)}</span> ÷ ${e.rms.toFixed(3)} × ${e.qnW.toFixed(4)} = <span class="cy">${sg(e.qn, 4)}</span></code></div>
-      <div class="bd-rp bd-rp2">${dial(e)}<div><b>2 · 旋转（RoPE）</b>第 ${e.dim} 维和第 ${e.partner} 维配成一对，看成平面上的一个点；这个词元在第 ${pos} 位，就转 θ = ${pos} ÷ 10⁶<sup>${2 * e.freq}/128</sup> = ${e.angle.toFixed(3)} 弧度${turns > 0 ? `（${turns} 圈多 ${(deg - turns * 360).toFixed(0)}°）` : `（${deg.toFixed(0)}°）`}：
+      <div class="bd-rp bd-rp2">${dial(e)}<div>${isEn
+        ? `<b>2 · Rotate (RoPE)</b> Dimensions ${e.dim} and ${e.partner} form a pair, seen as a point in a plane. This token is at position ${pos}, so it turns by θ = ${pos} ÷ 10⁶<sup>${2 * e.freq}/128</sup> = ${e.angle.toFixed(3)} radians${turns > 0 ? ` (${turns} full turn${turns > 1 ? 's' : ''} plus ${(deg - turns * 360).toFixed(0)}°)` : ` (${deg.toFixed(0)}°)`}:`
+        : `<b>2 · 旋转（RoPE）</b>第 ${e.dim} 维和第 ${e.partner} 维配成一对，看成平面上的一个点；这个词元在第 ${pos} 位，就转 θ = ${pos} ÷ 10⁶<sup>${2 * e.freq}/128</sup> = ${e.angle.toFixed(3)} 弧度${turns > 0 ? `（${turns} 圈多 ${(deg - turns * 360).toFixed(0)}°）` : `（${deg.toFixed(0)}°）`}：`}
         <code>${sg(e.qn, 4)} × cos θ ${lower ? MINUS : '+'} (${sg(e.qnP, 4)}) × sin θ = <span class="cy">${sg(lower ? e.qn * cos - e.qnP * sin : e.qn * cos + e.qnP * sin, 4)}</span></code>
-        <small>位置越靠后转得越多；两个词元的点积因此只取决于它们相隔多远。</small></div></div>
+        <small>${tr('位置越靠后转得越多；两个词元的点积因此只取决于它们相隔多远。', 'Later positions turn further, so the dot product of two tokens depends only on how far apart they are.')}</small></div></div>
     </div>`;
   }
 
@@ -250,28 +263,32 @@ export class Board {
     const maxP = Math.max(...rows.map((r) => Math.abs(r.p)), Math.abs(rest), 1e-9);
     this.calc = { rows, R, rest, total: d.sum, n, shownR, scale: Math.max(Math.abs(d.sum), ...(D.sum.cum || []).map((c) => Math.abs(c[1])), ...rows.map((_, k) => Math.abs(rows.slice(0, k + 1).reduce((a, r) => a + r.p, 0)))) * 1.15 || 1 };
     const ctxN = Q.P + st.g;
-    this.cap = {
+    this.cap = isEn ? {
+      mul: `Head ${d.head} takes the current token's <b class="cx">q</b> (128 numbers, already through q_norm and RoPE) and the <b class="cw">k</b> of “${tok}” (128 numbers, kept in the KV cache), and multiplies them dimension by dimension. Below are the ${R} dimensions with the largest products.<span class="dim"> Click a row, then press ＋ to see the bits of that number.</span>`,
+      sum: `Adding up all 128 dimensions gives q·k: the more the two vectors point the same way, the bigger this number, meaning “${tok}” is a better match for the current position.`,
+      scale: `Divide by √128 ≈ 11.31 to keep the numbers from getting too big, then softmax it together with the scores of all ${ctxN} tokens so far to get attention weights.`,
+    } : {
       mul: `第 ${d.head} 号头拿当前词元的 <b class="cx">q</b>（128 个数，已经过 q_norm 和 RoPE）和「${tok}」的 <b class="cw">k</b>（128 个数，存在 KV 缓存里）逐维相乘。下面是乘积最大的 ${R} 维。<span class="dim">点一行，再按 ＋ 看那个数的比特。</span>`,
       sum: `128 维全部加起来就是 q·k：两个向量越“同向”，这个数越大，说明「${tok}」和当前位置越对得上。`,
       scale: `除以 √128 ≈ 11.31，防止数值太大；再和前面全部 ${ctxN} 个词元的打分一起做 softmax，变成注意力权重。`,
     };
     const yHtml = 'q·k';
-    return `${this.head(`第 ${st.step.L} 层 · 注意力 · 第 ${d.head} 号头给「${tok}」打分`, STEPS.dot)}
+    return `${this.head(tr(`第 ${st.step.L} 层 · 注意力 · 第 ${d.head} 号头给「${tok}」打分`, `Layer ${st.step.L} · Attention · head ${d.head} scores “${tok}”`), STEPS.dot)}
       <div class="bd-scroll">
       <p class="bd-cap" data-cap></p>
       <div class="bd-body">
         <div class="bd-main">
-          <div class="bd-fx"><span class="cy">q·k</span> = <span class="op">Σ</span><sub class="lim">d</sub> <span class="cx">q[d]</span> × <span class="cw">k[d]</span><small>d 从 0 到 127，一共 128 维</small></div>
-          ${this.table(rows, { xh: 'q[d]', wh: 'k[d]', ph: '乘积', restN: n - R, rest, maxP }).replace(/title="[^"]*"/g, 'title="点一下：之后按 ＋ 看这个数的比特"')}
+          <div class="bd-fx"><span class="cy">q·k</span> = <span class="op">Σ</span><sub class="lim">d</sub> <span class="cx">q[d]</span> × <span class="cw">k[d]</span><small>${tr('d 从 0 到 127，一共 128 维', 'd from 0 to 127, 128 dims in all')}</small></div>
+          ${this.table(rows, { xh: 'q[d]', wh: 'k[d]', ph: tr('乘积', 'product'), restN: n - R, rest, maxP }).replace(/title="[^"]*"/g, `title="${tr('点一下：之后按 ＋ 看这个数的比特', 'Click, then press ＋ to see the bits of this number')}"`)}
         </div>
         <div class="bd-side">
           ${this.accHTML(yHtml, pn)}
           ${this.chart(rows.map((r) => r.p), d.sum, n, D.sum.cum, R)}
           <div class="bd-dest" data-dest>
-            <div class="bd-dest-h">打分 = <span class="cy">q·k</span> ÷ √128</div>
+            <div class="bd-dest-h">${tr('打分', 'score')} = <span class="cy">q·k</span> ÷ √128</div>
             <div class="bd-big"><span class="cy">${sg(d.sum, 2)}</span> ÷ 11.314 = <b class="cy">${sg(d.score, 3)}</b></div>
             <div class="bd-big">softmax → <b class="cy">${pct(d.w)}</b></div>
-            <p>第 ${d.head} 号头把 <b>${pct(d.w)}</b> 的注意力给了「${tok}」：之后它会按这个比例，从「${tok}」的 V 里取信息。</p>
+            <p>${tr(`第 ${d.head} 号头把 <b>${pct(d.w)}</b> 的注意力给了「${tok}」：之后它会按这个比例，从「${tok}」的 V 里取信息。`, `Head ${d.head} gives <b>${pct(d.w)}</b> of its attention to “${tok}”: it will then take information from the V of “${tok}” in that proportion.`)}</p>
           </div>
         </div>
       </div>
@@ -282,33 +299,38 @@ export class Board {
     const id = neuronId(n);
     const sig = n.silu / n.gz;
     const a = n.silu * n.uz;
-    this.cap = {
+    this.cap = isEn ? {
+      silu: `<b class="cx">g</b> first goes through <b>SiLU</b>: negative numbers are squashed to nearly 0, positive ones pass through almost unchanged. It decides how far this neuron "opens".`,
+      gate: `Then multiply by <b class="cw">u</b>: SiLU(g) acts like a valve that decides how much of u gets through. The product <b class="cy">a</b> is the output of neuron #${id}.`,
+    } : {
       silu: `<b class="cx">g</b> 先过 <b>SiLU</b>：负数被压到接近 0，正数几乎原样通过。它决定这个神经元“开多大”。`,
       gate: `再乘上 <b class="cw">u</b>：SiLU(g) 像一道阀门，决定放多少 u 通过。乘出来的 <b class="cy">a</b> 就是神经元 #${id} 的输出。`,
     };
     this.calc = null;
-    return `${this.head(`第 ${st.step.L} 层 · 前馈 · 神经元 #${id}`, STEPS.neuron)}
+    return `${this.head(tr(`第 ${st.step.L} 层 · 前馈 · 神经元 #${id}`, `Layer ${st.step.L} · Feed-forward · neuron #${id}`), STEPS.neuron)}
       <div class="bd-scroll">
       <p class="bd-cap" data-cap></p>
       <div class="bd-body">
         <div class="bd-main">
           <div class="bd-ins">
-            <div><span class="cx">g[${id}]</span> = <b class="cx">${sg(n.gz)}</b><small>上一步 W<sub>gate</sub> 第 ${id} 列乘加出来的</small></div>
-            <div><span class="cw">u[${id}]</span> = <b class="cw">${sg(n.uz)}</b><small>同一个神经元在 W<sub>up</sub> 里那一列乘加出来的</small></div>
+            <div><span class="cx">g[${id}]</span> = <b class="cx">${sg(n.gz)}</b><small>${tr(`上一步 W<sub>gate</sub> 第 ${id} 列乘加出来的`, `from column ${id} of W<sub>gate</sub> (previous step)`)}</small></div>
+            <div><span class="cw">u[${id}]</span> = <b class="cw">${sg(n.uz)}</b><small>${tr('同一个神经元在 W<sub>up</sub> 里那一列乘加出来的', "from the same neuron's column in W<sub>up</sub>")}</small></div>
           </div>
           ${siluSVG(n.gz)}
         </div>
         <div class="bd-side">
           <div class="bd-eqs">
-            <div data-eq="silu"><small>SiLU(g) = g × σ(g)，σ 是 0 到 1 之间的 S 形曲线</small>
+            <div data-eq="silu"><small>${tr('SiLU(g) = g × σ(g)，σ 是 0 到 1 之间的 S 形曲线', 'SiLU(g) = g × σ(g), where σ is an S-shaped curve between 0 and 1')}</small>
               <code>SiLU(${sg(n.gz)}) = ${sg(n.gz)} × ${sig.toFixed(3)} = <b class="cx">${sg(n.silu)}</b></code></div>
             <div data-eq="gate"><small>a = SiLU(g) × u</small>
               <code><span class="cy">a[${id}]</span> = ${sg(n.silu)} × ${sg(n.uz)} = <b class="cy">${sg(a)}</b></code></div>
           </div>
           <div class="bd-dest" data-dest>
-            <div class="bd-dest-h">结果落进 <b class="cy">a</b> 的第 ${id} 格</div>
+            <div class="bd-dest-h">${tr(`结果落进 <b class="cy">a</b> 的第 ${id} 格`, `The result lands in slot ${id} of <b class="cy">a</b>`)}</div>
             <div class="bd-vec"><span class="segs">${Array.from({ length: 12 }, (_, i) => `<i class="${i === Math.floor(id / 256) ? 'hot' : ''}"></i>`).join('')}</span><b style="left:${(((id + 0.5) / 3072) * 100).toFixed(2)}%"></b></div>
-            <p>3072 个神经元各自这样算出一个数，组成 a（1 × 3072），下一步交给降维矩阵 W<sub>down</sub>。${a > 1 ? '这个神经元这次被明显“点亮”了。' : a < 0.05 && a > -0.05 ? '这个神经元这次几乎没亮。' : ''}</p>
+            <p>${isEn
+              ? `Each of the 3072 neurons computes one number like this; together they form a (1 × 3072), which goes on to the down-projection matrix W<sub>down</sub>.${a > 1 ? ' This neuron clearly "lit up" this time.' : a < 0.05 && a > -0.05 ? ' This neuron barely lit up this time.' : ''}`
+              : `3072 个神经元各自这样算出一个数，组成 a（1 × 3072），下一步交给降维矩阵 W<sub>down</sub>。${a > 1 ? '这个神经元这次被明显“点亮”了。' : a < 0.05 && a > -0.05 ? '这个神经元这次几乎没亮。' : ''}`}</p>
           </div>
         </div>
       </div>
@@ -317,14 +339,18 @@ export class Board {
 
   renderBits(tg, st) {
     const name = tg.kind === 'q' ? `q[${tg.d.dims[tg.k]}]` : esc(tg.label);
-    const what = tg.kind === 'q' ? `当前词元在第 ${tg.d.head} 号头的查询 q 的第 ${tg.d.dims[tg.k]} 维` : `${tg.wHtml}：${esc(tg.yDesc)} 用到的一个权重`;
-    const bits = Array.from({ length: 16 }, (_, i) => `<button type="button" class="bd-bit ${i === 0 ? 's' : i <= 8 ? 'e' : 'm'}" data-i="${i}" aria-label="第 ${i} 位">0</button>`);
-    return `${this.head(`比特 · ${name}`, null)}
+    const what = isEn
+      ? (tg.kind === 'q' ? `dimension ${tg.d.dims[tg.k]} of the current token's query q in head ${tg.d.head}` : `${tg.wHtml}: one of the weights used for ${esc(tg.yDesc)}`)
+      : (tg.kind === 'q' ? `当前词元在第 ${tg.d.head} 号头的查询 q 的第 ${tg.d.dims[tg.k]} 维` : `${tg.wHtml}：${esc(tg.yDesc)} 用到的一个权重`);
+    const bits = Array.from({ length: 16 }, (_, i) => `<button type="button" class="bd-bit ${i === 0 ? 's' : i <= 8 ? 'e' : 'm'}" data-i="${i}" aria-label="${tr(`第 ${i} 位`, `bit ${i}`)}">0</button>`);
+    return `${this.head(`${tr('比特', 'Bits')} · ${name}`, null)}
       <div class="bd-scroll">
-      <p class="bd-cap">${tg.kind === 'q' ? '激活值' : '模型里的每个权重'}在显存里都是 <b>16 个 0/1</b>（bfloat16 格式）。<b>点任意一位</b>把它翻过来，看看会发生什么。<span class="dim">${what}</span></p>
+      <p class="bd-cap">${isEn
+        ? `${tg.kind === 'q' ? 'Activations are' : 'Every weight in the model is'} stored in memory as <b>16 zeros and ones</b> (bfloat16 format). <b>Click any bit</b> to flip it and see what happens.<span class="dim"> ${what}</span>`
+        : `${tg.kind === 'q' ? '激活值' : '模型里的每个权重'}在显存里都是 <b>16 个 0/1</b>（bfloat16 格式）。<b>点任意一位</b>把它翻过来，看看会发生什么。<span class="dim">${what}</span>`}</p>
       <div class="bd-bitrow">
         <div class="bd-bits"><span class="g s">${bits[0]}</span><span class="g e">${bits.slice(1, 9).join('')}</span><span class="g m">${bits.slice(9).join('')}</span></div>
-        <div class="bd-bitk"><span class="s">符号</span><span class="e">指数 · 8 位</span><span class="m">尾数 · 7 位</span></div>
+        <div class="bd-bitk"><span class="s">${tr('符号', 'Sign')}</span><span class="e">${tr('指数 · 8 位', 'Exponent · 8 bits')}</span><span class="m">${tr('尾数 · 7 位', 'Mantissa · 7 bits')}</span></div>
       </div>
       <div class="bd-body bd-bits-body">
         <div class="bd-main">
@@ -383,7 +409,9 @@ export class Board {
       const final = sumP >= 0.999;
       accv.textContent = at === 0 && this.mode === 'mm' ? '?' : sg(val, this.mode === 'dot' ? 2 : 3);
       eq.textContent = final ? '=' : '≈';
-      acck.textContent = at === 0 && this.mode === 'mm' ? '累加器：还没开始' : sumP > 0 ? (final ? `${c.n.toLocaleString('zh-CN')} 项全部加完` : `再加上其余 ${(c.n - c.R).toLocaleString('zh-CN')} 项…`) : `累加器 · 前 ${doneN} 项之和`;
+      acck.textContent = isEn
+        ? (at === 0 && this.mode === 'mm' ? 'Accumulator: not started' : sumP > 0 ? (final ? `all ${c.n.toLocaleString('en-US')} terms added` : `adding the other ${(c.n - c.R).toLocaleString('en-US')} terms…`) : `Accumulator · sum of the first ${doneN} terms`)
+        : (at === 0 && this.mode === 'mm' ? '累加器：还没开始' : sumP > 0 ? (final ? `${c.n.toLocaleString('zh-CN')} 项全部加完` : `再加上其余 ${(c.n - c.R).toLocaleString('zh-CN')} 项…`) : `累加器 · 前 ${doneN} 项之和`);
       const m = el.querySelector('[data-meter]');
       const f = Math.max(-1, Math.min(1, val / c.scale));
       m.style.left = f >= 0 ? '50%' : `${50 + f * 50}%`;
@@ -451,12 +479,14 @@ export class Board {
     const val = bf16Value(bits), old = bf16Value(base);
     const E = val.e - 127;
     const ebin = bits.slice(1, 9).join(''), mbin = bits.slice(9).join('');
-    const special = val.e === 255 ? (val.m ? '（指数全 1、尾数不为 0：NaN，“不是一个数”）' : '（指数全 1：无穷大）') : val.e === 0 ? '（指数全 0：非规格化数，公式里的 1 + 要换成 0 +）' : '';
+    const special = isEn
+      ? (val.e === 255 ? (val.m ? ' (exponent all 1s, mantissa not 0: NaN, "not a number")' : ' (exponent all 1s: infinity)') : val.e === 0 ? ' (exponent all 0s: a subnormal number; the 1 + in the formula becomes 0 +)' : '')
+      : (val.e === 255 ? (val.m ? '（指数全 1、尾数不为 0：NaN，“不是一个数”）' : '（指数全 1：无穷大）') : val.e === 0 ? '（指数全 0：非规格化数，公式里的 1 + 要换成 0 +）' : '');
     el.querySelector('[data-dec]').innerHTML = `
-      <span class="s">s = ${val.s} → ${val.s ? '负' : '正'}</span>
+      <span class="s">s = ${val.s} → ${val.s ? tr('负', 'negative') : tr('正', 'positive')}</span>
       <span class="e">e = ${ebin}₂ = ${val.e} → 2<sup>${val.e}−127</sup> = 2<sup>${E}</sup></span>
       <span class="m">m = ${mbin}₂ = ${val.m} → 1 + ${val.m}/128 = ${(1 + val.m / 128).toFixed(4)}</span>`;
-    el.querySelector('[data-bfx]').innerHTML = `值 = (−1)<sup class="s">${val.s}</sup> × 2<sup class="e">${val.e}−127</sup> × (1 + <span class="m">${val.m}</span>/128) = <b class="cw">${sx(val.value, 6)}</b><small>${special}</small>`;
+    el.querySelector('[data-bfx]').innerHTML = `${tr('值', 'value')} = (−1)<sup class="s">${val.s}</sup> × 2<sup class="e">${val.e}−127</sup> × (1 + <span class="m">${val.m}</span>/128) = <b class="cw">${sx(val.value, 6)}</b><small>${special}</small>`;
     // 翻转的后果：只改了这一个数，下游那一个输出元素怎么变（精确重算：总和里只有这一项变了）
     const flipped = !!flips && bits.some((b, i) => b !== base[i]);
     const ov = old.value, nv = val.value, dv = nv - ov;
@@ -467,29 +497,37 @@ export class Board {
       const s2 = d.sum + kd * dv, sc2 = s2 / Math.sqrt(128);
       const w2 = 1 / (1 + (1 / d.w - 1) * Math.exp(d.score - sc2));
       h = flipped
-        ? row(`q[${d.dims[tg.k]}]`, sx(ov, 4), sx(nv, 4), ratio(ov, nv)) + row('q·k', sg(d.sum, 2), sx(s2, 2)) + row('打分', sg(d.score, 3), sx(sc2, 3)) + row('注意力权重', pct(d.w), pct(w2))
-          + `<p>q·k 里只有这一项变了：新的 q·k = 原来的 ${sg(d.sum, 2)} + k[${d.dims[tg.k]}] × (新 − 旧) = ${sg(d.sum, 2)} + ${par(sg(kd, 3))} × ${par(sx(dv, 4))}。</p>`
-        : `<p>它和「${esc(tokPlain(this.M.Q.tokens[d.key]?.s ?? ''))}」的 k[${d.dims[tg.k]}] = ${sg(kd, 3)} 相乘，贡献了 <b class="cp">${sg(ov * kd, 2)}</b>。</p>`;
+        ? row(`q[${d.dims[tg.k]}]`, sx(ov, 4), sx(nv, 4), ratio(ov, nv)) + row('q·k', sg(d.sum, 2), sx(s2, 2)) + row(tr('打分', 'score'), sg(d.score, 3), sx(sc2, 3)) + row(tr('注意力权重', 'attention weight'), pct(d.w), pct(w2))
+          + (isEn
+            ? `<p>Only this one term of q·k changed: new q·k = old ${sg(d.sum, 2)} + k[${d.dims[tg.k]}] × (new − old) = ${sg(d.sum, 2)} + ${par(sg(kd, 3))} × ${par(sx(dv, 4))}.</p>`
+            : `<p>q·k 里只有这一项变了：新的 q·k = 原来的 ${sg(d.sum, 2)} + k[${d.dims[tg.k]}] × (新 − 旧) = ${sg(d.sum, 2)} + ${par(sg(kd, 3))} × ${par(sx(dv, 4))}。</p>`)
+        : (isEn
+          ? `<p>It is multiplied by k[${d.dims[tg.k]}] = ${sg(kd, 3)} of “${esc(tokPlain(this.M.Q.tokens[d.key]?.s ?? ''))}”, contributing <b class="cp">${sg(ov * kd, 2)}</b>.</p>`
+          : `<p>它和「${esc(tokPlain(this.M.Q.tokens[d.key]?.s ?? ''))}」的 k[${d.dims[tg.k]}] = ${sg(kd, 3)} 相乘，贡献了 <b class="cp">${sg(ov * kd, 2)}</b>。</p>`);
     } else {
       const t2 = tg.total + tg.x * dv;
-      h = flipped ? row('这个权重', sx(ov, 6), sx(nv, 6), ratio(ov, nv)) + row(tg.out, sg(tg.total), sx(t2), `<small>${diff(t2 - tg.total)}</small>`) : '';
+      h = flipped ? row(tr('这个权重', 'this weight'), sx(ov, 6), sx(nv, 6), ratio(ov, nv)) + row(tg.out, sg(tg.total), sx(t2), `<small>${diff(t2 - tg.total)}</small>`) : '';
       if (flipped && tg.e2) {
         const silu = (z) => (Number.isFinite(z) ? z / (1 + Math.exp(-z)) : z > 0 ? Infinity : 0);
         const u = tg.e2.total;
-        h += row('神经元输出 a', sg(silu(tg.total) * u), sx(silu(t2) * u));
+        h += row(tr('神经元输出 a', 'neuron output a'), sg(silu(tg.total) * u), sx(silu(t2) * u));
       }
       if (flipped && tg.head) {
         const stp = this.M.Q.steps[st.g];
         const p1 = stp.top.find((x) => x[0] === tg.head.j)?.[1];
-        if (p1) h += row(`「${esc(tokPlain(tg.head.token))}」的概率`, pct(p1), pct(1 / (1 + (1 / p1 - 1) * Math.exp(tg.total - t2))));
+        if (p1) h += row(tr(`「${esc(tokPlain(tg.head.token))}」的概率`, `probability of “${esc(tokPlain(tg.head.token))}”`), pct(p1), pct(1 / (1 + (1 / p1 - 1) * Math.exp(tg.total - t2))));
       }
-      h += flipped
-        ? `<p>${tg.out} 里只有这一项变了：新值 = 原来的 ${sg(tg.total)} + ${tg.xHtml} × (新权重 − 旧权重) = ${sg(tg.total)} + ${par(sg(tg.x))} × ${par(sx(dv, 5))}。</p>`
-        : `<p>这个权重乘的是 <span class="cx">${tg.xHtml} = ${sg(tg.x)}</span>，贡献了 <b class="cp">${sg(tg.x * ov, 4)}</b>，是 ${tg.out} 里最大的几项之一。</p>`;
+      h += isEn
+        ? (flipped
+          ? `<p>Only this one term of ${tg.out} changed: new value = old ${sg(tg.total)} + ${tg.xHtml} × (new weight − old weight) = ${sg(tg.total)} + ${par(sg(tg.x))} × ${par(sx(dv, 5))}.</p>`
+          : `<p>This weight multiplies <span class="cx">${tg.xHtml} = ${sg(tg.x)}</span>, contributing <b class="cp">${sg(tg.x * ov, 4)}</b>, one of the largest terms in ${tg.out}.</p>`)
+        : (flipped
+          ? `<p>${tg.out} 里只有这一项变了：新值 = 原来的 ${sg(tg.total)} + ${tg.xHtml} × (新权重 − 旧权重) = ${sg(tg.total)} + ${par(sg(tg.x))} × ${par(sx(dv, 5))}。</p>`
+          : `<p>这个权重乘的是 <span class="cx">${tg.xHtml} = ${sg(tg.x)}</span>，贡献了 <b class="cp">${sg(tg.x * ov, 4)}</b>，是 ${tg.out} 里最大的几项之一。</p>`);
     }
-    if (!flipped) h += '<p class="dim">试试看：翻<b class="e">指数</b>位，数会成倍地变大变小；翻<b class="m">尾数</b>位，只改一点点；翻<b class="s">符号</b>位，正负颠倒。</p>';
-    else h += '<button type="button" class="bd-reset">还原</button>';
-    el.querySelector('[data-eff]').innerHTML = `<div class="bd-eff-h">${flipped ? '翻转之后' : '它在算式里'}</div>${h}`;
+    if (!flipped) h += tr('<p class="dim">试试看：翻<b class="e">指数</b>位，数会成倍地变大变小；翻<b class="m">尾数</b>位，只改一点点；翻<b class="s">符号</b>位，正负颠倒。</p>', '<p class="dim">Try it: flip an <b class="e">exponent</b> bit and the number grows or shrinks by powers of two; flip a <b class="m">mantissa</b> bit and it changes only a little; flip the <b class="s">sign</b> bit and it changes sign.</p>');
+    else h += `<button type="button" class="bd-reset">${tr('还原', 'Reset')}</button>`;
+    el.querySelector('[data-eff]').innerHTML = `<div class="bd-eff-h">${flipped ? tr('翻转之后', 'After the flip') : tr('它在算式里', 'In the formula')}</div>${h}`;
   }
 
   // 飞行的乘积：从清单里那一格飞到累加器的数字上
@@ -553,9 +591,9 @@ const ratio = (a, b) => {
   if (!Number.isFinite(b) || !a) return '';
   const r = b / a;
   if (r === 1) return '';
-  return `<small>${r < 0 ? '变号，' : ''}×${Math.abs(r) >= 100 || Math.abs(r) < 0.01 ? sci(Math.abs(r)) : Math.abs(r).toFixed(Math.abs(r) >= 10 ? 1 : 3)}</small>`;
+  return `<small>${r < 0 ? tr('变号，', 'sign flipped, ') : ''}×${Math.abs(r) >= 100 || Math.abs(r) < 0.01 ? sci(Math.abs(r)) : Math.abs(r).toFixed(Math.abs(r) >= 10 ? 1 : 3)}</small>`;
 };
-const diff = (d) => (Number.isFinite(d) ? `变化 ${sx(d)}` : '');
+const diff = (d) => (Number.isFinite(d) ? `${tr('变化', 'change')} ${sx(d)}` : '');
 // 算式里的带符号数：负数加括号，免得出现“+ −2.1”
 const par = (s) => (s.startsWith(MINUS) ? `(${s})` : s);
 
@@ -572,7 +610,7 @@ function siluSVG(g) {
       <g data-guide class="guide"><line x1="${sx2(gx)}" x2="${sx2(gx)}" y1="${sy2(0)}" y2="${sy2(gy)}"/><line x1="${sx2(0)}" x2="${sx2(gx)}" y1="${sy2(gy)}" y2="${sy2(gy)}"/></g>
       <circle data-ball r="4.5" cx="${sx2(-6)}" cy="${sy2(0)}" class="ch-ball"/>
       <text x="16" y="14">SiLU(g)</text><text x="200" y="${Number(sy2(0)) + 12}">g</text>
-    </svg><figcaption>负的 g 被压到接近 0（阀门关上）；正的 g 几乎原样通过（阀门打开）</figcaption></figure>`;
+    </svg><figcaption>${tr('负的 g 被压到接近 0（阀门关上）；正的 g 几乎原样通过（阀门打开）', 'A negative g is squashed to nearly 0 (valve closed); a positive g passes through almost unchanged (valve open)')}</figcaption></figure>`;
 }
 
 // RoPE 表盘：这一对数 (d, d±64) 在平面上转过的角度（q_norm 之后、旋转前后）
@@ -588,6 +626,6 @@ function dial(e) {
     <line x1="${cx}" y1="${cy}" x2="${x0}" y2="${y0}" class="dl-before"/>
     <line x1="${cx}" y1="${cy}" x2="${x1}" y2="${y1}" class="dl-after"/>
     <circle cx="${x1}" cy="${y1}" r="3.5" class="dl-dot"/>
-    <text x="3" y="97">虚线 旋转前 · 实线 旋转后</text>
+    <text x="3" y="97">${tr('虚线 旋转前 · 实线 旋转后', '- - before · — after')}</text>
   </svg>`;
 }

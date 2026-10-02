@@ -1,0 +1,2632 @@
+{
+ "model": {
+  "name": "Qwen3-0.6B",
+  "source": "https://huggingface.co/Qwen/Qwen3-0.6B",
+  "layers": 28,
+  "hidden": 1024,
+  "heads": 16,
+  "kvHeads": 8,
+  "headDim": 128,
+  "ffn": 3072,
+  "vocab": 151936,
+  "ropeTheta": 1000000,
+  "eps": 1e-06,
+  "tied": true,
+  "params": 596049920,
+  "dtype": "bfloat16",
+  "paramsPerLayer": 15730944,
+  "embedParams": 155582464
+ },
+ "sampling": {
+  "temperature": 0.7,
+  "top_k": 20,
+  "top_p": 0.8,
+  "temps": [
+   0.3,
+   0.7,
+   1.0,
+   1.5
+  ]
+ },
+ "system": "You are a helpful assistant. Please answer concisely in one or two sentences.",
+ "fullMlpLayer": 14,
+ "attTopk": 4,
+ "mlpTopk": 16,
+ "questions": [
+  {
+   "id": "e01",
+   "text": "Why is the sky blue?",
+   "chips": [
+    {
+     "id": 10234,
+     "s": "Why"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 12884,
+     "s": " sky"
+    },
+    {
+     "id": 6303,
+     "s": " blue"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "The sky appears blue because of the way sunlight interacts with the atmosphere, scattering shorter wavelengths of light (blue) more than longer ones (red) in the visible spectrum.",
+   "replyTokens": [
+    {
+     "id": 785,
+     "s": "The"
+    },
+    {
+     "id": 12884,
+     "s": " sky"
+    },
+    {
+     "id": 7952,
+     "s": " appears"
+    },
+    {
+     "id": 6303,
+     "s": " blue"
+    },
+    {
+     "id": 1576,
+     "s": " because"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 1616,
+     "s": " way"
+    },
+    {
+     "id": 39020,
+     "s": " sunlight"
+    },
+    {
+     "id": 83161,
+     "s": " interacts"
+    },
+    {
+     "id": 448,
+     "s": " with"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 16566,
+     "s": " atmosphere"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 71816,
+     "s": " scattering"
+    },
+    {
+     "id": 23327,
+     "s": " shorter"
+    },
+    {
+     "id": 92859,
+     "s": " wavelengths"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 3100,
+     "s": " light"
+    },
+    {
+     "id": 320,
+     "s": " ("
+    },
+    {
+     "id": 12203,
+     "s": "blue"
+    },
+    {
+     "id": 8,
+     "s": ")"
+    },
+    {
+     "id": 803,
+     "s": " more"
+    },
+    {
+     "id": 1091,
+     "s": " than"
+    },
+    {
+     "id": 5021,
+     "s": " longer"
+    },
+    {
+     "id": 6174,
+     "s": " ones"
+    },
+    {
+     "id": 320,
+     "s": " ("
+    },
+    {
+     "id": 1151,
+     "s": "red"
+    },
+    {
+     "id": 8,
+     "s": ")"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 9434,
+     "s": " visible"
+    },
+    {
+     "id": 19745,
+     "s": " spectrum"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 283468,
+   "microBytes": 1002570
+  },
+  {
+   "id": "e02",
+   "text": "Why is seawater salty?",
+   "chips": [
+    {
+     "id": 10234,
+     "s": "Why"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 66229,
+     "s": " seaw"
+    },
+    {
+     "id": 962,
+     "s": "ater"
+    },
+    {
+     "id": 73875,
+     "s": " salty"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "Seawater is salty because it contains a lot of dissolved minerals, mainly sodium chloride, from the ocean floor and volcanic activity.",
+   "replyTokens": [
+    {
+     "id": 1514,
+     "s": "Se"
+    },
+    {
+     "id": 672,
+     "s": "aw"
+    },
+    {
+     "id": 962,
+     "s": "ater"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 73875,
+     "s": " salty"
+    },
+    {
+     "id": 1576,
+     "s": " because"
+    },
+    {
+     "id": 432,
+     "s": " it"
+    },
+    {
+     "id": 5610,
+     "s": " contains"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 2696,
+     "s": " lot"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 55667,
+     "s": " dissolved"
+    },
+    {
+     "id": 32972,
+     "s": " minerals"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 14576,
+     "s": " mainly"
+    },
+    {
+     "id": 38595,
+     "s": " sodium"
+    },
+    {
+     "id": 81782,
+     "s": " chloride"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 504,
+     "s": " from"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 17951,
+     "s": " ocean"
+    },
+    {
+     "id": 6422,
+     "s": " floor"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 66064,
+     "s": " volcanic"
+    },
+    {
+     "id": 5702,
+     "s": " activity"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 219140,
+   "microBytes": 786309
+  },
+  {
+   "id": "e03",
+   "text": "Why do cats like boxes?",
+   "chips": [
+    {
+     "id": 10234,
+     "s": "Why"
+    },
+    {
+     "id": 653,
+     "s": " do"
+    },
+    {
+     "id": 19423,
+     "s": " cats"
+    },
+    {
+     "id": 1075,
+     "s": " like"
+    },
+    {
+     "id": 14697,
+     "s": " boxes"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "Cats like boxes because they are safe and provide comfort and security.",
+   "replyTokens": [
+    {
+     "id": 34,
+     "s": "C"
+    },
+    {
+     "id": 1862,
+     "s": "ats"
+    },
+    {
+     "id": 1075,
+     "s": " like"
+    },
+    {
+     "id": 14697,
+     "s": " boxes"
+    },
+    {
+     "id": 1576,
+     "s": " because"
+    },
+    {
+     "id": 807,
+     "s": " they"
+    },
+    {
+     "id": 525,
+     "s": " are"
+    },
+    {
+     "id": 6092,
+     "s": " safe"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 3410,
+     "s": " provide"
+    },
+    {
+     "id": 6838,
+     "s": " comfort"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 4763,
+     "s": " security"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 124667,
+   "microBytes": 455167
+  },
+  {
+   "id": "e04",
+   "text": "Who are you?",
+   "chips": [
+    {
+     "id": 15191,
+     "s": "Who"
+    },
+    {
+     "id": 525,
+     "s": " are"
+    },
+    {
+     "id": 498,
+     "s": " you"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "I am a language model designed to assist and provide information. What can I help you with?",
+   "replyTokens": [
+    {
+     "id": 40,
+     "s": "I"
+    },
+    {
+     "id": 1079,
+     "s": " am"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 4128,
+     "s": " language"
+    },
+    {
+     "id": 1614,
+     "s": " model"
+    },
+    {
+     "id": 6188,
+     "s": " designed"
+    },
+    {
+     "id": 311,
+     "s": " to"
+    },
+    {
+     "id": 7789,
+     "s": " assist"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 3410,
+     "s": " provide"
+    },
+    {
+     "id": 1995,
+     "s": " information"
+    },
+    {
+     "id": 13,
+     "s": "."
+    },
+    {
+     "id": 3555,
+     "s": " What"
+    },
+    {
+     "id": 646,
+     "s": " can"
+    },
+    {
+     "id": 358,
+     "s": " I"
+    },
+    {
+     "id": 1492,
+     "s": " help"
+    },
+    {
+     "id": 498,
+     "s": " you"
+    },
+    {
+     "id": 448,
+     "s": " with"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "ended": true,
+   "bytes": 165654,
+   "microBytes": 596562
+  },
+  {
+   "id": "e05",
+   "text": "How many r's are in the word strawberry?",
+   "chips": [
+    {
+     "id": 4340,
+     "s": "How"
+    },
+    {
+     "id": 1657,
+     "s": " many"
+    },
+    {
+     "id": 435,
+     "s": " r"
+    },
+    {
+     "id": 594,
+     "s": "'s"
+    },
+    {
+     "id": 525,
+     "s": " are"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 3409,
+     "s": " word"
+    },
+    {
+     "id": 72600,
+     "s": " strawberry"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "There are 2 r's in the word strawberry.",
+   "replyTokens": [
+    {
+     "id": 3862,
+     "s": "There"
+    },
+    {
+     "id": 525,
+     "s": " are"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 435,
+     "s": " r"
+    },
+    {
+     "id": 594,
+     "s": "'s"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 3409,
+     "s": " word"
+    },
+    {
+     "id": 72600,
+     "s": " strawberry"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 102378,
+   "microBytes": 372046
+  },
+  {
+   "id": "e06",
+   "text": "How do large language models work?",
+   "chips": [
+    {
+     "id": 4340,
+     "s": "How"
+    },
+    {
+     "id": 653,
+     "s": " do"
+    },
+    {
+     "id": 3460,
+     "s": " large"
+    },
+    {
+     "id": 4128,
+     "s": " language"
+    },
+    {
+     "id": 4119,
+     "s": " models"
+    },
+    {
+     "id": 975,
+     "s": " work"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "Large language models work by training on vast amounts of text data to learn patterns and understand human language, enabling them to generate and understand text in a wide range of ways.",
+   "replyTokens": [
+    {
+     "id": 34253,
+     "s": "Large"
+    },
+    {
+     "id": 4128,
+     "s": " language"
+    },
+    {
+     "id": 4119,
+     "s": " models"
+    },
+    {
+     "id": 975,
+     "s": " work"
+    },
+    {
+     "id": 553,
+     "s": " by"
+    },
+    {
+     "id": 4862,
+     "s": " training"
+    },
+    {
+     "id": 389,
+     "s": " on"
+    },
+    {
+     "id": 12767,
+     "s": " vast"
+    },
+    {
+     "id": 14713,
+     "s": " amounts"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 1467,
+     "s": " text"
+    },
+    {
+     "id": 821,
+     "s": " data"
+    },
+    {
+     "id": 311,
+     "s": " to"
+    },
+    {
+     "id": 3960,
+     "s": " learn"
+    },
+    {
+     "id": 12624,
+     "s": " patterns"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 3535,
+     "s": " understand"
+    },
+    {
+     "id": 3738,
+     "s": " human"
+    },
+    {
+     "id": 4128,
+     "s": " language"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 27362,
+     "s": " enabling"
+    },
+    {
+     "id": 1105,
+     "s": " them"
+    },
+    {
+     "id": 311,
+     "s": " to"
+    },
+    {
+     "id": 6923,
+     "s": " generate"
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 3535,
+     "s": " understand"
+    },
+    {
+     "id": 1467,
+     "s": " text"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 6884,
+     "s": " wide"
+    },
+    {
+     "id": 2088,
+     "s": " range"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 5510,
+     "s": " ways"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 284419,
+   "microBytes": 996006
+  },
+  {
+   "id": "e07",
+   "text": "What is the attention mechanism?",
+   "chips": [
+    {
+     "id": 3838,
+     "s": "What"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 6529,
+     "s": " attention"
+    },
+    {
+     "id": 16953,
+     "s": " mechanism"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "The attention mechanism is a component of neural networks that helps the model focus on relevant information during processing.",
+   "replyTokens": [
+    {
+     "id": 785,
+     "s": "The"
+    },
+    {
+     "id": 6529,
+     "s": " attention"
+    },
+    {
+     "id": 16953,
+     "s": " mechanism"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 3692,
+     "s": " component"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 29728,
+     "s": " neural"
+    },
+    {
+     "id": 14155,
+     "s": " networks"
+    },
+    {
+     "id": 429,
+     "s": " that"
+    },
+    {
+     "id": 8609,
+     "s": " helps"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 1614,
+     "s": " model"
+    },
+    {
+     "id": 5244,
+     "s": " focus"
+    },
+    {
+     "id": 389,
+     "s": " on"
+    },
+    {
+     "id": 9760,
+     "s": " relevant"
+    },
+    {
+     "id": 1995,
+     "s": " information"
+    },
+    {
+     "id": 2337,
+     "s": " during"
+    },
+    {
+     "id": 8692,
+     "s": " processing"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 173100,
+   "microBytes": 621601
+  },
+  {
+   "id": "e08",
+   "text": "What is a token?",
+   "chips": [
+    {
+     "id": 3838,
+     "s": "What"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 3950,
+     "s": " token"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "A token is a small, symbolic item used to represent a specific item or concept in a system, often for convenience or to facilitate interactions.",
+   "replyTokens": [
+    {
+     "id": 32,
+     "s": "A"
+    },
+    {
+     "id": 3950,
+     "s": " token"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 2613,
+     "s": " small"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 35296,
+     "s": " symbolic"
+    },
+    {
+     "id": 1509,
+     "s": " item"
+    },
+    {
+     "id": 1483,
+     "s": " used"
+    },
+    {
+     "id": 311,
+     "s": " to"
+    },
+    {
+     "id": 4009,
+     "s": " represent"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 3151,
+     "s": " specific"
+    },
+    {
+     "id": 1509,
+     "s": " item"
+    },
+    {
+     "id": 476,
+     "s": " or"
+    },
+    {
+     "id": 7286,
+     "s": " concept"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 1849,
+     "s": " system"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 3545,
+     "s": " often"
+    },
+    {
+     "id": 369,
+     "s": " for"
+    },
+    {
+     "id": 19132,
+     "s": " convenience"
+    },
+    {
+     "id": 476,
+     "s": " or"
+    },
+    {
+     "id": 311,
+     "s": " to"
+    },
+    {
+     "id": 27596,
+     "s": " facilitate"
+    },
+    {
+     "id": 21880,
+     "s": " interactions"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 231292,
+   "microBytes": 830355
+  },
+  {
+   "id": "e09",
+   "text": "What is 1+1?",
+   "chips": [
+    {
+     "id": 3838,
+     "s": "What"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 10,
+     "s": "+"
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "1 + 1 equals 2.",
+   "replyTokens": [
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 488,
+     "s": " +"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 16819,
+     "s": " equals"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 77401,
+   "microBytes": 285132
+  },
+  {
+   "id": "e10",
+   "text": "What is 12 times 12?",
+   "chips": [
+    {
+     "id": 3838,
+     "s": "What"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 3039,
+     "s": " times"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "12 × 12 = 144.",
+   "replyTokens": [
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 24768,
+     "s": " ×"
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 17,
+     "s": "2"
+    },
+    {
+     "id": 284,
+     "s": " ="
+    },
+    {
+     "id": 220,
+     "s": " "
+    },
+    {
+     "id": 16,
+     "s": "1"
+    },
+    {
+     "id": 19,
+     "s": "4"
+    },
+    {
+     "id": 19,
+     "s": "4"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 108796,
+   "microBytes": 397454
+  },
+  {
+   "id": "e11",
+   "text": "What is the capital of France?",
+   "chips": [
+    {
+     "id": 3838,
+     "s": "What"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 6722,
+     "s": " capital"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 9625,
+     "s": " France"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    }
+   ],
+   "reply": "The capital of France is Paris.",
+   "replyTokens": [
+    {
+     "id": 785,
+     "s": "The"
+    },
+    {
+     "id": 6722,
+     "s": " capital"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 9625,
+     "s": " France"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 12095,
+     "s": " Paris"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 69169,
+   "microBytes": 257477
+  },
+  {
+   "id": "e12",
+   "text": "Tell me a joke.",
+   "chips": [
+    {
+     "id": 40451,
+     "s": "Tell"
+    },
+    {
+     "id": 752,
+     "s": " me"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 21646,
+     "s": " joke"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "reply": "A classic joke: \"Why don't scientists trust atoms? Because they make up everything!\"",
+   "replyTokens": [
+    {
+     "id": 32,
+     "s": "A"
+    },
+    {
+     "id": 11416,
+     "s": " classic"
+    },
+    {
+     "id": 21646,
+     "s": " joke"
+    },
+    {
+     "id": 25,
+     "s": ":"
+    },
+    {
+     "id": 330,
+     "s": " \""
+    },
+    {
+     "id": 10234,
+     "s": "Why"
+    },
+    {
+     "id": 1513,
+     "s": " don"
+    },
+    {
+     "id": 944,
+     "s": "'t"
+    },
+    {
+     "id": 13923,
+     "s": " scientists"
+    },
+    {
+     "id": 6950,
+     "s": " trust"
+    },
+    {
+     "id": 32199,
+     "s": " atoms"
+    },
+    {
+     "id": 30,
+     "s": "?"
+    },
+    {
+     "id": 9211,
+     "s": " Because"
+    },
+    {
+     "id": 807,
+     "s": " they"
+    },
+    {
+     "id": 1281,
+     "s": " make"
+    },
+    {
+     "id": 705,
+     "s": " up"
+    },
+    {
+     "id": 4297,
+     "s": " everything"
+    },
+    {
+     "id": 8958,
+     "s": "!\""
+    }
+   ],
+   "ended": true,
+   "bytes": 154315,
+   "microBytes": 570565
+  },
+  {
+   "id": "e13",
+   "text": "Describe London in one sentence.",
+   "chips": [
+    {
+     "id": 74785,
+     "s": "Describe"
+    },
+    {
+     "id": 7148,
+     "s": " London"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 825,
+     "s": " one"
+    },
+    {
+     "id": 11652,
+     "s": " sentence"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "reply": "London is a city in the United Kingdom known for its historical landmarks, cultural richness, and vibrant atmosphere.",
+   "replyTokens": [
+    {
+     "id": 39572,
+     "s": "London"
+    },
+    {
+     "id": 374,
+     "s": " is"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 3283,
+     "s": " city"
+    },
+    {
+     "id": 304,
+     "s": " in"
+    },
+    {
+     "id": 279,
+     "s": " the"
+    },
+    {
+     "id": 3639,
+     "s": " United"
+    },
+    {
+     "id": 15072,
+     "s": " Kingdom"
+    },
+    {
+     "id": 3881,
+     "s": " known"
+    },
+    {
+     "id": 369,
+     "s": " for"
+    },
+    {
+     "id": 1181,
+     "s": " its"
+    },
+    {
+     "id": 13656,
+     "s": " historical"
+    },
+    {
+     "id": 59924,
+     "s": " landmarks"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 12752,
+     "s": " cultural"
+    },
+    {
+     "id": 88930,
+     "s": " richness"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 323,
+     "s": " and"
+    },
+    {
+     "id": 32976,
+     "s": " vibrant"
+    },
+    {
+     "id": 16566,
+     "s": " atmosphere"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 180569,
+   "microBytes": 645894
+  },
+  {
+   "id": "e14",
+   "text": "Write a one-line poem about autumn.",
+   "chips": [
+    {
+     "id": 7985,
+     "s": "Write"
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 825,
+     "s": " one"
+    },
+    {
+     "id": 8447,
+     "s": "-line"
+    },
+    {
+     "id": 32794,
+     "s": " poem"
+    },
+    {
+     "id": 911,
+     "s": " about"
+    },
+    {
+     "id": 41674,
+     "s": " autumn"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "reply": "The leaves fall like silent songs, a final note of autumn.",
+   "replyTokens": [
+    {
+     "id": 785,
+     "s": "The"
+    },
+    {
+     "id": 10901,
+     "s": " leaves"
+    },
+    {
+     "id": 4399,
+     "s": " fall"
+    },
+    {
+     "id": 1075,
+     "s": " like"
+    },
+    {
+     "id": 21059,
+     "s": " silent"
+    },
+    {
+     "id": 11674,
+     "s": " songs"
+    },
+    {
+     "id": 11,
+     "s": ","
+    },
+    {
+     "id": 264,
+     "s": " a"
+    },
+    {
+     "id": 1590,
+     "s": " final"
+    },
+    {
+     "id": 5185,
+     "s": " note"
+    },
+    {
+     "id": 315,
+     "s": " of"
+    },
+    {
+     "id": 41674,
+     "s": " autumn"
+    },
+    {
+     "id": 13,
+     "s": "."
+    }
+   ],
+   "ended": true,
+   "bytes": 119600,
+   "microBytes": 426259
+  }
+ ],
+ "weightSample": [
+  0.004150390625,
+  -0.0012969970703125,
+  0.0015869140625,
+  -0.0693359375,
+  0.0250244140625,
+  0.040283203125,
+  0.0260009765625,
+  -0.0225830078125
+ ],
+ "thumbs": {
+  "block": 32,
+  "index": {
+   "0:q": {
+    "offset": 0,
+    "w": 64,
+    "h": 32
+   },
+   "0:k": {
+    "offset": 2048,
+    "w": 32,
+    "h": 32
+   },
+   "0:v": {
+    "offset": 3072,
+    "w": 32,
+    "h": 32
+   },
+   "0:o": {
+    "offset": 4096,
+    "w": 32,
+    "h": 64
+   },
+   "0:gate": {
+    "offset": 6144,
+    "w": 96,
+    "h": 32
+   },
+   "0:up": {
+    "offset": 9216,
+    "w": 96,
+    "h": 32
+   },
+   "0:down": {
+    "offset": 12288,
+    "w": 32,
+    "h": 96
+   },
+   "1:q": {
+    "offset": 15360,
+    "w": 64,
+    "h": 32
+   },
+   "1:k": {
+    "offset": 17408,
+    "w": 32,
+    "h": 32
+   },
+   "1:v": {
+    "offset": 18432,
+    "w": 32,
+    "h": 32
+   },
+   "1:o": {
+    "offset": 19456,
+    "w": 32,
+    "h": 64
+   },
+   "1:gate": {
+    "offset": 21504,
+    "w": 96,
+    "h": 32
+   },
+   "1:up": {
+    "offset": 24576,
+    "w": 96,
+    "h": 32
+   },
+   "1:down": {
+    "offset": 27648,
+    "w": 32,
+    "h": 96
+   },
+   "2:q": {
+    "offset": 30720,
+    "w": 64,
+    "h": 32
+   },
+   "2:k": {
+    "offset": 32768,
+    "w": 32,
+    "h": 32
+   },
+   "2:v": {
+    "offset": 33792,
+    "w": 32,
+    "h": 32
+   },
+   "2:o": {
+    "offset": 34816,
+    "w": 32,
+    "h": 64
+   },
+   "2:gate": {
+    "offset": 36864,
+    "w": 96,
+    "h": 32
+   },
+   "2:up": {
+    "offset": 39936,
+    "w": 96,
+    "h": 32
+   },
+   "2:down": {
+    "offset": 43008,
+    "w": 32,
+    "h": 96
+   },
+   "3:q": {
+    "offset": 46080,
+    "w": 64,
+    "h": 32
+   },
+   "3:k": {
+    "offset": 48128,
+    "w": 32,
+    "h": 32
+   },
+   "3:v": {
+    "offset": 49152,
+    "w": 32,
+    "h": 32
+   },
+   "3:o": {
+    "offset": 50176,
+    "w": 32,
+    "h": 64
+   },
+   "3:gate": {
+    "offset": 52224,
+    "w": 96,
+    "h": 32
+   },
+   "3:up": {
+    "offset": 55296,
+    "w": 96,
+    "h": 32
+   },
+   "3:down": {
+    "offset": 58368,
+    "w": 32,
+    "h": 96
+   },
+   "4:q": {
+    "offset": 61440,
+    "w": 64,
+    "h": 32
+   },
+   "4:k": {
+    "offset": 63488,
+    "w": 32,
+    "h": 32
+   },
+   "4:v": {
+    "offset": 64512,
+    "w": 32,
+    "h": 32
+   },
+   "4:o": {
+    "offset": 65536,
+    "w": 32,
+    "h": 64
+   },
+   "4:gate": {
+    "offset": 67584,
+    "w": 96,
+    "h": 32
+   },
+   "4:up": {
+    "offset": 70656,
+    "w": 96,
+    "h": 32
+   },
+   "4:down": {
+    "offset": 73728,
+    "w": 32,
+    "h": 96
+   },
+   "5:q": {
+    "offset": 76800,
+    "w": 64,
+    "h": 32
+   },
+   "5:k": {
+    "offset": 78848,
+    "w": 32,
+    "h": 32
+   },
+   "5:v": {
+    "offset": 79872,
+    "w": 32,
+    "h": 32
+   },
+   "5:o": {
+    "offset": 80896,
+    "w": 32,
+    "h": 64
+   },
+   "5:gate": {
+    "offset": 82944,
+    "w": 96,
+    "h": 32
+   },
+   "5:up": {
+    "offset": 86016,
+    "w": 96,
+    "h": 32
+   },
+   "5:down": {
+    "offset": 89088,
+    "w": 32,
+    "h": 96
+   },
+   "6:q": {
+    "offset": 92160,
+    "w": 64,
+    "h": 32
+   },
+   "6:k": {
+    "offset": 94208,
+    "w": 32,
+    "h": 32
+   },
+   "6:v": {
+    "offset": 95232,
+    "w": 32,
+    "h": 32
+   },
+   "6:o": {
+    "offset": 96256,
+    "w": 32,
+    "h": 64
+   },
+   "6:gate": {
+    "offset": 98304,
+    "w": 96,
+    "h": 32
+   },
+   "6:up": {
+    "offset": 101376,
+    "w": 96,
+    "h": 32
+   },
+   "6:down": {
+    "offset": 104448,
+    "w": 32,
+    "h": 96
+   },
+   "7:q": {
+    "offset": 107520,
+    "w": 64,
+    "h": 32
+   },
+   "7:k": {
+    "offset": 109568,
+    "w": 32,
+    "h": 32
+   },
+   "7:v": {
+    "offset": 110592,
+    "w": 32,
+    "h": 32
+   },
+   "7:o": {
+    "offset": 111616,
+    "w": 32,
+    "h": 64
+   },
+   "7:gate": {
+    "offset": 113664,
+    "w": 96,
+    "h": 32
+   },
+   "7:up": {
+    "offset": 116736,
+    "w": 96,
+    "h": 32
+   },
+   "7:down": {
+    "offset": 119808,
+    "w": 32,
+    "h": 96
+   },
+   "8:q": {
+    "offset": 122880,
+    "w": 64,
+    "h": 32
+   },
+   "8:k": {
+    "offset": 124928,
+    "w": 32,
+    "h": 32
+   },
+   "8:v": {
+    "offset": 125952,
+    "w": 32,
+    "h": 32
+   },
+   "8:o": {
+    "offset": 126976,
+    "w": 32,
+    "h": 64
+   },
+   "8:gate": {
+    "offset": 129024,
+    "w": 96,
+    "h": 32
+   },
+   "8:up": {
+    "offset": 132096,
+    "w": 96,
+    "h": 32
+   },
+   "8:down": {
+    "offset": 135168,
+    "w": 32,
+    "h": 96
+   },
+   "9:q": {
+    "offset": 138240,
+    "w": 64,
+    "h": 32
+   },
+   "9:k": {
+    "offset": 140288,
+    "w": 32,
+    "h": 32
+   },
+   "9:v": {
+    "offset": 141312,
+    "w": 32,
+    "h": 32
+   },
+   "9:o": {
+    "offset": 142336,
+    "w": 32,
+    "h": 64
+   },
+   "9:gate": {
+    "offset": 144384,
+    "w": 96,
+    "h": 32
+   },
+   "9:up": {
+    "offset": 147456,
+    "w": 96,
+    "h": 32
+   },
+   "9:down": {
+    "offset": 150528,
+    "w": 32,
+    "h": 96
+   },
+   "10:q": {
+    "offset": 153600,
+    "w": 64,
+    "h": 32
+   },
+   "10:k": {
+    "offset": 155648,
+    "w": 32,
+    "h": 32
+   },
+   "10:v": {
+    "offset": 156672,
+    "w": 32,
+    "h": 32
+   },
+   "10:o": {
+    "offset": 157696,
+    "w": 32,
+    "h": 64
+   },
+   "10:gate": {
+    "offset": 159744,
+    "w": 96,
+    "h": 32
+   },
+   "10:up": {
+    "offset": 162816,
+    "w": 96,
+    "h": 32
+   },
+   "10:down": {
+    "offset": 165888,
+    "w": 32,
+    "h": 96
+   },
+   "11:q": {
+    "offset": 168960,
+    "w": 64,
+    "h": 32
+   },
+   "11:k": {
+    "offset": 171008,
+    "w": 32,
+    "h": 32
+   },
+   "11:v": {
+    "offset": 172032,
+    "w": 32,
+    "h": 32
+   },
+   "11:o": {
+    "offset": 173056,
+    "w": 32,
+    "h": 64
+   },
+   "11:gate": {
+    "offset": 175104,
+    "w": 96,
+    "h": 32
+   },
+   "11:up": {
+    "offset": 178176,
+    "w": 96,
+    "h": 32
+   },
+   "11:down": {
+    "offset": 181248,
+    "w": 32,
+    "h": 96
+   },
+   "12:q": {
+    "offset": 184320,
+    "w": 64,
+    "h": 32
+   },
+   "12:k": {
+    "offset": 186368,
+    "w": 32,
+    "h": 32
+   },
+   "12:v": {
+    "offset": 187392,
+    "w": 32,
+    "h": 32
+   },
+   "12:o": {
+    "offset": 188416,
+    "w": 32,
+    "h": 64
+   },
+   "12:gate": {
+    "offset": 190464,
+    "w": 96,
+    "h": 32
+   },
+   "12:up": {
+    "offset": 193536,
+    "w": 96,
+    "h": 32
+   },
+   "12:down": {
+    "offset": 196608,
+    "w": 32,
+    "h": 96
+   },
+   "13:q": {
+    "offset": 199680,
+    "w": 64,
+    "h": 32
+   },
+   "13:k": {
+    "offset": 201728,
+    "w": 32,
+    "h": 32
+   },
+   "13:v": {
+    "offset": 202752,
+    "w": 32,
+    "h": 32
+   },
+   "13:o": {
+    "offset": 203776,
+    "w": 32,
+    "h": 64
+   },
+   "13:gate": {
+    "offset": 205824,
+    "w": 96,
+    "h": 32
+   },
+   "13:up": {
+    "offset": 208896,
+    "w": 96,
+    "h": 32
+   },
+   "13:down": {
+    "offset": 211968,
+    "w": 32,
+    "h": 96
+   },
+   "14:q": {
+    "offset": 215040,
+    "w": 64,
+    "h": 32
+   },
+   "14:k": {
+    "offset": 217088,
+    "w": 32,
+    "h": 32
+   },
+   "14:v": {
+    "offset": 218112,
+    "w": 32,
+    "h": 32
+   },
+   "14:o": {
+    "offset": 219136,
+    "w": 32,
+    "h": 64
+   },
+   "14:gate": {
+    "offset": 221184,
+    "w": 96,
+    "h": 32
+   },
+   "14:up": {
+    "offset": 224256,
+    "w": 96,
+    "h": 32
+   },
+   "14:down": {
+    "offset": 227328,
+    "w": 32,
+    "h": 96
+   },
+   "15:q": {
+    "offset": 230400,
+    "w": 64,
+    "h": 32
+   },
+   "15:k": {
+    "offset": 232448,
+    "w": 32,
+    "h": 32
+   },
+   "15:v": {
+    "offset": 233472,
+    "w": 32,
+    "h": 32
+   },
+   "15:o": {
+    "offset": 234496,
+    "w": 32,
+    "h": 64
+   },
+   "15:gate": {
+    "offset": 236544,
+    "w": 96,
+    "h": 32
+   },
+   "15:up": {
+    "offset": 239616,
+    "w": 96,
+    "h": 32
+   },
+   "15:down": {
+    "offset": 242688,
+    "w": 32,
+    "h": 96
+   },
+   "16:q": {
+    "offset": 245760,
+    "w": 64,
+    "h": 32
+   },
+   "16:k": {
+    "offset": 247808,
+    "w": 32,
+    "h": 32
+   },
+   "16:v": {
+    "offset": 248832,
+    "w": 32,
+    "h": 32
+   },
+   "16:o": {
+    "offset": 249856,
+    "w": 32,
+    "h": 64
+   },
+   "16:gate": {
+    "offset": 251904,
+    "w": 96,
+    "h": 32
+   },
+   "16:up": {
+    "offset": 254976,
+    "w": 96,
+    "h": 32
+   },
+   "16:down": {
+    "offset": 258048,
+    "w": 32,
+    "h": 96
+   },
+   "17:q": {
+    "offset": 261120,
+    "w": 64,
+    "h": 32
+   },
+   "17:k": {
+    "offset": 263168,
+    "w": 32,
+    "h": 32
+   },
+   "17:v": {
+    "offset": 264192,
+    "w": 32,
+    "h": 32
+   },
+   "17:o": {
+    "offset": 265216,
+    "w": 32,
+    "h": 64
+   },
+   "17:gate": {
+    "offset": 267264,
+    "w": 96,
+    "h": 32
+   },
+   "17:up": {
+    "offset": 270336,
+    "w": 96,
+    "h": 32
+   },
+   "17:down": {
+    "offset": 273408,
+    "w": 32,
+    "h": 96
+   },
+   "18:q": {
+    "offset": 276480,
+    "w": 64,
+    "h": 32
+   },
+   "18:k": {
+    "offset": 278528,
+    "w": 32,
+    "h": 32
+   },
+   "18:v": {
+    "offset": 279552,
+    "w": 32,
+    "h": 32
+   },
+   "18:o": {
+    "offset": 280576,
+    "w": 32,
+    "h": 64
+   },
+   "18:gate": {
+    "offset": 282624,
+    "w": 96,
+    "h": 32
+   },
+   "18:up": {
+    "offset": 285696,
+    "w": 96,
+    "h": 32
+   },
+   "18:down": {
+    "offset": 288768,
+    "w": 32,
+    "h": 96
+   },
+   "19:q": {
+    "offset": 291840,
+    "w": 64,
+    "h": 32
+   },
+   "19:k": {
+    "offset": 293888,
+    "w": 32,
+    "h": 32
+   },
+   "19:v": {
+    "offset": 294912,
+    "w": 32,
+    "h": 32
+   },
+   "19:o": {
+    "offset": 295936,
+    "w": 32,
+    "h": 64
+   },
+   "19:gate": {
+    "offset": 297984,
+    "w": 96,
+    "h": 32
+   },
+   "19:up": {
+    "offset": 301056,
+    "w": 96,
+    "h": 32
+   },
+   "19:down": {
+    "offset": 304128,
+    "w": 32,
+    "h": 96
+   },
+   "20:q": {
+    "offset": 307200,
+    "w": 64,
+    "h": 32
+   },
+   "20:k": {
+    "offset": 309248,
+    "w": 32,
+    "h": 32
+   },
+   "20:v": {
+    "offset": 310272,
+    "w": 32,
+    "h": 32
+   },
+   "20:o": {
+    "offset": 311296,
+    "w": 32,
+    "h": 64
+   },
+   "20:gate": {
+    "offset": 313344,
+    "w": 96,
+    "h": 32
+   },
+   "20:up": {
+    "offset": 316416,
+    "w": 96,
+    "h": 32
+   },
+   "20:down": {
+    "offset": 319488,
+    "w": 32,
+    "h": 96
+   },
+   "21:q": {
+    "offset": 322560,
+    "w": 64,
+    "h": 32
+   },
+   "21:k": {
+    "offset": 324608,
+    "w": 32,
+    "h": 32
+   },
+   "21:v": {
+    "offset": 325632,
+    "w": 32,
+    "h": 32
+   },
+   "21:o": {
+    "offset": 326656,
+    "w": 32,
+    "h": 64
+   },
+   "21:gate": {
+    "offset": 328704,
+    "w": 96,
+    "h": 32
+   },
+   "21:up": {
+    "offset": 331776,
+    "w": 96,
+    "h": 32
+   },
+   "21:down": {
+    "offset": 334848,
+    "w": 32,
+    "h": 96
+   },
+   "22:q": {
+    "offset": 337920,
+    "w": 64,
+    "h": 32
+   },
+   "22:k": {
+    "offset": 339968,
+    "w": 32,
+    "h": 32
+   },
+   "22:v": {
+    "offset": 340992,
+    "w": 32,
+    "h": 32
+   },
+   "22:o": {
+    "offset": 342016,
+    "w": 32,
+    "h": 64
+   },
+   "22:gate": {
+    "offset": 344064,
+    "w": 96,
+    "h": 32
+   },
+   "22:up": {
+    "offset": 347136,
+    "w": 96,
+    "h": 32
+   },
+   "22:down": {
+    "offset": 350208,
+    "w": 32,
+    "h": 96
+   },
+   "23:q": {
+    "offset": 353280,
+    "w": 64,
+    "h": 32
+   },
+   "23:k": {
+    "offset": 355328,
+    "w": 32,
+    "h": 32
+   },
+   "23:v": {
+    "offset": 356352,
+    "w": 32,
+    "h": 32
+   },
+   "23:o": {
+    "offset": 357376,
+    "w": 32,
+    "h": 64
+   },
+   "23:gate": {
+    "offset": 359424,
+    "w": 96,
+    "h": 32
+   },
+   "23:up": {
+    "offset": 362496,
+    "w": 96,
+    "h": 32
+   },
+   "23:down": {
+    "offset": 365568,
+    "w": 32,
+    "h": 96
+   },
+   "24:q": {
+    "offset": 368640,
+    "w": 64,
+    "h": 32
+   },
+   "24:k": {
+    "offset": 370688,
+    "w": 32,
+    "h": 32
+   },
+   "24:v": {
+    "offset": 371712,
+    "w": 32,
+    "h": 32
+   },
+   "24:o": {
+    "offset": 372736,
+    "w": 32,
+    "h": 64
+   },
+   "24:gate": {
+    "offset": 374784,
+    "w": 96,
+    "h": 32
+   },
+   "24:up": {
+    "offset": 377856,
+    "w": 96,
+    "h": 32
+   },
+   "24:down": {
+    "offset": 380928,
+    "w": 32,
+    "h": 96
+   },
+   "25:q": {
+    "offset": 384000,
+    "w": 64,
+    "h": 32
+   },
+   "25:k": {
+    "offset": 386048,
+    "w": 32,
+    "h": 32
+   },
+   "25:v": {
+    "offset": 387072,
+    "w": 32,
+    "h": 32
+   },
+   "25:o": {
+    "offset": 388096,
+    "w": 32,
+    "h": 64
+   },
+   "25:gate": {
+    "offset": 390144,
+    "w": 96,
+    "h": 32
+   },
+   "25:up": {
+    "offset": 393216,
+    "w": 96,
+    "h": 32
+   },
+   "25:down": {
+    "offset": 396288,
+    "w": 32,
+    "h": 96
+   },
+   "26:q": {
+    "offset": 399360,
+    "w": 64,
+    "h": 32
+   },
+   "26:k": {
+    "offset": 401408,
+    "w": 32,
+    "h": 32
+   },
+   "26:v": {
+    "offset": 402432,
+    "w": 32,
+    "h": 32
+   },
+   "26:o": {
+    "offset": 403456,
+    "w": 32,
+    "h": 64
+   },
+   "26:gate": {
+    "offset": 405504,
+    "w": 96,
+    "h": 32
+   },
+   "26:up": {
+    "offset": 408576,
+    "w": 96,
+    "h": 32
+   },
+   "26:down": {
+    "offset": 411648,
+    "w": 32,
+    "h": 96
+   },
+   "27:q": {
+    "offset": 414720,
+    "w": 64,
+    "h": 32
+   },
+   "27:k": {
+    "offset": 416768,
+    "w": 32,
+    "h": 32
+   },
+   "27:v": {
+    "offset": 417792,
+    "w": 32,
+    "h": 32
+   },
+   "27:o": {
+    "offset": 418816,
+    "w": 32,
+    "h": 64
+   },
+   "27:gate": {
+    "offset": 420864,
+    "w": 96,
+    "h": 32
+   },
+   "27:up": {
+    "offset": 423936,
+    "w": 96,
+    "h": 32
+   },
+   "27:down": {
+    "offset": 427008,
+    "w": 32,
+    "h": 96
+   }
+  }
+ }
+}

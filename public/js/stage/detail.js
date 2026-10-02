@@ -5,6 +5,7 @@ import { esc } from '../ui.js';
 import { bf16Bits } from '../num.js';
 import { neuronId } from './fields.js';
 import { termAt, ROLE } from './micro.js';
+import { L as tr } from '../i18n.js';
 
 const COLS = 64, ROWS = 48, CELL = 0.05;
 const AMBER = new THREE.Color(0xffb65c), BLUE = new THREE.Color(0x6b9bff), CYAN = new THREE.Color(0x5ef0d4), VIOLET = new THREE.Color(0xb39dff);
@@ -121,7 +122,7 @@ export class Detail {
       this.maxAct = mx || 1;
       this.order = Float32Array.from({ length: acts.length }, () => Math.random());
       this.topN = acts.reduce((bi, a, i) => (a > acts[bi] ? i : bi), 0);
-      this.panelTitle.el.innerHTML = `第 ${L} 层 · SwiGLU 的 3072 个神经元<small>${this.fullLayer ? '完整导出' : '只导出了最亮的 16 个'} · 明显激活 ${Q.mlpCount(g, L)} 个</small>`;
+      this.panelTitle.el.innerHTML = tr(`第 ${L} 层 · SwiGLU 的 3072 个神经元<small>${this.fullLayer ? '完整导出' : '只导出了最亮的 16 个'} · 明显激活 ${Q.mlpCount(g, L)} 个</small>`, `Layer ${L} · the 3072 SwiGLU neurons<small>${this.fullLayer ? 'fully exported' : 'only the 16 brightest exported'} · ${Q.mlpCount(g, L)} clearly active</small>`);
       this.litState = -1;
     }
     // 升维：两把“扇子”从残差流展开到阵列；激活：灯泡逐个点亮；降维：光收回残差流
@@ -252,7 +253,7 @@ export class Detail {
     this.linkS = link(v3(3.2, 1.2, 0), v3(3.5, 0.15, 0));
     this.linkU = link(v3(1.15, -0.8, 0), v3(3.45, -0.1, 0));
     R.add(this.linkS, this.linkU);
-    const title = label(`神经元 #${neuronId(n)}`, 'lbl title');
+    const title = label(`${tr('神经元', 'Neuron')} #${neuronId(n)}`, 'lbl title');
     title.position.set(-0.3, 2.05, 0);
     title.center.set(0, 0.5);
     R.add(title);
@@ -326,10 +327,10 @@ export class Detail {
     });
     const L = (html, x, y, cls) => { const o = label(html, cls); o.position.set(x, y, 0); o.center.set(1, 0.5); R.add(o); this.dotTags.push(o); return o; };
     this.dotTags = [];
-    L(`<span class="cx">q</span> · 第 ${d.head} 号头`, -2.15, 0.95, 'lbl tag x');
-    L(`<span class="cw">k</span> · 「${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}」`, -2.15, -0.95, 'lbl tag w');
+    L(`<span class="cx">q</span> · ${tr(`第 ${d.head} 号头`, `head ${d.head}`)}`, -2.15, 0.95, 'lbl tag x');
+    L(`<span class="cw">k</span> · ${tr(`「${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}」`, `“${esc(this.Q.tokens[d.key].s.replace(/\n/g, '↵'))}”`)}`, -2.15, -0.95, 'lbl tag w');
     L('<span class="cp">q × k</span>', -2.15, 0, 'lbl tag p');
-    const hint = label(`128 维里乘积最大的 12 维`, 'lbl hint');
+    const hint = label(tr(`128 维里乘积最大的 12 维`, 'the 12 largest of the 128 products'), 'lbl hint');
     hint.position.set(0, 1.85, 0);
     R.add(hint);
     this.dotTags.push(hint);
@@ -387,9 +388,9 @@ export class Detail {
       this.keys.push(m);
     }
     const grp = (txt, a, b, cls) => { const o = label(txt, `lbl tag ${cls}`); o.position.set((kx(a) + kx(b)) / 2, 0, 0.2); o.center.set(0.5, 0); R.add(o); };
-    grp('符号', 0, 0, 's');
-    grp('指数 · 8 位', 1, 8, 'e');
-    grp('尾数 · 7 位', 9, 15, 'm');
+    grp(tr('符号', 'sign'), 0, 0, 's');
+    grp(tr('指数 · 8 位', 'exponent · 8 bits'), 1, 8, 'e');
+    grp(tr('尾数 · 7 位', 'mantissa · 7 bits'), 9, 15, 'm');
     this.bits.rotation.x = 1.2; // 键帽顶面大致朝向镜头，0 / 1 才看得清
   }
 

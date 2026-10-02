@@ -1,10 +1,13 @@
 // 读取 tools/export_qwen.py 导出的真实模型数据。
 import { measure } from './prefetch.js';
+import { isEn, L as tr } from './i18n.js';
 
 const cache = new Map();
+// 英文版的问题是另一批真实运行（tools/export_qwen.py --lang en → data/en/）；权重缩略图两种语言共用 data/weights.bin
+const DIR = isEn ? 'data/en/' : 'data/';
 
 export async function loadManifest() {
-  const r = await fetch('data/manifest.json');
+  const r = await fetch(`${DIR}manifest.json`);
   if (!r.ok) throw new Error(`manifest ${r.status}`);
   return r.json();
 }
@@ -50,7 +53,7 @@ async function fetchData(url) {
 }
 
 // “一次乘加”的按层分块只存了 .gz（省一半体积），浏览器不支持解压时直接失败，不去请求不存在的原始文件
-const NO_GUNZIP = '当前浏览器不支持解压，无法显示这一层的乘加细节';
+const NO_GUNZIP = tr('当前浏览器不支持解压，无法显示这一层的乘加细节', "This browser can't decompress gzip, so the multiply-add details for this layer can't be shown");
 async function fetchGz(url) {
   if (typeof DecompressionStream === 'undefined') throw Object.assign(new Error(NO_GUNZIP), { unsupported: true });
   const r = await fetch(`${url}.gz`);
@@ -82,7 +85,7 @@ export function loadQuestion(id, manifest) {
 }
 
 async function decodeQuestion(id, manifest) {
-  const [jbuf, buf] = await Promise.all([fetchData(`data/${id}.json`), fetchData(`data/${id}.bin`)]);
+  const [jbuf, buf] = await Promise.all([fetchData(`${DIR}${id}.json`), fetchData(`${DIR}${id}.bin`)]);
   const t0 = performance.now();
   const meta = decodeJSON(jbuf);
   const arr = {};
@@ -141,8 +144,8 @@ async function decodeQuestion(id, manifest) {
     ensureMicro(L) {
       if (micro.has(L)) return Promise.resolve(micro.get(L));
       if (pending.has(L)) return pending.get(L);
-      if (!Number.isInteger(L) || L < 0 || L >= NL) return Promise.reject(new Error(`没有第 ${L} 层`));
-      const p = fetchGz(`data/${id}/L${String(L).padStart(2, '0')}.json`).then((b) => {
+      if (!Number.isInteger(L) || L < 0 || L >= NL) return Promise.reject(new Error(tr(`没有第 ${L} 层`, `There is no layer ${L}`)));
+      const p = fetchGz(`${DIR}${id}/L${String(L).padStart(2, '0')}.json`).then((b) => {
         const d = decodeJSON(b);
         micro.set(L, d);
         pending.delete(L);
