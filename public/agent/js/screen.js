@@ -1,14 +1,15 @@
 // D1 屏幕：沙箱里的文件树、编辑器、终端。全部按录下来的真实工具调用回放：
 // 命令和输出来自沙箱里的真实执行，文件内容和 diff 来自每次工具调用前后的真实快照。
 import { $, esc } from '../../js/ui.js';
+import { L } from '../../js/i18n.js';
 
 const PS1 = '<span class="pr">agent@sandbox<i>:/work</i>$</span> ';
 
 export const normPath = (p) => String(p || '').trim().replace(/^\/work\/?/, '').replace(/^\.\//, '');
 
-// 工具输出拆成：正文 + 退出码（harness 在末尾加了一行 [退出码 N]）
+// 工具输出拆成：正文 + 退出码（harness 在末尾加了一行 [退出码 N]；英文录制里是 [exit code N]）
 export function splitExit(result) {
-  const m = result.match(/\n?\[退出码 (\d+)\]$/);
+  const m = result.match(/\n?\[(?:退出码|exit code) (\d+)\]$/);
   if (!m) return { body: result, code: null };
   return { body: result.slice(0, m.index), code: Number(m[1]) };
 }
@@ -23,7 +24,7 @@ function outCls(line) {
 function verdict(body, code) {
   const m = body.match(/Ran (\d+) tests?/);
   if (!m) return '';
-  return code === 0 ? `<span class="verdict ok">✓ ${m[1]} 个测试全部通过</span>` : `<span class="verdict bad">✗ 测试没通过（共 ${m[1]} 个）</span>`;
+  return code === 0 ? `<span class="verdict ok">${L(`✓ ${m[1]} 个测试全部通过`, `✓ all ${m[1]} tests passed`)}</span>` : `<span class="verdict bad">${L(`✗ 测试没通过（共 ${m[1]} 个）`, `✗ tests failed (${m[1]} in total)`)}</span>`;
 }
 
 // 极简语法高亮（Python 为主）
@@ -83,11 +84,11 @@ export class Screen {
     this.key = '';
     this.tree.innerHTML = '<div class="th">/work</div>';
     this.tabs.innerHTML = '';
-    this.ed.innerHTML = '<div class="ed-empty"><span>还没有任务</span><span>在左边选一个任务，agent 会在这里打开、修改文件</span></div>';
+    this.ed.innerHTML = L('<div class="ed-empty"><span>还没有任务</span><span>在左边选一个任务，agent 会在这里打开、修改文件</span></div>', '<div class="ed-empty"><span>No task yet</span><span>Pick a task on the left; the agent will open and edit files here</span></div>');
     this.term.innerHTML = `${PS1}<span class="cur"></span>`;
     this.termSt.textContent = '';
     this.termSt.className = 'term-st';
-    this.status.innerHTML = '<span>等待任务</span>';
+    this.status.innerHTML = L('<span>等待任务</span>', '<span>waiting for a task</span>');
     this.done.hidden = true;
   }
 
@@ -144,20 +145,20 @@ export class Screen {
     this.renderTabs(curPath || (lastEd && this.edPath(lastEd.c)));
     if (!curPath) {
       if (lastEd) this.renderEditor(lastEd.c, 1);
-      else this.ed.innerHTML = '<div class="ed-empty"><span>编辑器</span><span>agent 读写文件时会在这里打开</span></div>';
+      else this.ed.innerHTML = L('<div class="ed-empty"><span>编辑器</span><span>agent 读写文件时会在这里打开</span></div>', '<div class="ed-empty"><span>Editor</span><span>files open here when the agent reads or writes them</span></div>');
     }
     // 状态栏
     if (!curAct) {
       const prev = k > 0 ? this.acts[k - 1].c : null;
-      this.status.innerHTML = prev ? this.statusDone(prev) : '<span>沙箱已就绪 · 只读系统目录 · 只能写 /work · 无网络</span>';
+      this.status.innerHTML = prev ? this.statusDone(prev) : L('<span>沙箱已就绪 · 只读系统目录 · 只能写 /work · 无网络</span>', '<span>sandbox ready · system dirs read-only · only /work writable · no network</span>');
     }
     this.done.hidden = !final;
-    if (final) this.done.innerHTML = `<b>${R.check.ok ? '✓ 任务完成' : '任务结束'}</b>独立检查：${esc(R.check.detail)}`;
+    if (final) this.done.innerHTML = L(`<b>${R.check.ok ? '✓ 任务完成' : '任务结束'}</b>独立检查：${esc(R.check.detail)}`, `<b>${R.check.ok ? '✓ Task complete' : 'Task ended'}</b>Independent check: ${esc(R.check.detail)}`);
   }
 
   setTermSt(code) {
     this.termSt.className = `term-st${code == null ? '' : code === 0 ? ' ok' : ' bad'}`;
-    this.termSt.textContent = code == null ? '' : `上一条命令 · 退出码 ${code}`;
+    this.termSt.textContent = code == null ? '' : L(`上一条命令 · 退出码 ${code}`, `last command · exit code ${code}`);
   }
 
   edPath(c) {
@@ -178,7 +179,7 @@ export class Screen {
     const nShow = Math.ceil(lines.length * op);
     h += lines.slice(0, nShow).map((l) => { const k = outCls(l); return k ? `<span class="${k}">${esc(l)}</span>` : esc(l); }).join('\n');
     if (nShow) h += '\n';
-    if (p >= 0.9) h += `<span class="ex ${code === 0 ? 'ok' : 'bad'}">退出码 ${code}${c.info?.timeout ? ' · 超时' : ''}</span>\n` + verdict(body, code);
+    if (p >= 0.9) h += `<span class="ex ${code === 0 ? 'ok' : 'bad'}">${L(`退出码 ${code}${c.info?.timeout ? ' · 超时' : ''}`, `exit code ${code}${c.info?.timeout ? ' · timed out' : ''}`)}</span>\n` + verdict(body, code);
     return h;
   }
 
@@ -200,9 +201,9 @@ export class Screen {
 
   statusDone(c) {
     const ok = c.info?.ok !== false && !(c.name === 'bash' && splitExit(c.result).code !== 0);
-    const ms = c.info?.ms != null ? ` · 实测 ${c.info.ms} ms` : '';
-    const what = c.name === 'bash' ? `退出码 ${splitExit(c.result).code}` : c.result.split('\n')[0].slice(0, 80);
-    const label = c.name === 'read_file' && c.info?.ok ? `读取了 ${c.result.split('\n').length} 行` : what;
+    const ms = c.info?.ms != null ? L(` · 实测 ${c.info.ms} ms`, ` · measured ${c.info.ms} ms`) : '';
+    const what = c.name === 'bash' ? L(`退出码 ${splitExit(c.result).code}`, `exit code ${splitExit(c.result).code}`) : c.result.split('\n')[0].slice(0, 80);
+    const label = c.name === 'read_file' && c.info?.ok ? L(`读取了 ${c.result.split('\n').length} 行`, `read ${c.result.split('\n').length} lines`) : what;
     return `<span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${esc(c.name || '?')}</span><span>${esc(label)}${ms}</span>`;
   }
 

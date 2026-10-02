@@ -262,7 +262,7 @@ export class Chat {
     if (!h || msg.want !== i) return;
     const g = cv.getContext('2d');
     drawHeat(g, h.img, cv.width, cv.height, h.values, h.rows, h.cols, { dim: 0.5 });
-    cap.innerHTML = isEn ? `Where it looked while writing “${esc(msg.q.replyTokens[i].s)}” <small>${esc(h.label)}</small>` : `生成「${esc(msg.q.replyTokens[i].s)}」时在看哪 <small>${esc(h.label)}</small>`;
+    cap.innerHTML = isEn ? `Where it looked while writing “${esc(msg.q.replyTokens[i].s.trim() || msg.q.replyTokens[i].s)}” <small>${esc(h.label)}</small>` : `生成「${esc(msg.q.replyTokens[i].s)}」时在看哪 <small>${esc(h.label)}</small>`;
     box.classList.add('on');
   }
 

@@ -3,6 +3,7 @@
 import { $, $$, esc } from '../../js/ui.js';
 import { DEPTH_NAMES, MAX_DEPTH } from './timeline.js';
 import { renderCode, linesFor, explain, watch, renderWatch, stepLabel, crumbs } from './explain.js';
+import { L } from '../../js/i18n.js';
 
 export const SPEEDS = [0.25, 0.5, 1, 2, 4, 8];
 
@@ -49,7 +50,7 @@ export class Controls {
     this.renderCrumbs(tl);
     $('#dname').innerHTML = `${DEPTH_NAMES[tl.depth]}<small>DEPTH ${tl.depth} / ${MAX_DEPTH}</small>`;
     $('#btnIn').disabled = !tl.canInto();
-    $('#btnOut').title = tl.depth <= 1 ? '收起调试器（−）' : '退回上一层（−）';
+    $('#btnOut').title = tl.depth <= 1 ? L('收起调试器（−）', 'Close the debugger (−)') : L('退回上一层（−）', 'Step out (−)');
     const cur = new Set(linesFor(s, tl.depth));
     this.lines.forEach((l, i) => l.classList.toggle('cur', cur.has(i + 1)));
     const first = this.lines[Math.min(...cur) - 1];
@@ -57,20 +58,20 @@ export class Controls {
       const box = this.code.parentElement;
       if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top: first.offsetTop - box.clientHeight * 0.25, behavior: 'smooth' });
     }
-    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">这一步 · ${esc(stepLabel(s, R))}</div>${explain(s, tl.depth, R)}`;
+    $('#explain').innerHTML = `<div class="eyebrow" style="margin-bottom:4px">${L('这一步', 'This step')} · ${esc(stepLabel(s, R))}</div>${explain(s, tl.depth, R)}`;
     renderWatch($('#watch'), watch(s, tl.depth, R));
     const n = tl.list.length;
     const a = n <= 90 ? 0 : Math.max(0, Math.min(n - 80, tl.i - 40)), b = n <= 90 ? n : a + 80;
     let h = '';
     for (let i = a; i < b; i++) h += `<i data-i="${i}" data-l="${esc(stepLabel(tl.list[i], R))}" class="${i < tl.i ? 'done' : i === tl.i ? 'cur' : ''}"></i>`;
     $('#track').innerHTML = h;
-    $('#pos').innerHTML = `第 <b>${tl.t + 1}</b>/${tl.T} 圈<br>步骤 <b>${tl.i + 1}</b>/${n}`;
+    $('#pos').innerHTML = L(`第 <b>${tl.t + 1}</b>/${tl.T} 圈<br>步骤 <b>${tl.i + 1}</b>/${n}`, `turn <b>${tl.t + 1}</b>/${tl.T}<br>step <b>${tl.i + 1}</b>/${n}`);
     this.updatePlay(tl);
   }
 
   updatePlay(tl) {
     $('#btnPlay').textContent = tl.playing ? '❚❚' : '▶';
-    $('#btnPlay').title = tl.playing ? '暂停（空格）' : tl.done ? '从头再放（空格）' : '播放（空格）';
+    $('#btnPlay').title = tl.playing ? L('暂停（空格）', 'Pause (Space)') : tl.done ? L('从头再放（空格）', 'Replay from the start (Space)') : L('播放（空格）', 'Play (Space)');
     $$('#speeds button').forEach((b) => { b.classList.toggle('on', Number(b.dataset.s) === tl.speed); b.setAttribute('aria-checked', Number(b.dataset.s) === tl.speed); });
   }
 }

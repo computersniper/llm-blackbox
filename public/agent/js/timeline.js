@@ -9,9 +9,10 @@
 // “＋”= 单步进入（step into），“−”= 跳出（step out），上一步 / 下一步 = 在当前深度逐步执行。
 // 外层循环是“轮”（turn）：模型每说完一次（以 <|im_end|> 结束）算一轮。
 import { isDecision } from './data.js';
+import { L } from '../../js/i18n.js';
 
 export const MAX_DEPTH = 5;
-export const DEPTH_NAMES = ['任务', '屏幕', '循环', '上下文', '生成', '模型内部'];
+export const DEPTH_NAMES = L(['任务', '屏幕', '循环', '上下文', '生成', '模型内部'], ['Task', 'Screen', 'Loop', 'Context', 'Generation', 'Inside the model']);
 
 // 每一级的键：k1 屏幕事件、k2 循环阶段、k3 上下文子步骤、k4 词元、k5 前向子步骤
 const KEYS = ['k1', 'k2', 'k3', 'k4', 'k5'];

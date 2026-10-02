@@ -107,7 +107,7 @@ export class Monitor {
     this.cellInfo = null;
     let title = tr('监视器', 'Monitor'), cap = '', tools = '';
     const p = st.p;
-    const heatTools = (layerOK) => `<div class="seg">${layerOK ? `<button type="button" data-k="heat" data-v="cur" class="${this.mode.heat === 'cur' ? 'on' : ''}">${tr('本层', 'This layer')}</button>` : ''}<button type="button" data-k="heat" data-v="ground" class="${this.mode.heat === 'ground' || (!layerOK && this.mode.heat === 'cur') ? 'on' : ''}">${tr('对准层平均', 'Grounded avg')}</button><button type="button" data-k="heat" data-v="all" class="${this.mode.heat === 'all' ? 'on' : ''}">${tr('全部 28 层', 'All 28 layers')}</button></div>${layerOK ? `<button type="button" data-k="lens" class="tog ${this.mode.lens ? 'on' : ''}">${tr('读数', 'Readout')}</button>` : ''}`;
+    const heatTools = (layerOK) => `<div class="seg">${layerOK ? `<button type="button" data-k="heat" data-v="cur" class="${this.mode.heat === 'cur' ? 'on' : ''}">${tr('本层', 'Layer')}</button>` : ''}<button type="button" data-k="heat" data-v="ground" class="${this.mode.heat === 'ground' || (!layerOK && this.mode.heat === 'cur') ? 'on' : ''}">${tr('对准层平均', 'Grounded')}</button><button type="button" data-k="heat" data-v="all" class="${this.mode.heat === 'all' ? 'on' : ''}">${tr('全部 28 层', 'All 28')}</button></div>${layerOK ? `<button type="button" data-k="lens" class="tog ${this.mode.lens ? 'on' : ''}">${tr('读数', 'Lens')}</button>` : ''}`;
 
     if (view === 'image' || (view === 'box' && s.ph === 'see')) {
       g.drawImage(V.img, 0, 0, W, H);
@@ -223,14 +223,14 @@ export class Monitor {
       const [ga, gb] = Q.manifest.groundLayers;
       let vals, lab;
       if (mode === 'cur' && layerOK) { vals = Q.attImg(gg, s.L); lab = tr(`第 ${s.L} 层`, `layer ${s.L}`); }
-      else if (mode === 'all') { vals = Q.attAvg(gg, [0, Q.NL - 1]); lab = tr(`全部 ${Q.NL} 层平均`, `mean of all ${Q.NL} layers`); }
-      else { vals = Q.attAvg(gg, [ga, gb]); lab = tr(`第 ${ga}–${gb} 层平均`, `mean of layers ${ga}–${gb}`); }
+      else if (mode === 'all') { vals = Q.attAvg(gg, [0, Q.NL - 1]); lab = tr(`全部 ${Q.NL} 层平均`, `all ${Q.NL} layers averaged`); }
+      else { vals = Q.attAvg(gg, [ga, gb]); lab = tr(`第 ${ga}–${gb} 层平均`, `layers ${ga}–${gb} averaged`); }
       drawHeat(g, V.img, W, H, vals, V.mh, V.mw, { dim: 0.45 });
       if (this.mode.lens && layerOK) this.lensWords(s.L);
       const tokS = Q.steps[gg].chosenS;
-      title = tr(`生成「${tokS.replace(/\n/g, '↵')}」时在看哪`, `“${tokS.replace(/\n/g, '↵')}” · where it looks`);
+      title = tr(`生成「${tokS.replace(/\n/g, '↵')}」时在看哪`, `“${(tokS.trim() || tokS).replace(/\n/g, '↵')}” · where it looks`);
       const mass = mode === 'cur' && layerOK ? Q.mass(gg, s.L) : avgMass(Q, gg, mode === 'all' ? 0 : ga, mode === 'all' ? Q.NL - 1 : gb);
-      cap = tr(`真实注意力（16 头平均，${lab}），按最大值归一化。图片一共分到 ${fmtPct(mass)} 的注意力。`, `Real attention (mean of 16 heads, ${lab}), normalized to its maximum. The image gets ${fmtPct(mass)} of the attention in total.`);
+      cap = tr(`真实注意力（16 头平均，${lab}），按最大值归一化。图片一共分到 ${fmtPct(mass)} 的注意力。`, `Real attention (16-head mean, ${lab}), scaled to its max. The image gets ${fmtPct(mass)} of all attention.`);
       tools = heatTools(layerOK);
       this.cellInfo = (c) => {
         let h = tr(`<span class="k">视觉词元 (${c.row}, ${c.col})</span>注意力 <span class="v">${fmtPct(vals[c.m])}</span>`, `<span class="k">vision token (${c.row}, ${c.col})</span>attention <span class="v">${fmtPct(vals[c.m])}</span>`);

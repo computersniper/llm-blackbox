@@ -1,6 +1,10 @@
 // 读取 tools/agent/record.py 录下的真实 agent 轨迹，并预先算好回放要用的东西。
 
+import { isEn } from '../../js/i18n.js';
+
 const cache = new Map();
+// 英文版：同样 4 个沙箱项目、英文提示和任务的另一次真实录制（data/en/）
+const BASE = isEn ? 'data/en/' : 'data/';
 
 // 数据文件预先 gzip 过（服务器只压缩 HTML），浏览器里用 DecompressionStream 解开；不支持时退回未压缩版本
 async function fetchData(url) {
@@ -16,7 +20,7 @@ async function fetchData(url) {
 }
 
 export async function loadManifest() {
-  return JSON.parse(await fetchData('data/manifest.json'));
+  return JSON.parse(await fetchData(`${BASE}manifest.json`));
 }
 
 // 关键决策点：模型在这里真的有得选（第一名概率不到 75%），或者是每一轮的第一个词元（先说话还是直接调用工具）
@@ -24,7 +28,7 @@ export const isDecision = (tk, j) => j === 0 || tk.end || (tk.top[0] && tk.top[0
 
 export async function loadTask(id) {
   if (cache.has(id)) return cache.get(id);
-  const R = JSON.parse(await fetchData(`data/${id}.json`));
+  const R = JSON.parse(await fetchData(`${BASE}${id}.json`));
   // 还原每一轮喂给模型的完整上下文：上一轮的上下文 + 上一轮生成的文字，取公共前缀，再接上新增部分
   let prev = '';
   for (const t of R.turns) {
