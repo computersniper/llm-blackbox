@@ -18,6 +18,9 @@
     - 解析出的工具调用、沙箱里真实的命令输出 / 退出码 / 耗时、每次工具调用前后的文件 diff；
     - 预填充和逐词元生成的实测耗时；
     - 最后由脚本独立检查任务是否真的完成（跑测试、核对数字），失败的录制会如实记在 manifest 里。
+
+英文版：加 --lang en，同样的沙箱项目，换成英文系统提示、英文工具说明、英文任务和英文的 harness 回报，
+重新真实录制，输出到 public/agent/data/en/。
 """
 import argparse
 import difflib
@@ -36,7 +39,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 SANDBOX_SRC = pathlib.Path(__file__).resolve().parent / "sandbox"
-OUT = ROOT / "public" / "agent" / "data"
+DATA = ROOT / "public" / "agent" / "data"
+OUT = DATA             # --lang en 时换成 DATA / "en"
+LANG = "zh"
 
 TEMPERATURE, TOP_K, TOP_P = 0.7, 20, 0.8   # Qwen3 非思考模式的推荐采样参数
 TOPN = 5               # 每个词元记录前几名候选
@@ -55,6 +60,18 @@ SYSTEM = """你是一个在终端里工作的编程助手，要亲自用工具�
 - 任务全部完成之后，再用简短的中文总结你做了什么。
 环境：Linux，工作目录 /work，没有网络。
 项目里的文件：
+{files}"""
+
+SYSTEM_EN = """You are a coding assistant working in a terminal. Use the tools to actually finish the user's task yourself instead of just giving advice.
+You can view, create and modify files in /work, and you can run shell commands.
+How to work:
+- Before each tool call, say in one sentence what you are about to do, then call the tool right away.
+- Call only one tool at a time; look at the result before deciding the next step.
+- Save any code you write to a file, then run it with a command.
+- After changing code, run the tests or the command to confirm the result is correct.
+- When the whole task is done, briefly summarize what you did in English.
+Environment: Linux, working directory /work, no network.
+Files in the project:
 {files}"""
 
 TOOLS = [
@@ -83,6 +100,96 @@ TOOLS = [
             "new_string": {"type": "string", "description": "替换后的新内容"}}, "required": ["path", "old_string", "new_string"]}}},
 ]
 
+TOOLS_EN = [
+    {"type": "function", "function": {
+        "name": "bash",
+        "description": "Run a shell command in the working directory /work (no network, 10-second timeout) and return its output and exit code.",
+        "parameters": {"type": "object", "properties": {
+            "command": {"type": "string", "description": "The command to run"}}, "required": ["command"]}}},
+    {"type": "function", "function": {
+        "name": "read_file",
+        "description": "Read the entire contents of a text file.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path, relative to /work"}}, "required": ["path"]}}},
+    {"type": "function", "function": {
+        "name": "write_file",
+        "description": "Create a new file, or overwrite a whole file with new contents.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path, relative to /work"},
+            "content": {"type": "string", "description": "The complete contents of the file"}}, "required": ["path", "content"]}}},
+    {"type": "function", "function": {
+        "name": "edit_file",
+        "description": "Replace a passage old_string in a file (it must occur exactly once) with new_string.",
+        "parameters": {"type": "object", "properties": {
+            "path": {"type": "string", "description": "File path, relative to /work"},
+            "old_string": {"type": "string", "description": "The original text to replace; it must match the file exactly"},
+            "new_string": {"type": "string", "description": "The new text to put in its place"}}, "required": ["path", "old_string", "new_string"]}}},
+]
+
+# harness 回给模型的话、检查结果的说明：两种语言各一份（中文版的措辞保持原样）
+MSG = {
+    "zh": {
+        "no_command": "错误：缺少参数 command",
+        "timeout": "\n（命令超时：超过 {s} 秒被终止）",
+        "exit": "[退出码 {code}]",
+        "outside": "错误：只能访问 /work 里的文件",
+        "not_found": "错误：文件不存在：{path}",
+        "empty": "（空文件）",
+        "no_content": "错误：缺少参数 content",
+        "written": "已{verb} {path}（{n} 行）", "overwrote": "覆盖", "created": "创建",
+        "no_old_new": "错误：缺少参数 old_string 或 new_string",
+        "old_missing": "错误：在 {path} 里没有找到 old_string，请先读取文件，确认原文一字不差",
+        "old_many": "错误：old_string 在 {path} 里出现了 {n} 次，请多带一些上下文让它唯一",
+        "edited": "已修改 {path}",
+        "no_tool": "错误：没有叫 {name} 的工具",
+        "err_prefix": "错误",
+        "clip": "\n…（输出太长，后面 {n} 个字符被截掉了）",
+        "bad_json": "错误：工具调用不是合法的 JSON（{error}）",
+        "no_close": "缺少 </tool_call>",
+        "chk_median": "python3 -m unittest → 退出码 {code}；测试文件{same}改动；额外数据{hid}",
+        "same_yes": "没有", "same_no": "被", "hid_ok": "正确", "hid_bad": "出错",
+        "chk_log_nofile": "没有生成 summary.md",
+        "chk_log_ok": "summary.md 里三种错误的次数都正确",
+        "chk_log_bad": "这些错误的次数不对或缺失：{bad}",
+        "chk_sales": "脚本{ran}；回答{told}杭州（9250 元）",
+        "ran_yes": "跑通了", "ran_no": "没有跑通", "told_yes": "提到", "told_no": "没有提到",
+        "chk_rename": "残留 calc_total：{left}；total_price 已定义：{defined}；测试只改了名字：{test_ok}；测试退出码 {code}",
+        "none": "无",
+    },
+    "en": {
+        "no_command": "Error: missing argument command",
+        "timeout": "\n(command timed out: killed after {s} seconds)",
+        "exit": "[exit code {code}]",
+        "outside": "Error: only files inside /work can be accessed",
+        "not_found": "Error: file not found: {path}",
+        "empty": "(empty file)",
+        "no_content": "Error: missing argument content",
+        "written": "{verb} {path} ({n} lines)", "overwrote": "Overwrote", "created": "Created",
+        "no_old_new": "Error: missing argument old_string or new_string",
+        "old_missing": "Error: old_string was not found in {path}; read the file first and make sure the text matches exactly",
+        "old_many": "Error: old_string occurs {n} times in {path}; include more context to make it unique",
+        "edited": "Edited {path}",
+        "no_tool": "Error: there is no tool named {name}",
+        "err_prefix": "Error",
+        "clip": "\n…(output too long; the remaining {n} characters were cut off)",
+        "bad_json": "Error: the tool call is not valid JSON ({error})",
+        "no_close": "missing </tool_call>",
+        "chk_median": "python3 -m unittest → exit code {code}; test file {same}; extra data {hid}",
+        "same_yes": "unchanged", "same_no": "modified", "hid_ok": "correct", "hid_bad": "wrong",
+        "chk_log_nofile": "summary.md was not created",
+        "chk_log_ok": "summary.md has the correct count for all three errors",
+        "chk_log_bad": "wrong or missing counts for: {bad}",
+        "chk_sales": "script {ran}; answer {told} 杭州 / Hangzhou (9250)",
+        "ran_yes": "ran successfully", "ran_no": "never ran successfully", "told_yes": "names", "told_no": "does not name",
+        "chk_rename": "calc_total left in: {left}; total_price defined: {defined}; test file only renamed: {test_ok}; test exit code {code}",
+        "none": "none",
+    },
+}
+
+
+def m(key, **kw):
+    return MSG[LANG][key].format(**kw)
+
 
 # ---------------------------------------------------------------- 任务与独立检查
 
@@ -98,13 +205,13 @@ def check_fix_median(work, final, orig, turns):
     # 再用几组测试里没有的数据检查一遍，防止“只对付测试”
     hid, _ = sh(work, "python3 -c 'from stats import median; assert median([1, 2]) == 1.5; assert median([5]) == 5; assert median([7, 1, 3, 9]) == 5'")
     ok = code == 0 and same_test and hid == 0
-    return ok, f"python3 -m unittest → 退出码 {code}；测试文件{'没有' if same_test else '被'}改动；额外数据{'正确' if hid == 0 else '出错'}"
+    return ok, m("chk_median", code=code, same=m("same_yes") if same_test else m("same_no"), hid=m("hid_ok") if hid == 0 else m("hid_bad"))
 
 
 def check_log_errors(work, final, orig, turns):
     p = work / "summary.md"
     if not p.exists():
-        return False, "没有生成 summary.md"
+        return False, m("chk_log_nofile")
     text = p.read_text()
     want = {"database timeout": 4, "invalid token": 3, "disk full": 2}
     bad = []
@@ -112,15 +219,18 @@ def check_log_errors(work, final, orig, turns):
         lines = [ln for ln in text.splitlines() if kind in ln]
         if not any(re.search(rf"(?<!\d){n}(?!\d)", ln) for ln in lines):
             bad.append(kind)
-    return not bad, "summary.md 里三种错误的次数都正确" if not bad else f"这些错误的次数不对或缺失：{', '.join(bad)}"
+    return not bad, m("chk_log_ok") if not bad else m("chk_log_bad", bad=", ".join(bad))
 
 
 def check_sales_top(work, final, orig, turns):
     # 必须真的写了脚本、真的跑通了（输出里有答案），回答也要对
     ran = [c for t in turns for c in t["calls"] if c["name"] == "bash" and ".py" in str(c["args"].get("command", ""))
            and c["info"].get("exit") == 0 and "杭州" in c["result"]]
-    ok = "杭州" in final and "9250" in final and bool(ran)
-    return ok, f"脚本{'跑通了' if ran else '没有跑通'}；回答{'提到' if '杭州' in final else '没有提到'}杭州（9250 元）"
+    # 英文回答可能把城市名写成拼音、把金额写成 9,250
+    told = "杭州" in final or (LANG == "en" and "hangzhou" in final.lower())
+    num = "9250" in (final.replace(",", "") if LANG == "en" else final)
+    ok = told and num and bool(ran)
+    return ok, m("chk_sales", ran=m("ran_yes") if ran else m("ran_no"), told=m("told_yes") if told else m("told_no"))
 
 
 def check_rename(work, final, orig, turns):
@@ -130,7 +240,7 @@ def check_rename(work, final, orig, turns):
     test_ok = (work / "test_shop.py").read_text() == orig["test_shop.py"].replace("calc_total", "total_price")
     code, out = sh(work, "python3 -m unittest -q 2>&1")
     ok = not left and defined and code == 0 and test_ok
-    return ok, f"残留 calc_total：{left or '无'}；total_price 已定义：{defined}；测试只改了名字：{test_ok}；测试退出码 {code}"
+    return ok, m("chk_rename", left=left or m("none"), defined=defined, test_ok=test_ok, code=code)
 
 
 TASKS = [
@@ -147,6 +257,18 @@ TASKS = [
      "prompt": "把函数 calc_total 改名为 total_price，所有用到它的地方都要改，改完跑一下测试。", "check": check_rename,
      "blurb": "函数定义在 shop/cart.py，另外两个文件也在用它。"},
 ]
+
+# 英文版：同样的四个沙箱项目，任务描述换成英文
+TASKS_EN = {
+    "fix-median": {"title": "Fix the failing test", "prompt": "The tests are failing. Find the bug and fix it.",
+                   "blurb": "The median function in stats.py has an indexing bug, so the tests fail."},
+    "log-errors": {"title": "Count errors in the logs", "prompt": "Count how many times each kind of ERROR appears in the logs directory and write the results to summary.md.",
+                   "blurb": "Logs from two services, with INFO / WARN / ERROR mixed together."},
+    "sales-top": {"title": "Find the top-selling city", "prompt": "Which city in sales.csv has the highest total sales? Write a Python script to work it out.",
+                  "blurb": "A sales ledger: Chengdu (成都) has the most orders, but not the highest total."},
+    "rename-func": {"title": "Rename a function", "prompt": "Rename the function calc_total to total_price, update every place that uses it, then run the tests.",
+                    "blurb": "It is defined in shop/cart.py, and two other files use it too."},
+}
 
 
 # ---------------------------------------------------------------- 沙箱
@@ -225,7 +347,7 @@ def resolve(work, path):
 def clip(s):
     if len(s) <= OUT_LIMIT:
         return s
-    return s[:OUT_LIMIT] + f"\n…（输出太长，后面 {len(s) - OUT_LIMIT} 个字符被截掉了）"
+    return s[:OUT_LIMIT] + m("clip", n=len(s) - OUT_LIMIT)
 
 
 def exec_tool(work, name, args):
@@ -235,53 +357,53 @@ def exec_tool(work, name, args):
     if name == "bash":
         cmd = args.get("command")
         if not isinstance(cmd, str) or not cmd.strip():
-            text = "错误：缺少参数 command"
+            text = m("no_command")
         else:
             r = run_sandboxed(work, cmd)
             info = {"exit": r["code"], "timeout": r["timeout"]}
             body = clip(r["out"].rstrip("\n"))
             if r["timeout"]:
-                body += f"\n（命令超时：超过 {CMD_TIMEOUT} 秒被终止）"
-            text = (body + "\n" if body else "") + f"[退出码 {r['code']}]"
+                body += m("timeout", s=CMD_TIMEOUT)
+            text = (body + "\n" if body else "") + m("exit", code=r["code"])
     elif name in ("read_file", "write_file", "edit_file"):
         full = resolve(work, args.get("path", ""))
         if full is None:
-            text = "错误：只能访问 /work 里的文件"
+            text = m("outside")
         elif name == "read_file":
             if not full.is_file():
-                text = f"错误：文件不存在：{args.get('path')}"
+                text = m("not_found", path=args.get("path"))
             else:
                 c = full.read_text()
-                text = clip(c) if c else "（空文件）"
+                text = clip(c) if c else m("empty")
         elif name == "write_file":
             content = args.get("content")
             if not isinstance(content, str):
-                text = "错误：缺少参数 content"
+                text = m("no_content")
             else:
                 full.parent.mkdir(parents=True, exist_ok=True)
                 existed = full.exists()
                 full.write_text(content)
-                text = f"已{'覆盖' if existed else '创建'} {args.get('path')}（{len(content.splitlines())} 行）"
+                text = m("written", verb=m("overwrote") if existed else m("created"), path=args.get("path"), n=len(content.splitlines()))
         else:
             old, new = args.get("old_string"), args.get("new_string")
             if not full.is_file():
-                text = f"错误：文件不存在：{args.get('path')}"
+                text = m("not_found", path=args.get("path"))
             elif not isinstance(old, str) or not isinstance(new, str) or not old:
-                text = "错误：缺少参数 old_string 或 new_string"
+                text = m("no_old_new")
             else:
                 c = full.read_text()
                 n = c.count(old)
                 if n == 0:
-                    text = f"错误：在 {args.get('path')} 里没有找到 old_string，请先读取文件，确认原文一字不差"
+                    text = m("old_missing", path=args.get("path"))
                 elif n > 1:
-                    text = f"错误：old_string 在 {args.get('path')} 里出现了 {n} 次，请多带一些上下文让它唯一"
+                    text = m("old_many", path=args.get("path"), n=n)
                 else:
                     full.write_text(c.replace(old, new, 1))
-                    text = f"已修改 {args.get('path')}"
+                    text = m("edited", path=args.get("path"))
     else:
-        text = f"错误：没有叫 {name} 的工具"
+        text = m("no_tool", name=name)
     info["ms"] = round((time.perf_counter() - t0) * 1000, 1)
-    info["ok"] = not text.startswith("错误")
+    info["ok"] = not text.startswith(m("err_prefix"))
     return text, info
 
 
@@ -427,7 +549,7 @@ def parse_calls(text):
             calls.append({"name": None, "args": None, "a": m.start(), "b": m.end(), "ok": False, "error": f"{type(e).__name__}: {e}"})
     if not calls and "<tool_call>" in text:   # 有开头没结尾
         a = text.index("<tool_call>")
-        calls.append({"name": None, "args": None, "a": a, "b": len(text), "ok": False, "error": "缺少 </tool_call>"})
+        calls.append({"name": None, "args": None, "a": a, "b": len(text), "ok": False, "error": m("no_close")})
     say = text[: calls[0]["a"]].strip() if calls else text.strip()
     return say, calls
 
@@ -442,6 +564,8 @@ class Recorder:
         self.model = AutoModelForCausalLM.from_pretrained(model_path, dtype=torch.bfloat16, device_map="cuda")
         self.model.eval()
         self.thinking_tpl = "enable_thinking" in (self.tok.chat_template or "")
+        self.tools = TOOLS_EN if LANG == "en" else TOOLS
+        self.system_tpl = SYSTEM_EN if LANG == "en" else SYSTEM
         cfg = self.model.config
         self.meta = {
             "name": pathlib.Path(model_path).name,
@@ -459,7 +583,7 @@ class Recorder:
 
     def render(self, msgs):
         kw = {"enable_thinking": False} if self.thinking_tpl else {}
-        return self.tok.apply_chat_template(msgs, tools=TOOLS, tokenize=False, add_generation_prompt=True, **kw)
+        return self.tok.apply_chat_template(msgs, tools=self.tools, tokenize=False, add_generation_prompt=True, **kw)
 
     @torch.no_grad()
     def run(self, task, seed):
@@ -469,7 +593,7 @@ class Recorder:
         shutil.copytree(SANDBOX_SRC / task["id"], work)
         files0 = snapshot(work)
         # 和 Claude Code 等 agent 一样，把运行环境（工作目录里有哪些文件）写进系统提示
-        system = SYSTEM.format(files="\n".join(sorted(files0)))
+        system = self.system_tpl.format(files="\n".join(sorted(files0)))
         msgs = [{"role": "system", "content": system}, {"role": "user", "content": task["prompt"]}]
         gen = torch.Generator(device=model.device).manual_seed(seed)
         cache = DynamicCache()
@@ -550,7 +674,7 @@ class Recorder:
                 if c["ok"]:
                     resp, info = exec_tool(work, c["name"], c["args"] if isinstance(c["args"], dict) else {})
                 else:
-                    resp, info = f"错误：工具调用不是合法的 JSON（{c['error']}）", {"ok": False, "ms": 0}
+                    resp, info = m("bad_json", error=c["error"]), {"ok": False, "ms": 0}
                 after = snapshot(work)
                 d = diff_snap(before, after)
                 rtoks = len(tok(resp, add_special_tokens=False)["input_ids"])
@@ -564,7 +688,7 @@ class Recorder:
         shutil.rmtree(tmp, ignore_errors=True)
         return {
             "id": task["id"], "title": task["title"], "prompt": task["prompt"], "seed": seed,
-            "system": system, "tools": TOOLS,
+            "system": system, "tools": self.tools,
             "files0": files0, "files1": files1,
             "turns": turns, "final": final, "finished": final is not None,
             "check": {"ok": ok, "detail": why},
@@ -586,7 +710,12 @@ def main():
     ap.add_argument("--seeds", default="0,1,2,3,4,5,6,7", help="依次尝试的随机种子，录到第一个通过检查的为止")
     ap.add_argument("--dry", action="store_true", help="只打印，不写文件")
     ap.add_argument("--chips-only", action="store_true", help="只用分词器重建 manifest 里的输入法候选，不跑模型")
+    ap.add_argument("--lang", default="zh", choices=["zh", "en"], help="en：英文提示与任务，输出到 data/en/")
     args = ap.parse_args()
+    global OUT, LANG, TASKS
+    if args.lang == "en":
+        LANG, OUT = "en", DATA / "en"
+        TASKS = [{**t, **TASKS_EN[t["id"]]} for t in TASKS]
     if args.chips_only:
         man_path = OUT / "manifest.json"
         manifest = json.loads(man_path.read_text())
@@ -603,6 +732,8 @@ def main():
     man_path = OUT / "manifest.json"
     manifest = json.loads(man_path.read_text()) if man_path.exists() and args.only else {"tasks": []}
     manifest["model"] = rec.meta
+    if LANG == "en":
+        manifest["lang"] = "en"
     by_id = {t["id"]: t for t in manifest.get("tasks", [])}
     for task in TASKS:
         if args.only and task["id"] != args.only:
