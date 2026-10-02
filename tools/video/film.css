@@ -268,18 +268,20 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 /* 算式板（网站 D6/D7）在片子里只留算式、表格和累加器：说明文字、步骤胶囊、去向说明都藏起来 */
 .board .bd-cap, .board .bd-steps, .board .bd-dest, .board .bd-dest-h, .board .bd-eff p { display: none !important; }
 
-/* 片尾：继续探索 */
-.endcard .lead { font-size: 58px; font-weight: 600; letter-spacing: .08em; color: #f2f5fb; }
-.endcard .more { display: grid; grid-template-columns: auto auto; gap: 30px 44px; align-items: baseline; text-align: left; }
-.endcard .more b { font-size: 46px; font-weight: 900; letter-spacing: .08em; color: #f2f5fb; }
-.endcard .more span { font-size: 38px; font-weight: 600; letter-spacing: .04em; color: var(--ink2); }
-.endcard.fin { align-items: center; gap: 72px; text-align: left; }
-.endcard .qr { flex: none; width: 340px; height: 340px; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
-.endcard .qr svg { display: block; width: 100%; height: 100%; }
-.endcard .fin-t .k { font-size: 72px; font-weight: 900; letter-spacing: .12em; color: #f2f5fb; }
-.endcard .fin-t .url { margin-top: 22px; font-family: var(--mono); font-size: 36px; letter-spacing: .04em; color: var(--cyan); }
-.endcard .fin-t .hint { margin-top: 26px; font-size: 26px; font-weight: 600; letter-spacing: .06em; color: var(--ink2); }
-.endcard .fin-t .cred { margin-top: 40px; font-size: 19px; font-weight: 600; letter-spacing: .08em; color: var(--dim); }
+/* 片尾：推理页录屏的窗口框（中性的深色窗口，不模仿任何浏览器）、鼠标、落版 */
+.win { position: absolute; width: 1440px; border-radius: 14px; overflow: hidden; background: #060d1a; border: 1px solid rgba(150, 180, 230, .28); box-shadow: 0 30px 90px rgba(0, 0, 0, .6); transform-origin: 50% 50%; }
+.win .bar { height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 16px; background: #0b1424; border-bottom: 1px solid rgba(150, 180, 230, .16); }
+.win .bar i { width: 11px; height: 11px; border-radius: 50%; background: rgba(150, 180, 230, .28); }
+.win .bar .url { margin: 0 auto; padding: 4px 22px; border-radius: 999px; background: rgba(255, 255, 255, .05); font-family: var(--mono); font-size: 17px; color: var(--ink2); letter-spacing: .03em; }
+.win canvas { display: block; width: 1440px; height: 810px; }
+.cur { position: absolute; width: 0; height: 0; pointer-events: none; }
+.cur svg { position: absolute; left: -5px; top: -3px; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .6)); }
+.cur .rip { position: absolute; left: 0; top: 0; width: 64px; height: 64px; border-radius: 50%; border: 3px solid rgba(94, 240, 212, .9); box-shadow: 0 0 18px rgba(94, 240, 212, .5); }
+.fin7 { position: absolute; left: 1190px; top: 50%; display: flex; flex-direction: column; align-items: center; gap: 30px; white-space: nowrap; }
+.fin7 .url { font-family: var(--mono); font-size: 42px; letter-spacing: .03em; color: var(--cyan); }
+.fin7 .qr { width: 340px; height: 340px; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
+.fin7 .qr svg { display: block; width: 100%; height: 100%; }
+.fin7 .hint { font-size: 28px; font-weight: 600; letter-spacing: .06em; color: var(--ink2); }
 
 /* v6：前馈的结构图（1024 → 门 / 内容 3072 → 相乘 → down 1024 → 加回去），正在讲的部分亮 */
 .ffnmap { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 18px 28px 14px; border-radius: 18px; background: rgba(3, 7, 15, .84); border: 1px solid var(--line2); backdrop-filter: blur(8px); white-space: nowrap; }

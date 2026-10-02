@@ -457,7 +457,7 @@ SEC_CHORDS = {
     'sampleK': ['Gm9', 'Gm9', 'A7sus4', 'A'],
     'loop2': P1,
     'pick': ['Bbmaj7', 'Bbmaj7', 'Gm9', 'Gm9', 'A7sus4', 'A7sus4', 'A', 'A'],  # 选字：理解完之后怎么把词说出来
-    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Bbmaj9', 'FmajA', 'Dsus2', 'D'],  # 答案卡 → 继续探索 → 收尾
+    'end': ['Bbmaj9', 'Bbmaj9', 'FmajA', 'Gm9', 'Bbmaj9', 'FmajA', 'Gm9', 'Dsus2', 'D', 'D'],  # 答案卡 → 推理页演示 → 落版收尾
 }
 
 

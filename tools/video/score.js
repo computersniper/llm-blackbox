@@ -16,7 +16,7 @@ const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
 // 段落：名字、小节数、能量（配乐用）
 const PLAN = [
   ['chat', 5, 0.1], ['fly', 3, 0.55], ['land', 2, 0.4], ['embed', 2, 0.5], ['layers1', 7, 0.78],
-  ['attn', 29, 0.4], ['ffn', 13, 0.45], ['pick', 8, 0.6], ['loop1', 5, 0.72], ['loop2', 4, 0.9], ['end', 8, 0.22],
+  ['attn', 29, 0.4], ['ffn', 13, 0.45], ['pick', 8, 0.6], ['loop1', 5, 0.72], ['loop2', 4, 0.9], ['end', 10, 0.22],
 ];
 // 顶部章节进度条的六章
 const CHAPTERS = ['切成词元', '查表', '穿过 28 层', '注意力', '前馈', '选字'];
@@ -48,7 +48,8 @@ function pick(list, t) {
   return null;
 }
 
-export function buildScore(Q) {
+export function buildScore(Q, cap = null) {
+  let endSite = null;
   const NL = Q.NL;
   const subs = [], strips = [], chapters = [], cards = [], events = [], sections = [];
   const sub = (t0, t1, html) => subs.push({ t0, t1, html });
@@ -649,12 +650,39 @@ export function buildScore(Q) {
   const statLine = `${Q.G} 个词元 · 每个都走完 28 层 · 约 ${Math.round(macs / 1e8)} 亿次乘加`;
   {
     const T0 = SEC.end.t0, T1 = SEC.end.t1;
-    // 0–9 s 完整回答；9.6 s 起「继续探索」：一句引子 → 站内另外几页各一行 → 延伸学习 + 二维码；配乐在这里收尾
-    const E1 = 7.0, E2 = 10.4, E3 = 14.2; // 二维码那一屏留将近 6 秒，够手机对准扫
+    // 0–6.2 s 完整回答；6.4 s 起用推理页的真实录屏演示一遍（点选发送 → 点 ＋ 揭开 → 一层层往里钻 → 调试器），最后落版网址 + 二维码
+    const D0 = 6.4, FIN = 18.4;
     ev(T0 + 1.6, 'hit', { k: 0.5 });
-    ev(T0 + E1, 'reveal', { k: 0.5 });
-    ev(T0 + E2, 'step', { k: 0.4 });
-    ev(T0 + E3, 'end', { k: 0.4 });
+    // 录屏的时间表：电影里的一段 [f0, f1] 对应录屏里的 [c0, c1]（可以变速；段与段之间直接剪接）
+    const A = (cap?.actions || []);
+    const at = (name, k = 0) => A.filter((a) => a.name === name)[k]?.t ?? 0;
+    const segs = [];
+    let f = D0;
+    const add = (d, c0, c1, note) => { segs.push({ f0: f, f1: f + d, c0, c1, note }); f += d; };
+    if (A.length) {
+      add(1.6, at('chip', 0) - 0.5, at('send') + 0.15, 'ask');          // 点选词元、发送
+      add(1.2, at('send') + 0.15, at('replyDone') + 0.2, 'reply');      // 回答流式写出来
+      add(1.4, at('plus') - 0.4, at('plus') + 3.7, 'reveal');           // 点 ＋ 揭开黑箱
+      const dives = A.filter((a) => a.name === 'in');
+      dives.forEach((a) => add(0.9, a.t - 0.25, a.t + 1.0, 'dive'));     // 每点一次 ＋ 往里钻一层
+      add(FIN - f, at('play') - 0.3, at('step', 1) + 0.8, 'debug');     // 播放、倍速、暂停、单步
+    }
+    const capAt = (lt) => { if (!segs.length) return 0; const s = segs.find((x) => lt < x.f1) || segs[segs.length - 1]; return lerp(s.c0, s.c1, clamp((lt - s.f0) / (s.f1 - s.f0))); };
+    const filmOf = (ct) => { const s = segs.find((x) => ct >= x.c0 && ct <= x.c1); return s ? s.f0 + ((ct - s.c0) / (s.c1 - s.c0)) * (s.f1 - s.f0) : null; };
+    for (const a of A) { if (a.x == null) continue; const lt = filmOf(a.t); if (lt != null) ev(T0 + lt, a.name === 'in' ? 'step' : 'tick', { k: a.name === 'in' ? 0.55 : 0.3 }); }
+    ev(T0 + FIN, 'end', { k: 0.4 });
+    const depthNames = ['结构', '层塔', '一层之内', '注意力', '一次乘加'];
+    const dv = segs.filter((s) => s.note === 'dive');
+    sub(T0 + D0 + 0.2, T0 + (dv[0]?.f0 ?? D0 + 4) - 1.4 - 0.1, '想自己一步步打开看看？');
+    if (dv.length) {
+      const r = segs.find((s) => s.note === 'reveal');
+      sub(T0 + r.f0 + 0.1, T0 + dv[dv.length - 1].f1 - 0.15, '在网页上，每点一次 ＋，就往里钻一层');
+      term(T0 + r.f0 + 0.2, T0 + dv[0].f0, `${m('01')} 黑箱`);
+      dv.forEach((s, k) => term(T0 + s.f0 + 0.05, T0 + s.f1 - (k === dv.length - 1 ? 0.15 : 0), `${m(String(k + 2).padStart(2, '0'))} ${depthNames[k] ?? ''}`)); // 和网页顶栏的深度编号一致
+      const dbg = segs.find((s) => s.note === 'debug');
+      sub(T0 + dbg.f0 + 0.1, T0 + FIN - 0.15, '暂停、单步、倍速，像调试程序一样看它思考');
+      term(T0 + dbg.f0 + 0.2, T0 + FIN - 0.15, '播放 · 倍速 · 暂停 · 单步');
+    }
     shot('end', (lt, t, { M }) => ({
       st: mst(2, Q.G - 1, { ph: 'sample' }, 1, { dAnim: lerp(2.7, 1, smoother(seg(lt, 0.4, 3.9))), view: 'machine' }),
       cam: () => {
@@ -664,18 +692,21 @@ export function buildScore(Q) {
       },
       hide: ['bars'],
       dof: { focus: 14, range: 24, blur: 6 * smooth(seg(lt, 2.5, 5)) },
-      fade: lerp(0, 0.86, smooth(seg(lt, 0.6, 2.0))) + 0.14 * smooth(seg(t, T1 - 1.2, T1 - 0.05)),
+      fade: lerp(0, 0.86, smooth(seg(lt, 0.6, 2.0))) + 0.14 * smooth(seg(lt, D0 - 0.4, D0 + 0.4)),
       ov: {
         reply: { a: 1 - smooth(seg(lt, 0.4, 1.4)), n: Q.G, k: 1 },
         band: 1 - smooth(seg(lt, 0, 1)),
-        end: {
-          a1: smooth(seg(lt, 1.4, 2.4)) * (1 - smooth(seg(lt, E1 - 0.8, E1 - 0.1))), k1: smooth(seg(lt, 4.0, 5.0)),
-          a3: smooth(seg(lt, E1, E1 + 0.8)) * (1 - smooth(seg(lt, E2 - 0.6, E2 - 0.05))),
-          a4: smooth(seg(lt, E2, E2 + 0.5)) * (1 - smooth(seg(lt, E3 - 0.6, E3 - 0.05))), k4: seg(lt, E2 + 0.2, E2 + 3.2),
-          a5: smooth(seg(lt, E3, E3 + 0.8)) * (1 - smooth(seg(t, T1 - 0.8, T1 - 0.05))), k5: seg(lt, E3, E3 + 1.6),
-        },
+        end: { a1: smooth(seg(lt, 1.4, 2.4)) * (1 - smooth(seg(lt, D0 - 0.8, D0 - 0.2))), k1: smooth(seg(lt, 3.6, 4.6)) },
+        site: segs.length ? {
+          a: smooth(seg(lt, D0 - 0.1, D0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.9, T1 - 0.05))),
+          ct: capAt(Math.min(lt, FIN)),
+          fin: easeInOut(seg(lt, FIN, FIN + 1.0)),
+          finA: smooth(seg(lt, FIN + 0.5, FIN + 1.3)) * (1 - smooth(seg(t, T1 - 0.9, T1 - 0.05))),
+          cursor: lt < FIN ? smooth(seg(lt, D0 + 0.3, D0 + 0.7)) * (1 - smooth(seg(lt, FIN - 0.4, FIN))) : 0,
+        } : null,
       },
     }));
+    endSite = { segs, D0, FIN };
   }
 
   function frame(t, ctx) {
@@ -697,5 +728,5 @@ export function buildScore(Q) {
     const a = progs.length ? smooth(seg(t, progs[0].t, progs[0].t + 0.6)) * (1 - smooth(seg(t, SEC.end.t0, SEC.end.t0 + 1.0))) : 0;
     return { i, a: i < 0 ? 0 : a };
   };
-  return { end, frame, subs, strips, chapters, cards, terms, chapterNames: CHAPTERS, progAt, events, sections, open: OPEN, statLine, bpm: BPM, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
+  return { end, frame, subs, strips, chapters, cards, terms, chapterNames: CHAPTERS, progAt, endSite, events, sections, open: OPEN, statLine, bpm: BPM, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
 }
