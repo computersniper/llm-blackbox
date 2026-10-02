@@ -102,7 +102,7 @@ async function boot() {
   buildOverlays();
   OPENING = new Opening({ E, M, Q, frame: $('#frame'), T: SC.open, lang: LANG });
   if (EN) localizeStage();
-  window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end } };
+  window.__film = { M, E, Q, probe, poster, ready: true, fps: FPS, duration: SC.end, renderAt, seek, events: () => SC.events.slice().sort((a, b) => a.t - b.t), score: { sections: SC.sections, shots: SC.shots, bpm: SC.bpm, end: SC.end, subs: SC.subs, terms: SC.terms } };
   if (PREVIEW) startPreview();
 }
 

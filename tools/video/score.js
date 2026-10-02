@@ -146,9 +146,10 @@ export function buildScore(Q, cap = null, opts = {}) {
   const upAt = [B(0, 3), B(1, 0.5), B(1, 1.5), B(1, 2.5), B(1, 3.5), B(2, 0.5)];
   const jit = (i) => (((i * 7919) % 13) / 13 - 0.5) * 0.03; // 敲键间隔的一点不均匀（确定的）
   // 英文：逐字母敲（没有输入法候选），空格稍微停一下；每个词敲完那一下当作“上屏”（配乐的拨弦）
-  let tEn = B(0, 2);
+  // 节奏：大约每秒 6 个字母，最后一个字母敲在中文最后一次上屏的同一拍（B(2, 0.5)），离按发送还有不到一秒
+  let tEn = B(0, 3) - 0.1;
   const typingEn = user.map((u, k) => {
-    const keys = [...u.s].map((ch, j) => { const t = tEn; tEn += 0.098 + jit(k * 10 + j) * 1.6 + (ch === ' ' ? 0.07 : 0); return t; });
+    const keys = [...u.s].map((ch, j) => { const t = tEn; tEn += 0.168 + jit(k * 10 + j) * 2.4 + (ch === ' ' ? 0.08 : 0); return t; });
     return { s: u.s, py: null, keys, commit: keys[keys.length - 1], chars: true };
   });
   const typing = EN ? typingEn : user.map((u, k) => {
@@ -657,7 +658,7 @@ export function buildScore(Q, cap = null, opts = {}) {
     const top2 = `${q(stR.top[0][2])} ${m(pct(stR.top[0][1]))}，${q(stR.top[1][2])} ${m(pct(stR.top[1][1]))}`;
     const top2En = `${q(stR.top[0][2])} ${m(pct(stR.top[0][1]))}, ${q(stR.top[1][2])} ${m(pct(stR.top[1][1]))}`;
     sub(headT + 0.1, sampT - 0.2, T_(`第 ${R + 1} 个字：${top2}`, `${R === 1 ? 'The next word' : `Word ${R + 1}`}: ${top2En}`));
-    sub(sampT + 0.1, T1 - 0.2, T_(`这次抽中了${q(stR.chosenS)}：抽签有随机性`, stR.chosenRank > 0 ? `It drew ${q(stR.chosenS)}, not the favourite: it really is a draw` : `It drew ${q(stR.chosenS)}, but it could have gone the other way`));
+    sub(sampT + 0.1, T1 - 0.2, T_(`这次抽中了${q(stR.chosenS)}：抽签有随机性`, stR.chosenRank > 0 ? `It drew ${q(stR.chosenS)}, not the top pick: it really is a draw` : `It drew ${q(stR.chosenS)}, but it could have gone the other way`));
     shot('loop1', (lt, t, { M }) => {
       let st, detail = false, gNow = R;
       if (t < tr) { const s = loopState(fast, t); gNow = s.g; st = mst(2, s.g, { ph: s.ph }, s.p, { dAnim: 2.7 }); }
