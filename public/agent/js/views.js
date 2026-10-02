@@ -3,8 +3,10 @@ import { $, esc, fmtPct, fmtNum, tokPlain } from '../../js/ui.js';
 import { isDecision } from './data.js';
 import { normPath, splitExit } from './screen.js';
 import { callArg } from './chat.js';
+import { isEn, L as tr } from '../../js/i18n.js';
 
-export const KIND_NAME = { sys: '系统提示', tools: '工具定义', user: '用户任务', asst: '模型的输出', tool: '工具结果', gen: '轮到模型（生成提示）' };
+export const KIND_NAME = tr({ sys: '系统提示', tools: '工具定义', user: '用户任务', asst: '模型的输出', tool: '工具结果', gen: '轮到模型（生成提示）' },
+  { sys: 'system prompt', tools: 'tool definitions', user: 'user task', asst: 'model output', tool: 'tool results', gen: 'model’s turn (generation prompt)' });
 const KIND_ORDER = ['sys', 'tools', 'user', 'asst', 'tool', 'gen'];
 const SPECIAL = /(<\|im_start\|>|<\|im_end\|>|<\/?tool_call>|<\/?tool_response>|<\/?tools>)/g;
 
@@ -39,7 +41,7 @@ export class LoopView {
 
   setModel(M) {
     $('#nModelName').textContent = M.name.replace('-Instruct-2507', '');
-    $('#nModelSpec').innerHTML = `${(M.params / 1e8).toFixed(1)} 亿参数 · ${M.layers} 层<br>只会做一件事：读一串词元，写下一个词元`;
+    $('#nModelSpec').innerHTML = tr(`${(M.params / 1e8).toFixed(1)} 亿参数 · ${M.layers} 层<br>只会做一件事：读一串词元，写下一个词元`, `${(M.params / 1e9).toFixed(1)}B parameters · ${M.layers} layers<br>does one thing only: read a run of tokens, write the next token`);
     const st = document.createElement('div');
     st.className = 'stack';
     st.innerHTML = '<i></i>'.repeat(12);
@@ -71,11 +73,11 @@ export class LoopView {
 
   renderStatic(R, s, T) {
     // 圈数
-    let h = `<span class="lk">第 <b>${s.t + 1}</b> / ${R.T} 圈</span>`;
+    let h = tr(`<span class="lk">第 <b>${s.t + 1}</b> / ${R.T} 圈</span>`, `<span class="lk">turn <b>${s.t + 1}</b> / ${R.T}</span>`);
     R.turns.forEach((x, t) => {
       const bad = x.calls.some((c) => !c.info?.ok || (c.name === 'bash' && splitExit(c.result).code !== 0));
-      const lab = x.final ? '✓ 回答' : x.calls.map((c) => c.name || '?').join(' + ');
-      h += `<button type="button" class="lap ${t < s.t ? 'done' : ''} ${t === s.t ? 'cur' : ''} ${bad ? 'bad' : ''} ${x.final ? 'fin' : ''}" data-t="${t}" title="第 ${t + 1} 圈：${esc(lab)}">${t + 1}<span>${esc(lab.replace('_file', ''))}</span></button>`;
+      const lab = x.final ? tr('✓ 回答', '✓ answer') : x.calls.map((c) => c.name || '?').join(' + ');
+      h += `<button type="button" class="lap ${t < s.t ? 'done' : ''} ${t === s.t ? 'cur' : ''} ${bad ? 'bad' : ''} ${x.final ? 'fin' : ''}" data-t="${t}" title="${tr(`第 ${t + 1} 圈：${esc(lab)}`, `turn ${t + 1}: ${esc(lab)}`)}">${t + 1}<span>${esc(lab.replace('_file', ''))}</span></button>`;
     });
     this.laps.innerHTML = h;
     // harness 的步骤
@@ -88,7 +90,7 @@ export class LoopView {
     });
     const act = { prompt: 'nHarness', gen: 'nModel', parse: 'nHarness', exec: 'nSbx', append: 'nHarness', done: 'nHarness' }[s.p];
     for (const id of ['nModel', 'nHarness', 'nSbx']) $(`#${id}`).classList.toggle('on', id === act);
-    if (s.p === 'prompt') this.mOut.innerHTML = `<span style="color:var(--dim)">等待输入：整段上下文 ${fmtNum(T.ctx.n)} 个词元</span>`;
+    if (s.p === 'prompt') this.mOut.innerHTML = `<span style="color:var(--dim)">${tr(`等待输入：整段上下文 ${fmtNum(T.ctx.n)} 个词元`, `waiting for input: the whole context, ${fmtNum(T.ctx.n)} tokens`)}</span>`;
     if (s.p === 'exec' || s.p === 'append') {
       const c = T.calls[s.c];
       const r = splitExit(c.result);
@@ -96,9 +98,9 @@ export class LoopView {
       this.sOut.innerHTML = `<span class="v">${esc(c.name || '?')}</span> ${esc(callArg(c).slice(0, 80))}\n<span class="${ok ? 'g' : 'r'}">→ ${esc((r.body || c.result).split('\n').filter(Boolean).slice(-2).join('\n').slice(0, 160))}</span>`;
     } else if (s.p === 'prompt' && s.t > 0) {
       const prev = R.turns[s.t - 1];
-      this.sOut.innerHTML = prev.calls.length ? `<span style="color:var(--dim)">上一圈：${esc(prev.calls.map((c) => c.name).join(' + '))} 已执行完</span>` : '';
-    } else if (s.p === 'done') this.sOut.innerHTML = `<span class="g">${R.check.ok ? '✓ 独立检查通过' : '检查未通过'}</span>`;
-    else if (s.t === 0 && s.p === 'prompt') this.sOut.innerHTML = '<span style="color:var(--dim)">沙箱已就绪</span>';
+      this.sOut.innerHTML = prev.calls.length ? `<span style="color:var(--dim)">${tr(`上一圈：${esc(prev.calls.map((c) => c.name).join(' + '))} 已执行完`, `last turn: ${esc(prev.calls.map((c) => c.name).join(' + '))} finished`)}</span>` : '';
+    } else if (s.p === 'done') this.sOut.innerHTML = `<span class="g">${R.check.ok ? tr('✓ 独立检查通过', '✓ independent check passed') : tr('检查未通过', 'check failed')}</span>`;
+    else if (s.t === 0 && s.p === 'prompt') this.sOut.innerHTML = `<span style="color:var(--dim)">${tr('沙箱已就绪', 'sandbox ready')}</span>`;
   }
 
   drawEdges(st, T) {
@@ -113,10 +115,10 @@ export class LoopView {
     const gx = (M.r + H.l) / 2;
     const xR = H.cx - 28, xB = H.cx + 28, my = (H.b + S.t) / 2;
     const edges = [
-      { id: 'in', d: `M${H.l - 2},${yA} C${gx + 20},${yA - 10} ${gx - 20},${yA - 10} ${M.r + 6},${yA}`, on: s.p === 'prompt', label: `上下文 ${fmtNum(T.ctx.n)} 词元`, lx: gx, ly: yA - 16, anchor: 'middle' },
-      { id: 'out', d: `M${M.r + 2},${yB} C${gx - 20},${yB + 10} ${gx + 20},${yB + 10} ${H.l - 6},${yB}`, on: s.p === 'gen' || s.p === 'parse', label: `输出 ${T.gen.n} 词元`, lx: gx, ly: yB + 24, anchor: 'middle' },
-      { id: 'run', d: `M${xR},${H.b + 2} C${xR - 8},${my} ${xR - 8},${my} ${xR},${S.t - 6}`, on: s.p === 'exec', label: c ? `执行 ${c.name}` : '执行工具', lx: xR - 14, ly: my + 4, anchor: 'end' },
-      { id: 'back', d: `M${xB},${S.t - 2} C${xB + 8},${my} ${xB + 8},${my} ${xB},${H.b + 6}`, on: s.p === 'append', label: c ? `结果 ${c.resultTokens} 词元` : '结果', lx: xB + 14, ly: my + 4, anchor: 'start' },
+      { id: 'in', d: `M${H.l - 2},${yA} C${gx + 20},${yA - 10} ${gx - 20},${yA - 10} ${M.r + 6},${yA}`, on: s.p === 'prompt', label: tr(`上下文 ${fmtNum(T.ctx.n)} 词元`, `context ${fmtNum(T.ctx.n)} tokens`), lx: gx, ly: yA - 16, anchor: 'middle' },
+      { id: 'out', d: `M${M.r + 2},${yB} C${gx - 20},${yB + 10} ${gx + 20},${yB + 10} ${H.l - 6},${yB}`, on: s.p === 'gen' || s.p === 'parse', label: tr(`输出 ${T.gen.n} 词元`, `output ${T.gen.n} tokens`), lx: gx, ly: yB + 24, anchor: 'middle' },
+      { id: 'run', d: `M${xR},${H.b + 2} C${xR - 8},${my} ${xR - 8},${my} ${xR},${S.t - 6}`, on: s.p === 'exec', label: c ? tr(`执行 ${c.name}`, `run ${c.name}`) : tr('执行工具', 'run tool'), lx: xR - 14, ly: my + 4, anchor: 'end' },
+      { id: 'back', d: `M${xB},${S.t - 2} C${xB + 8},${my} ${xB + 8},${my} ${xB},${H.b + 6}`, on: s.p === 'append', label: c ? tr(`结果 ${c.resultTokens} 词元`, `result ${c.resultTokens} tokens`) : tr('结果', 'result'), lx: xB + 14, ly: my + 4, anchor: 'start' },
     ];
     const key = `${Math.round(v.width)}|${Math.round(v.height)}|${M.r | 0}|${H.b | 0}|${S.t | 0}|${s.t}|${s.k2}`;
     if (key !== this.edgeKey) {
@@ -194,6 +196,15 @@ export class CtxView {
     const kv = s.sub === 'kv';
     const total = T.ctx.n;
     let note = '';
+    if (isEn) {
+      if (s.p === 'prompt' && s.sub !== 'kv') note = s.t === 0 ? 'First turn: system prompt, tool definitions, user task' : `<b>${fmtNum(total - R.turns[s.t - 1].ctx.n)}</b> more tokens than last turn`;
+      if (kv) note = `reused <b>${fmtNum(T.kv.reused)}</b> · newly computed <b>${fmtNum(T.kv.computed)}</b> · measured prefill <b>${T.ms.prefill} ms</b>`;
+      if (s.p === 'gen' || s.p === 'parse') note = `The model keeps writing: <b>${T.gen.n}</b> tokens this turn, measured <b>${(T.ms.decode / 1000).toFixed(1)} s</b>`;
+      if (s.p === 'exec') note = 'The tool is running in the sandbox; its result isn’t back yet';
+      if (s.p === 'append') note = `The tool result is wrapped in <b>&lt;tool_response&gt;</b> and appended as user`;
+      if (s.p === 'done') note = `When the task ends, the whole conversation is <b>${fmtNum(total + T.gen.n)}</b> tokens`;
+      this.head.innerHTML = `<h3>Turn ${s.t + 1} · the whole context fed to the model</h3><span class="big">${fmtNum(total)}<small>tokens</small></span><span class="note">${note}</span><span class="note">limit <b>${fmtNum(M.ctx)}</b> · only ${((total / M.ctx) * 100).toFixed(2)}% used</span>`;
+    } else {
     if (s.p === 'prompt' && s.sub !== 'kv') note = s.t === 0 ? '第一圈：系统提示、工具定义、用户任务' : `比上一圈多了 <b>${fmtNum(total - R.turns[s.t - 1].ctx.n)}</b> 个词元`;
     if (kv) note = `复用 <b>${fmtNum(T.kv.reused)}</b> · 新算 <b>${fmtNum(T.kv.computed)}</b> · 预填充实测 <b>${T.ms.prefill} ms</b>`;
     if (s.p === 'gen' || s.p === 'parse') note = `模型往后接着写：这一圈一共写了 <b>${T.gen.n}</b> 个词元，实测 <b>${(T.ms.decode / 1000).toFixed(1)} s</b>`;
@@ -201,11 +212,12 @@ export class CtxView {
     if (s.p === 'append') note = `工具结果包进 <b>&lt;tool_response&gt;</b>，以 user 的身份接到末尾`;
     if (s.p === 'done') note = `任务结束时，整段对话一共 <b>${fmtNum(total + T.gen.n)}</b> 个词元`;
     this.head.innerHTML = `<h3>第 ${s.t + 1} 圈 · 喂给模型的整段上下文</h3><span class="big">${fmtNum(total)}<small>词元</small></span><span class="note">${note}</span><span class="note">上限 <b>${fmtNum(M.ctx)}</b> · 只用了 ${((total / M.ctx) * 100).toFixed(2)}%</span>`;
+    }
     this.renderBar(R, s, T, p);
     // 阶梯：每一圈的上下文长度
-    let h = '<div class="sh">每一圈喂进去的长度</div>';
+    let h = `<div class="sh">${tr('每一圈喂进去的长度', 'Length fed in each turn')}</div>`;
     R.turns.forEach((x, t) => {
-      h += `<div class="st-row ${t === s.t ? 'cur' : ''} ${t > s.t ? 'fut' : ''}" data-t="${t}" title="第 ${t + 1} 圈：${fmtNum(x.ctx.n)} 词元，其中复用 KV 缓存 ${fmtNum(x.kv.reused)}，新算 ${fmtNum(x.kv.computed)}；生成 ${x.gen.n}"><span>#${t + 1}</span><span class="bar"><i class="reuse" style="width:${pct(x.kv.reused, max)}"></i><i class="newc" style="width:${pct(x.kv.computed, max)}"></i><i class="gen" style="width:${pct(x.gen.n, max)}"></i></span><span>${fmtNum(x.ctx.n)}</span></div>`;
+      h += `<div class="st-row ${t === s.t ? 'cur' : ''} ${t > s.t ? 'fut' : ''}" data-t="${t}" title="${tr(`第 ${t + 1} 圈：${fmtNum(x.ctx.n)} 词元，其中复用 KV 缓存 ${fmtNum(x.kv.reused)}，新算 ${fmtNum(x.kv.computed)}；生成 ${x.gen.n}`, `turn ${t + 1}: ${fmtNum(x.ctx.n)} tokens, ${fmtNum(x.kv.reused)} reused from the KV cache, ${fmtNum(x.kv.computed)} newly computed; ${x.gen.n} generated`)}"><span>#${t + 1}</span><span class="bar"><i class="reuse" style="width:${pct(x.kv.reused, max)}"></i><i class="newc" style="width:${pct(x.kv.computed, max)}"></i><i class="gen" style="width:${pct(x.gen.n, max)}"></i></span><span>${fmtNum(x.ctx.n)}</span></div>`;
     });
     this.stairs.innerHTML = h;
     // 原始文本
@@ -221,11 +233,11 @@ export class CtxView {
     const fresh = s.p === 'prompt' && s.sub !== 'kv';
     for (const g of segs) {
       const isNew = fresh && acc + g.n > prevLen && s.t > 0 && g.k !== 'sys' && g.k !== 'tools';
-      h += `<div class="sg ${g.k} ${isNew ? 'new' : ''}" data-a="${g.a}" style="width:${pct(g.n, max)}" title="${KIND_NAME[g.k]}${g.t != null ? `（第 ${g.t + 1} 圈）` : ''} · ${g.n} 词元">${g.n / max > 0.045 ? `<span>${g.n}</span>` : ''}</div>`;
+      h += `<div class="sg ${g.k} ${isNew ? 'new' : ''}" data-a="${g.a}" style="width:${pct(g.n, max)}" title="${KIND_NAME[g.k]}${g.t != null ? tr(`（第 ${g.t + 1} 圈）`, ` (turn ${g.t + 1})`) : ''} · ${g.n} ${tr('词元', 'tokens')}">${g.n / max > 0.045 ? `<span>${g.n}</span>` : ''}</div>`;
       acc += g.n;
     }
-    for (const g of extra) h += `<div class="sg ${g.k} ${g.grow ? 'grow' : ''} ${g.ghost ? 'ghost' : ''}" style="width:${pct(g.n, max)}" title="${KIND_NAME[g.k]} · ${g.n} 词元">${g.n / max > 0.04 ? `<span>${g.ghost ? '…' : g.n}</span>` : ''}</div>`;
-    if (s.sub === 'kv') h += `<div class="kv" style="width:${pct(T.kv.reused, max)}"><b>KV 缓存复用 ${fmtNum(T.kv.reused)}</b></div>`;
+    for (const g of extra) h += `<div class="sg ${g.k} ${g.grow ? 'grow' : ''} ${g.ghost ? 'ghost' : ''}" style="width:${pct(g.n, max)}" title="${KIND_NAME[g.k]} · ${g.n} ${tr('词元', 'tokens')}">${g.n / max > 0.04 ? `<span>${g.ghost ? '…' : g.n}</span>` : ''}</div>`;
+    if (s.sub === 'kv') h += `<div class="kv" style="width:${pct(T.kv.reused, max)}"><b>${tr(`KV 缓存复用 ${fmtNum(T.kv.reused)}`, `KV cache reused ${fmtNum(T.kv.reused)}`)}</b></div>`;
     this.bar.innerHTML = h;
     // 图例：各类合计
     const sum = {};
@@ -250,7 +262,7 @@ export class CtxView {
       if (s.p === 'exec' || s.p === 'append') {
         T.calls.forEach((c, ci) => {
           if (ci > s.c) return;
-          if (ci === s.c && s.p === 'exec') h += '\n<span class="pend">（工具正在沙箱里执行……）</span>';
+          if (ci === s.c && s.p === 'exec') h += `\n<span class="pend">${tr('（工具正在沙箱里执行……）', '(the tool is running in the sandbox…)')}</span>`;
           else h += `<span class="r tool">${rawHTML(`${ci === 0 ? '\n<|im_start|>user' : ''}\n<tool_response>\n${c.result}\n</tool_response>`)}</span>`;
         });
       }
@@ -284,7 +296,7 @@ export class TokView {
       const txt = tk.end ? '<|im_end|>' : tk.s === '' ? '·' : tk.s;
       const cls = ['tk', inCall(j) ? 'call' : '', sp || tk.end ? 'sp' : '', tk.end ? 'end' : '', isDecision(tk, j) ? 'dec' : ''].join(' ');
       const shown = esc(txt).replace(/\n/g, '<i style="opacity:.4;font-style:normal">↵</i>\n');
-      return `<span class="${cls}" data-j="${j}" title="${tk.s === '' && !tk.end ? '半个字：要和下一个词元拼起来才能显示' : `概率 ${fmtPct(tk.p)}`}">${shown}</span>`;
+      return `<span class="${cls}" data-j="${j}" title="${tk.s === '' && !tk.end ? tr('半个字：要和下一个词元拼起来才能显示', 'part of a character: shown once combined with the next token') : tr(`概率 ${fmtPct(tk.p)}`, `probability ${fmtPct(tk.p)}`)}">${shown}</span>`;
     }).join('');
     this.spans = [...this.stream.children];
   }
@@ -310,7 +322,10 @@ export class TokView {
       if (curEl.offsetTop < this.stream.scrollTop + 10 || curEl.offsetTop > this.stream.scrollTop + this.stream.clientHeight - 30) this.stream.scrollTop = top;
     }
     const rate = T.gen.n ? (T.gen.n / (T.ms.decode / 1000)).toFixed(0) : 0;
-    this.head.innerHTML = parse
+    this.head.innerHTML = isEn ? (parse
+      ? `<h3>Turn ${s.t + 1} · the harness parses what the model wrote</h3><span>Find <b>&lt;tool_call&gt;…&lt;/tool_call&gt;</b> in the output and read what’s inside as JSON</span>`
+      : `<h3>Turn ${s.t + 1} · token <b>${j + 1}</b> / ${T.gen.toks.length}</h3><span>Measured: ${T.gen.n} tokens took <b>${(T.ms.decode / 1000).toFixed(2)} s</b> this turn (about ${rate} tokens/s)</span><span>● key decision point</span>`)
+      : parse
       ? `<h3>第 ${s.t + 1} 圈 · harness 解析模型写下的文字</h3><span>在输出里找 <b>&lt;tool_call&gt;…&lt;/tool_call&gt;</b>，把中间那段当 JSON 读</span>`
       : `<h3>第 ${s.t + 1} 圈 · 第 <b>${j + 1}</b> / ${T.gen.toks.length} 个词元</h3><span>实测：这一圈 ${T.gen.n} 个词元用了 <b>${(T.ms.decode / 1000).toFixed(2)} s</b>（约 ${rate} 词元/秒）</span><span>● 关键决策点</span>`;
     if (parse) this.renderParse(T);
@@ -320,14 +335,27 @@ export class TokView {
   renderCands(T, j) {
     const tk = T.gen.toks[j];
     const dec = isDecision(tk, j);
-    const shown = tk.end ? '<|im_end|>' : tk.s === '' ? '（半个字）' : tokPlain(tk.s);
+    const shown = tk.end ? '<|im_end|>' : tk.s === '' ? tr('（半个字）', '(part of a character)') : tokPlain(tk.s);
     const max = Math.max(...tk.top.map((x) => x[1]), 1e-9);
     const chosen = tk.top.findIndex((x) => Math.abs(x[1] - tk.p) < 1e-9);
     const rows = tk.top.map(([w, pr], i) => `<div class="tc-row ${i === chosen ? 'win' : ''}"><span class="w">${esc(tokPlain(w))}</span><span class="bar"><i style="width:${(pr / max) * 100}%"></i></span><span class="p">${fmtPct(pr)}</span></div>`).join('');
-    const why = j === 0 ? (T.calls.length ? '每一圈的第一个词元：先说句话，还是直接调用工具？' : '每一圈的第一个词元：继续调用工具，还是开始回答？')
+    const why = isEn
+      ? (j === 0 ? (T.calls.length ? 'The first token of each turn: say something first, or call a tool right away?' : 'The first token of each turn: call another tool, or start answering?')
+        : tk.end ? 'Done talking? Picking <|im_end|> ends this turn and hands control back to the harness.'
+          : 'The top candidate is under 75%: the model really has a choice here.')
+      : j === 0 ? (T.calls.length ? '每一圈的第一个词元：先说句话，还是直接调用工具？' : '每一圈的第一个词元：继续调用工具，还是开始回答？')
       : tk.end ? '说完了吗？选中 <|im_end|>，这一圈就结束，控制权交回 harness。'
         : '第一名不到 75%：模型在这里真的有得选。';
-    this.cands.innerHTML = `
+    this.cands.innerHTML = isEn ? `
+      <div class="tc-big">
+        <span class="k">chosen token</span>
+        <span class="w">${esc(shown)}</span>
+        <span class="p">probability ${fmtPct(tk.p)}${chosen < 0 ? ' (not in the top 5 — drawn by the sampler)' : ''}</span>
+        ${dec ? '<span class="dec">● key decision</span>' : ''}
+      </div>
+      <div class="tc-bars">${rows}
+        <div class="tc-note">${dec ? esc(why) + ' ' : ''}The top 5 are raw probabilities at temperature 1. The actual draw uses temperature 0.7, top-k 20, top-p 0.8; at this step <b>${tk.pool}</b> candidate${tk.pool === 1 ? '' : 's'} remained in the pool.</div>
+      </div>` : `
       <div class="tc-big">
         <span class="k">选中的词元</span>
         <span class="w">${esc(shown)}</span>
@@ -341,15 +369,17 @@ export class TokView {
 
   renderParse(T) {
     if (!T.calls.length) {
-      this.cands.innerHTML = `<div class="tc-big"><span class="k">解析结果</span><span class="w" style="font-size:16px">没有 &lt;tool_call&gt;</span></div><div class="tc-bars"><div class="tc-note">模型这一圈只写了文字。对 harness 来说，这就是最终回答：循环结束，把这段话交给用户。</div></div>`;
+      this.cands.innerHTML = tr(`<div class="tc-big"><span class="k">解析结果</span><span class="w" style="font-size:16px">没有 &lt;tool_call&gt;</span></div><div class="tc-bars"><div class="tc-note">模型这一圈只写了文字。对 harness 来说，这就是最终回答：循环结束，把这段话交给用户。</div></div>`,
+        `<div class="tc-big"><span class="k">parse result</span><span class="w" style="font-size:16px">no &lt;tool_call&gt;</span></div><div class="tc-bars"><div class="tc-note">This turn the model only wrote text. To the harness that is the final answer: the loop ends and the text goes to the user.</div></div>`);
       return;
     }
     const cards = T.calls.map((c) => {
-      if (!c.ok) return `<div class="json-card bad">json.loads 失败：${esc(c.error || '')}</div>`;
+      if (!c.ok) return `<div class="json-card bad">${tr('json.loads 失败：', 'json.loads failed: ')}${esc(c.error || '')}</div>`;
       const args = Object.entries(c.args || {}).map(([k, v]) => `    <span class="k">"${esc(k)}"</span>: <span class="s">${esc(JSON.stringify(v))}</span>`).join(',\n');
       return `<div class="json-card">{\n  <span class="k">"name"</span>: <span class="s">"${esc(c.name)}"</span>,\n  <span class="k">"arguments"</span>: {\n${args}\n  }\n}</div>`;
     }).join('');
-    this.cands.innerHTML = `<div class="tc-big"><span class="k">解析结果</span><span class="w" style="font-size:16px">${T.calls.length} 个工具调用</span><span class="p">${T.calls.map((c) => esc(c.name || '?')).join(' + ')}</span></div><div class="tc-bars">${cards}<div class="tc-note">这只是模型写下的一段文字。是 harness 把它当成命令去执行的。</div></div>`;
+    this.cands.innerHTML = tr(`<div class="tc-big"><span class="k">解析结果</span><span class="w" style="font-size:16px">${T.calls.length} 个工具调用</span><span class="p">${T.calls.map((c) => esc(c.name || '?')).join(' + ')}</span></div><div class="tc-bars">${cards}<div class="tc-note">这只是模型写下的一段文字。是 harness 把它当成命令去执行的。</div></div>`,
+      `<div class="tc-big"><span class="k">parse result</span><span class="w" style="font-size:16px">${T.calls.length} tool call${T.calls.length === 1 ? '' : 's'}</span><span class="p">${T.calls.map((c) => esc(c.name || '?')).join(' + ')}</span></div><div class="tc-bars">${cards}<div class="tc-note">This is just a piece of text the model wrote. It is the harness that treats it as a command and runs it.</div></div>`);
   }
 }
 
@@ -374,18 +404,40 @@ export class FwdView {
       this.key = key;
       const prevTok = s.j > 0 ? T.gen.toks[s.j - 1] : null;
       const ctxLen = T.ctx.n + s.j;
-      const input = prevTok ? (prevTok.s === '' ? '（半个字）' : tokPlain(prevTok.s)) : '<|im_start|>assistant\\n';
-      const shown = tk.end ? '<|im_end|>' : tk.s === '' ? '（半个字）' : tokPlain(tk.s);
+      const half = tr('（半个字）', '(part of a character)');
+      const input = prevTok ? (prevTok.s === '' ? half : tokPlain(prevTok.s)) : '<|im_start|>assistant\\n';
+      const shown = tk.end ? '<|im_end|>' : tk.s === '' ? half : tokPlain(tk.s);
       let lab = '';
       for (const L of [0, 9, 18, 27, 35]) lab += `<span class="lab" style="bottom:${((L + 0.5) / M.layers) * 100}%">L${L}</span>`;
-      this.col.innerHTML = `
+      this.col.innerHTML = isEn ? `
+        <div class="fwd-io"><span class="k">output · next token</span>${s.f === 'pick' ? `drew <b>${esc(shown)}</b> (${fmtPct(tk.p)})` : `probabilities for ${fmtNum(M.vocab)} tokens…`}</div>
+        <div class="fwd-layers" style="padding-right:30px">${'<i></i>'.repeat(M.layers)}${lab}</div>
+        <div class="fwd-io"><span class="k">input</span>${s.j === 0 ? 'the whole context' : `previous token <b>${esc(input)}</b>`} · <b>${fmtNum(ctxLen)}</b> already in the KV cache</div>` : `
         <div class="fwd-io"><span class="k">输出 · 下一个词元</span>${s.f === 'pick' ? `抽中 <b>${esc(shown)}</b>（${fmtPct(tk.p)}）` : '15 万个词元的概率……'}</div>
         <div class="fwd-layers" style="padding-right:30px">${'<i></i>'.repeat(M.layers)}${lab}</div>
         <div class="fwd-io"><span class="k">输入</span>${s.j === 0 ? '整段上下文' : `上一个词元 <b>${esc(input)}</b>`} · KV 缓存里已有 <b>${fmtNum(ctxLen)}</b> 个</div>`;
       this.layers = [...this.col.querySelectorAll('.fwd-layers i')];
       const perTok = T.gen.n ? T.ms.decode / T.gen.n : 0;
       const pool = this.poolProbs(tk);
-      this.info.innerHTML = s.f === 'fwd' ? `
+      if (isEn) this.info.innerHTML = s.f === 'fwd' ? `
+        <h3>Token ${s.j + 1}: one complete forward pass</h3>
+        <div>To write this one token, the model sends it through all <b>${M.layers}</b> Transformer layers: each layer first does attention (looking back at the ${fmtNum(ctxLen)} tokens in the KV cache), then a feed-forward network. Finally the output head scores every one of the ${fmtNum(M.vocab)} tokens in the vocabulary.</div>
+        <div class="fwd-spec">
+          <div><b>${(M.params / 1e9).toFixed(1)}B</b> parameters (bf16)</div>
+          <div><b>${M.layers}</b> layers</div>
+          <div><b>${M.hidden}</b> hidden size</div>
+          <div><b>${M.heads} / ${M.kvHeads}</b> Q heads / KV heads</div>
+          <div><b>${M.ffn}</b> SwiGLU width</div>
+          <div><b>${perTok.toFixed(0)} ms</b> measured per token</div>
+        </div>
+        <div>Each parameter takes part in roughly one multiply-add: writing one token ≈ <b>${(M.params / 1e9).toFixed(0)} billion multiply-adds</b>. This whole agent task generated ${fmtNum(R.genTotal)} tokens, plus the prefill of every turn.</div>
+        <div style="color:var(--dim)">We didn’t record the internal values of this model. For its smaller sibling Qwen3-0.6B (28 layers), the real computation inside every layer can be taken apart all the way down to the bits of a weight on the “Inference” page:</div>
+        <a class="fwd-link" href="../">To the Inference page: the real computation inside a layer →</a>` : `
+        <h3>From probabilities to a token: the draw</h3>
+        <div>The output head gives probabilities for ${fmtNum(M.vocab)} tokens. The agent samples with temperature <b>${M.sampling.temperature}</b>, top-k <b>${M.sampling.top_k}</b>, top-p <b>${M.sampling.top_p}</b>: first sharpen the distribution, keep only the top 20, cut at 80% cumulative probability, then roll the dice.</div>
+        ${pool}
+        <div style="color:var(--dim)">The chosen token is appended to the context and becomes the next step’s input. Once it picks &lt;|im_end|&gt;, the turn is over.</div>`;
+      else this.info.innerHTML = s.f === 'fwd' ? `
         <h3>第 ${s.j + 1} 个词元：一次完整的前向计算</h3>
         <div>为了写出这一个词元，模型要让它穿过全部 <b>${M.layers}</b> 层 Transformer：每层先做注意力（回头看 KV 缓存里的 ${fmtNum(ctxLen)} 个词元），再过一个前馈网络。最后接输出头，算出词表里 ${fmtNum(M.vocab)} 个词元各自的分数。</div>
         <div class="fwd-spec">
@@ -419,6 +471,7 @@ export class FwdView {
     const chosen = tk.top.findIndex((x) => Math.abs(x[1] - tk.p) < 1e-9);
     const bars = top.map(([wd], i) => `<i class="${i === chosen ? 'win' : ''}" style="width:${(w[i] / sum) * 100}%" title="${esc(tokPlain(wd))} ${fmtPct(w[i] / sum)}"></i>`).join('');
     const list = top.map(([wd], i) => `<span style="font-family:var(--mono);font-size:12px;${i === chosen ? 'color:var(--amber)' : ''}">${esc(tokPlain(wd))} ${fmtPct(w[i] / sum)}</span>`).join('　');
+    if (isEn) return `<div><b>${tk.pool}</b> candidate${tk.pool === 1 ? '' : 's'} left in the pool${tk.pool === 1 ? ': nothing to draw — it’s this one' : ''}${tk.pool > 5 ? ' (only the top 5 are drawn below)' : ''}:</div><div class="draw">${bars}</div><div>${list}</div>`;
     return `<div>候选池里剩 <b>${tk.pool}</b> 个${tk.pool === 1 ? '：没什么可抽的，就是它' : ''}${tk.pool > 5 ? '（下面只画出前 5 个）' : ''}：</div><div class="draw">${bars}</div><div>${list}</div>`;
   }
 }

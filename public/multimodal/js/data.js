@@ -1,10 +1,13 @@
 // 读取 tools/multimodal/export_qwen3vl.py 导出的真实模型数据。
 // 每张图一份视觉侧数据（ViT、合并器、DeepStack，和问题无关），每个问题一份语言侧数据。
+// 英文版是同样 7 张图、英文问题的另一次真实运行（data/en/）；模型看到的像素两种语言共用（data/img/）。
+import { isEn, L } from '../../js/i18n.js';
 
 const cache = new Map();
+const BASE = isEn ? 'data/en/' : 'data/';
 
 export async function loadManifest() {
-  const r = await fetch('data/manifest.json');
+  const r = await fetch(`${BASE}manifest.json`);
   if (!r.ok) throw new Error(`manifest ${r.status}`);
   return r.json();
 }
@@ -50,7 +53,7 @@ async function fetchData(url) {
 }
 
 async function loadPair(stem) {
-  const [jbuf, buf] = await Promise.all([fetchData(`data/${stem}.json`), fetchData(`data/${stem}.bin`)]);
+  const [jbuf, buf] = await Promise.all([fetchData(`${BASE}${stem}.json`), fetchData(`${BASE}${stem}.bin`)]);
   const meta = JSON.parse(new TextDecoder().decode(jbuf));
   const arr = {};
   for (const [k, spec] of Object.entries(meta.bin)) arr[k] = view(buf, spec);
@@ -64,7 +67,7 @@ export function loadImage(url) {
     imgCache.set(url, new Promise((res, rej) => {
       const im = new Image();
       im.onload = () => res(im);
-      im.onerror = () => rej(new Error(`图片 ${url} 加载失败`));
+      im.onerror = () => rej(new Error(L(`图片 ${url} 加载失败`, `failed to load image ${url}`)));
       im.src = url;
     }));
   }

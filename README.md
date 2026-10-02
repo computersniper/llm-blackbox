@@ -83,6 +83,7 @@
 - 缩放、切成 16×16 图块、ViT 24 层（每层特征按主成分着色）、2×2 合并、DeepStack、M-RoPE 三维位置
 - 语言模型 28 层逐层热力图；实测第 16–26 层对准物体的**富集倍数 3–5 倍**，更浅的层基本不看物体
 - 一次乘加：一个图块的 1,536 个输入乘第 c 个卷积核再加偏置，得到嵌入的一个数
+- **英文版**（`?lang=en` 或右上角 中 / EN）：同样 7 张图配 15 个英文问题，用英文系统提示真实重跑一遍（`export_qwen3vl.py --lang en` → `data/en/`），讲解里的数字都取自这次运行；图里的中文（诗笺、图表）照原样，模型读诗笺时照样答出“床前明月光，疑是地上霜。”
 
 </td>
 <td width="50%" valign="top">
@@ -97,6 +98,7 @@
 - 4 个任务：修测试、统计日志、算销售冠军、重命名函数；每条轨迹都在沙箱里**独立检查**是否真的完成
 - 揭开后看 agent 循环、每一圈的整段上下文和 KV 缓存复用、逐词元的前 5 名候选、36 层前向
 - 轨迹保留了模型自己犯错再纠正的过程：`python` 不存在就换 `python3`，装不了 pandas 就改用 csv 模块
+- **英文版**（`?lang=en`）：同样 4 个沙箱项目，换成英文系统提示、工具说明和任务重新真实录制（`record.py --lang en` → `data/en/`），4 条都通过独立检查，没通过的种子照录（日志统计第 5 个种子才通过）
 
 </td>
 </tr>
@@ -502,9 +504,11 @@ python tools/train/qwen_step.py --model /path/to/Qwen3-0.6B         # 约 6 GB �
 # 多模态 → public/multimodal/data/（另需 torchvision、Pillow）
 python tools/multimodal/make_images.py ...                           # 先画输入图，参数见下
 python tools/multimodal/export_qwen3vl.py --model /path/to/Qwen3-VL-2B-Instruct
+python tools/multimodal/export_qwen3vl.py --model /path/to/Qwen3-VL-2B-Instruct --lang en   # 英文版 → data/en/
 
 # 智能体 → public/agent/data/（另需 bubblewrap）
 python tools/agent/record.py --model /path/to/Qwen3-4B-Instruct-2507
+python tools/agent/record.py --model /path/to/Qwen3-4B-Instruct-2507 --lang en   # 英文版 → data/en/（--resume 跳过已录好的任务）
 
 # 世界模型 → public/world/data/（只要 torch、numpy；采集的画面和检查点放 --work，默认 /mnt/d/cjc/world-model）
 python tools/world/train.py                      # 采集 → V → M → C → 导出，RTX 5090 上约 8 分钟
@@ -556,6 +560,7 @@ python tools/multimodal/make_images.py --sans NotoSansSC.ttf --serif NotoSerifSC
     --aldrin Aldrin_Apollo_11_original.jpg --starry Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg
 # 2. 导出（需要 torch、transformers 5.x、torchvision、Pillow）
 python tools/multimodal/export_qwen3vl.py --model /path/to/Qwen3-VL-2B-Instruct
+python tools/multimodal/export_qwen3vl.py --model /path/to/Qwen3-VL-2B-Instruct --lang en   # 英文版 → data/en/
 # 可选：对准层分析
 python tools/multimodal/grounding.py
 ```

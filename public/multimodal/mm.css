@@ -3,6 +3,11 @@
    ============================================================ */
 
 :root { --mon-w: 272px; --vis: #b39dff; }
+/* 英文版：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的，夹在英文里很难看） */
+:root:lang(en) {
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "DejaVu Sans", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --serif: Georgia, "Times New Roman", "Noto Serif", "DejaVu Serif", "BB Serif", "Noto Serif SC", serif;
+}
 /* 揭开时聊天栏窄一点：舞台上还要放监视器 */
 body.mode-inspect { --chat-w: 320px; }
 
@@ -50,6 +55,7 @@ body.mode-inspect { --chat-w: 320px; }
 .msg.bot.hoverable .bot-text .rt:hover, .bot-text .rt.lit { background: rgba(255, 182, 92, .2); color: #fff; }
 .bot-meta .hover-tip { font-size: 11.5px; color: var(--faint); }
 @media (hover: none) { .bot-meta .hover-tip::after { content: "（手机上点一下字）"; } }
+@media (hover: none) { html[lang="en"] .bot-meta .hover-tip::after { content: " (on a phone, tap a word)"; } }
 
 /* ---------------- 舞台：图像监视器 ---------------- */
 

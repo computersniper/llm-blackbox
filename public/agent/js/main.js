@@ -12,6 +12,10 @@ import { $, esc, fmtNum } from '../../js/ui.js';
 import { initPanes } from '../../js/resize.js';
 import { splitExit } from './screen.js';
 import { callArg } from './chat.js';
+import { isEn, L, mountLangSwitch } from '../../js/i18n.js';
+import { initStrings } from './strings.js';
+
+initStrings();
 
 const KEY = 'blackbox:agent:v1';
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
@@ -30,16 +34,21 @@ const small = () => matchMedia('(max-width: 900px)').matches;
 /* ---------------------------------------------------------------- 启动 */
 
 async function boot() {
+  mountLangSwitch($('#langSwitch'));
   new Background($('#bg'));
   initPanes('agent', { left: { el: '#side', v: '--side-w', name: '对话栏', min: 300 }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 520 });
+  // 拖动手柄的提示文字写在共用的 resize.js 里（中文）；英文版在这里换掉
+  if (isEn) document.querySelectorAll('.pane-grip').forEach((g) => { g.title = 'Drag to resize, double-click to reset'; g.setAttribute('aria-label', g.classList.contains('l') ? 'Resize the conversation panel' : 'Resize the debugger'); });
   try {
     M = await loadManifest();
   } catch (e) {
-    $('#log').innerHTML = `<p style="color:var(--rose)">数据加载失败：${esc(e.message)}</p>`;
+    $('#log').innerHTML = `<p style="color:var(--rose)">${L('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}</p>`;
     return;
   }
   $('#modelName').textContent = M.model.name;
-  $('#cxFoot').textContent = `模型：${M.model.name}（${(M.model.params / 1e8).toFixed(1)} 亿参数 · ${M.model.layers} 层 · 隐藏维度 ${M.model.hidden} · ${M.model.heads} 个查询头 / ${M.model.kvHeads} 个键值头）。每条轨迹都是这个模型在 bubblewrap 沙箱里的一次真实运行：上下文、词元概率、命令输出、文件改动和耗时都来自录制（${M.model.gpu}），网页只是回放。`;
+  $('#cxFoot').textContent = isEn
+    ? `Model: ${M.model.name} (${(M.model.params / 1e9).toFixed(1)}B parameters · ${M.model.layers} layers · hidden size ${M.model.hidden} · ${M.model.heads} query heads / ${M.model.kvHeads} key-value heads). Every trajectory is one real run of this model in a bubblewrap sandbox, with an English system prompt and English tasks: the context, token probabilities, command output, file changes and timings all come from the recording (${M.model.gpu}); the page only replays it.`
+    : `模型：${M.model.name}（${(M.model.params / 1e8).toFixed(1)} 亿参数 · ${M.model.layers} 层 · 隐藏维度 ${M.model.hidden} · ${M.model.heads} 个查询头 / ${M.model.kvHeads} 个键值头）。每条轨迹都是这个模型在 bubblewrap 沙箱里的一次真实运行：上下文、词元概率、命令输出、文件改动和耗时都来自录制（${M.model.gpu}），网页只是回放。`;
   screen = new Screen();
   loopV = new LoopView();
   loopV.setModel(M.model);
@@ -76,7 +85,7 @@ async function boot() {
 
 async function onSend(q) {
   let r;
-  try { r = await loadTask(q.id); } catch (e) { chat.log.insertAdjacentHTML('beforeend', `<p style="color:var(--rose)">数据加载失败：${esc(e.message)}</p>`); return; }
+  try { r = await loadTask(q.id); } catch (e) { chat.log.insertAdjacentHTML('beforeend', `<p style="color:var(--rose)">${L('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}</p>`); return; }
   r.M = M.model;
   R = r;
   document.body.classList.remove('idle');
@@ -251,11 +260,11 @@ function resetDesk() {
 
 function renderStrip(cur) {
   const T = R.turns[cur.t];
-  let h = `<span class="k">第 ${cur.t + 1}/${R.T} 圈</span>`;
+  let h = `<span class="k">${L(`第 ${cur.t + 1}/${R.T} 圈`, `Turn ${cur.t + 1}/${R.T}`)}</span>`;
   if (cur.act >= 0) { const c = T.calls[cur.act]; h += `<b>${esc(c.name)}</b> ${esc(callArg(c).slice(0, 80))}`; }
   else if (T.say) h += md(T.say.slice(0, Math.max(cur.say, 1)).split('\n').filter(Boolean).pop() || '');
   else if (T.calls.length) h += `<b>${esc(T.calls[0].name)}</b> ${esc(callArg(T.calls[0]).slice(0, 80))}`;
-  h += '<span style="float:right;color:var(--dim)">对话 ›</span>';
+  h += `<span style="float:right;color:var(--dim)">${L('对话 ›', 'Chat ›')}</span>`;
   const el = $('#strip');
   if (el.dataset.h !== h) { el.dataset.h = h; el.innerHTML = h; }
 }
@@ -296,7 +305,7 @@ function discover(id) {
   const t = document.createElement('button');
   t.type = 'button';
   t.className = 'toast';
-  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
+  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">${L('发现知识碎片', 'Discovery')} · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
   while (box.children.length > 3) box.lastElementChild.remove();
@@ -314,7 +323,7 @@ function openCodex() {
   const c = $('#codex');
   $('.cx-grid', c).innerHTML = INSIGHTS.map((x) => (store.found.has(x.id)
     ? `<article class="cx-card found"><div class="where">${esc(x.where)}</div><h4>✦ ${esc(x.title)}</h4><p>${esc(x.text)}</p></article>`
-    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>在「${esc(x.where)}」附近找找。</p></article>`)).join('');
+    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>${L(`在「${esc(x.where)}」附近找找。`, `Look around “${esc(x.where)}”.`)}</p></article>`)).join('');
   $('.cx-progress b', c).textContent = `${store.found.size} / ${INSIGHTS.length}`;
   $('.cx-bar i', c).style.width = `${(store.found.size / INSIGHTS.length) * 100}%`;
   c.classList.add('on');
@@ -328,9 +337,9 @@ function bindChrome() {
   $('#btnCodex').addEventListener('click', openCodex);
   $('.cx-close').addEventListener('click', closeCodex);
   $('#codex').addEventListener('click', (e) => { if (e.target.id === 'codex') closeCodex(); });
-  $('#btnReset').addEventListener('click', () => { if (!confirm('清空已收集的知识碎片？')) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
+  $('#btnReset').addEventListener('click', () => { if (!confirm(L('清空已收集的知识碎片？', 'Clear all discoveries you have collected?'))) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
   const sb = $('#btnSound');
-  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? '关闭声音' : '打开声音'; };
+  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? L('关闭声音', 'Sound off') : L('打开声音', 'Sound on'); };
   sb.addEventListener('click', () => { setSound(!soundOn()); renderSound(); save(); sfx.click(); });
   renderSound();
   $('#btnSideClose').addEventListener('click', () => document.body.classList.remove('chat-open'));

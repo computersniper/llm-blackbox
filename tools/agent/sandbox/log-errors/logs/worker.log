@@ -1,0 +1,9 @@
+2026-09-27 08:00:03 INFO  worker: 4 jobs queued
+2026-09-27 08:00:40 INFO  worker: job 101 done (2.1s)
+2026-09-27 08:01:16 ERROR worker: database timeout
+2026-09-27 08:02:05 INFO  worker: job 102 done (1.7s)
+2026-09-27 08:04:31 ERROR worker: disk full
+2026-09-27 08:04:32 WARN  worker: retrying job 103
+2026-09-27 08:05:21 ERROR worker: database timeout
+2026-09-27 08:06:02 ERROR worker: disk full
+2026-09-27 08:08:44 INFO  worker: job 104 done (3.0s)

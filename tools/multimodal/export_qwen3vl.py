@@ -13,6 +13,9 @@
 以及 manifest.json：模型配置、图片与问题列表、回答、输入法候选（问题的真实分词）。
 
 解码用贪心（每步取概率最高的词元），所以回答完全可复现。
+
+英文版：加 --lang en，同样 7 张图换成英文系统提示和英文问题，重新真实跑一遍，输出到 public/multimodal/data/en/
+（图片里的中文文字是图片内容，不变；模型看到的像素和中文版完全一样，仍写到共用的 data/img/）。
 """
 import argparse
 import gzip
@@ -26,26 +29,49 @@ from PIL import Image
 from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-OUT = ROOT / "public" / "multimodal" / "data"
+DATA = ROOT / "public" / "multimodal" / "data"
+OUT = DATA                                  # --lang en 时换成 DATA / "en"
+IMG_OUT = DATA / "img"                      # 模型看到的像素，两种语言共用
 IMG_DIR = pathlib.Path(__file__).resolve().parent / "images"
 
 SYSTEM = "你是一个乐于助人的助手，请用一两句话简洁地回答。"
+SYSTEM_EN = "You are a helpful assistant. Answer briefly, in one or two complete sentences."
 MAX_PIXELS = 384 * 384   # 处理器的像素上限：边长会被取整到 32 的倍数，面积不超过它
 MIN_PIXELS = 256 * 256
 MAX_NEW = 64
+MAX_NEW_EN = 96                          # 英文的词元多一些：“描述一下这张图”的英文回答有 73 个词元
 IMAGES = [
-    {"id": "shapes", "file": "shapes.png", "title": "四个形状", "questions": ["图里有哪些形状？", "红色的是什么形状？", "绿色的是什么形状？"]},
-    {"id": "apples", "file": "apples.png", "title": "桌上的苹果", "questions": ["图里有几个苹果？", "绿色的苹果是第几个？"]},
-    {"id": "poem", "file": "poem.png", "title": "一张诗笺", "questions": ["图片上写了什么？", "这首诗的作者是谁？"]},
-    {"id": "chart", "file": "chart.png", "title": "柱状图", "questions": ["哪种水果卖得最多？", "橙子卖了多少箱？"]},
-    {"id": "night", "file": "night.png", "title": "夜晚的小屋", "questions": ["现在是白天还是晚上？", "描述一下这张图。"]},
+    {"id": "shapes", "file": "shapes.png", "title": "四个形状", "questions": ["图里有哪些形状？", "红色的是什么形状？", "绿色的是什么形状？"],
+     "en": {"title": "Four shapes", "questions": ["What shapes are in the image?", "What shape is the red one?", "What shape is the green one?"]}},
+    {"id": "apples", "file": "apples.png", "title": "桌上的苹果", "questions": ["图里有几个苹果？", "绿色的苹果是第几个？"],
+     "en": {"title": "Apples on a table", "questions": ["How many apples are in the image?", "Which number is the green apple, counting from the left?"]}},
+    {"id": "poem", "file": "poem.png", "title": "一张诗笺", "questions": ["图片上写了什么？", "这首诗的作者是谁？"],
+     "en": {"title": "A poem card", "questions": ["What text is written in this image?", "Who wrote this poem?"]}},
+    {"id": "chart", "file": "chart.png", "title": "柱状图", "questions": ["哪种水果卖得最多？", "橙子卖了多少箱？"],
+     "en": {"title": "A bar chart", "questions": ["Which fruit sold the most?", "How many boxes of oranges were sold?"]}},
+    {"id": "night", "file": "night.png", "title": "夜晚的小屋", "questions": ["现在是白天还是晚上？", "描述一下这张图。"],
+     "en": {"title": "A cottage at night", "questions": ["Is it day or night?", "Describe this image."]}},
     {"id": "moon", "file": "moon.jpg", "title": "月面上的人", "questions": ["这张照片拍的是什么？", "他站在哪里？"],
      "source": {"name": "Aldrin Apollo 11（AS11-40-5903）", "author": "Neil Armstrong / NASA", "license": "公共领域",
-                "url": "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11_original.jpg"}},
+                "url": "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11_original.jpg"},
+     "en": {"title": "A man on the Moon", "questions": ["What does this photo show?", "Where is he standing?"],
+            "source": {"name": "Aldrin Apollo 11 (AS11-40-5903)", "author": "Neil Armstrong / NASA", "license": "Public domain",
+                       "url": "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11_original.jpg"}}},
     {"id": "starry", "file": "starry.jpg", "title": "一幅名画", "questions": ["这是哪幅画？", "画里有什么？"],
      "source": {"name": "The Starry Night（1889）", "author": "Vincent van Gogh", "license": "公共领域",
-                "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"}},
+                "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"},
+     "en": {"title": "A famous painting", "questions": ["Which painting is this?", "What is in the painting?"],
+            "source": {"name": "The Starry Night (1889)", "author": "Vincent van Gogh", "license": "Public domain",
+                       "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"}}},
 ]
+
+
+def localize(spec, lang):
+    """英文版：标题、问题、图片来源换成英文；图片本身不变。"""
+    if lang != "en":
+        return spec
+    e = spec["en"]
+    return {**spec, "title": e["title"], "questions": e["questions"], "source": e.get("source", spec.get("source"))}
 VIT_ATTN_LAYERS = [0, 5, 11, 17, 23]   # 导出完整注意力图（合并到词元分辨率）的 ViT 层
 FOCUS_LAYERS = [17, 20]                 # 导出每个头各自看图位置的 LLM 层
 # “对准”层：tools/multimodal/grounding.py 用几张图上手工标的物体区域打分，第 16–26 层生成某个词时
@@ -280,8 +306,8 @@ def export_image(ii, spec, proc, model, tok):
     canvas = np.zeros((gh * ps, gw * ps, 3), np.uint8)
     for i in range(Np):
         canvas[prow[i] * ps:(prow[i] + 1) * ps, pcol[i] * ps:(pcol[i] + 1) * ps] = pix[i].transpose(1, 2, 0)
-    (OUT / "img").mkdir(parents=True, exist_ok=True)
-    Image.fromarray(canvas).save(OUT / "img" / f"{spec['id']}.jpg", quality=90)
+    IMG_OUT.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(canvas).save(IMG_OUT / f"{spec['id']}.jpg", quality=90)
 
     vis = model.model.visual
     # ViT 每层：PCA 颜色、复现注意力并核对、平均注意距离、残差流统计
@@ -501,7 +527,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
     ap.add_argument("--only", default=None, help="只导出某一张图（调试用）")
+    ap.add_argument("--lang", default="zh", choices=["zh", "en"], help="en：英文系统提示和英文问题，输出到 data/en/")
     args = ap.parse_args()
+    global OUT, SYSTEM, MAX_NEW
+    if args.lang == "en":
+        OUT, SYSTEM, MAX_NEW = DATA / "en", SYSTEM_EN, MAX_NEW_EN
     OUT.mkdir(parents=True, exist_ok=True)
     proc = AutoProcessor.from_pretrained(args.model)
     tok = proc.tokenizer
@@ -512,7 +542,7 @@ def main():
         if args.only and spec["id"] != args.only:
             continue
         print(f"[{ii + 1}/{len(IMAGES)}] {spec['id']}")
-        images.append(export_image(ii, spec, proc, model, tok))
+        images.append(export_image(ii, localize(spec, args.lang), proc, model, tok))
         torch.cuda.empty_cache()
     vis, lm = model.model.visual, model.model.language_model
     n_vis = sum(p.numel() for n, p in vis.named_parameters() if not n.startswith(("merger", "deepstack")))
@@ -534,6 +564,7 @@ def main():
             "params": {"total": sum(p.numel() for p in model.parameters()), "vision": n_vis, "merger": n_merge, "deepstack": n_ds, "text": n_lm},
             "imageToken": model.config.image_token_id, "visionStart": model.config.vision_start_token_id, "visionEnd": model.config.vision_end_token_id,
         },
+        **({"lang": "en"} if args.lang == "en" else {}),
         "system": SYSTEM,
         "decoding": "greedy",
         "pixels": {"min": MIN_PIXELS, "max": MAX_PIXELS, "mean": 0.5, "std": 0.5},

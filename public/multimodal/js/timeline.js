@@ -8,10 +8,12 @@
 //
 // 图片只在生成第一个词元之前编码一次，之后视觉词元都躺在 KV 缓存里。
 
+import { L } from '../../js/i18n.js';
+
 export const VIT_OPS = ['ln1', 'attn', 'add1', 'ln2', 'mlp', 'add2'];
 export const LLM_OPS = ['ln1', 'attn', 'add1', 'ln2', 'mlp', 'add2'];
 export const MAX_DEPTH = 5;
-export const DEPTH_NAMES = ['对话', '黑箱', '流水线', '逐层', '一层之内', '一次乘加'];
+export const DEPTH_NAMES = L(['对话', '黑箱', '流水线', '逐层', '一层之内', '一次乘加'], ['Chat', 'Black box', 'Pipeline', 'Layer by layer', 'Inside a layer', 'One multiply-add']);
 
 const DUR = {
   see: 2.6, pass: 1.7, read: 1.1,

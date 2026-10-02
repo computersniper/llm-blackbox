@@ -1,5 +1,8 @@
 // 知识碎片：在模型里走到特定的地方才会解锁。数字都来自 Qwen3-VL-2B 的真实配置和导出数据。
-export const INSIGHTS = [
+// 英文版的例子和数字取自英文数据（data/en/）：“circle”的注意力、月面照片的透镜读数、第 16–26 层的富集倍数都是在英文这次运行上量的。
+import { isEn } from '../../js/i18n.js';
+
+const ZH = [
   { id: 'hover', where: '聊天', title: '它在看哪里',
     text: '回答完以后，把鼠标放在回复里的字上：图上会亮起模型生成这个字时真实的注意力。问“红色的是什么形状”，生成“圆”的那一刻，它确实在看那个红圆。' },
   { id: 'resize', where: '流水线 · 缩放', title: '32 的倍数',
@@ -35,5 +38,44 @@ export const INSIGHTS = [
   { id: 'greedy', where: '输出', title: '贪心解码',
     text: '这里每一步都直接取概率最高的词（贪心解码），没有随机数。同样的图、同样的问题，永远得到同样的回答。' },
 ];
+
+const EN = [
+  { id: 'hover', where: 'Chat', title: 'Where it’s looking',
+    text: 'Once it has answered, hover over a word in the reply: the image lights up with the real attention the model paid while writing that word. Ask “What shape is the red one?” and at the moment it writes “circle”, it really is looking at the red circle.' },
+  { id: 'resize', where: 'Pipeline · Resize', title: 'Multiples of 32',
+    text: 'The image is resized so each side is a multiple of 32: 16-pixel patches, merged 2×2 into one token. The processor also caps the total pixel count — a bigger image means more tokens and a slower answer.' },
+  { id: 'patch', where: 'Pipeline · Patches', title: 'An image = a pile of small squares',
+    text: 'The vision encoder doesn’t know “pixels”. It first cuts the image into 16×16 patches and treats each one as a “visual word”. A 384×384 image is 576 patches.' },
+  { id: 'frames', where: 'Preprocessing · Normalize', title: 'One image is a two-frame video',
+    text: 'Qwen3-VL’s vision encoder also handles video, taking frames two at a time. A single image is simply copied and treated as a video of two identical frames: each patch has 3 × 2 × 16 × 16 = 1536 numbers.' },
+  { id: 'conv', where: 'One multiply-add', title: 'Convolution is just multiply-add',
+    text: '“Patch embedding” sounds fancy, but it is just 1536 pixel values each multiplied by a weight and added up, giving one number of a 1024-dim vector. 1024 kernels, one per dimension.' },
+  { id: 'noncausal', where: 'Vision encoder · Attention', title: 'No causal mask',
+    text: 'The language model can only look backwards; the vision encoder has no such limit. Every patch can see every other patch, and 2-D rotary position encoding tells up, down, left and right apart.' },
+  { id: 'semantic', where: 'Vision encoder · Deep layers', title: 'Higher up, it understands objects',
+    text: 'Project each layer’s features onto the top three principal components and use them as colors: in shallow layers the colors follow the pixels; in deep layers the patches of one object grow more and more alike, and the background merges into one region.' },
+  { id: 'merge', where: 'Merger', title: 'Four into one',
+    text: 'Each 2×2 block of neighboring patches is concatenated into a 4096-dim vector and turned by an MLP into the language model’s 2048 dims. A quarter of the tokens means the language model’s attention costs only about a sixteenth.' },
+  { id: 'deepstack', where: 'Merger · DeepStack', title: 'DeepStack',
+    text: 'Besides the last layer, features from vision-encoder layers 5, 11 and 17 also each go through a merger and are added directly to the image positions of the language model’s first three layers, so shallow details aren’t “washed out” over 24 layers.' },
+  { id: 'imgpad', where: 'Into the chat', title: 'Images are tokens too',
+    text: 'To the language model, an image is just over a hundred “words” between <|vision_start|> and <|vision_end|>. Their embeddings aren’t looked up in the vocabulary; they are replaced outright by the merger’s output.' },
+  { id: 'mrope', where: 'Into the chat · M-RoPE', title: 'Three-dimensional positions',
+    text: 'Text positions are one-dimensional; images are two-dimensional. M-RoPE gives every token three coordinates (t, h, w): the same three numbers for text, rows and columns for the image. Over a hundred vision tokens use up only a dozen or so position numbers.' },
+  { id: 'imgfirst', where: 'Into the chat', title: 'The image can’t see the question',
+    text: 'The image comes before the question. Under causal attention the image tokens can’t see the question that follows: whatever you ask about the same image, its representation in the language model is exactly the same. It is the question and the answer that look back at the image.' },
+  { id: 'kvimg', where: 'Read in', title: 'The image is looked at once',
+    text: 'The vision encoder runs only once, before the first word is generated. For every word after that, the image’s hundred-plus tokens sit in the KV cache and are reused directly.' },
+  { id: 'ground', where: 'Layer by layer · from layer 16', title: 'Only the deep layers lock on',
+    text: 'In shallow layers attention wanders all over the image; from about layer 16 on, the attention while writing a word suddenly concentrates on the matching object — on this English run, about 3 to 4 times more than looking at random.' },
+  { id: 'lens', where: 'Layer by layer · Readout', title: 'Patches that read like words',
+    text: 'Feed the vectors at the image positions straight into the output head (the logit lens) and the middle-to-deep layers read out words like “astronaut”, “helmet” and “lunar”: inside the language model, vision tokens gradually become meaning that can be put into words.' },
+  { id: 'heads', where: 'Inside a layer · 16 heads', title: 'Heads with their own jobs',
+    text: 'Of the 16 heads in one layer, some look almost only at text, others give most of their attention to the image — and the image-watching heads each keep an eye on their own region.' },
+  { id: 'greedy', where: 'Output', title: 'Greedy decoding',
+    text: 'Here every step simply takes the most likely token (greedy decoding), with no random numbers. The same image and the same question always give the same answer.' },
+];
+
+export const INSIGHTS = isEn ? EN : ZH;
 
 export const INSIGHT_BY_ID = new Map(INSIGHTS.map((x) => [x.id, x]));

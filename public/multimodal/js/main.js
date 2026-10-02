@@ -9,9 +9,15 @@ import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, esc, tokPlain, fmtPct, sleep } from '../../js/ui.js';
 import { initPanes } from '../../js/resize.js';
 import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, imagesLoaded, measure } from '../../js/prefetch.js';
+import { isEn, L, mountLangSwitch } from '../../js/i18n.js';
+import { initStrings } from './strings.js';
+
+initStrings();
 
 const KEY = 'blackbox:mm:v1';
-const ROLE_NAME = { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记', img: '视觉词元' };
+const ROLE_NAME = isEn
+  ? { system: 'system prompt', user: 'your question', assistant: 'model’s answer', tpl: 'template / special token', img: 'vision token' }
+  : { system: '系统提示', user: '你的问题', assistant: '模型的回答', tpl: '模板 / 特殊标记', img: '视觉词元' };
 
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
 const saved = load();
@@ -31,11 +37,12 @@ const ctx = { vq: null };
 /* ---------------------------------------------------------------- 启动 */
 
 async function boot() {
+  mountLangSwitch($('#langSwitch'));
   new Background($('#bg'));
   try {
     manifest = await loadManifest();
   } catch (e) {
-    $('#chatLog').innerHTML = `<p style="color:var(--rose)">数据加载失败：${esc(e.message)}</p>`;
+    $('#chatLog').innerHTML = `<p style="color:var(--rose)">${L('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}</p>`;
     return;
   }
   controls = new Controls({
@@ -64,6 +71,7 @@ async function boot() {
 
 function footText() {
   const m = manifest.model, v = m.vision, t = m.text;
+  if (isEn) return `Model: Qwen3-VL-2B-Instruct (vision encoder ${v.depth} layers · ${v.hidden} dims · ${v.heads} heads · ${v.patch}×${v.patch} patches · 2×2 merge; language model ${t.layers} layers · ${t.hidden} dims · ${t.heads} Q / ${t.kvHeads} KV heads · SwiGLU ${t.ffn} · vocabulary ${t.vocab}). Answers, tokens, probabilities, attention, features and weights all come from one offline run of the real model (greedy decoding) with an English system prompt and English questions. To keep the download small, the ViT’s full attention is exported for only 5 layers, merged to 2×2-token resolution.`;
   return `模型：Qwen3-VL-2B-Instruct（视觉编码器 ${v.depth} 层 · ${v.hidden} 维 · ${v.heads} 头 · 图块 ${v.patch}×${v.patch} · 2×2 合并；语言模型 ${t.layers} 层 · ${t.hidden} 维 · ${t.heads} Q / ${t.kvHeads} KV 头 · SwiGLU ${t.ffn} · 词表 ${t.vocab}）。回答、分词、概率、注意力、特征和权重都来自真实模型的一次离线运行（贪心解码）；为控制体积，ViT 的完整注意力只导出了 5 层，并合并到 2×2 词元的分辨率。`;
 }
 
@@ -74,7 +82,7 @@ async function heatFor(q, i) {
   const QQ = await loadQuestion(q, manifest);
   const [a, b] = manifest.groundLayers;
   discover('hover');
-  return { img: QQ.V.img, values: QQ.attAvg(i, [a, b]), rows: QQ.V.mh, cols: QQ.V.mw, label: `第 ${a}–${b} 层 · 16 头平均` };
+  return { img: QQ.V.img, values: QQ.attAvg(i, [a, b]), rows: QQ.V.mh, cols: QQ.V.mw, label: L(`第 ${a}–${b} 层 · 16 头平均`, `layers ${a}–${b} · mean of 16 heads`) };
 }
 
 // 选了一张图：这张图的视觉侧数据（和问题无关）先取回来，发问题、点 ＋ 时就只差语言侧那一份
@@ -185,7 +193,7 @@ async function enterInspect(msg) {
     $('#loading').hidden = false;
     const t0 = performance.now();
     // 模块和这条回复的数据并行载入；数据失败由 attach 报错、重试
-    try { await Promise.all([ensureEngine(), loadQuestion(msg.q, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `3D 舞台初始化失败：${esc(e.message)}`; return; }
+    try { await Promise.all([ensureEngine(), loadQuestion(msg.q, manifest).catch(() => null)]); } catch (e) { console.error(e); $('#loading').innerHTML = `${L('3D 舞台初始化失败：', 'The 3D stage failed to start: ')}${esc(e.message)}`; return; }
     measure('揭开·模块和数据', t0);
     engine.active = true;
     if (!store.hinted) { store.hinted = true; setTimeout(() => showHint(true), 1800); }
@@ -202,7 +210,7 @@ async function attach(msg, from = null) {
   $('#loading').hidden = false;
   if (tl) tl.pause();
   let q;
-  try { q = await loadQuestion(msg.q, manifest); } catch (e) { $('#loading').innerHTML = `数据加载失败：${esc(e.message)}`; return; }
+  try { q = await loadQuestion(msg.q, manifest); } catch (e) { $('#loading').innerHTML = `${L('数据加载失败：', 'Failed to load data: ')}${esc(e.message)}`; return; }
   $('#loading').hidden = true;
   if (cur && cur !== msg && !cur.done) streamNormal(cur, cur.shown < 0 ? 0 : cur.shown);
   const fresh = Q !== q;
@@ -339,6 +347,7 @@ function onHover(info, e) {
   if (!info || !Q) return hideTip();
   const V = Q.V;
   let h = '';
+  if (isEn) return onHoverEn(info, e, V);
   switch (info.type) {
     case 'tile': { const t = Q.tokens[info.i]; const p = Q.pos(info.i); h = `<span class="k">词元 #${info.i} · ${ROLE_NAME[t.role] || ''}</span><b>${esc(tokPlain(t.s))}</b>　编号 <span class="v">${t.id}</span><br>位置 (t, h, w) = (${p.join(', ')})`; break; }
     case 'vcell': { const i = V.vs + info.m, p = Q.pos(i); h = `<span class="k">视觉词元 #${i} · 第 ${Math.floor(info.m / V.mw)} 行第 ${info.m % V.mw} 列</span>&lt;|image_pad|&gt; 的位置上换成了合并器的输出<br>位置 (t, h, w) = <span class="v">(${p.join(', ')})</span>`; break; }
@@ -349,6 +358,23 @@ function onHover(info, e) {
       break;
     }
     case 'photo': h = `<span class="k">模型看到的图片</span>${V.gw * 16}×${V.gh * 16} 像素 · ${V.gh}×${V.gw} 个图块`; break;
+    default: return hideTip();
+  }
+  showTip(h, e);
+}
+
+function onHoverEn(info, e, V) {
+  let h = '';
+  switch (info.type) {
+    case 'tile': { const t = Q.tokens[info.i]; const p = Q.pos(info.i); h = `<span class="k">token #${info.i} · ${ROLE_NAME[t.role] || ''}</span><b>${esc(tokPlain(t.s))}</b>　id <span class="v">${t.id}</span><br>position (t, h, w) = (${p.join(', ')})`; break; }
+    case 'vcell': { const i = V.vs + info.m, p = Q.pos(i); h = `<span class="k">vision token #${i} · row ${Math.floor(info.m / V.mw)}, column ${info.m % V.mw}</span>this &lt;|image_pad|&gt; slot is replaced by the merger’s output<br>position (t, h, w) = <span class="v">(${p.join(', ')})</span>`; break; }
+    case 'slab': h = `<span class="k">language model layer ${info.L}</span>gives <span class="v">${fmtPct(Q.mass(tl.g, info.L))}</span> of its attention to the image while generating the current token<br><span class="v">click to jump to this layer</span>`; break;
+    case 'vlevel': {
+      const r = Math.floor(info.i / V.gw), c = info.i % V.gw;
+      h = `<span class="k">ViT ${info.k === 0 ? 'patch embedding' : `after layer ${info.k - 1}`} · patch (${r}, ${c})</span>color = top three principal components of this level’s features<br><span class="v">click to jump to this layer</span>`;
+      break;
+    }
+    case 'photo': h = `<span class="k">the image the model sees</span>${V.gw * 16}×${V.gh * 16} pixels · ${V.gh}×${V.gw} patches`; break;
     default: return hideTip();
   }
   showTip(h, e);
@@ -405,7 +431,7 @@ function discover(id) {
   const t = document.createElement('button');
   t.type = 'button';
   t.className = 'toast';
-  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
+  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">${L('发现知识碎片', 'Discovery')} · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
   while (box.children.length > 3) box.lastElementChild.remove();
@@ -423,7 +449,7 @@ function openCodex() {
   const c = $('#codex');
   $('.cx-grid', c).innerHTML = INSIGHTS.map((x) => (store.found.has(x.id)
     ? `<article class="cx-card found"><div class="where">${esc(x.where)}</div><h4>✦ ${esc(x.title)}</h4><p>${esc(x.text)}</p></article>`
-    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>在「${esc(x.where)}」附近找找。</p></article>`)).join('');
+    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>${L(`在「${esc(x.where)}」附近找找。`, `Look around “${esc(x.where)}”.`)}</p></article>`)).join('');
   $('.cx-progress b', c).textContent = `${store.found.size} / ${INSIGHTS.length}`;
   $('.cx-bar i', c).style.width = `${(store.found.size / INSIGHTS.length) * 100}%`;
   c.classList.add('on');
@@ -436,16 +462,16 @@ function closeCodex() { const c = $('#codex'); c.classList.remove('on'); c.setAt
 function renderStrip() {
   if (!cur) return;
   const n = tl ? tl.g : cur.q.replyTokens.length;
-  $('#strip').innerHTML = `<span class="eyebrow" style="margin-right:6px">回复</span>${cur.q.replyTokens.slice(0, n).map((t) => esc(t.s)).join('')}<span class="caret" style="display:inline-block;width:6px;height:1em;background:var(--amber);margin-left:2px"></span>`;
+  $('#strip').innerHTML = `<span class="eyebrow" style="margin-right:6px">${L('回复', 'Reply')}</span>${cur.q.replyTokens.slice(0, n).map((t) => esc(t.s)).join('')}<span class="caret" style="display:inline-block;width:6px;height:1em;background:var(--amber);margin-left:2px"></span>`;
 }
 
 function bindChrome() {
   $('#btnCodex').addEventListener('click', openCodex);
   $('.cx-close').addEventListener('click', closeCodex);
   $('#codex').addEventListener('click', (e) => { if (e.target.id === 'codex') closeCodex(); });
-  $('#btnReset').addEventListener('click', () => { if (!confirm('清空已收集的知识碎片？')) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
+  $('#btnReset').addEventListener('click', () => { if (!confirm(L('清空已收集的知识碎片？', 'Clear all discoveries you have collected?'))) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
   const sb = $('#btnSound');
-  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? '关闭声音' : '打开声音'; };
+  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? L('关闭声音', 'Sound off') : L('打开声音', 'Sound on'); };
   sb.addEventListener('click', () => { setSound(!soundOn()); renderSound(); save(); sfx.click(); });
   renderSound();
   $('#btnChatToggle').addEventListener('click', () => document.body.classList.remove('chat-open'));
@@ -454,6 +480,8 @@ function bindChrome() {
   $('#btnHint').addEventListener('click', () => showHint(!$('#stageHint').classList.contains('on')));
   $('#btnMonFold').addEventListener('click', () => updateInsets());
   initPanes('mm', { left: { el: '#chat', v: '--chat-w', name: '聊天栏' }, right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 600, onChange: updateInsets });
+  // 拖动手柄的提示文字写在共用的 resize.js 里（中文）；英文版在这里换掉
+  if (isEn) document.querySelectorAll('.pane-grip').forEach((g) => { g.title = 'Drag to resize, double-click to reset'; g.setAttribute('aria-label', g.classList.contains('l') ? 'Resize the chat panel' : 'Resize the debugger'); });
 }
 
 function bindKeys() {

@@ -16,23 +16,24 @@
   <div class="grain" aria-hidden="true"></div>
 
   <header class="topbar">
-    <a class="brand" href="../" aria-label="揭开黑箱">
+    <a class="brand" href="../" aria-label="揭开黑箱" data-i18n-attr="aria-label:mm.brand">
       <span class="brand-cube" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="brand-en">BLACK&nbsp;BOX</span>
-      <span class="brand-zh">揭开黑箱</span>
+      <span class="brand-zh" data-i18n="mm.brandSub">揭开黑箱</span>
     </a>
-    <nav class="site-nav" aria-label="站点">
-      <a href="../">推理</a>
-      <a href="../train/">训练</a>
-      <a href="./" aria-current="page">多模态</a>
-      <a href="../agent/">智能体</a>
-      <a href="../world/">世界模型</a>
-      <a href="../learn/">学习</a>
+    <nav class="site-nav" aria-label="站点" data-i18n-attr="aria-label:nav.label">
+      <a href="../" data-i18n="nav.infer">推理</a>
+      <a href="../train/" data-i18n="nav.train">训练</a>
+      <a href="./" aria-current="page" data-i18n="nav.mm">多模态</a>
+      <a href="../agent/" data-i18n="nav.agent">智能体</a>
+      <a href="../world/" data-i18n="nav.world">世界模型</a>
+      <a href="../learn/" data-i18n="nav.learn">学习</a>
     </nav>
     <script>(function(){var n=document.querySelector('.site-nav'),a=n&&n.querySelector('[aria-current]');if(a&&n.scrollWidth>n.clientWidth)n.scrollLeft=a.offsetLeft-(n.clientWidth-a.offsetWidth)/2;})();</script>
-    <nav class="crumbs" id="crumbs" aria-label="当前深度"></nav>
+    <nav class="crumbs" id="crumbs" aria-label="当前深度" data-i18n-attr="aria-label:mm.crumbs"></nav>
     <div class="top-actions">
-      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
+      <span id="langSwitch"></span>
+      <button class="hud-btn codex-btn" id="btnCodex" type="button" title="知识碎片图鉴" data-i18n-attr="title:mm.codex"><span class="ring" aria-hidden="true"></span><span aria-hidden="true">✦</span> <span id="codexCount">0</span></button>
       <button class="hud-btn" id="btnSound" type="button" aria-pressed="false" title="打开声音">
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path class="mute" d="M16.5 9.5l5 5m0-5l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
@@ -40,57 +41,57 @@
   </header>
 
   <div class="app">
-    <section class="chat" id="chat" aria-label="聊天">
+    <section class="chat" id="chat" aria-label="聊天" data-i18n-attr="aria-label:mm.chat">
       <div class="chat-head">
         <span class="avatar eye" aria-hidden="true"><i></i></span>
         <div class="chat-title">
           <b>Qwen3-VL-2B-Instruct</b>
-          <span>阿里开源的 21 亿参数视觉语言模型 · 真实输出，离线录制</span>
+          <span data-i18n="mm.chatSub">阿里开源的 21 亿参数视觉语言模型 · 真实输出，离线录制</span>
         </div>
-        <button class="chat-close" id="btnChatToggle" type="button" title="收起聊天">‹</button>
+        <button class="chat-close" id="btnChatToggle" type="button" title="收起聊天" data-i18n-attr="title:mm.chatClose">‹</button>
       </div>
       <div class="chat-log" id="chatLog" aria-live="polite"></div>
       <div class="composer" id="composer">
         <div class="cmp-row">
-          <button class="cmp-plus" id="btnPlus" type="button" title="揭开：看下一层（单步进入）" disabled>＋</button>
-          <button class="cmp-attach" id="btnAttach" type="button" title="换一张图"><span class="ph">图</span></button>
-          <div class="cmp-input" id="cmpInput" role="textbox" aria-label="用词元拼出的问题" aria-readonly="true"></div>
-          <button class="cmp-icon" id="btnBack" type="button" title="删掉最后一个词元">⌫</button>
-          <button class="cmp-send" id="btnSend" type="button" title="发送" disabled>↑</button>
+          <button class="cmp-plus" id="btnPlus" type="button" title="揭开：看下一层（单步进入）" data-i18n-attr="title:mm.plus" disabled>＋</button>
+          <button class="cmp-attach" id="btnAttach" type="button" title="换一张图" data-i18n-attr="title:mm.attach"><span class="ph" data-i18n="mm.attachPh">图</span></button>
+          <div class="cmp-input" id="cmpInput" role="textbox" aria-label="用词元拼出的问题" data-i18n-attr="aria-label:mm.input" aria-readonly="true"></div>
+          <button class="cmp-icon" id="btnBack" type="button" title="删掉最后一个词元" data-i18n-attr="title:mm.back">⌫</button>
+          <button class="cmp-send" id="btnSend" type="button" title="发送" data-i18n-attr="title:mm.send" disabled>↑</button>
         </div>
-        <div class="cmp-pics" id="pics" aria-label="选一张图"></div>
-        <div class="cmp-cands" id="cands" aria-label="候选词元"></div>
+        <div class="cmp-pics" id="pics" aria-label="选一张图" data-i18n-attr="aria-label:mm.pics"></div>
+        <div class="cmp-cands" id="cands" aria-label="候选词元" data-i18n-attr="aria-label:mm.cands"></div>
       </div>
     </section>
 
-    <section class="stage" id="stage" aria-label="模型内部">
+    <section class="stage" id="stage" aria-label="模型内部" data-i18n-attr="aria-label:mm.stage">
       <div class="gl" id="gl"></div>
       <div class="stage-top">
         <div class="stage-strip" id="strip"></div>
-        <button class="follow" id="btnFollow" type="button" hidden>◎ 回到跟随视角 <kbd>F</kbd></button>
-        <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）">操作说明</button>
+        <button class="follow" id="btnFollow" type="button" data-i18n-html="mm.follow" hidden>◎ 回到跟随视角 <kbd>F</kbd></button>
+        <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）" data-i18n="mm.hintBtn" data-i18n-attr="title:mm.hintTitle">操作说明</button>
       </div>
-      <div class="stage-hint" id="stageHint">
+      <div class="stage-hint" id="stageHint" data-i18n-html="mm.hint">
         <b>在模型里自由走动</b>
         <span><kbd>拖动</kbd>旋转</span><span><kbd>右键</kbd>/<kbd>Shift</kbd>+拖动 平移</span><span><kbd>滚轮</kbd>推进</span>
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>Q</kbd>/<kbd>E</kbd> 下降 / 上升</span><span><kbd>双击</kbd>飞到物体跟前</span><span><kbd>F</kbd> 回到跟随</span>
         <span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> 换层</span><span><kbd>空格</kbd> 播放</span><span><kbd>←</kbd>/<kbd>→</kbd> 单步</span><span>点监视器上的图块：换一个查询位置</span>
       </div>
 
-      <aside class="mon" id="mon" aria-label="图像监视器">
-        <header class="mon-h"><span class="eyebrow" id="monTitle">监视器</span><button class="mon-fold" id="btnMonFold" type="button" title="收起">–</button></header>
+      <aside class="mon" id="mon" aria-label="图像监视器" data-i18n-attr="aria-label:mm.mon">
+        <header class="mon-h"><span class="eyebrow" id="monTitle" data-i18n="mm.monTitle">监视器</span><button class="mon-fold" id="btnMonFold" type="button" title="收起" data-i18n-attr="title:mm.fold">–</button></header>
         <div class="mon-body">
           <div class="mon-cv"><canvas id="monCv"></canvas></div>
           <div class="mon-cap" id="monCap"></div>
           <div class="mon-tools" id="monTools"></div>
         </div>
       </aside>
-      <div class="stage-loading" id="loading" hidden><span class="spin"></span><span>正在载入这条回复的真实内部数据…</span></div>
+      <div class="stage-loading" id="loading" hidden><span class="spin"></span><span data-i18n="mm.loading">正在载入这条回复的真实内部数据…</span></div>
 
-      <aside class="dbg" id="dbg" aria-label="调试器">
+      <aside class="dbg" id="dbg" aria-label="调试器" data-i18n-attr="aria-label:mm.dbg">
         <header class="dbg-h">
-          <span class="dbg-dot"></span><b>调试器</b><span class="dbg-sub mono">generate(image, question)</span>
-          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起">–</button>
+          <span class="dbg-dot"></span><b data-i18n="mm.dbg">调试器</b><span class="dbg-sub mono">generate(image, question)</span>
+          <button class="dbg-fold" id="btnDbgFold" type="button" title="收起" data-i18n-attr="title:mm.fold">–</button>
         </header>
         <div class="dbg-body">
           <pre class="code" id="code"></pre>
@@ -100,19 +101,19 @@
       </aside>
 
       <div class="ctl" id="ctl">
-        <div class="ctl-track" id="track" aria-label="当前深度的步骤"></div>
+        <div class="ctl-track" id="track" aria-label="当前深度的步骤" data-i18n-attr="aria-label:mm.track"></div>
         <div class="ctl-bar">
           <div class="ctl-depth">
-            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）">−</button>
+            <button class="ctl-btn" id="btnOut" type="button" title="退回上一层（−）" data-i18n-attr="title:mm.out">−</button>
             <span class="ctl-dname" id="dname"></span>
-            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）">＋</button>
+            <button class="ctl-btn plus" id="btnIn" type="button" title="单步进入下一层（＋）" data-i18n-attr="title:mm.in">＋</button>
           </div>
           <div class="ctl-play">
-            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）">⏮</button>
-            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）">▶</button>
-            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）">⏭</button>
+            <button class="ctl-btn" id="btnPrev" type="button" title="上一步（←）" data-i18n-attr="title:mm.prev">⏮</button>
+            <button class="ctl-btn big" id="btnPlay" type="button" title="播放 / 暂停（空格）" data-i18n-attr="title:mm.play">▶</button>
+            <button class="ctl-btn" id="btnNextStep" type="button" title="下一步（→）" data-i18n-attr="title:mm.next">⏭</button>
           </div>
-          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速"></div>
+          <div class="ctl-speed" id="speeds" role="radiogroup" aria-label="倍速" data-i18n-attr="aria-label:mm.speed"></div>
           <div class="ctl-pos mono" id="pos"></div>
         </div>
       </div>
@@ -122,26 +123,26 @@
   <div id="toasts" aria-live="polite"></div>
   <div id="tooltip" role="tooltip"></div>
 
-  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴">
+  <div class="codex" id="codex" aria-hidden="true" role="dialog" aria-label="知识碎片图鉴" data-i18n-attr="aria-label:mm.codex">
     <div class="cx-panel">
       <header class="cx-head">
         <div>
-          <div class="eyebrow">CODEX · 知识碎片图鉴</div>
-          <h2>模型怎么看图</h2>
+          <div class="eyebrow" data-i18n="mm.cxEyebrow">CODEX · 知识碎片图鉴</div>
+          <h2 data-i18n="mm.cxTitle">模型怎么看图</h2>
         </div>
         <div class="cx-progress"><b>0</b><span class="cx-bar"><i></i></span></div>
-        <button class="cx-close" type="button" aria-label="关闭">✕</button>
+        <button class="cx-close" type="button" aria-label="关闭" data-i18n-attr="aria-label:mm.close">✕</button>
       </header>
       <div class="cx-grid"></div>
       <footer class="cx-foot">
         <p id="cxFoot"></p>
-        <a class="linkish" href="../learn/">延伸学习 →</a>
-        <button class="linkish" id="btnReset" type="button">重置进度</button>
+        <a class="linkish" href="../learn/" data-i18n="mm.learn">延伸学习 →</a>
+        <button class="linkish" id="btnReset" type="button" data-i18n="mm.reset">重置进度</button>
       </footer>
     </div>
   </div>
 
-  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。</p></noscript>
+  <noscript><p class="noscript">这个网站需要 JavaScript 才能运行。 / This site needs JavaScript.</p></noscript>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

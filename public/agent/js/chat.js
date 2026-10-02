@@ -2,6 +2,7 @@
 // 输入法的候选是任务句子的真实分词（Qwen3 的词元），只能拼出真的录制过的任务。
 import { $, $$, esc, tokHTML, tokInner, sleep, fmtNum } from '../../js/ui.js';
 import { normPath, splitExit } from './screen.js';
+import { isEn, L } from '../../js/i18n.js';
 
 const ICON = { bug: '✕', log: '≡', chart: '▤', rename: '⇄' };
 const ckey = (c) => c.ids.join(',');
@@ -11,7 +12,7 @@ export function md(text) {
 }
 
 export function callArg(c) {
-  if (!c.ok) return 'JSON 解析失败';
+  if (!c.ok) return L('JSON 解析失败', 'JSON parse failed');
   const a = c.args || {};
   if (c.name === 'bash') return String(a.command ?? '');
   if (c.name === 'edit_file') return `${normPath(a.path)}  “${String(a.old_string ?? '').split('\n')[0].trim().slice(0, 40)}” → …`;
@@ -23,9 +24,9 @@ export function callResult(c) {
   if (c.name === 'bash') {
     const { body, code } = splitExit(c.result);
     const n = body ? body.split('\n').length : 0;
-    return { cls: code === 0 ? 'ok' : 'bad', text: `退出码 ${code}${n ? ` · ${n} 行输出` : ''}` };
+    return { cls: code === 0 ? 'ok' : 'bad', text: L(`退出码 ${code}${n ? ` · ${n} 行输出` : ''}`, `exit code ${code}${n ? ` · ${n} line${n === 1 ? '' : 's'} of output` : ''}`) };
   }
-  if (c.name === 'read_file') return { cls: '', text: `读到 ${c.result.split('\n').length} 行` };
+  if (c.name === 'read_file') return { cls: '', text: L(`读到 ${c.result.split('\n').length} 行`, `read ${c.result.split('\n').length} lines`) };
   return { cls: 'ok', text: c.result.split('\n')[0] };
 }
 
@@ -70,7 +71,19 @@ export class Chat {
     const m = this.M.model;
     const el = document.createElement('div');
     el.className = 'intro-card';
-    el.innerHTML = `
+    el.innerHTML = isEn ? `
+      <h1>How an agent gets work done</h1>
+      Coding agents like Claude Code all follow the same pattern: <b>model + tools + loop</b>. The model can only write text; a program outside takes the “tool calls” it writes, actually runs them, and feeds the results back — round after round, until the model says “done”.<br>
+      No commercial model is used here. Every step below was really recorded: the open model <b>${esc(m.name)}</b> working in a real Linux sandbox (no network), with an English system prompt and English tasks. The command output, file changes and every token’s probability all come from that run.
+      <span class="chips-hint">Build a task from the tokens below, or just click a task card. Watch it finish, then press <span class="key">＋</span> to open it up level by level.</span>
+      <div class="tasks">${this.M.tasks.map((q, i) => `
+        <button type="button" class="task-card" data-q="${i}">
+          <span class="ico" aria-hidden="true">${ICON[q.icon] || '•'}</span>
+          <b>${esc(q.title)}</b>
+          <span>${esc(q.blurb)}</span>
+          <span class="meta">${q.turns} turns · ${q.calls} tool calls · ${fmtNum(q.ctxEnd)} tokens</span>
+        </button>`).join('')}</div>
+      <div class="spec"><span><b>${(m.params / 1e9).toFixed(1)}B</b> parameters</span><span><b>${m.layers}</b> layers</span><span>tools <b>bash · read_file · write_file · edit_file</b></span></div>` : `
       <h1>一个 agent 是怎么干活的</h1>
       像 Claude Code 这样的编程 agent，本质是同一个模式：<b>模型 + 工具 + 循环</b>。模型只会写字；外面的程序把它写出的“工具调用”拿去真的执行，再把结果喂回给它，一圈一圈，直到它说“做完了”。<br>
       这里没有用任何商业模型。下面每一步都是真实录下来的：开源模型 <b>${esc(m.name)}</b> 在一个真实的 Linux 沙箱里干活（没有网络），命令输出、文件改动、每个词元的概率，都来自那次运行。
@@ -93,7 +106,7 @@ export class Chat {
   renderInput() {
     this.inputEl.innerHTML = this.chosen.length
       ? this.chosen.map((c) => tokHTML(c.s, 'r-user')).join('') + '<span class="cur"></span>'
-      : '<span class="ph">点下面的词元，拼出一个任务</span>';
+      : `<span class="ph">${L('点下面的词元，拼出一个任务', 'Tap the tokens below to build a task')}</span>`;
     const ready = !!this.node.end && !this.busy;
     this.sendBtn.disabled = !ready;
     this.sendBtn.classList.toggle('glow', ready);
@@ -101,9 +114,9 @@ export class Chat {
 
   renderCands() {
     const kids = [...this.node.kids.values()];
-    let html = `<span class="lab">${this.chosen.length ? '接下来' : '候选词元'}</span>`;
+    let html = `<span class="lab">${this.chosen.length ? L('接下来', 'Next') : L('候选词元', 'Candidate tokens')}</span>`;
     html += kids.map((k, i) => `<button type="button" class="cand" data-k="${k.chip.ids.join(',')}" style="animation-delay:${i * 30}ms">${tokInner(k.chip.s)}<i>${k.chip.ids.join('+')}</i></button>`).join('');
-    if (this.node.end && !kids.length) html += '<span class="cand done" aria-hidden="true">✓ 拼好了，按 ↑ 交给 agent</span>';
+    if (this.node.end && !kids.length) html += `<span class="cand done" aria-hidden="true">${L('✓ 拼好了，按 ↑ 交给 agent', '✓ Done — press ↑ to hand it to the agent')}</span>`;
     this.candsEl.innerHTML = html;
     $$('.cand[data-k]', this.candsEl).forEach((b) => b.addEventListener('click', () => this.push(b.dataset.k)));
   }
@@ -163,7 +176,7 @@ export class Chat {
     const s = document.createElement('div');
     s.className = 'ag-session';
     s.style.cssText = 'display:flex;flex-direction:column;gap:14px';
-    s.innerHTML = `<div class="ag-sep">— 新任务 · 沙箱已重置 —</div><div class="ag-user ag-msg">${md(q.prompt)}</div>`;
+    s.innerHTML = `<div class="ag-sep">${L('— 新任务 · 沙箱已重置 —', '— new task · sandbox reset —')}</div><div class="ag-user ag-msg">${md(q.prompt)}</div>`;
     this.log.append(s);
     this.sess = s;
     this.blocks = [];
@@ -224,7 +237,7 @@ export class Chat {
         const run = ci < cur.shown && ci >= cur.done;
         el.classList.toggle('run', run);
         const r = el.querySelector('.c-r');
-        if (run) { r.className = 'c-r'; r.textContent = '在沙箱里执行'; }
+        if (run) { r.className = 'c-r'; r.textContent = L('在沙箱里执行', 'running in the sandbox'); }
         else if (ci < cur.done) { const x = callResult(T.calls[ci]); r.className = `c-r ${x.cls}`; r.textContent = x.text; }
       });
     }
@@ -234,6 +247,14 @@ export class Chat {
     const R = this.R, q = this.q;
     const calls = R.turns.reduce((a, t) => a + t.calls.length, 0);
     const failed = q.attempts.filter((a) => !a.ok);
+    if (isEn) {
+      return `<div class="ag-meta">
+        <button type="button" class="peek" title="Step into it: see how the agent works inside"><b>＋</b>Open up this task</button>
+        <span class="stat">${R.T} turns · ${calls} tool calls · ${fmtNum(R.genTotal)} tokens generated · context ${fmtNum(R.maxCtx)} tokens</span>
+      </div>
+      <div class="ag-check" style="margin-top:8px"><b>${R.check.ok ? '✓ Independent check passed' : '✗ Independent check failed'}</b>　${esc(R.check.detail)}</div>
+      ${failed.length ? `<div class="ag-check tries" style="margin-top:6px">This is recording no. ${q.attempts.length} (random seed ${R.seed}). The previous ${failed.length === 1 ? 'one' : failed.length} failed the check: ${failed.map((a) => esc(a.detail)).join('; ')}.</div>` : `<div class="ag-check tries" style="margin-top:6px">The first recording (random seed ${R.seed}) passed the check.</div>`}`;
+    }
     return `<div class="ag-meta">
         <button type="button" class="peek" title="单步进入：看 agent 内部怎么运转"><b>＋</b>揭开这次任务</button>
         <span class="stat">${R.T} 轮 · ${calls} 次工具调用 · 生成 ${fmtNum(R.genTotal)} 词元 · 上下文 ${fmtNum(R.maxCtx)} 词元</span>

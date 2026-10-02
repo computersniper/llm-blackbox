@@ -5,6 +5,7 @@ import { THREE, label, textTexture, easeOut, easeInOut, seg } from '../../js/sta
 import { tokPlain, shortSpecial, esc, fmtPct } from '../../js/ui.js';
 import { drawHeat } from './paint.js';
 import { argmax } from './explain.js';
+import { isEn, L as tr } from '../../js/i18n.js';
 
 const PS = 0.1;            // 一个 16×16 图块在场景里的边长
 const LVL = 0.16;          // ViT 相邻两级的间距
@@ -149,7 +150,7 @@ export class Scene {
     this.shaft = new THREE.LineSegments(new THREE.EdgesGeometry(shaftGeo), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.16 }));
     this.shaft.position.set(VX, Y0 + 12 * LVL, 0);
     root.add(this.shaft);
-    this.vitLbl = label(`视觉编码器 ViT<small>${Q.manifest.model.vision.depth} 层 · ${Q.manifest.model.vision.hidden} 维</small>`, 'lbl part');
+    this.vitLbl = label(tr(`视觉编码器 ViT<small>${Q.manifest.model.vision.depth} 层 · ${Q.manifest.model.vision.hidden} 维</small>`, `Vision encoder ViT<small>${Q.manifest.model.vision.depth} layers · ${Q.manifest.model.vision.hidden} dims</small>`), 'lbl part');
     this.vitLbl.position.set(VX, Y0 + 24 * LVL + 0.15, -this.ph / 2);
     this.vitLbl.center.set(0.5, 1.6);
     root.add(this.vitLbl);
@@ -172,7 +173,7 @@ export class Scene {
     this.merged.instanceColor.needsUpdate = true;
     this.merged.frustumCulled = false;
     root.add(this.merged);
-    this.mergeLbl = label(`合并器<small>2×2 → 1 · ${Q.manifest.model.vision.out} 维</small>`, 'lbl part');
+    this.mergeLbl = label(tr(`合并器<small>2×2 → 1 · ${Q.manifest.model.vision.out} 维</small>`, `Merger<small>2×2 → 1 · ${Q.manifest.model.vision.out} dims</small>`), 'lbl part');
     this.mergeLbl.position.set(VX + this.pw / 2 + 0.1, MY, 0);
     this.mergeLbl.center.set(0, 0.5);
     root.add(this.mergeLbl);
@@ -256,7 +257,7 @@ export class Scene {
       root.add(s);
       this.slabs.push(s);
     }
-    this.llmLbl = label(`语言模型<small>${Q.NL} 层 · ${Q.M.hidden} 维</small>`, 'lbl part');
+    this.llmLbl = label(tr(`语言模型<small>${Q.NL} 层 · ${Q.M.hidden} 维</small>`, `Language model<small>${Q.NL} layers · ${Q.M.hidden} dims</small>`), 'lbl part');
     this.llmLbl.position.set(this.cx, LY0 + Q.NL * LG + 0.1, -this.bd / 2 - 0.2);
     this.llmLbl.center.set(0.5, 1.4);
     root.add(this.llmLbl);
@@ -358,7 +359,7 @@ export class Scene {
     winBg.position.set(PX - cx, PY + 0.1, 0.035);
     front.add(winBg);
     this.cWin = win;
-    const winLbl = new THREE.Mesh(new THREE.PlaneGeometry(winW, winW * 0.12), new THREE.MeshBasicMaterial({ map: textTexture('图片从这里进去', { color: '#c9a36b', font: '500 56px "PingFang SC","Microsoft YaHei",sans-serif', w: 900, h: 108 }), transparent: true }));
+    const winLbl = new THREE.Mesh(new THREE.PlaneGeometry(winW, winW * 0.12), new THREE.MeshBasicMaterial({ map: textTexture(tr('图片从这里进去', 'Images go in here'), { color: '#c9a36b', font: '500 56px "PingFang SC","Microsoft YaHei",sans-serif', w: 900, h: 108 }), transparent: true }));
     winLbl.position.set(PX - cx, PY + 0.1 - winH / 2 - 0.16, 0.035);
     front.add(winLbl);
     const lw = Math.min(W * 0.3, 6);
@@ -366,7 +367,7 @@ export class Scene {
     logo.position.set(x0 + W * 0.36 - cx, H * 0.58, 0.035);
     front.add(logo);
     const m = Q.manifest.model;
-    const sub = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.07), new THREE.MeshBasicMaterial({ map: textTexture(`视觉 ${m.vision.depth} 层 + 语言 ${m.text.layers} 层 · ${(m.params.total / 1e8).toFixed(1)} 亿参数`, { color: '#7a859e', font: '500 60px "PingFang SC","Microsoft YaHei",sans-serif', w: 1400, h: 98 }), transparent: true }));
+    const sub = new THREE.Mesh(new THREE.PlaneGeometry(lw, lw * 0.07), new THREE.MeshBasicMaterial({ map: textTexture(tr(`视觉 ${m.vision.depth} 层 + 语言 ${m.text.layers} 层 · ${(m.params.total / 1e8).toFixed(1)} 亿参数`, `vision ${m.vision.depth} layers + language ${m.text.layers} layers · ${(m.params.total / 1e9).toFixed(2)}B parameters`), { color: '#7a859e', font: '500 60px "PingFang SC","Microsoft YaHei",sans-serif', w: 1400, h: 98 }), transparent: true }));
     sub.position.set(logo.position.x, H * 0.4, 0.035);
     front.add(sub);
     this.cLight = new THREE.Mesh(new THREE.CircleGeometry(0.16, 32), new THREE.MeshBasicMaterial({ color: 0x5ef0d4 }));
@@ -429,7 +430,8 @@ export class Scene {
       const L = vis.hl - 1;
       const k = vis.hl;
       const dist = L >= 0 ? V.vitDist[L].reduce((a, b) => a + b, 0) / 16 : 0;
-      const html = k === 0 ? `<span class="l">嵌入</span>图块嵌入 + 位置` : `<span class="l">L${String(L).padStart(2, '0')}</span>注意距离 <span class="p">${dist.toFixed(1)}</span>`;
+      const html = isEn ? (k === 0 ? `<span class="l">EMB</span>patch embedding + position` : `<span class="l">L${String(L).padStart(2, '0')}</span>attn distance <span class="p">${dist.toFixed(1)}</span>`)
+        : k === 0 ? `<span class="l">嵌入</span>图块嵌入 + 位置` : `<span class="l">L${String(L).padStart(2, '0')}</span>注意距离 <span class="p">${dist.toFixed(1)}</span>`;
       if (this.lvlLbl.el.innerHTML !== html) this.lvlLbl.el.innerHTML = html;
       this.lvlLbl.position.set(VX + this.pw / 2 + 0.12, Y0 + k * LVL, this.ph / 2);
       this.lvlLbl.el.classList.remove('hide');
@@ -492,7 +494,7 @@ export class Scene {
     // 层标签
     if (lit.L >= 0 && open > 0.5) {
       const lens = Q.lensAt(g, lit.L)[0];
-      const html = `<span class="l">L${String(lit.L).padStart(2, '0')}</span>看图 <span class="p">${fmtPct(Q.mass(g, lit.L))}</span>　透镜 <b>${esc(tokPlain(lens[0]))}</b>`;
+      const html = tr(`<span class="l">L${String(lit.L).padStart(2, '0')}</span>看图 <span class="p">${fmtPct(Q.mass(g, lit.L))}</span>　透镜 <b>${esc(tokPlain(lens[0]))}</b>`, `<span class="l">L${String(lit.L).padStart(2, '0')}</span>on image <span class="p">${fmtPct(Q.mass(g, lit.L))}</span>　lens <b>${esc(tokPlain(lens[0]))}</b>`);
       if (this.layerLbl.el.innerHTML !== html) this.layerLbl.el.innerHTML = html;
       this.layerLbl.position.set(this.bx - 0.25, LY0 + lit.L * LG, this.bd / 2);
       this.layerLbl.el.classList.remove('hide');
@@ -515,7 +517,7 @@ export class Scene {
     });
     this.dsLbl.el.classList.toggle('hide', !(open > 0.5 && (dsOn || view === 'vit' || view === 'merge')));
     // 照片标签
-    const pl = `图片<small>${V.spec.orig[0]}×${V.spec.orig[1]} → ${V.gw * 16}×${V.gh * 16} · ${V.gh}×${V.gw} 块</small>`;
+    const pl = tr(`图片<small>${V.spec.orig[0]}×${V.spec.orig[1]} → ${V.gw * 16}×${V.gh * 16} · ${V.gh}×${V.gw} 块</small>`, `Image<small>${V.spec.orig[0]}×${V.spec.orig[1]} → ${V.gw * 16}×${V.gh * 16} · ${V.gh}×${V.gw} patches</small>`);
     if (this.photoLbl.el.innerHTML !== pl) this.photoLbl.el.innerHTML = pl;
     this.photoLbl.el.classList.toggle('hide', open < 0.5 || vis.photo < 1 || vis.fly > 0);
   }

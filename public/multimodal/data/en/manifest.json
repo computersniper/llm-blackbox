@@ -1,0 +1,1697 @@
+{
+ "model": {
+  "name": "Qwen3-VL-2B-Instruct",
+  "source": "https://modelscope.cn/models/Qwen/Qwen3-VL-2B-Instruct",
+  "vision": {
+   "depth": 24,
+   "hidden": 1024,
+   "heads": 16,
+   "headDim": 64,
+   "ffn": 4096,
+   "act": "gelu_pytorch_tanh",
+   "patch": 16,
+   "temporal": 2,
+   "merge": 2,
+   "posGrid": 48,
+   "deepstack": [
+    5,
+    11,
+    17
+   ],
+   "out": 2048,
+   "inDim": 1536
+  },
+  "text": {
+   "layers": 28,
+   "hidden": 2048,
+   "heads": 16,
+   "kvHeads": 8,
+   "headDim": 128,
+   "ffn": 6144,
+   "vocab": 151936,
+   "ropeTheta": 5000000,
+   "mrope": [
+    24,
+    20,
+    20
+   ],
+   "tied": true
+  },
+  "params": {
+   "total": 2127532032,
+   "vision": 306242560,
+   "merger": 25174016,
+   "deepstack": 75540480,
+   "text": 1720574976
+  },
+  "imageToken": 151655,
+  "visionStart": 151652,
+  "visionEnd": 151653
+ },
+ "lang": "en",
+ "system": "You are a helpful assistant. Answer briefly, in one or two complete sentences.",
+ "decoding": "greedy",
+ "pixels": {
+  "min": 65536,
+  "max": 147456,
+  "mean": 0.5,
+  "std": 0.5
+ },
+ "vitAttnLayers": [
+  0,
+  5,
+  11,
+  17,
+  23
+ ],
+ "focusLayers": [
+  17,
+  20
+ ],
+ "groundLayers": [
+  16,
+  26
+ ],
+ "images": [
+  {
+   "id": "shapes",
+   "title": "Four shapes",
+   "file": "img/shapes.jpg",
+   "orig": [
+    400,
+    400
+   ],
+   "size": [
+    384,
+    384
+   ],
+   "grid": [
+    24,
+    24
+   ],
+   "merged": [
+    12,
+    12
+   ],
+   "Nv": 144,
+   "Np": 576,
+   "source": null,
+   "questions": [
+    {
+     "id": "shapes-1",
+     "text": "What shapes are in the image?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 20816,
+       "s": " shapes"
+      },
+      {
+       "id": 525,
+       "s": " are"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "The image contains a circle, a square, a triangle, and a star.",
+     "replyTokens": [
+      {
+       "id": 785,
+       "s": "The"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 5610,
+       "s": " contains"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 12671,
+       "s": " circle"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 9334,
+       "s": " square"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 21495,
+       "s": " triangle"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 323,
+       "s": " and"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 6774,
+       "s": " star"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 138515
+    },
+    {
+     "id": "shapes-2",
+     "text": "What shape is the red one?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 6083,
+       "s": " shape"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 2518,
+       "s": " red"
+      },
+      {
+       "id": 825,
+       "s": " one"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "circle",
+     "replyTokens": [
+      {
+       "id": 25857,
+       "s": "circle"
+      }
+     ],
+     "ended": true,
+     "bytes": 17256
+    },
+    {
+     "id": "shapes-3",
+     "text": "What shape is the green one?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 6083,
+       "s": " shape"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 6176,
+       "s": " green"
+      },
+      {
+       "id": 825,
+       "s": " one"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "The green one is a star.",
+     "replyTokens": [
+      {
+       "id": 785,
+       "s": "The"
+      },
+      {
+       "id": 6176,
+       "s": " green"
+      },
+      {
+       "id": 825,
+       "s": " one"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 6774,
+       "s": " star"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 64906
+    }
+   ],
+   "bytes": 162791
+  },
+  {
+   "id": "apples",
+   "title": "Apples on a table",
+   "file": "img/apples.jpg",
+   "orig": [
+    460,
+    330
+   ],
+   "size": [
+    448,
+    320
+   ],
+   "grid": [
+    20,
+    28
+   ],
+   "merged": [
+    10,
+    14
+   ],
+   "Nv": 140,
+   "Np": 560,
+   "source": null,
+   "questions": [
+    {
+     "id": "apples-1",
+     "text": "How many apples are in the image?",
+     "chips": [
+      {
+       "id": 4340,
+       "s": "How"
+      },
+      {
+       "id": 1657,
+       "s": " many"
+      },
+      {
+       "id": 40676,
+       "s": " apples"
+      },
+      {
+       "id": 525,
+       "s": " are"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "There are 5 apples in the image.",
+     "replyTokens": [
+      {
+       "id": 3862,
+       "s": "There"
+      },
+      {
+       "id": 525,
+       "s": " are"
+      },
+      {
+       "id": 220,
+       "s": " "
+      },
+      {
+       "id": 20,
+       "s": "5"
+      },
+      {
+       "id": 40676,
+       "s": " apples"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 77991
+    },
+    {
+     "id": "apples-2",
+     "text": "Which number is the green apple, counting from the left?",
+     "chips": [
+      {
+       "id": 23085,
+       "s": "Which"
+      },
+      {
+       "id": 1372,
+       "s": " number"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 6176,
+       "s": " green"
+      },
+      {
+       "id": 23268,
+       "s": " apple"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 25009,
+       "s": " counting"
+      },
+      {
+       "id": 504,
+       "s": " from"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 2115,
+       "s": " left"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "3",
+     "replyTokens": [
+      {
+       "id": 18,
+       "s": "3"
+      }
+     ],
+     "ended": true,
+     "bytes": 15585
+    }
+   ],
+   "bytes": 157912
+  },
+  {
+   "id": "poem",
+   "title": "A poem card",
+   "file": "img/poem.jpg",
+   "orig": [
+    430,
+    300
+   ],
+   "size": [
+    416,
+    288
+   ],
+   "grid": [
+    18,
+    26
+   ],
+   "merged": [
+    9,
+    13
+   ],
+   "Nv": 117,
+   "Np": 468,
+   "source": null,
+   "questions": [
+    {
+     "id": "poem-1",
+     "text": "What text is written in this image?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 1467,
+       "s": " text"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 5326,
+       "s": " written"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 419,
+       "s": " this"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "床前明月光，疑是地上霜。",
+     "replyTokens": [
+      {
+       "id": 99830,
+       "s": "床"
+      },
+      {
+       "id": 24562,
+       "s": "前"
+      },
+      {
+       "id": 30858,
+       "s": "明"
+      },
+      {
+       "id": 9754,
+       "s": "月"
+      },
+      {
+       "id": 99225,
+       "s": "光"
+      },
+      {
+       "id": 3837,
+       "s": "，"
+      },
+      {
+       "id": 99515,
+       "s": "疑"
+      },
+      {
+       "id": 20412,
+       "s": "是"
+      },
+      {
+       "id": 102605,
+       "s": "地上"
+      },
+      {
+       "id": 105401,
+       "s": "霜"
+      },
+      {
+       "id": 1773,
+       "s": "。"
+      }
+     ],
+     "ended": true,
+     "bytes": 77978
+    },
+    {
+     "id": "poem-2",
+     "text": "Who wrote this poem?",
+     "chips": [
+      {
+       "id": 15191,
+       "s": "Who"
+      },
+      {
+       "id": 6139,
+       "s": " wrote"
+      },
+      {
+       "id": 419,
+       "s": " this"
+      },
+      {
+       "id": 32794,
+       "s": " poem"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "This poem is by Li Bai, a famous Chinese poet.",
+     "replyTokens": [
+      {
+       "id": 1986,
+       "s": "This"
+      },
+      {
+       "id": 32794,
+       "s": " poem"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 553,
+       "s": " by"
+      },
+      {
+       "id": 14511,
+       "s": " Li"
+      },
+      {
+       "id": 84908,
+       "s": " Bai"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 11245,
+       "s": " famous"
+      },
+      {
+       "id": 8453,
+       "s": " Chinese"
+      },
+      {
+       "id": 39260,
+       "s": " poet"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 89116
+    }
+   ],
+   "bytes": 126695
+  },
+  {
+   "id": "chart",
+   "title": "A bar chart",
+   "file": "img/chart.jpg",
+   "orig": [
+    480,
+    350
+   ],
+   "size": [
+    448,
+    320
+   ],
+   "grid": [
+    20,
+    28
+   ],
+   "merged": [
+    10,
+    14
+   ],
+   "Nv": 140,
+   "Np": 560,
+   "source": null,
+   "questions": [
+    {
+     "id": "chart-1",
+     "text": "Which fruit sold the most?",
+     "chips": [
+      {
+       "id": 23085,
+       "s": "Which"
+      },
+      {
+       "id": 13779,
+       "s": " fruit"
+      },
+      {
+       "id": 6088,
+       "s": " sold"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 1429,
+       "s": " most"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "Based on the bar chart, the fruit that sold the most is the banana, with a sales figure of 45 boxes.",
+     "replyTokens": [
+      {
+       "id": 28715,
+       "s": "Based"
+      },
+      {
+       "id": 389,
+       "s": " on"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 3619,
+       "s": " bar"
+      },
+      {
+       "id": 9487,
+       "s": " chart"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 13779,
+       "s": " fruit"
+      },
+      {
+       "id": 429,
+       "s": " that"
+      },
+      {
+       "id": 6088,
+       "s": " sold"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 1429,
+       "s": " most"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 43096,
+       "s": " banana"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 448,
+       "s": " with"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 6625,
+       "s": " sales"
+      },
+      {
+       "id": 7071,
+       "s": " figure"
+      },
+      {
+       "id": 315,
+       "s": " of"
+      },
+      {
+       "id": 220,
+       "s": " "
+      },
+      {
+       "id": 19,
+       "s": "4"
+      },
+      {
+       "id": 20,
+       "s": "5"
+      },
+      {
+       "id": 14697,
+       "s": " boxes"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 202176
+    },
+    {
+     "id": "chart-2",
+     "text": "How many boxes of oranges were sold?",
+     "chips": [
+      {
+       "id": 4340,
+       "s": "How"
+      },
+      {
+       "id": 1657,
+       "s": " many"
+      },
+      {
+       "id": 14697,
+       "s": " boxes"
+      },
+      {
+       "id": 315,
+       "s": " of"
+      },
+      {
+       "id": 84038,
+       "s": " oranges"
+      },
+      {
+       "id": 1033,
+       "s": " were"
+      },
+      {
+       "id": 6088,
+       "s": " sold"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "18",
+     "replyTokens": [
+      {
+       "id": 16,
+       "s": "1"
+      },
+      {
+       "id": 23,
+       "s": "8"
+      }
+     ],
+     "ended": true,
+     "bytes": 23362
+    }
+   ],
+   "bytes": 155372
+  },
+  {
+   "id": "night",
+   "title": "A cottage at night",
+   "file": "img/night.jpg",
+   "orig": [
+    400,
+    400
+   ],
+   "size": [
+    384,
+    384
+   ],
+   "grid": [
+    24,
+    24
+   ],
+   "merged": [
+    12,
+    12
+   ],
+   "Nv": 144,
+   "Np": 576,
+   "source": null,
+   "questions": [
+    {
+     "id": "night-1",
+     "text": "Is it day or night?",
+     "chips": [
+      {
+       "id": 3872,
+       "s": "Is"
+      },
+      {
+       "id": 432,
+       "s": " it"
+      },
+      {
+       "id": 1899,
+       "s": " day"
+      },
+      {
+       "id": 476,
+       "s": " or"
+      },
+      {
+       "id": 3729,
+       "s": " night"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "It is night.",
+     "replyTokens": [
+      {
+       "id": 2132,
+       "s": "It"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 3729,
+       "s": " night"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 40753
+    },
+    {
+     "id": "night-2",
+     "text": "Describe this image.",
+     "chips": [
+      {
+       "id": 74785,
+       "s": "Describe"
+      },
+      {
+       "id": 419,
+       "s": " this"
+      },
+      {
+       "id": 2168,
+       "s": " image"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "reply": "This is a simple, stylized illustration of a nighttime scene. It features a small house with a brown roof and two lit windows, situated on a dark green hill. To the right of the house is a round, green tree. The sky is dark blue, dotted with white stars, and a yellow crescent moon is visible in the upper right corner.",
+     "replyTokens": [
+      {
+       "id": 1986,
+       "s": "This"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 4285,
+       "s": " simple"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 48204,
+       "s": " styl"
+      },
+      {
+       "id": 1506,
+       "s": "ized"
+      },
+      {
+       "id": 39034,
+       "s": " illustration"
+      },
+      {
+       "id": 315,
+       "s": " of"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 92644,
+       "s": " nighttime"
+      },
+      {
+       "id": 6109,
+       "s": " scene"
+      },
+      {
+       "id": 13,
+       "s": "."
+      },
+      {
+       "id": 1084,
+       "s": " It"
+      },
+      {
+       "id": 4419,
+       "s": " features"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 2613,
+       "s": " small"
+      },
+      {
+       "id": 3753,
+       "s": " house"
+      },
+      {
+       "id": 448,
+       "s": " with"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 13876,
+       "s": " brown"
+      },
+      {
+       "id": 15134,
+       "s": " roof"
+      },
+      {
+       "id": 323,
+       "s": " and"
+      },
+      {
+       "id": 1378,
+       "s": " two"
+      },
+      {
+       "id": 13020,
+       "s": " lit"
+      },
+      {
+       "id": 11030,
+       "s": " windows"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 30083,
+       "s": " situated"
+      },
+      {
+       "id": 389,
+       "s": " on"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 6319,
+       "s": " dark"
+      },
+      {
+       "id": 6176,
+       "s": " green"
+      },
+      {
+       "id": 23946,
+       "s": " hill"
+      },
+      {
+       "id": 13,
+       "s": "."
+      },
+      {
+       "id": 2014,
+       "s": " To"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 1290,
+       "s": " right"
+      },
+      {
+       "id": 315,
+       "s": " of"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 3753,
+       "s": " house"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 4778,
+       "s": " round"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 6176,
+       "s": " green"
+      },
+      {
+       "id": 4916,
+       "s": " tree"
+      },
+      {
+       "id": 13,
+       "s": "."
+      },
+      {
+       "id": 576,
+       "s": " The"
+      },
+      {
+       "id": 12884,
+       "s": " sky"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 6319,
+       "s": " dark"
+      },
+      {
+       "id": 6303,
+       "s": " blue"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 58101,
+       "s": " dotted"
+      },
+      {
+       "id": 448,
+       "s": " with"
+      },
+      {
+       "id": 4158,
+       "s": " white"
+      },
+      {
+       "id": 9759,
+       "s": " stars"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 323,
+       "s": " and"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 13753,
+       "s": " yellow"
+      },
+      {
+       "id": 45758,
+       "s": " cres"
+      },
+      {
+       "id": 1168,
+       "s": "cent"
+      },
+      {
+       "id": 17788,
+       "s": " moon"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 9434,
+       "s": " visible"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 8416,
+       "s": " upper"
+      },
+      {
+       "id": 1290,
+       "s": " right"
+      },
+      {
+       "id": 9131,
+       "s": " corner"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 533491
+    }
+   ],
+   "bytes": 164893
+  },
+  {
+   "id": "moon",
+   "title": "A man on the Moon",
+   "file": "img/moon.jpg",
+   "orig": [
+    636,
+    640
+   ],
+   "size": [
+    352,
+    384
+   ],
+   "grid": [
+    24,
+    22
+   ],
+   "merged": [
+    12,
+    11
+   ],
+   "Nv": 132,
+   "Np": 528,
+   "source": {
+    "name": "Aldrin Apollo 11 (AS11-40-5903)",
+    "author": "Neil Armstrong / NASA",
+    "license": "Public domain",
+    "url": "https://commons.wikimedia.org/wiki/File:Aldrin_Apollo_11_original.jpg"
+   },
+   "questions": [
+    {
+     "id": "moon-1",
+     "text": "What does this photo show?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 1558,
+       "s": " does"
+      },
+      {
+       "id": 419,
+       "s": " this"
+      },
+      {
+       "id": 6548,
+       "s": " photo"
+      },
+      {
+       "id": 1473,
+       "s": " show"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "An astronaut on the Moon, standing on the lunar surface.",
+     "replyTokens": [
+      {
+       "id": 2082,
+       "s": "An"
+      },
+      {
+       "id": 46633,
+       "s": " astronaut"
+      },
+      {
+       "id": 389,
+       "s": " on"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 17330,
+       "s": " Moon"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 11259,
+       "s": " standing"
+      },
+      {
+       "id": 389,
+       "s": " on"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 56711,
+       "s": " lunar"
+      },
+      {
+       "id": 7329,
+       "s": " surface"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 94924
+    },
+    {
+     "id": "moon-2",
+     "text": "Where is he standing?",
+     "chips": [
+      {
+       "id": 9064,
+       "s": "Where"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 566,
+       "s": " he"
+      },
+      {
+       "id": 11259,
+       "s": " standing"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "on the moon",
+     "replyTokens": [
+      {
+       "id": 263,
+       "s": "on"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 17788,
+       "s": " moon"
+      }
+     ],
+     "ended": true,
+     "bytes": 30031
+    }
+   ],
+   "bytes": 145233
+  },
+  {
+   "id": "starry",
+   "title": "A famous painting",
+   "file": "img/starry.jpg",
+   "orig": [
+    640,
+    507
+   ],
+   "size": [
+    416,
+    320
+   ],
+   "grid": [
+    20,
+    26
+   ],
+   "merged": [
+    10,
+    13
+   ],
+   "Nv": 130,
+   "Np": 520,
+   "source": {
+    "name": "The Starry Night (1889)",
+    "author": "Vincent van Gogh",
+    "license": "Public domain",
+    "url": "https://commons.wikimedia.org/wiki/File:Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg"
+   },
+   "questions": [
+    {
+     "id": "starry-1",
+     "text": "Which painting is this?",
+     "chips": [
+      {
+       "id": 23085,
+       "s": "Which"
+      },
+      {
+       "id": 18824,
+       "s": " painting"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 419,
+       "s": " this"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "The painting is \"The Starry Night,\" a famous work by Vincent van Gogh.",
+     "replyTokens": [
+      {
+       "id": 785,
+       "s": "The"
+      },
+      {
+       "id": 18824,
+       "s": " painting"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 330,
+       "s": " \""
+      },
+      {
+       "id": 785,
+       "s": "The"
+      },
+      {
+       "id": 7679,
+       "s": " Star"
+      },
+      {
+       "id": 884,
+       "s": "ry"
+      },
+      {
+       "id": 12826,
+       "s": " Night"
+      },
+      {
+       "id": 1335,
+       "s": ",\""
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 11245,
+       "s": " famous"
+      },
+      {
+       "id": 975,
+       "s": " work"
+      },
+      {
+       "id": 553,
+       "s": " by"
+      },
+      {
+       "id": 34307,
+       "s": " Vincent"
+      },
+      {
+       "id": 5242,
+       "s": " van"
+      },
+      {
+       "id": 479,
+       "s": " G"
+      },
+      {
+       "id": 63936,
+       "s": "ogh"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 124337
+    },
+    {
+     "id": "starry-2",
+     "text": "What is in the painting?",
+     "chips": [
+      {
+       "id": 3838,
+       "s": "What"
+      },
+      {
+       "id": 374,
+       "s": " is"
+      },
+      {
+       "id": 304,
+       "s": " in"
+      },
+      {
+       "id": 279,
+       "s": " the"
+      },
+      {
+       "id": 18824,
+       "s": " painting"
+      },
+      {
+       "id": 30,
+       "s": "?"
+      }
+     ],
+     "reply": "A village, a cypress tree, and a night sky with swirling stars and a bright moon.",
+     "replyTokens": [
+      {
+       "id": 32,
+       "s": "A"
+      },
+      {
+       "id": 14126,
+       "s": " village"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 272,
+       "s": " c"
+      },
+      {
+       "id": 47601,
+       "s": "ypress"
+      },
+      {
+       "id": 4916,
+       "s": " tree"
+      },
+      {
+       "id": 11,
+       "s": ","
+      },
+      {
+       "id": 323,
+       "s": " and"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 3729,
+       "s": " night"
+      },
+      {
+       "id": 12884,
+       "s": " sky"
+      },
+      {
+       "id": 448,
+       "s": " with"
+      },
+      {
+       "id": 92278,
+       "s": " swirling"
+      },
+      {
+       "id": 9759,
+       "s": " stars"
+      },
+      {
+       "id": 323,
+       "s": " and"
+      },
+      {
+       "id": 264,
+       "s": " a"
+      },
+      {
+       "id": 9906,
+       "s": " bright"
+      },
+      {
+       "id": 17788,
+       "s": " moon"
+      },
+      {
+       "id": 13,
+       "s": "."
+      }
+     ],
+     "ended": true,
+     "bytes": 148550
+    }
+   ],
+   "bytes": 144206
+  }
+ ]
+}
