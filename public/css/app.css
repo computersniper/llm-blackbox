@@ -75,6 +75,11 @@ button { font: inherit; color: inherit; }
 .site-nav a:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
 .site-nav a[aria-current="page"] { color: #04121a; background: var(--acc); font-weight: 600; }
 body.mode-inspect .site-nav { display: none; }
+/* 中 / EN 切换（js/i18n.js 的 mountLangSwitch） */
+.lang-switch { display: inline-flex; flex: none; padding: 2px; border-radius: 999px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .02); }
+.lang-switch button { border: 0; background: none; padding: 0 8px; height: 28px; border-radius: 999px; color: var(--dim); font: 600 11.5px/1 var(--mono); cursor: pointer; transition: color .2s, background .2s; }
+.lang-switch button:hover { color: var(--ink); }
+.lang-switch button[aria-pressed="true"] { color: #04121a; background: var(--acc); }
 .crumbs { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; overflow: hidden; white-space: nowrap; font-size: 13px; }
 .crumbs button { border: 0; background: none; padding: 4px 8px; border-radius: 8px; color: var(--dim); cursor: pointer; transition: color .2s, background .2s; }
 .crumbs button:hover { color: var(--ink); background: rgba(255, 255, 255, .05); }
