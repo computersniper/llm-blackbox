@@ -106,12 +106,12 @@ export function featLabel(ft, kind) {
   if (!isEn) return ft.label;
   const m = ft.name.match(/^model\.layers\.(\d+)\.(?:self_attn|mlp)\.(\w+)\.weight$/);
   if (kind === 'qwen') {
-    if (ft.name === 'model.embed_tokens.weight') return 'Embedding / output matrix · row of "黑"';
+    if (ft.name === 'model.embed_tokens.weight') return 'Embedding / output matrix · row of “黑”';
     if (ft.name === 'model.norm.weight') return 'Final RMSNorm scale γ';
     if (m) return `Layer ${m[1]} ${T_EN[m[2]] || m[2]}: largest-gradient weight`;
     return ft.label;
   }
-  if (ft.name === 'model.embed_tokens.weight') return `Embedding · "${ft.label.match(/「(.+)」/)?.[1] ?? '?'}" dim ${ft.index[1]}`;
+  if (ft.name === 'model.embed_tokens.weight') return `Embedding · “${ft.label.match(/「(.+)」/)?.[1] ?? '?'}” dim ${ft.index[1]}`;
   const n = ft.name.match(/^model\.layers\.(\d+)\.input_layernorm\.weight$/);
   if (n) return `Layer ${n[1]} RMSNorm γ[${ft.index.join(', ')}]`;
   if (m) return `Layer ${m[1]} ${T_EN[m[2]] || m[2]}[${ft.index.join(', ')}]`;
