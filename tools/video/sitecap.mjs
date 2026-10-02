@@ -22,7 +22,9 @@ const HOME = process.env.HOME;
 const env = { ...process.env, LD_LIBRARY_PATH: `/usr/lib/wsl/lib:${HOME}/.local/lib/chromium-deps/root/usr/lib/x86_64-linux-gnu`, GALLIUM_DRIVER: 'd3d12', MESA_D3D12_DEFAULT_ADAPTER_NAME: 'NVIDIA' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const browser = await chromium.launch({ env, args: ['--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist', '--hide-scrollbars', '--force-color-profile=srgb', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
+// --cpu：用 swiftshader（不碰显卡），只适合 --dry 试走一遍流程；真正录屏要 GPU，否则帧率太低
+const GPU = args.includes('--cpu') ? ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] : ['--use-angle=gl-egl', '--enable-gpu', '--ignore-gpu-blocklist'];
+const browser = await chromium.launch({ env, args: [...GPU, '--hide-scrollbars', '--force-color-profile=srgb', '--disable-renderer-backgrounding', '--disable-background-timer-throttling'] });
 const page = await browser.newPage({ viewport: { width: VW, height: VH }, deviceScaleFactor: DPR });
 const errs = [];
 page.on('pageerror', (e) => errs.push(String(e)));
