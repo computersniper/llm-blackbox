@@ -32,7 +32,8 @@ async function open(extra = '') {
   const errs = [];
   page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   page.on('pageerror', (e) => errs.push(String(e)));
-  await page.goto(`${BASE}?fps=${FPS}${extra}`, { waitUntil: 'load' });
+  // 语言写进网址：网站的 i18n 没有 ?lang= 时会按浏览器语言猜（无头浏览器是英文），所以中文版也明确写 lang=zh
+  await page.goto(`${BASE}?fps=${FPS}&lang=${A.lang || 'zh'}${A.q ? `&q=${A.q}` : ''}${extra}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__film && (window.__film.ready || window.__film.error), null, { timeout: 120000 });
   const err = await page.evaluate(() => window.__film.error);
   if (err) throw new Error(err);

@@ -6,6 +6,9 @@
 @font-face { font-family: "PingFang SC"; src: url("/ext/fonts/NotoSerifSC-SemiBold.otf") format("opentype"); font-weight: 400 700; }
 @font-face { font-family: "Noto Sans SC"; src: url("/ext/fonts/NotoSerifSC-SemiBold.otf") format("opentype"); font-weight: 400 700; }
 @font-face { font-family: "Film Sans"; src: url("/ext/fonts/NotoSansSC-VF.ttf") format("truetype"); font-weight: 100 900; }
+/* 英文版：Noto Serif / Noto Sans（SIL OFL） */
+@font-face { font-family: "Film Serif EN"; src: url("/ext/fonts/NotoSerif-VF.ttf") format("truetype"); font-weight: 100 900; }
+@font-face { font-family: "Film Sans EN"; src: url("/ext/fonts/NotoSans-VF.ttf") format("truetype"); font-weight: 100 900; }
 @font-face { font-family: "JetBrains Mono"; src: url("/public/fonts/jetbrains-mono-400.woff2") format("woff2"); font-weight: 400; }
 @font-face { font-family: "JetBrains Mono"; src: url("/public/fonts/jetbrains-mono-700.woff2") format("woff2"); font-weight: 700; }
 
@@ -57,6 +60,8 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .lbl.bar { text-align: center; padding: 4px 9px; }
 .lbl.bar .t { display: block; font-size: 21px; color: var(--ink); }
 .lbl.bar .p { display: block; font-family: var(--mono); font-size: 14px; color: var(--amber); font-weight: 400; }
+.en .lbl.bar { padding: 3px 6px; }
+.en .lbl.bar .t { font-size: 17px; }
 .lbl.bar.win { border-color: var(--amber); box-shadow: 0 0 16px rgba(255, 182, 92, .3); }
 .lbl.bar.cut { opacity: .3; }
 .lbl.num { font-family: var(--mono); font-weight: 400; font-size: 15.5px; padding: 2px 9px; color: var(--ink); }
@@ -151,6 +156,9 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .reply .t.new i { background: var(--amber); }
 .reply .t.hl .s { color: var(--amber); }
 .reply .t.sp .s { font-family: var(--mono); font-size: 22px; color: var(--violet); vertical-align: middle; }
+.en .reply { font-size: 38px; width: 1560px; line-height: 1.5; }
+.en .reply .c.lead { margin-left: .27em; }
+.en .reply .t.sp { margin-left: .3em; }
 .reply .tag { display: inline-block; margin-left: 16px; font-family: var(--mono); font-size: 17px; font-weight: 400; color: var(--amber); vertical-align: middle; }
 
 /* 片尾 */
@@ -282,6 +290,8 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .fin7 .qr { width: 340px; height: 340px; border-radius: 16px; background: #fff; overflow: hidden; box-shadow: 0 24px 70px rgba(0, 0, 0, .55); }
 .fin7 .qr svg { display: block; width: 100%; height: 100%; }
 .fin7 .hint { font-size: 28px; font-weight: 600; letter-spacing: .06em; color: var(--ink2); }
+.en .fin7 { left: 1056px; width: 820px; }
+.en .fin7 .url { font-size: 35px; letter-spacing: .01em; }
 
 /* v6：前馈的结构图（1024 → 门 / 内容 3072 → 相乘 → down 1024 → 加回去），正在讲的部分亮 */
 .ffnmap { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 18px 28px 14px; border-radius: 18px; background: rgba(3, 7, 15, .84); border: 1px solid var(--line2); backdrop-filter: blur(8px); white-space: nowrap; }
@@ -291,6 +301,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .ffnmap .b b { font-size: 26px; font-weight: 600; letter-spacing: .04em; }
 .ffnmap .b span { font-size: 19px; font-weight: 600; }
 .ffnmap .b.in { width: 150px; height: 128px; }
+.en .ffnmap .b.in span { white-space: normal; text-align: center; line-height: 1.15; }
 .ffnmap .b.g, .ffnmap .b.u { width: 330px; }
 .ffnmap .b.mul, .ffnmap .b.add { width: 74px; height: 74px; border-radius: 50%; padding: 0; }
 .ffnmap .b.mul b, .ffnmap .b.add b { font-size: 34px; }
@@ -310,3 +321,12 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .ffnmap .cap .r { color: #9ff3e2; }
 .ring.violet { border-color: rgba(179, 157, 255, .95); box-shadow: 0 0 18px rgba(179, 157, 255, .45), inset 0 0 12px rgba(179, 157, 255, .2); }
 .ring.violet .rl { color: #e6dcff; }
+
+/* 英文版：西文字体、字距收紧、引号换成弯引号 */
+:root.en { --serif: "Film Serif EN", "Film Serif", serif; }
+.en .cpage { font-family: "Film Sans EN", "Film Sans", sans-serif; }
+.en .sub, .en .term, .en .endcard .ans, .en .title .st, .en .cp-head .t, .en .cp-head .s, .en .cp-hello .h, .en .prog, .en .fin7 .hint, .en .ffnmap .b b, .en .heads6 .hn { letter-spacing: .01em; }
+.en .sub { font-size: 36px; }
+.en .endcard .ans { font-size: 44px; line-height: 1.6; }
+.en .sub q, .en .term q, .en .formula .cap q, .en .ring q, .en .strip q, .en .card q { quotes: "\201C" "\201D"; }
+.en .cp-head .s::after { margin-left: -.01em; }

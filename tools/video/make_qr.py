@@ -1,4 +1,4 @@
-"""片尾用的二维码：本地生成（segno），指向网站首页，写成 tools/video/qr-blackbox.svg。
+"""片尾用的二维码：本地生成（segno），中文版指向网站首页（qr-blackbox.svg），英文版指向 ?lang=en（qr-blackbox-en.svg）。
 
     /mnt/d/cjc/venvs/blackbox/bin/python tools/video/make_qr.py
 
@@ -8,9 +8,10 @@ import pathlib
 
 import segno
 
-URL = 'https://caijiechao.com/blackbox/'
-OUT = pathlib.Path(__file__).with_name('qr-blackbox.svg')
-
-qr = segno.make(URL, error='m', micro=False)
-qr.save(str(OUT), kind='svg', scale=10, border=4, dark='#000000', light='#ffffff', xmldecl=False, svgns=True, nl=False)
-print(f'{OUT}: version {qr.version}, {qr.symbol_size(border=4)[0] // 1} modules incl. border')
+HERE = pathlib.Path(__file__).parent
+# 中文版指向首页；英文版指向 ?lang=en
+for url, name in (('https://caijiechao.com/blackbox/', 'qr-blackbox.svg'), ('https://caijiechao.com/blackbox/?lang=en', 'qr-blackbox-en.svg')):
+    out = HERE / name
+    qr = segno.make(url, error='m', micro=False)
+    qr.save(str(out), kind='svg', scale=10, border=4, dark='#000000', light='#ffffff', xmldecl=False, svgns=True, nl=False)
+    print(f'{out}: {url} · version {qr.version}, {qr.symbol_size(border=4)[0]} modules incl. border')

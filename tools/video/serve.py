@@ -25,10 +25,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if p.startswith("/ext/fonts/") and self.fonts_dir:
             name = posixpath.basename(p)
             return os.path.join(self.fonts_dir, name)
+        # 英文版：电影页把 <base> 换成 /en-public/，数据从 D 盘 data-en/ 取（和网站英文版同一份导出），其余照常走 public/
+        if p.startswith("/en-public/"):
+            rest = p[len("/en-public/"):]
+            base = os.path.dirname(self.fonts_dir.rstrip("/")) if self.fonts_dir else ""
+            for pre in ("data/en/", "data/"):
+                if rest.startswith(pre):
+                    cand = os.path.join(base, "data-en", rest[len(pre):])
+                    if os.path.exists(cand):
+                        return cand
+            return str(ROOT / "public" / rest)
         # 片尾用的推理页录屏帧（sitecap.mjs 生成，放在字体目录旁边的 sitecap/）
-        if p.startswith("/ext/sitecap/") and self.fonts_dir:
-            name = posixpath.basename(p)
-            return os.path.join(os.path.dirname(self.fonts_dir.rstrip("/")), "sitecap", name)
+        for d in ("sitecap", "sitecap-en"):
+            if p.startswith(f"/ext/{d}/") and self.fonts_dir:
+                name = posixpath.basename(p)
+                return os.path.join(os.path.dirname(self.fonts_dir.rstrip("/")), d, name)
         return super().translate_path(path)
 
     def end_headers(self):

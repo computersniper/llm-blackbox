@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <!-- 站点脚本里的 fetch('data/...') 是相对路径：把基准地址指到 /public/，自己的文件一律用绝对路径 -->
   <base href="/public/">
+  <script>
+    // 英文版：数据换成网站英文版的同一份导出（serve.py 把 /en-public/data/ 映射到 D 盘 data-en/，其余照常是 public/）
+    if (new URLSearchParams(location.search).get('lang') === 'en') document.querySelector('base').href = '/en-public/';
+  </script>
   <title>AI 的一个字是怎么思考出来的 · 电影模式</title>
   <link rel="stylesheet" href="/tools/video/film.css">
   <link rel="stylesheet" href="/tools/video/board.css">
