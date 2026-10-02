@@ -1,9 +1,8 @@
 // 首页右上角的 GitHub 链接和访问量。
 // 计数在服务器上（deploy/counter/counter.py）：同一个 IP 每天只算一个访客，IP 不落盘。本地开发没有这个接口，就什么都不显示。
+import { L as tr } from './i18n.js';
 
 export const REPO = 'https://github.com/computersniper/llm-blackbox';
-
-import { L as tr } from './i18n.js';
 
 const fmt = (n) => n.toLocaleString('zh-CN');
 
