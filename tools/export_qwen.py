@@ -1,7 +1,12 @@
 """用真实的 Qwen3-0.6B 跑一遍所有预设问题，把网页要展示的内部数据导出到 public/data/。
 
 用法：
-    python tools/export_qwen.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6B
+    python tools/export_qwen.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6B             # 中文问题 → public/data/
+    python tools/export_qwen.py --model /mnt/d/cjc/model-weights/qwen3/Qwen3-0.6B --lang en   # 英文问题 → public/data/en/
+
+英文版（--lang en）用英文系统提示和英文问题集，采样参数和种子规则（第 i 个问题用 1000 + i）与中文完全一样，
+文件名是 eNN.json / eNN.bin / eNN/Lxx.json.gz；权重缩略图两种语言共用 public/data/weights.bin，英文目录里不另存。
+英文的 --only / --from 会把这次导出的问题并进已有的 manifest（中文的 --only 仍然只打印、不写 manifest）。
 
 每个问题导出：
     qNN.json        词元、逐步的候选概率与采样过程、逻辑透镜、残差范数、输出头 logit 的真实乘加
@@ -28,8 +33,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "public" / "data"
 
-SYSTEM = "你是一个乐于助人的助手，请用一两句话简洁地回答。"
-QUESTIONS = [
+SYSTEM_ZH = "你是一个乐于助人的助手，请用一两句话简洁地回答。"
+QUESTIONS_ZH = [
     "天空为什么是蓝色的？",
     "为什么海水是咸的？",
     "为什么猫喜欢纸箱？",
@@ -47,6 +52,29 @@ QUESTIONS = [
     "写一句关于秋天的诗。",
     "What is the capital of France?",
 ]
+# 英文版：常识、科学、数学、写作各类都有；第一个固定是 “Why is the sky blue?”
+SYSTEM_EN = "You are a helpful assistant. Please answer concisely in one or two sentences."
+QUESTIONS_EN = [
+    "Why is the sky blue?",
+    "Why is seawater salty?",
+    "Why do cats like boxes?",
+    "Who are you?",
+    "What can you do?",
+    "How do large language models work?",
+    "What is the attention mechanism?",
+    "What is a token?",
+    "What is 1+1?",
+    "What is 12 times 12?",
+    "What is the capital of France?",
+    "Tell me a joke.",
+    "Describe London in one sentence.",
+    "Write a one-line poem about autumn.",
+]
+LANGS = {
+    "zh": {"out": OUT, "system": SYSTEM_ZH, "questions": QUESTIONS_ZH, "prefix": "q"},
+    "en": {"out": OUT / "en", "system": SYSTEM_EN, "questions": QUESTIONS_EN, "prefix": "e"},
+}
+SYSTEM, QUESTIONS, PREFIX = SYSTEM_ZH, QUESTIONS_ZH, "q"   # main() 按 --lang 改写这几个全局量
 TEMPERATURE, TOP_K, TOP_P = 0.7, 20, 0.8
 TEMPS = [0.3, 0.7, 1.0, 1.5]  # 网页里温度滑块可选的几个档位，概率都是真实算出来的
 MAX_NEW = 64
@@ -365,7 +393,7 @@ def export_question(qi, text, tok, model, cfg):
 
     # 每一层、每个生成词元的真实乘加：单神经元（SwiGLU）、单次打分（Q·K）、W_q / W_o / W_down 各一个输出元素。
     # 28 层全部导出，每层一个小文件 qNN/Lxx.json，网页按需载入
-    qid = f"q{qi + 1:02d}"
+    qid = f"{PREFIX}{qi + 1:02d}"
     theta_base = rope_theta(cfg)
     Dh = cfg.head_dim
     micro_bytes = 0
@@ -487,17 +515,23 @@ def export_question(qi, text, tok, model, cfg):
 
 
 def main():
+    global OUT, SYSTEM, QUESTIONS, PREFIX
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
+    ap.add_argument("--lang", choices=sorted(LANGS), default="zh", help="问题集：zh → public/data/，en → public/data/en/")
     ap.add_argument("--only", type=int, default=None, help="只导出第几个问题（从 1 开始），调试用")
+    ap.add_argument("--from", dest="start", type=int, default=1, help="从第几个问题开始导出（从 1 开始）")
     args = ap.parse_args()
+    cfg_lang = LANGS[args.lang]
+    OUT, SYSTEM, QUESTIONS, PREFIX = cfg_lang["out"], cfg_lang["system"], cfg_lang["questions"], cfg_lang["prefix"]
+    en = args.lang == "en"
     OUT.mkdir(parents=True, exist_ok=True)
     tok = AutoTokenizer.from_pretrained(args.model)
     model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16, attn_implementation="eager").cuda().eval()
     cfg = model.config
     items = []
     for qi, q in enumerate(QUESTIONS):
-        if args.only and qi + 1 != args.only:
+        if (args.only and qi + 1 != args.only) or qi + 1 < args.start:
             continue
         print(f"[{qi + 1}/{len(QUESTIONS)}] {q}")
         items.append(export_question(qi, q, tok, model, cfg))
@@ -517,8 +551,9 @@ def main():
             img = (v.T.flip(0) * 255).round().to(torch.uint8).cpu().numpy()        # 行 = 输入（上下翻转，0 在底部），列 = 输出
             thumb_index[f"{li}:{name}"] = {"offset": len(thumbs), "w": img.shape[1], "h": img.shape[0]}
             thumbs += img.tobytes()
-    (OUT / "weights.bin").write_bytes(bytes(thumbs))
-    (OUT / "weights.bin.gz").write_bytes(gzip.compress(bytes(thumbs), 9, mtime=0))
+    if not en:  # 英文版和中文版共用 public/data/weights.bin
+        (OUT / "weights.bin").write_bytes(bytes(thumbs))
+        (OUT / "weights.bin.gz").write_bytes(gzip.compress(bytes(thumbs), 9, mtime=0))
     manifest = {
         "model": {
             "name": "Qwen3-0.6B",
@@ -539,9 +574,17 @@ def main():
         "weightSample": [float(v) for v in sample_w[0, :8]],
         "thumbs": {"block": B, "index": thumb_index},
     }
-    if args.only:
+    partial = args.only or args.start > 1
+    if partial and not en:
         print(json.dumps(items, ensure_ascii=False, indent=1)[:3000])
         return
+    if partial and (OUT / "manifest.json").exists():
+        # 英文版分几次导出：把这次的问题并进已有的 manifest，按问题顺序排好
+        old = json.loads((OUT / "manifest.json").read_text(encoding="utf-8"))
+        merged = {q["id"]: q for q in old.get("questions", [])}
+        merged.update({q["id"]: q for q in items})
+        manifest["questions"] = [merged[k] for k in sorted(merged)]
+        items = manifest["questions"]
     (OUT / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")
     print("首次载入合计（gz）:", sum(i["bytes"] for i in items), " 乘加分块合计（gz）:", sum(i["microBytes"] for i in items))
 
