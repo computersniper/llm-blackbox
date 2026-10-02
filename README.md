@@ -602,6 +602,8 @@ git push deploy main                                               # 发布（�
 - 写完整句（蒙太奇）；
 - 收尾：推理页的真实录屏（点选问题发送 → 点 ＋ 揭开黑箱 → 一层层往里钻 → 播放 / 倍速 / 暂停 / 单步），落版网址和二维码。
 
+**英文版**（`film.html?lang=en`，成片 `qwen3-inference-v7-en.mp4`）：结构、节奏、画面和中文版一样，问题换成 “Why is the sky blue?”，数据用网站英文版的同一份导出 `public/data/en/e01`（英文系统提示、采样参数和中文相同）。开场逐字母打字（没有输入法），片名 “How Does AI Think Up a Single Word?”，字幕是白话英文、Noto Serif / Noto Sans。戏剧点由 `score.js` 里的 `findDrama` 从英文数据里找：逻辑透镜在第 15 层最想“什么都不说”（结束符 83%），第 17 层 “The” 领先（52%）；拆开第 19 层，第 13 号头 74% 的注意力给了 “sky”（点积 178.3）；这次 3072 个开关亮了 157 个；第 6 个词 “it” 49% / “of” 38%，抽中了 “of”。片尾录的是推理页英文界面，二维码指向 `caijiechao.com/blackbox/?lang=en`。
+
 全片只演示一次逐数计算（注意力里的一次点积）。讲解的写法是一次只讲一件事：顶部有一条很小的章节进度条；任何时刻最多一行白话字幕，加一个小号术语标签；正在讲的东西用高亮或指示环点出来，其他压暗。配乐由 `compose.py` 用 numpy / scipy 现场合成，讲解段落更安静。
 
 | 文件 | 作用 |
@@ -622,7 +624,7 @@ git push deploy main                                               # 发布（�
 重新生成（帧序列、配乐、成片都放 D 盘，不放仓库里）：
 
 ```bash
-# 需要 /mnt/d/cjc/videos/llm-inference/fonts/ 下的 NotoSerifSC-{Black,SemiBold}.otf 和 NotoSansSC-VF.ttf（都是 SIL OFL）
+# 需要 /mnt/d/cjc/videos/llm-inference/fonts/ 下的 NotoSerifSC-{Black,SemiBold}.otf 和 NotoSansSC-VF.ttf（都是 SIL OFL）；英文版另需 NotoSerif-VF.ttf 和 NotoSans-VF.ttf
 python tools/video/serve.py --port 8776 &
 O=/mnt/d/cjc/videos/llm-inference
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/make_qr.py                 # 只在网址变了时需要（uv pip install segno）
@@ -633,6 +635,14 @@ node tools/video/render.mjs events --out tools/video/events.json
 bash tools/video/encode.sh $O/frames60 $O/score.wav $O/qwen3-inference-v7.mp4 60
 bash tools/video/share.sh $O/frames60 $O/score.wav $O/qwen3-inference-v7-share.mp4
 node tools/video/render.mjs poster --out $O/poster-v7.png                   # 默认取片名落版那一刻
+# 英文版：数据从 $O/data-en/（public/data/en/ 的拷贝）读，录屏放 $O/sitecap-en/，帧、配乐、成片都单独放
+node tools/video/sitecap.mjs --lang en --out $O/sitecap-en
+node tools/video/render.mjs frames --lang en --out $O/frames60-en --fps 60 --workers 4
+node tools/video/render.mjs events --lang en --out tools/video/events-en.json
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/compose.py --events tools/video/events-en.json --out $O/score-en.wav
+TITLE="How Does AI Think Up a Single Word? · Inside the black box of LLM inference (real Qwen3-0.6B run)" bash tools/video/encode.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en.mp4 60
+TITLE="..." bash tools/video/share.sh $O/frames60-en $O/score-en.wav $O/qwen3-inference-v7-en-share.mp4
+node tools/video/render.mjs poster --lang en --out $O/poster-v7-en.png
 python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/review   # 可选：联系表
 ```
 
