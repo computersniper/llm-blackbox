@@ -60,7 +60,7 @@
       <a href="../world/" data-i18n="nav.world">世界模型</a>
       <a href="../learn/" data-i18n="nav.learn">学习</a>
     </nav>
-    <script>(function(){var n=document.querySelector('.site-nav'),a=n&&n.querySelector('[aria-current]');if(a&&n.scrollWidth>n.clientWidth)n.scrollLeft=a.offsetLeft-(n.clientWidth-a.offsetWidth)/2;})();</script>
+    <script>(function(){var n=document.querySelector('.site-nav'),a=n&&n.querySelector('[aria-current]');if(a&&n.scrollWidth>n.clientWidth){var c=a.getBoundingClientRect(),b=n.getBoundingClientRect();n.scrollLeft+=c.left-b.left-(b.width-c.width)/2}})();</script>
     <nav class="crumbs" id="crumbs" aria-label="当前深度" data-i18n-attr="aria-label:tr.crumbs"></nav>
     <div class="top-actions">
       <span id="langSwitch"></span>

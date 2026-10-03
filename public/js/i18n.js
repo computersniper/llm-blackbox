@@ -63,7 +63,9 @@ export function applyDom(root = document) {
 export function scrollNavToCurrent() {
   const go = () => {
     const nav = document.querySelector('.site-nav'), cur = nav && nav.querySelector('[aria-current]');
-    if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
+    if (!cur || nav.scrollWidth <= nav.clientWidth) return;
+    const c = cur.getBoundingClientRect(), n = nav.getBoundingClientRect();   // 按导航自己的坐标算（offsetLeft 是相对顶栏的，会把品牌宽度算进去）
+    nav.scrollLeft += c.left - n.left - (n.width - c.width) / 2;
   };
   go();
   requestAnimationFrame(go);
@@ -81,7 +83,11 @@ export function mountLangSwitch(el) {
   el.classList.add('lang-switch');
   el.setAttribute('role', 'group');
   el.setAttribute('aria-label', isEn ? 'Language' : '语言');
-  el.innerHTML = `<button type="button" data-l="zh" aria-pressed="${!isEn}" lang="zh-CN">中</button><button type="button" data-l="en" aria-pressed="${isEn}" lang="en">EN</button>`;
+  el.title = isEn ? '切换到中文 / Language' : 'Switch to English / 语言';
+  // 宽屏写全称「中文 | English」，窄屏（app.css ≤560px）只留「中 | EN」
+  el.innerHTML = `<svg class="ls-globe" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.6 2.8 3.9 5.8 3.9 9s-1.3 6.2-3.9 9c-2.6-2.8-3.9-5.8-3.9-9S9.4 5.8 12 3z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`
+    + `<button type="button" data-l="zh" aria-pressed="${!isEn}" lang="zh-CN"><span class="ls-long">中文</span><span class="ls-short">中</span></button>`
+    + `<button type="button" data-l="en" aria-pressed="${isEn}" lang="en"><span class="ls-long">English</span><span class="ls-short">EN</span></button>`;
   el.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-l]');
     if (b && b.dataset.l !== lang) setLang(b.dataset.l);

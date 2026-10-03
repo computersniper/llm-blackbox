@@ -274,12 +274,13 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
   .site-nav a { padding: 3px 3px; font-size: 11px; }
 }
 
-/* 手机上六个导航链接放不下时：导航可以左右滑，右边缘渐隐提示；右侧按钮永远不被挤出去 */
-@media (max-width: 560px) {
-  .site-nav { flex: 0 1 auto; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); }
-  .site-nav::-webkit-scrollbar { display: none; }
-  .site-nav a { flex: none; white-space: nowrap; }
-  .top-actions { flex: none; }
+/* 导航放不下时（平板、手机、英文更长）：导航可以缩窄、左右滑；右侧按钮永远不被挤出去 */
+.site-nav { flex: 0 1 auto; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.site-nav::-webkit-scrollbar { display: none; }
+.site-nav a { flex: none; white-space: nowrap; }
+.top-actions { flex: none; }
+@media (max-width: 1100px) {
+  .site-nav { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -318,6 +319,10 @@ body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
 .lang-switch button { border: 0; background: none; padding: 0 8px; height: 28px; border-radius: 999px; color: var(--dim); font: 600 11.5px/1 var(--mono); cursor: pointer; transition: color .2s, background .2s; }
 .lang-switch button:hover { color: var(--ink); }
 .lang-switch button[aria-pressed="true"] { color: #04121a; background: var(--acc); }
+.lang-switch { align-items: center; }
+.lang-switch .ls-globe { flex: none; margin: 0 2px 0 7px; color: var(--dim); }
+.lang-switch .ls-short { display: none; }
+@media (max-width: 1100px) { .lang-switch .ls-long, .lang-switch .ls-globe { display: none; } .lang-switch .ls-short { display: inline; } }
 html[lang="en"] .brand-zh { display: none; }   /* 英文模式：TRAINING 已经说明了是哪一页，把位置让给面包屑 */
 /* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的，夹在英文里会空出一大块）；诗句等中文照常落到后面的中文字体 */
 html[lang="en"] { --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
