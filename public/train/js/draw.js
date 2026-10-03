@@ -203,8 +203,8 @@ export function sci(v, d = 3) {
   if (!Number.isFinite(v)) return String(v);
   const a = Math.abs(v);
   if (a >= 1e-3 && a < 1e4) return (v < 0 ? '−' : '') + a.toPrecision(d + 1).replace(/\.?0+$/, (m) => (m.includes('.') ? '' : m));
-  const e = Math.floor(Math.log10(a));
-  const m = a / 10 ** e;
+  let e = Math.floor(Math.log10(a)), m = a / 10 ** e;
+  if (Number(m.toFixed(d - 1)) >= 10) { e += 1; m /= 10; }   // 9.9996 → 1.00e+1，不写成 10.00
   return `${v < 0 ? '−' : ''}${m.toFixed(d - 1)}e${e}`;
 }
 // 上标形式：1.23 × 10⁻⁵
@@ -213,8 +213,8 @@ export function sciSup(v, d = 3) {
   if (v === 0) return '0';
   const a = Math.abs(v);
   if (a >= 1e-3 && a < 1e4) return (v < 0 ? '−' : '') + Number(a.toPrecision(d)).toString();
-  const e = Math.floor(Math.log10(a));
-  const m = a / 10 ** e;
+  let e = Math.floor(Math.log10(a)), m = a / 10 ** e;
+  if (Number(m.toFixed(d - 1)) >= 10) { e += 1; m /= 10; }
   return `${v < 0 ? '−' : ''}${m.toFixed(d - 1)}×10${String(e).split('').map((c) => SUP[c]).join('')}`;
 }
 export const fmtInt = (n) => Math.round(n).toLocaleString('zh-CN');

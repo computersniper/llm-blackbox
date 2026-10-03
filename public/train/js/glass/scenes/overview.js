@@ -128,8 +128,32 @@ export class GInit extends Base {
     text(g, L('对照：Qwen3-0.6B 约 6 亿个数，同样的结构', 'For scale: Qwen3-0.6B has ~600 million, same kind of parts'), C.x + 14, C.y + C.h - 12, { size: 10, color: COL.dim, max: C.w - 28 });
   }
 
+  // 全零对照：训练 200 步以后，两次真实训练的 E 和 W_q 并排（全零那次 200 步里 max |w| 始终是 0，所以画出来就是全零）
+  drawAfter(g, st, env) {
+    const C = this.cards.hist, D = this.D, K = D.NF - 1;
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('AFTER 200 STEPS · 两次真实训练并排', 'AFTER 200 STEPS · TWO REAL RUNS SIDE BY SIDE'), title: L('训练 200 步以后', 'After 200 training steps'), accent: COL.rose, active: true });
+    const cols = [[L('正态初始化', 'normal init'), COL.cyan, false], [L('全零初始化', 'all-zero init'), COL.rose, true]];
+    const have = D.has('w', K);
+    const W = have ? D.W(K) : null;
+    cols.forEach(([lab, col, zero], ci) => {
+      const x0 = C.x + 18 + ci * ((C.w - 36) / 2);
+      text(g, lab, x0, C.y + 62, { size: 11, color: col, weight: 600 });
+      [['E', 20, 16, 4.4], ['Wq', 16, 16, 4.4]].forEach(([name, rows, ncols, cell], j) => {
+        const p = D.pIndex.get(name), x = x0 + j * (ncols * cell + 14), y = C.y + 74;
+        text(g, TENSOR_LABEL[name], x, y + rows * cell + 12, { size: 9, kind: 'mono', color: COL.dim });
+        if (!zero && !have) { waitBox(g, x, y, ncols * cell, rows * cell, env, st.wait, { label: '', size: 9 }); return; }
+        let sc = 0;
+        if (!zero) for (let q = p.off; q < p.off + p.n; q++) sc = Math.max(sc, Math.abs(W[q]));
+        heat(g, x, y, rows, ncols, cell, cell, (r, c) => (zero ? 0 : W[p.off + r * ncols + c]), { scale: sc * 0.8 || 1, s: env.s });
+      });
+    });
+    const z = D.meta.runs.zero;
+    wrap(g, L(`右边：200 步里梯度范数始终 ${z.maxGnorm}、max |w| 始终 ${z.maxAbsW}，损失一直 ${z.finalEval.toFixed(3)}。左边同样 200 步，损失降到 ${D.meta.train.finalEval.toFixed(3)}。`, `Right: over 200 steps the gradient norm stayed ${z.maxGnorm}, max |w| stayed ${z.maxAbsW}, loss stuck at ${z.finalEval.toFixed(3)}. Left, same 200 steps: loss down to ${D.meta.train.finalEval.toFixed(3)}.`), C.x + 18, C.y + C.h - 26, C.w - 36, 13, { size: 9.5, color: COL.dim });
+  }
+
   // 初始值的直方图（真实的 2,880 个矩阵参数）+ 理论的正态曲线
   drawHist(g, st, env, on, which) {
+    if (which === 'zero') return this.drawAfter(g, st, env);
     const C = this.cards.hist, D = this.D;
     const big = which === 'big';
     card(g, C.x, C.y, C.w, C.h, { eyebrow: L('INIT · 初始值的分布（真实的 2,880 个）', 'INIT · DISTRIBUTION OF THE REAL 2,880'), title: big ? L('放大 50 倍：N(0, 1²)', '50× larger: N(0, 1²)') : L('正态分布 N(0, 0.02²)', 'Normal distribution N(0, 0.02²)'), accent: COL.cyan, active: on });

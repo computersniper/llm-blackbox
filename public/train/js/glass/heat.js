@@ -111,8 +111,9 @@ export function fnum(v, d = 3) {
   if (v === 0) return '0';
   const a = Math.abs(v);
   if (a >= 1e-3 && a < 1e4) return (v < 0 ? '−' : '') + Number(a.toPrecision(d)).toString();
-  const e = Math.floor(Math.log10(a));
-  return `${v < 0 ? '−' : ''}${(a / 10 ** e).toFixed(d - 1)}e${e}`;
+  let e = Math.floor(Math.log10(a)), m = a / 10 ** e;
+  if (Number(m.toFixed(d - 1)) >= 10) { e += 1; m /= 10; }
+  return `${v < 0 ? '−' : ''}${m.toFixed(d - 1)}e${e}`;
 }
 
 // 一组数的“典型大小”：绝对值的某个分位（色标用；比最大值稳，不会被一个特别大的数压暗全图）
