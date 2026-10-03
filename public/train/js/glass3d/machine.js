@@ -511,7 +511,7 @@ export class GlassMachine {
       add2: add(L('⊕ 加回残差', '⊕ add to residual'), 'hint gr', SPINE.x0 - 0.12, Y.add2, 0.2, 1, 0.5),
     };
     this.lGauge = add('', 'big gg', GAUGE.x + 0.3, GAUGE.y + 0.6, 0, 0, 0.5);
-    this.lClip = add('', 'num gc', GAUGE.x + 0.3, GAUGE.y + 1.6, 0, 0, 0.5);
+    this.lClip = add('', 'num gc', GAUGE.x + 0.3, GAUGE.y - 0.3, 0.2, 0, 0);
     this.lGap = add('', 'num gt', WHEEL.x, WHEEL.y - WHEEL.r - 0.25, 0.3, 0.5, 0);
     this.lWheel = add(L('《静夜思》首尾相接 · 25 个字', '静夜思 looped · 25 characters'), 'hint gw2', WHEEL.x, WHEEL.y + WHEEL.r + 0.2, 0.3, 0.5, 1);
     this.lTray = add(L('这一步的批次：8 段 × 8 个字（最前一排是第 0 段）', 'This step’s batch: 8 windows × 8 characters (front row = window 0)'), 'hint gw2', (SPINE.x0 + SPINE.x1) / 2, -0.12, 0.6, 0.5, 0);
@@ -667,8 +667,8 @@ export class GlassMachine {
     this.updSpine(st, F, haveF, t);
     this.updFeed(st, F);
     this.updHead(st, F, kw);
-    this.updLabels(st, F, kw, haveF);
-    this.updMarks(st, F);
+    this.updLabels(st, F);
+    this.updMarks(st);
     const close = st.view === 'g-mat' || st.view === 'g-param';
     const bl = close ? 0.18 : st.view === 'g-op' ? 0.24 : 0.3;
     this.E.bloom.strength += (bl - this.E.bloom.strength) * Math.min(1, dt * 3);
@@ -687,10 +687,8 @@ export class GlassMachine {
       csM = INIT_CS; csG = 0.05;
       if (s.sub === 'hist') reveal = easeOut(Math.min(1, p * 1.5));
       // 换初始化的时候，方块从上一种慢慢变过去
-      const prev = this.initFrom ?? initMode;
       if (this.initMode !== initMode) { this.initFrom = this.initMode || initMode; this.initMode = initMode; this.initT0 = t; }
       this.initMix = Math.min(1, (t - (this.initT0 ?? t)) / 0.9);
-      void prev;
     } else {
       this.initMode = null;
       if (kw < 0) W = D.w0;
@@ -862,10 +860,8 @@ export class GlassMachine {
     this.pulseB.count = n;
     this.pulseB.instanceMatrix.needsUpdate = true;
     this.pulseB.material.opacity = 0.55 + 0.25 * Math.sin(t * 9);
-    // 光柱：前向走过的地方更亮
-    const yF = fOn ? lerpK(F.fwd, FK) : F.fwd >= 10 ? SPINE.top : 0.32;
+    // 光柱：有数据流过时亮一点
     for (const c of this.cols) c.material.opacity = (F.fwd >= 0 ? 0.32 : 0.16) + (fOn ? 0.15 : 0);
-    void yF;
     // 环 / 连接管：前向或反向正经过这个算子时亮
     const opOn = (name) => { const fi = FWD_OPS.indexOf(name), bi = BWD_OPS.indexOf(name); return (F.fwd > fi && F.fwd < fi + 1) || (F.bwd > bi && F.bwd < bi + 1); };
     const lit = (o, on, base = 0.16, hi = 0.75) => { o.material.opacity += ((on ? hi : base) - o.material.opacity) * 0.25; };
@@ -887,7 +883,7 @@ export class GlassMachine {
 
   // 语料轮 → 托盘：这一步的 8 段从轮子上切下来，字块飞进托盘；第 0 段错开一位的答案排在最前面
   updFeed(st, F) {
-    const D = this.D, s = st.step, o = this.tok0;
+    const D = this.D, o = this.tok0;
     const tStep = D.FR[st.k];
     const show = F.feed >= 0;
     // 轮子上这一步的 8 个切口
@@ -935,7 +931,6 @@ export class GlassMachine {
     }
     this.tokBody.instanceMatrix.needsUpdate = true;
     this.tokFace.instanceMatrix.needsUpdate = true;
-    void s;
   }
 
   // 概率架：前向到最后升起来（真实概率），正确答案绿框；损失：每个位置 −ln p、整批平均
@@ -968,11 +963,9 @@ export class GlassMachine {
     this.marks.material.opacity = 0.85 * rise;
     // −ln p
     const na = this.nll.instanceMatrix.array, nc = this.nll.instanceColor.array;
-    let sum = 0;
     for (let p = 0; p < T; p++) {
       const pr = have ? D.probs(k, p, D.fixed[p + 1]) : 1, nl = -Math.log(Math.max(pr, 1e-9));
       const f = clamp01(F.lossUpTo - p);
-      sum += nl;
       const o = p * 16;
       na[o] = 1; na[o + 5] = Math.max(0.002, Math.min(1, nl / 3.2) * GAUGE.hMax * 0.6 * f); na[o + 10] = 1;
       na[o + 12] = SHELF.x0 + V * SHELF.px + 0.32; na[o + 13] = SHELF.y; na[o + 14] = shelfZ(p);
@@ -984,17 +977,15 @@ export class GlassMachine {
     this.nll.instanceColor.needsUpdate = true;
     const L0 = have ? D.loss[D.FR[k]] : 0;
     this.gauge.scale.y = Math.max(0.001, Math.min(1, L0 / 3.2) * GAUGE.hMax * F.lossMean);
-    this.rowMean = sum / T;
   }
 
-  updLabels(st, F, kw, haveF) {
+  updLabels(st, F) {
     const D = this.D, v = st.view, s = st.step, k = st.k;
-    const far = v === 'g-init' || v === 'g-run' || v === 'g-step';
+    const far = v === 'g-init' || v === 'g-run' || v === 'g-step' || (v === 'g-op' && s.ph === 'upd' && s.sub === 'clip');
     const focusT = s.t ? s.t : null;
     // 参数块：远景只留名字，近景加形状；γ 条太小，远景不标
     for (const [id, o] of Object.entries(this.lw)) {
       const b = BLOCK[id], isG = b.t.startsWith('g');
-      const t = b.mirror ? 'ET' : b.t;
       const mine = focusT && (focusT === b.t) && (v === 'g-mat' || v === 'g-param');
       // 窄屏的远景里标签相对更大：同一排并列的几块只标第一块（W_q 代表 q k v，W_gate 代表 gate up）
       let show = (!isG || !far) && !(far && this.small && (id === 'Wk' || id === 'Wv' || id === 'Wu'));
@@ -1005,7 +996,6 @@ export class GlassMachine {
       const html = far ? `${o.short}` : o.full;
       if (o.el._h !== html) { o.el.innerHTML = html; o.el._h = html; }
       o.el.classList.toggle('on', !!mine || (v === 'g-op' && this.inOp(b) && s.ph !== 'loss'));
-      void t;
     }
     for (const [id, o] of Object.entries(this.la)) {
       const b = BLOCK[id];
@@ -1047,7 +1037,6 @@ export class GlassMachine {
       const html = { model: L('出厂状态 · 还没训练 · 2,928 个参数', 'Factory state · untrained · 2,928 parameters'), hist: L('出厂状态 · 每个参数是一个很小的随机数', 'Factory state · each parameter a small random number'), zero: L('对照：全部设成 0（γ 仍为 1）', 'Control: everything set to 0 (γ still 1)'), big: L('对照：放大 50 倍 N(0, 1²)', 'Control: 50× larger N(0, 1²)') }[s.sub];
       if (this.lFactory.el._h !== html) { this.lFactory.el.innerHTML = html; this.lFactory.el._h = html; }
     }
-    void kw; void haveF;
   }
 
   // 这一块是不是当前算子用到的（D3 标签、D2 高亮）
@@ -1086,7 +1075,7 @@ export class GlassMachine {
   }
 
   // 选中的参数：方块外面的框；D5 再框出它乘到的输入那一行、输出那一列
-  updMarks(st, F) {
+  updMarks(st) {
     const D = this.D, s = st.step;
     const place = (m, x, y, z, w, h, d) => { m.position.set(x, y, z); m.scale.set(w, h, d); m.visible = true; };
     // 悬停
@@ -1129,7 +1118,6 @@ export class GlassMachine {
       else slice(this.mOut, 'h0', true, lc.j);
     } else if (lc.p.norm) slice(this.mOut, outId, true, lc.i);
     else { slice(this.mIn, inId, true, lc.i); slice(this.mOut, outId, false, lc.j); }
-    void F;
   }
 
   /* ================================================================ 拾取 / 提示 */
