@@ -5,7 +5,6 @@ import { GlassMachine } from './machine.js';
 import { GlassBoard } from './board.js';
 import { defaultParam, adamAt } from '../glass/math.js';
 import { fnum } from '../glass/heat.js';
-import { L } from '../lang.js';
 
 export class GlassStage {
   constructor(host, stageEl, D, app, { state, onTip, onFreeChange, scrub }) {
@@ -79,4 +78,3 @@ export class GlassStage {
   }
 }
 
-export const HINT_3D = () => L('在机器里自由走动', 'Walk around the machine');

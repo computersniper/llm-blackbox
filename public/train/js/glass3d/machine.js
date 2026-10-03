@@ -7,9 +7,8 @@
 //   反向：玫红色的脉冲倒流回去，激活换成它们的梯度，每块面板按真实的 |∂L/∂w| 发光；
 //   更新：每个方块按真实的 Δw 往前顶出 / 往后沉下（紫色），再落到新值。
 // 和推理页的机器一样，一切都由 update(st) 根据当前步骤算出来：暂停、单步、回退都能正确显示。
-import { THREE, textTexture, label, easeOut, easeInOut, seg } from '../../../js/stage/engine.js';
-import { RoundedBoxGeometry } from '../../../js/vendor/three/addons/geometries/RoundedBoxGeometry.js';
-import { C, FACE, SP, xPos, SPINE, Y, BLOCKS, BLOCK, cellX, cellY, SHELF, shelfX, shelfZ, GAUGE, WHEEL, TRAY, BOUNDS, OP_RECT, TENSOR_PARTS, unionRect } from './layout.js';
+import { THREE, label, easeOut, easeInOut, seg } from '../../../js/stage/engine.js';
+import { FACE, xPos, SPINE, Y, BLOCKS, BLOCK, cellX, cellY, SHELF, shelfX, shelfZ, GAUGE, WHEEL, TRAY, BOUNDS, OP_RECT, TENSOR_PARTS, unionRect } from './layout.js';
 import { divInto, gradInto, seqInto, LIN } from './palette.js';
 import { G_PHASES, FWD_OPS, BWD_OPS, FWD_TENSORS, BWD_TENSORS, UPD_TENSORS, ADAM_SUBS } from '../glass/timeline.js';
 import { TENSOR_LABEL } from '../glass/data.js';
@@ -19,7 +18,7 @@ import { L } from '../lang.js';
 import { esc } from '../../../js/ui.js';
 
 const HS_MAT = 0.55, HS_G = 0.85;          // 方块厚度的满格：矩阵 |w| = 0.55、γ 的 |γ − 1| = 0.85（训练结束时的量级，看得出越练越厚）
-const H0 = 0.012, HK = 0.3;                // 方块厚度 = H0 + HK × (|w| / 满格)^0.85
+const H0 = 0.012, HK = 0.36;                // 方块厚度 = H0 + HK × (|w| / 满格)^0.85
 const INIT_CS = 0.06;                      // 初始化时的色标（±3 个标准差）
 const POP = 0.15;                          // Δw = 一个 lr 时方块顶出 / 沉下的距离
 
@@ -99,6 +98,7 @@ export class GlassMachine {
     this.buildHead();
     this.buildLabels();
     this.buildMarks();
+    this.fixBounds();
   }
 
   /* ================================================================ 搭机器 */
@@ -192,7 +192,7 @@ export class GlassMachine {
     this.aBlk = [];
     this.aR = new Int16Array(n);
     this.aC = new Int16Array(n);
-    const geo = new THREE.BoxGeometry(1, 1, 0.022);
+    const geo = new THREE.PlaneGeometry(1, 1);
     this.acts = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0xffffff }), n);
     this.acts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
     this.acts.frustumCulled = false;
@@ -258,7 +258,7 @@ export class GlassMachine {
   }
 
   tube(curve, color, r = 0.014) {
-    const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, r, 6, false), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, r, 5, false), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, depthWrite: false }));
     m.raycast = () => {};
     this.root.add(m);
     return m;
@@ -289,47 +289,61 @@ export class GlassMachine {
 
   /* ---------------------------------------------------------------- 进料：语料轮、托盘、字块 */
 
+  // 字块：轮子上 25 块 + 托盘里 64 块 + 第 0 段的 8 个答案，方块和字面各用一个 InstancedMesh（字面查一张字表贴图）
   buildFeed() {
-    const D = this.D, NS = D.stream.length;
+    const D = this.D, NS = D.stream.length, B = D.B, T = D.T;
     const g = (this.feed = new THREE.Group());
     this.root.add(g);
-    this.tileGeo = new RoundedBoxGeometry(0.26, 0.22, 0.2, 2, 0.03);
-    this.faceGeo = new THREE.PlaneGeometry(0.22, 0.19);
-    const faceMat = new Map();
-    this.face = (ch, color) => {
-      const key = `${ch}|${color}`;
-      if (!faceMat.has(key)) { const m = new THREE.MeshBasicMaterial({ map: textTexture(ch, { color, font: '600 92px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif' }), transparent: true }); m.userData.shared = true; faceMat.set(key, m); }
-      return faceMat.get(key);
+    // 字表：20 个字 × 4 种颜色（轮子 / 第 0 段 / 其余 7 段 / 答案）
+    const COLS = ['#b4bed2', '#ffd9a6', '#b8cdf5', '#bff8ec'], CELL = 96, V = D.V;
+    const cv = document.createElement('canvas');
+    cv.width = CELL * V; cv.height = CELL * COLS.length;
+    const cx = cv.getContext('2d');
+    cx.font = `600 ${Math.round(CELL * 0.62)}px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif`;
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    COLS.forEach((c, r) => { cx.fillStyle = c; for (let v = 0; v < V; v++) cx.fillText(D.ch(v), CELL * v + CELL / 2, CELL * r + CELL * 0.54); });
+    const atlas = new THREE.CanvasTexture(cv);
+    atlas.colorSpace = THREE.SRGBColorSpace;
+    atlas.anisotropy = 4;
+    this.nTok = NS + B * T + T;
+    this.tok0 = { wheel: 0, tray: NS, tgt: NS + B * T };
+    const bodyGeo = new THREE.BoxGeometry(0.26, 0.22, 0.2);
+    this.tokBody = new THREE.InstancedMesh(bodyGeo, cubeMaterial(0.3), this.nTok);
+    this.tokBody.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.nTok * 3), 3);
+    const faceGeo = new THREE.PlaneGeometry(0.22, 0.19);
+    this.tokUv = new THREE.InstancedBufferAttribute(new Float32Array(this.nTok * 2), 2);
+    faceGeo.setAttribute('aUv', this.tokUv);
+    const fm = new THREE.MeshBasicMaterial({ map: atlas, transparent: true, depthWrite: false });
+    fm.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <uv_pars_vertex>', '#include <uv_pars_vertex>\nattribute vec2 aUv;')
+        .replace('#include <uv_vertex>', `#include <uv_vertex>\n\tvMapUv = vec2((aUv.x + vMapUv.x) / ${V}.0, 1.0 - (aUv.y + 1.0 - vMapUv.y) / ${COLS.length}.0);`);
     };
-    const bodyMat = (c, e) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c).multiplyScalar(0.25), emissive: c, emissiveIntensity: e, roughness: 0.4, metalness: 0.2 });
+    this.tokFace = new THREE.InstancedMesh(faceGeo, fm, this.nTok);
+    for (const m of [this.tokBody, this.tokFace]) { m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(m); }
+    this.tokFace.raycast = () => {};
+    const bc = this.tokBody.instanceColor.array;
+    const setCol = (i, c, k) => { const col = new THREE.Color(c); bc[i * 3] = col.r * k; bc[i * 3 + 1] = col.g * k; bc[i * 3 + 2] = col.b * k; };
+    for (let i = 0; i < NS; i++) { setCol(i, 0x8fa6d6, 0.32); this.tokUv.setXY(i, D.stream[i], 0); }
+    for (let b = 0; b < B; b++) for (let i = 0; i < T; i++) setCol(NS + b * T + i, b === 0 ? 0xffb65c : 0x6b9bff, b === 0 ? 0.42 : 0.26);
+    for (let i = 0; i < T; i++) setCol(NS + B * T + i, 0x5ef0d4, 0.4);
+    this.tokBody.instanceColor.needsUpdate = true;
+    this.tokBody.userData.pick = (hit) => {
+      const i = hit.instanceId;
+      if (i < NS) return { type: 'wheel', i };
+      if (i < NS + B * T) return { type: 'tok', b: Math.floor((i - NS) / T), i: (i - NS) % T };
+      return { type: 'tgt', i: i - NS - B * T };
+    };
+    this.E.pickables.push(this.tokBody);
     // 语料轮
     const wheel = (this.wheel = new THREE.Group());
     wheel.position.set(WHEEL.x, WHEEL.y, WHEEL.z);
     g.add(wheel);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(WHEEL.r, 0.012, 6, 80), new THREE.MeshBasicMaterial({ color: 0x2c4a70, transparent: true, opacity: 0.6 }));
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(WHEEL.r, 0.012, 6, 64), new THREE.MeshBasicMaterial({ color: 0x2c4a70, transparent: true, opacity: 0.6 }));
     rim.raycast = () => {};
-    wheel.add(rim);
-    const hub = new THREE.Mesh(new THREE.CircleGeometry(WHEEL.r - 0.24, 48), new THREE.MeshBasicMaterial({ color: 0x0a1222, transparent: true, opacity: 0.55, depthWrite: false }));
+    const hub = new THREE.Mesh(new THREE.CircleGeometry(WHEEL.r - 0.24, 40), new THREE.MeshBasicMaterial({ color: 0x0a1222, transparent: true, opacity: 0.55, depthWrite: false }));
     hub.position.z = -0.06;
     hub.raycast = () => {};
-    wheel.add(hub);
-    this.wheelTiles = [];
-    const tileMat = bodyMat(0x8fa6d6, 0.06);
-    for (let i = 0; i < NS; i++) {
-      const a = Math.PI / 2 - (i / NS) * Math.PI * 2;
-      const t = new THREE.Group();
-      t.position.set(Math.cos(a) * WHEEL.r, Math.sin(a) * WHEEL.r, 0);
-      const body = new THREE.Mesh(this.tileGeo, tileMat);
-      body.scale.setScalar(0.9);
-      const f = new THREE.Mesh(this.faceGeo, this.face(D.ch(D.stream[i]), '#b4bed2'));
-      f.position.z = 0.092;
-      f.scale.setScalar(0.9);
-      t.add(body, f);
-      body.userData.pick = { type: 'wheel', i };
-      this.E.pickables.push(body);
-      wheel.add(t);
-      this.wheelTiles.push(t);
-    }
+    wheel.add(rim, hub);
     this.wheelArcs = new THREE.Group();
     wheel.add(this.wheelArcs);
     this.arcKey = '';
@@ -339,36 +353,6 @@ export class GlassMachine {
     const te = new THREE.LineSegments(new THREE.EdgesGeometry(tray.geometry), new THREE.LineBasicMaterial({ color: 0x2c6b8a, transparent: true, opacity: 0.6 }));
     te.position.copy(tray.position);
     g.add(tray, te);
-    // 64 个输入字块 + 第 0 段错开一位的 8 个答案
-    this.seg0Mat = bodyMat(0xffb65c, 0.1);
-    this.segMat = bodyMat(0x6b9bff, 0.05);
-    this.tgtMat = bodyMat(0x5ef0d4, 0.1);
-    this.blocks = [];
-    for (let b = 0; b < D.B; b++) for (let i = 0; i < D.T; i++) {
-      const t = new THREE.Group();
-      const body = new THREE.Mesh(this.tileGeo, b === 0 ? this.seg0Mat : this.segMat);
-      const f = new THREE.Mesh(this.faceGeo, this.face('?', '#fff'));
-      f.position.z = 0.102;
-      t.add(body, f);
-      t.visible = false;
-      body.userData.pick = { type: 'tok', b, i };
-      this.E.pickables.push(body);
-      g.add(t);
-      this.blocks.push({ g: t, f, b, i, body });
-    }
-    this.targets = [];
-    for (let i = 0; i < D.T; i++) {
-      const t = new THREE.Group();
-      const body = new THREE.Mesh(this.tileGeo, this.tgtMat);
-      const f = new THREE.Mesh(this.faceGeo, this.face('?', '#fff'));
-      f.position.z = 0.102;
-      t.add(body, f);
-      t.visible = false;
-      body.userData.pick = { type: 'tgt', i };
-      this.E.pickables.push(body);
-      g.add(t);
-      this.targets.push({ g: t, f, i });
-    }
     this.batchT = -1;
   }
 
@@ -376,15 +360,29 @@ export class GlassMachine {
   slot(b, i) { return new THREE.Vector3(xPos(i), TRAY.y + b * 0.085, -b * TRAY.dz); }
   wheelPos(si) {
     const NS = this.D.stream.length, a = Math.PI / 2 - (((si % NS) + NS) % NS / NS) * Math.PI * 2;
-    return new THREE.Vector3(WHEEL.x + Math.cos(a) * WHEEL.r, WHEEL.y + Math.sin(a) * WHEEL.r, WHEEL.z + 0.05);
+    return new THREE.Vector3(WHEEL.x + Math.cos(a) * WHEEL.r, WHEEL.y + Math.sin(a) * WHEEL.r, WHEEL.z);
   }
 
   setBatch(t) {
     if (t === this.batchT) return;
     this.batchT = t;
-    const D = this.D, bt = D.batch(t);
-    for (const k of this.blocks) k.f.material = this.face(D.ch(bt[k.b][k.i]), k.b === 0 ? '#ffd9a6' : '#b8cdf5');
-    for (const k of this.targets) k.f.material = this.face(D.ch(bt[0][k.i + 1]), '#bff8ec');
+    const D = this.D, bt = D.batch(t), o = this.tok0;
+    for (let b = 0; b < D.B; b++) for (let i = 0; i < D.T; i++) this.tokUv.setXY(o.tray + b * D.T + i, bt[b][i], b === 0 ? 1 : 2);
+    for (let i = 0; i < D.T; i++) this.tokUv.setXY(o.tgt + i, bt[0][i + 1], 3);
+    this.tokUv.needsUpdate = true;
+  }
+
+  // 一个字块放到 (x, y, z)，缩放 s，绕 y 转 ry；s = 0 藏起来
+  placeTok(i, pos, s, ry = 0) {
+    const m = this.tmpM || (this.tmpM = new THREE.Matrix4()), q = this.tmpQ || (this.tmpQ = new THREE.Quaternion()), sc = this.tmpS || (this.tmpS = new THREE.Vector3());
+    q.setFromAxisAngle(this.yAxis || (this.yAxis = new THREE.Vector3(0, 1, 0)), ry);
+    m.compose(pos, q, sc.set(s, s, s));
+    this.tokBody.setMatrixAt(i, m);
+    // 字面贴在方块正面
+    const f = this.tmpF || (this.tmpF = new THREE.Vector3());
+    f.set(0, 0, 0.102 * s).applyQuaternion(q).add(pos);
+    m.compose(f, q, sc);
+    this.tokFace.setMatrixAt(i, m);
   }
 
   /* ---------------------------------------------------------------- 输出：概率架和损失 */
@@ -538,6 +536,12 @@ export class GlassMachine {
     this.mOut = box(0x5ef0d4);
   }
 
+  // 拾取用的包围球：装得下整台机器（实例每帧都在动，不必每帧重算）
+  fixBounds() {
+    const sp = new THREE.Sphere(new THREE.Vector3((BOUNDS.x0 + BOUNDS.x1) / 2, (BOUNDS.y0 + BOUNDS.y1) / 2, 0), 32);
+    for (const m of [this.cubes, this.acts, this.bars, this.nll, this.tokBody]) m.boundingSphere = sp.clone();
+  }
+
   /* ================================================================ 状态 */
 
   // 暂停时单步过来：这一步的动画自己播一遍再停住；播放时跟着时间轴走
@@ -659,7 +663,7 @@ export class GlassMachine {
     this.updWeights(st, F, kw, haveF, p, t);
     this.updActs(st, F, haveF);
     this.updSpine(st, F, haveF, t);
-    this.updFeed(st, F, t);
+    this.updFeed(st, F);
     this.updHead(st, F, kw);
     this.updLabels(st, F, kw, haveF);
     this.updMarks(st, F);
@@ -707,13 +711,14 @@ export class GlassMachine {
       if (b.kind !== 'w') continue;
       const fwin = win(FW[b.id], fx), bwin = win(BW[b.id], bx);
       const u = F.upd[b.t] || { dw: 0, done: 0 };
-      const gOn = s.ph === 'init' ? 0 : bwin * (1 - u.dw);
+      const gOn = s.ph === 'init' ? 0 : bwin * (1 - Math.min(1, u.dw * 2.5));
       blkState.set(b, { fwin, bwin, u, gOn });
       if (fwin > 0 && fwin < 1 && !b.t.startsWith('g') && b.id !== 'E') scanOn.blk = b, scanOn.f = fwin;
     }
     const lookRow = new Set();
     if (fx > 0 && fx < 1) for (let q = 0; q < 8; q++) if (fx * 8 > q && fx * 8 < q + 1.6) lookRow.add(D.fixed[q]);
     const selGi = st.view === 'g-param' ? this.selGi : null;
+    let anyGlow = false;
     for (let i = 0; i < this.nW; i++) {
       const b = this.wBlk[i], gi = this.wGi[i], bs = blkState.get(b);
       const norm = b.t.charCodeAt(0) === 103; // 'g'
@@ -741,23 +746,24 @@ export class GlassMachine {
       // 发光层
       let gr = 0, gg = 0, gb = 0;
       if (G && bs.gOn > 0) {
-        const I = Math.pow(Math.min(1, Math.abs(G[gi]) / gqs[b.t]), 0.8) * bs.gOn * 0.75;
+        const I = Math.pow(Math.min(1, Math.abs(G[gi]) / gqs[b.t]), 1.3) * bs.gOn * 0.42;
         gr += LIN.rose[0] * I; gg += LIN.rose[1] * I; gb += LIN.rose[2] * I;
       }
       if (popA > 0) {
-        const I = Math.min(1, Math.abs(DW[gi]) / lr) * popA * 0.6;
+        const I = Math.min(1, Math.abs(DW[gi]) / lr) * popA * 0.32;
         gr += LIN.violet[0] * I; gg += LIN.violet[1] * I; gb += LIN.violet[2] * I;
       }
       if (b.id === 'E' && lookRow.size && lookRow.has(this.wR[i])) { gr += 0.22; gg += 0.5; gb += 0.45; }
       if (selGi != null && gi === selGi) { const I = 0.35 + 0.2 * Math.sin(t * 5); gr += I; gg += I * 0.85; gb += I * 0.6; }
       ga[o] = 1; ga[o + 5] = 1; ga[o + 10] = h + 0.03; ga[o + 12] = this.wX[i]; ga[o + 13] = this.wY[i]; ga[o + 14] = pop - 0.015;
       gca[i * 3] = gr; gca[i * 3 + 1] = gg; gca[i * 3 + 2] = gb;
+      if (gr + gg + gb > 0.003) anyGlow = true;
     }
+    this.glow.visible = anyGlow;
     this.cubes.instanceMatrix.needsUpdate = true;
     this.cubes.instanceColor.needsUpdate = true;
     this.glow.instanceMatrix.needsUpdate = true;
     this.glow.instanceColor.needsUpdate = true;
-    this.cubes.computeBoundingSphere();
     // 面板边框：正在算 / 梯度到了 / 更新中 换颜色
     for (const [b, bs] of blkState) {
       const e = b.plate.edge.material;
@@ -874,8 +880,8 @@ export class GlassMachine {
   }
 
   // 语料轮 → 托盘：这一步的 8 段从轮子上切下来，字块飞进托盘；第 0 段错开一位的答案排在最前面
-  updFeed(st, F, t) {
-    const D = this.D, s = st.step;
+  updFeed(st, F) {
+    const D = this.D, s = st.step, o = this.tok0;
     const tStep = D.FR[st.k];
     const show = F.feed >= 0;
     // 轮子上这一步的 8 个切口
@@ -887,45 +893,43 @@ export class GlassMachine {
       if (show) {
         const NS = D.stream.length;
         for (let b = D.B - 1; b >= 0; b--) {
-          const o = D.offs(tStep, b), r = WHEEL.r + 0.2 + b * 0.04;
-          const a0 = Math.PI / 2 - ((o - 0.45) / NS) * Math.PI * 2, a1 = Math.PI / 2 - ((o + D.T + 0.45) / NS) * Math.PI * 2;
+          const off = D.offs(tStep, b), r = WHEEL.r + 0.2 + b * 0.04;
+          const a0 = Math.PI / 2 - ((off - 0.45) / NS) * Math.PI * 2, a1 = Math.PI / 2 - ((off + D.T + 0.45) / NS) * Math.PI * 2;
           const pts = [];
-          for (let j = 0; j <= 40; j++) { const a = a0 + (a1 - a0) * (j / 40); pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0)); }
-          const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, b === 0 ? 0.022 : 0.012, 5, false), new THREE.MeshBasicMaterial({ color: b === 0 ? 0xffb65c : 0x6b9bff, transparent: true, opacity: b === 0 ? 0.85 : 0.45, depthWrite: false }));
+          for (let j = 0; j <= 24; j++) { const a = a0 + (a1 - a0) * (j / 24); pts.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, 0)); }
+          const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, b === 0 ? 0.022 : 0.012, 5, false), new THREE.MeshBasicMaterial({ color: b === 0 ? 0xffb65c : 0x6b9bff, transparent: true, opacity: b === 0 ? 0.85 : 0.45, depthWrite: false }));
           m.raycast = () => {};
           this.wheelArcs.add(m);
         }
       }
     }
-    this.wheelArcs.visible = show && F.feed < 1 || (s.ph === 'batch');
-    const T = D.T, B = D.B;
+    this.wheelArcs.visible = show;
+    const NS = D.stream.length, T = D.T, B = D.B;
+    for (let i = 0; i < NS; i++) this.placeTok(o.wheel + i, this.wheelPos(i), 0.9);
     const tmp = new THREE.Vector3();
-    for (const k of this.blocks) {
-      if (!show) { k.g.visible = false; continue; }
-      const order = k.b * T + k.i, d0 = (order / (B * T)) * 0.62, f = seg(F.feed, d0, d0 + 0.38);
-      k.g.visible = f > 0;
-      if (!k.g.visible) continue;
-      const from = this.wheelPos(D.offs(tStep, k.b) + k.i), to = this.slot(k.b, k.i);
+    for (let b = 0; b < B; b++) for (let i = 0; i < T; i++) {
+      const idx = o.tray + b * T + i;
+      const order = b * T + i, d0 = (order / (B * T)) * 0.62, f = show ? seg(F.feed, d0, d0 + 0.38) : 0;
+      if (f <= 0) { this.placeTok(idx, tmp.set(0, -50, 0), 0); continue; }
+      const from = this.wheelPos(D.offs(tStep, b) + i), to = this.slot(b, i);
       const e = easeInOut(f);
       tmp.copy(from).lerp(to, e);
-      tmp.y += Math.sin(e * Math.PI) * (0.9 + k.b * 0.05);
+      tmp.y += Math.sin(e * Math.PI) * (0.9 + b * 0.05);
       tmp.z += Math.sin(e * Math.PI) * 0.4;
-      k.g.position.copy(tmp);
-      k.g.rotation.y = (1 - e) * 0.6;
-      const lossHi = F.lossPos >= 0 && k.b === 0 && k.i === F.lossPos;
-      k.g.scale.setScalar(k.b === 0 ? (lossHi ? 1.18 : 1.06) : 0.92);
+      const hi = F.lossPos >= 0 && b === 0 && i === F.lossPos;
+      this.placeTok(idx, tmp, b === 0 ? (hi ? 1.18 : 1.06) : 0.92, (1 - e) * 0.6);
     }
-    for (const k of this.targets) {
-      const f = show ? F.shift : 0;
-      k.g.visible = f > 0.01;
-      if (!k.g.visible) continue;
-      const from = new THREE.Vector3(xPos(k.i + 1), TRAY.y, 0), to = new THREE.Vector3(xPos(k.i), TRAY.y, TRAY.zTarget);
+    for (let i = 0; i < T; i++) {
+      const f = show ? F.shift : 0, idx = o.tgt + i;
+      if (f <= 0.01) { this.placeTok(idx, tmp.set(0, -50, 0), 0); continue; }
       const e = easeInOut(f);
-      k.g.position.copy(from).lerp(to, e);
-      k.g.position.y += Math.sin(e * Math.PI) * 0.25;
-      k.g.scale.setScalar(0.86);
+      tmp.set(xPos(i + 1), TRAY.y, 0).lerp(new THREE.Vector3(xPos(i), TRAY.y, TRAY.zTarget), e);
+      tmp.y += Math.sin(e * Math.PI) * 0.25;
+      this.placeTok(idx, tmp, 0.86);
     }
-    void t;
+    this.tokBody.instanceMatrix.needsUpdate = true;
+    this.tokFace.instanceMatrix.needsUpdate = true;
+    void s;
   }
 
   // 概率架：前向到最后升起来（真实概率），正确答案绿框；损失：每个位置 −ln p、整批平均
@@ -952,7 +956,6 @@ export class GlassMachine {
     }
     this.bars.instanceMatrix.needsUpdate = true;
     this.bars.instanceColor.needsUpdate = true;
-    this.bars.computeBoundingSphere();
     const m = new THREE.Matrix4();
     for (let p = 0; p < T; p++) { m.makeTranslation(shelfX(D.fixed[p + 1]), SHELF.y + 0.004, shelfZ(p)); this.marks.setMatrixAt(p, m); }
     this.marks.instanceMatrix.needsUpdate = true;
@@ -973,7 +976,6 @@ export class GlassMachine {
     }
     this.nll.instanceMatrix.needsUpdate = true;
     this.nll.instanceColor.needsUpdate = true;
-    this.nll.computeBoundingSphere();
     const L0 = have ? D.loss[D.FR[k]] : 0;
     this.gauge.scale.y = Math.max(0.001, Math.min(1, L0 / 3.2) * GAUGE.hMax * F.lossMean);
     this.rowMean = sum / T;
@@ -1006,7 +1008,7 @@ export class GlassMachine {
       else if (v === 'g-step') show = b.spine;
       o.visible = show;
     }
-    for (const [id, o] of Object.entries(this.lr)) o.visible = v !== 'g-param' && v !== 'g-mat' && (far || this.inOpName(id));
+    for (const [id, o] of Object.entries(this.lr)) o.visible = v === 'g-step' || (v === 'g-op' && this.inOpName(id));
     const t = D.FR[k];
     // 损失
     const lossOn = F.lossMean > 0.05 && s.ph !== 'init' && (v !== 'g-mat' && v !== 'g-param');
@@ -1200,49 +1202,94 @@ export class GlassMachine {
 
   /* ================================================================ 镜头 */
 
-  camera(st) {
-    const E = this.E, s = st.step, v = st.view, F = this.F || this.flow(st, st.p);
-    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
-    const frame = ([x0, x1, y0, y1], dir, margin = 1.08, minD = 3) => {
-      const w = x1 - x0, h = y1 - y0;
-      const d = Math.max(minD, E.fitDistance(w, h, margin));
-      const look = V3((x0 + x1) / 2, (y0 + y1) / 2, 0);
-      return { pos: look.clone().add(dir.clone().normalize().multiplyScalar(d)), look };
+  // 让一个盒子刚好装进没被面板挡住的那块画面：按真实透视把 8 个角投影出来，二分出距离，再把盒子挪到画面正中
+  fitBox(b, dir, margin = 1.06, minD = 2) {
+    const E = this.E;
+    const key = `${b.join(',')}|${dir.x},${dir.y},${dir.z}|${margin}|${E.w}x${E.h}|${E.insetR | 0}|${E.padB | 0}|${E.padT | 0}`;
+    if (this.fitKey === key) return { pos: this.fitRes.pos.clone(), look: this.fitRes.look.clone() };
+    const cam = this.fitCam || (this.fitCam = new THREE.PerspectiveCamera());
+    cam.copy(E.camera);
+    cam.updateProjectionMatrix();
+    const [x0, x1, y0, y1, z0 = -0.7, z1 = 0.6] = b;
+    const pts = [];
+    for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) pts.push(new THREE.Vector3(x, y, z));
+    const w = E.w || 1, h = E.h || 1;
+    const rx0 = -1, rx1 = 1 - (2 * (E.insetR || 0)) / w, ry0 = -1 + (2 * E.padB) / h, ry1 = 1 - (2 * E.padT) / h;
+    const cx = (rx0 + rx1) / 2, cy = (ry0 + ry1) / 2, hw = (rx1 - rx0) / 2 / margin, hh = (ry1 - ry0) / 2 / margin;
+    const d0 = dir.clone().normalize();
+    const look = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    const v = new THREE.Vector3();
+    const test = (dd) => {
+      cam.position.copy(look).addScaledVector(d0, dd);
+      cam.lookAt(look);
+      cam.updateMatrixWorld();
+      let mnx = Infinity, mxx = -Infinity, mny = Infinity, mxy = -Infinity, behind = false;
+      for (const p of pts) {
+        v.copy(p).applyMatrix4(cam.matrixWorldInverse);
+        if (v.z > -0.05) behind = true;
+        v.applyMatrix4(cam.projectionMatrix);
+        mnx = Math.min(mnx, v.x); mxx = Math.max(mxx, v.x); mny = Math.min(mny, v.y); mxy = Math.max(mxy, v.y);
+      }
+      return { mnx, mxx, mny, mxy, behind };
     };
-    const WIDE = V3(0.34, 0.24, 1), MID = V3(0.26, 0.2, 1), NEAR = V3(0.14, 0.1, 1);
-    const whole = [BOUNDS.x0, BOUNDS.x1, BOUNDS.y0, BOUNDS.y1];
+    let d = minD;
+    const right = new THREE.Vector3(), up = new THREE.Vector3();
+    for (let it = 0; it < 3; it++) {
+      let lo = minD, hi = 400;
+      for (let j = 0; j < 24; j++) {
+        const mid = (lo + hi) / 2, r = test(mid);
+        if (!r.behind && (r.mxx - r.mnx) / 2 <= hw && (r.mxy - r.mny) / 2 <= hh) hi = mid; else lo = mid;
+      }
+      d = hi;
+      const r = test(d);
+      right.setFromMatrixColumn(cam.matrixWorld, 0);
+      up.setFromMatrixColumn(cam.matrixWorld, 1);
+      const halfH = d * Math.tan((cam.fov * Math.PI) / 360), halfW = halfH * cam.aspect;
+      look.addScaledVector(right, ((r.mnx + r.mxx) / 2 - cx) * halfW).addScaledVector(up, ((r.mny + r.mxy) / 2 - cy) * halfH);
+    }
+    const res = { pos: look.clone().addScaledVector(d0, d), look: look.clone() };
+    this.fitKey = key;
+    this.fitRes = res;
+    return { pos: res.pos.clone(), look: res.look.clone() };
+  }
+
+  camera(st) {
+    const s = st.step, v = st.view, F = this.F || this.flow(st, st.p);
+    const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+    const frame = (r, dir, margin = 1.06, minD = 2) => this.fitBox(r, dir, margin, minD);
+    // 远景从右前上方斜看（看得出方块的厚度），越近越正
+    const WIDE = V3(0.5, 0.32, 1), MID = V3(0.36, 0.26, 1), NEAR = V3(0.2, 0.14, 1), TOP = V3(0.25, 0.85, 1);
+    const whole = [BOUNDS.x0, BOUNDS.x1, BOUNDS.y0, BOUNDS.y1, -2.2, 1.4];
     if (v === 'g-init' || v === 'g-run') return frame(whole, WIDE, 1.02);
     if (v === 'g-step') {
-      if (s.ph === 'batch') return frame(OP_RECT.batch, MID, 1.1);
-      if (s.ph === 'loss') return frame(OP_RECT.loss, MID, 1.1);
+      if (s.ph === 'batch') return frame([...OP_RECT.batch, -2.4, 0.8], MID, 1.06);
+      if (s.ph === 'loss') return frame([...OP_RECT.loss, -1.3, 1.3], TOP, 1.06);
       if (s.ph === 'upd') return frame(whole, WIDE, 1.02);
       // 前向 / 反向：镜头跟着正在算的那一层走
       const x = s.ph === 'fwd' ? F.fwd : F.bwd;
       const op = s.ph === 'fwd' ? FWD_OPS[Math.min(9, Math.max(0, Math.floor(x)))] : BWD_OPS[Math.min(9, Math.max(0, Math.floor(x)))];
       const r = OP_RECT[op];
       const yc = (r[2] + r[3]) / 2;
-      return frame([BOUNDS.x0 + 2.6, BOUNDS.x1, yc - 5.2, yc + 5.2], MID, 1.04);
+      return frame([BOUNDS.x0 + 2.6, BOUNDS.x1, yc - 4.6, yc + 4.6], MID, 1.02);
     }
     if (v === 'g-op') {
-      if (s.ph === 'batch') return frame(OP_RECT.batch, MID, 1.08);
-      if (s.ph === 'loss') return frame(OP_RECT.loss, MID, 1.08);
+      if (s.ph === 'batch') return frame([...OP_RECT.batch, -2.4, 0.8], MID, 1.06);
+      if (s.ph === 'loss') return frame([...OP_RECT.loss, -1.3, 1.3], TOP, 1.06);
       if (s.ph === 'upd') {
         if (s.sub === 'clip') return frame(whole, WIDE, 1.02);
-        const key = s.t === 'E' ? 'E' : s.t;
-        return frame(unionRect(TENSOR_PARTS[key], 0.8), MID, 1.12);
+        return frame(unionRect(TENSOR_PARTS[s.t], 0.8), MID, 1.08);
       }
-      return frame(OP_RECT[s.sub], MID, 1.06);
+      return frame(OP_RECT[s.sub], MID, 1.04);
     }
     if (v === 'g-mat') {
       const key = s.t === 'E' && s.sub === 'logits' ? 'ET' : s.t;
-      return frame(unionRect(TENSOR_PARTS[key], 0.35), NEAR, 1.06);
+      return frame([...unionRect(TENSOR_PARTS[key], 0.3), -0.2, 0.4], NEAR, 1.04);
     }
     // 一个参数：推到方块跟前（底部有算式板，取景区域会让出来）
     const i = this.selInst ?? 0;
     const b = this.wBlk[i];
     const x = this.wX[i], y = this.wY[i];
-    const r = b && b.t.startsWith('g') ? [x - 0.9, x + 1.6, y - 0.8, y + 0.8] : [x - 1.0, x + 1.0, y - 0.7, y + 0.7];
-    return frame(r, V3(0.2, 0.14, 1), 1.05, 1.2);
+    const r = b && b.t.startsWith('g') ? [x - 1.2, x + 1.8, y - 1.0, y + 1.0] : [x - 1.4, x + 1.4, y - 1.0, y + 1.0];
+    return frame([...r, -0.1, 0.4], V3(0.22, 0.16, 1), 1.04, 0.8);
   }
 }
-

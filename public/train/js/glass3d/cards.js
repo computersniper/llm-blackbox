@@ -1,6 +1,6 @@
 // 3D 舞台旁边的 2D 卡片（画在 board.js 的小画布上）：训练曲线、初始值的直方图、三种初始化的对照、
 // 一个参数的一生（w / g / m / √v / Δw）、前向它乘了谁、梯度从哪来、AdamW 算式。数字全部来自记录。
-import { COL, text, rr, card, line, dot, clamp, ease, seg, fmtP, sciSup, hexA, wrap, waitBox, measure, badge } from '../draw.js';
+import { COL, text, rr, card, line, dot, clamp, ease, seg, sciSup, hexA, wrap, waitBox } from '../draw.js';
 import { heat, fnum, rgb, divRGB, paramName } from '../glass/heat.js';
 import { ADAM_SUBS } from '../glass/timeline.js';
 import { TENSOR_LABEL } from '../glass/data.js';
@@ -321,4 +321,3 @@ export function drawAdam(g, C, D, k, gi, st, env) {
 }
 
 export function drawWait(g, C, env, wait, label) { waitBox(g, C.x, C.y, C.w, C.h, env, wait, { withCard: true, label }); }
-export { badge, measure };

@@ -260,7 +260,10 @@ body.g3d .stage-hint .h2d, body:not(.g3d) .stage-hint .h3d { display: none; }
 
 /* 监视器（左上角）和算式板（底部） */
 .ghud { position: absolute; z-index: 4; top: 64px; left: 14px; width: 330px; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: boardin .5s var(--ease); }
+.ghud.compact { width: 260px; }
 .ghud canvas, .gboard canvas { display: block; }
+/* 算式板在底部时，知识碎片的提示挪到左上角，免得压住算式 */
+body.g-board #toasts { bottom: auto; top: 128px; }
 .gboard { position: absolute; z-index: 4; left: 14px; right: calc(var(--dbg-w) + 28px); bottom: 104px; border-radius: 16px; overflow: hidden auto; max-height: calc(100% - 200px); box-shadow: 0 18px 44px rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); scrollbar-width: thin; scrollbar-color: var(--line2) transparent; animation: boardin .5s var(--ease); }
 .dbg.folded ~ .gboard { right: 14px; }
 @keyframes boardin { from { opacity: 0; transform: translateY(10px); } }

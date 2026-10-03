@@ -74,7 +74,7 @@ export class GlassBoard {
     addEventListener('resize', () => { this.ovKey = ''; });
   }
 
-  hide() { this.hudEl.hidden = this.boardEl.hidden = true; this.E.setOverlay(0, 0); this.ovKey = ''; }
+  hide() { this.hudEl.hidden = this.boardEl.hidden = true; document.body.classList.remove('g-board'); this.E.setOverlay(0, 0); this.ovKey = ''; }
 
   update(st, D, ctx, t, ap) {
     const v = st.view;
@@ -82,18 +82,20 @@ export class GlassBoard {
     const showBoard = v === 'g-init' || v === 'g-param';
     this.hudEl.hidden = !showHud;
     this.boardEl.hidden = !showBoard;
+    document.body.classList.toggle('g-board', showBoard);
     if (showHud) this.drawHud(st, D, t);
     if (showBoard) this.drawBoard(st, D, ctx, t, ap);
     this.measure(showBoard);
   }
 
   drawHud(st, D, t) {
-    const sm = small();
-    const w = this.hudEl.clientWidth || (sm ? 300 : 330), h = sm ? 84 : 150;
+    const sm = small(), compact = sm || st.view !== 'g-run';
+    this.hudEl.classList.toggle('compact', compact && !sm);
+    const w = this.hudEl.clientWidth || (sm ? 300 : 330), h = sm ? 84 : compact ? 104 : 150;
     this.hud.size(w, h);
     const k = st.k;
     const tt = st.view === 'g-run' && k < D.NF - 1 ? D.FR[k] + (D.FR[k + 1] - D.FR[k]) * Math.min(1, st.p) : D.FR[k];
-    this.hud.draw((g, env) => drawLoss(g, { x: 0.5, y: 0.5, w: w - 1, h: h - 1 }, D, tt, k, env, { drag: st.view === 'g-run' ? this.scrub : null, compact: sm }), t);
+    this.hud.draw((g, env) => drawLoss(g, { x: 0.5, y: 0.5, w: w - 1, h: h - 1 }, D, tt, k, env, { drag: st.view === 'g-run' ? this.scrub : null, compact }), t);
   }
 
   drawBoard(st, D, ctx, t, ap) {
