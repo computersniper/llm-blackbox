@@ -167,7 +167,7 @@ def train(c, init, work=None, record=True, log=print):
                             lr=c['lr'], betas=(c['beta1'], c['beta2']), eps=c['eps'], foreach=False)
     bgen = torch.Generator().manual_seed(c['seed'] + 1)
     allx = torch.tensor([win(o) for o in range(NS)])
-    R = {k: [] for k in ['offs', 'loss', 'evalLoss', 'lr', 'gnorm', 'clip', 'W', 'G', 'Gc', 'M', 'Vv', 'W1', 'maxAbsW', 'nnzG']}
+    R = {k: [] for k in ['offs', 'loss', 'evalLoss', 'lr', 'gnorm', 'clip', 'W', 'G', 'Gc', 'M', 'Vv', 'W1', 'maxAbsW', 'nnzG', 'p0', 'att0']}
     if record:
         for k in ACT_F:
             R['f_' + k] = []
@@ -183,7 +183,7 @@ def train(c, init, work=None, record=True, log=print):
             gr['lr'] = lr
         with torch.no_grad():
             ev = F.cross_entropy(m.forward(allx[:, :-1])[0].reshape(-1, V), allx[:, 1:].reshape(-1)).item()
-        logits, A = m.forward(xb[:, :-1], keep=record)
+        logits, A = m.forward(xb[:, :-1], keep=True)
         loss = F.cross_entropy(logits.reshape(-1, V), xb[:, 1:].reshape(-1))
         opt.zero_grad()
         loss.backward()
@@ -203,6 +203,8 @@ def train(c, init, work=None, record=True, log=print):
         R['clip'].append(clip)
         R['maxAbsW'].append(max(float(m.P[n].detach().abs().max()) for n in names if not n.startswith('g')))
         R['nnzG'].append(int((Gt != 0).sum()))
+        R['p0'].append(logits[0].softmax(-1).detach().numpy().copy())   # 对照组也记第 0 段的预测和注意力（很小）
+        R['att0'].append(A['att'][0].detach().numpy().copy())
         if record:
             R['W'].append(Wt.numpy())
             R['G'].append(Gt.numpy())
@@ -235,6 +237,297 @@ def train(c, init, work=None, record=True, log=print):
     return out, dict(chars=chars, stream=stream, fix=fix, names=names, specs=[(n, list(s), dc) for n, s, dc in m.specs])
 
 
+# ---------------------------------------------------------------- 导出
+
+def frames_of(S):
+    """逐数记录的步：前 50 步每步都记，之后到第 150 步每 5 步一帧，再之后每 10 步一帧，加上最后一步"""
+    return sorted(set(list(range(min(50, S))) + list(range(50, min(150, S), 5)) + list(range(150, S, 10)) + [S - 1]))
+
+
+W_GROUP = 9            # 权重分块：每块 9 帧（训练全程播放时按顺序取）
+TRI_NAMES = ('att',)   # 注意力只存下三角（因果遮罩，上三角本来就是 0）
+F16 = np.float16
+
+
+def tensor_slices(specs):
+    off, sl = 0, {}
+    for n, s, _ in specs:
+        k = int(np.prod(s))
+        sl[n] = (off, off + k)
+        off += k
+    return sl, off
+
+
+def scaled16(x, sl):
+    """每个张量各自除以自己的最大绝对值再存 float16（相对精度约 10⁻³，不会因为太小下溢）；返回 (f16, 每个张量的倍数)"""
+    out = np.zeros(x.shape, F16)
+    sc = np.ones(len(sl), np.float32)
+    for j, (a, b) in enumerate(sl.values()):
+        m = float(np.abs(x[a:b]).max())
+        if m > 0:
+            sc[j] = m
+            out[a:b] = (x[a:b] / m).astype(F16)
+    return out, sc
+
+
+def unscale(x16, sc, sl):
+    out = x16.astype(np.float64)
+    for j, (a, b) in enumerate(sl.values()):
+        out[a:b] *= sc[j]
+    return out
+
+
+def delta16(a16):
+    """沿第 0 维（帧）存 float16 比特模式的差（mod 2¹⁶）：权重一步只变一点点，差值很小，gzip 压得更好。读的时候累加回去"""
+    u = a16.view(np.uint16).astype(np.int64)
+    return (np.diff(u, axis=0, prepend=0) & 0xFFFF).astype(np.uint16)
+
+
+def adam_ref(w, g, m, v, lr, t, wd, c):
+    """torch.optim.AdamW（单张量实现）同样的 float32 运算顺序；t 从 1 开始"""
+    w, g, m, v = (torch.tensor(np.array(a, np.float32)) for a in (w, g, m, v))
+    if wd:
+        w.mul_(1 - lr * wd)
+    m.lerp_(g, 1 - c['beta1'])
+    v.mul_(c['beta2']).addcmul_(g, g, value=1 - c['beta2'])
+    bc1, bc2 = 1 - c['beta1'] ** t, 1 - c['beta2'] ** t
+    denom = (v.sqrt() / (bc2 ** 0.5)).add_(c['eps'])
+    w.addcdiv_(m, denom, value=-(lr / bc1))
+    return w.numpy(), m.numpy(), v.numpy()
+
+
+def rms_np(x, g, eps):
+    inv = 1.0 / np.sqrt((x * x).mean(-1, keepdims=True) + eps)
+    return x * inv * g
+
+
+def forward_np(Wf, sl, specs, x, c):
+    """用（导出的）参数在 numpy float64 里把第 0 段前向算一遍，和记录的激活核对"""
+    P = {n: Wf[a:b].astype(np.float64).reshape(s) for (n, s, _), (a, b) in zip(specs, sl.values())}
+    d, H, T = c['d'], c['heads'], len(x)
+    hd = d // H
+    half = hd // 2
+    inv = 1.0 / (c['theta'] ** (np.arange(half) / half))
+    ang = np.arange(T)[:, None] * inv[None]
+    cos, sin = np.concatenate([np.cos(ang)] * 2, -1), np.concatenate([np.sin(ang)] * 2, -1)
+    rope = lambda z: z * cos[:, None] + np.concatenate([-z[..., half:], z[..., :half]], -1) * sin[:, None]
+    h0 = P['E'][x]
+    n1 = rms_np(h0, P['g1'], c['normEps'])
+    q, k, v = ((n1 @ P[w]).reshape(T, H, hd) for w in ('Wq', 'Wk', 'Wv'))
+    sc = np.einsum('ihd,jhd->hij', rope(q), rope(k)) / math.sqrt(hd)
+    sc = np.where(np.triu(np.ones((T, T), bool), 1)[None], -np.inf, sc)
+    att = np.exp(sc - sc.max(-1, keepdims=True))
+    att /= att.sum(-1, keepdims=True)
+    ao = np.einsum('hij,jhd->ihd', att, v).reshape(T, d)
+    h1 = h0 + ao @ P['Wo']
+    n2 = rms_np(h1, P['g2'], c['normEps'])
+    gate, up = n2 @ P['Wg'], n2 @ P['Wu']
+    h2 = h1 + (gate / (1 + np.exp(-gate)) * up) @ P['Wd']
+    logits = rms_np(h2, P['gf'], c['normEps']) @ P['E'].T
+    p = np.exp(logits - logits.max(-1, keepdims=True))
+    return p / p.sum(-1, keepdims=True), att
+
+
+def export(work, out):
+    info = json.loads((work / 'info.json').read_text())
+    c = info['cfg']
+    R = dict(np.load(work / 'raw_normal.npz'))
+    Z = dict(np.load(work / 'raw_zero.npz'))
+    BG = dict(np.load(work / 'raw_big.npz'))
+    chars, stream, specs = info['chars'], info['stream'], info['specs']
+    sl, P = tensor_slices(specs)
+    S, T, B, V, H = c['steps'], c['ctx'], c['batch'], len(chars), c['heads']
+    FR = frames_of(S)
+    NF = len(FR)
+    ti, tj = np.tril_indices(T)
+    gdir = out / 'glass'
+    if gdir.exists():
+        for f in gdir.iterdir():
+            f.unlink()
+    files = {}
+    t0 = time.time()
+    is_norm = lambda n: n.startswith('g')
+
+    # 选中的几个张量：每一步都存 float32 原值（三个 RMSNorm γ，再加嵌入表里“月”那一行），能逐位重算 AdamW
+    a, _ = sl['E']
+    yue = chars.index('月')
+    exact_idx = list(range(*sl['g1'])) + list(range(*sl['g2'])) + list(range(*sl['gf'])) + list(range(a + yue * c['d'], a + (yue + 1) * c['d']))
+    ex = np.array(exact_idx)
+    Mprev = np.concatenate([np.zeros((1, P), np.float32), R['M'][:-1]])       # 第 t 步更新前的 m（第 0 步是 0）
+    Vprev = np.concatenate([np.zeros((1, P), np.float32), R['Vv'][:-1]])
+    assert np.array_equal(R['W1'][:-1], R['W'][1:]), '更新后的参数应该就是下一步的参数'
+
+    # ---- 首屏：配置、每一步的标量和批次、初始化的全部参数、两个对照组
+    core = Pack()
+    for k in ['loss', 'evalLoss', 'lr', 'gnorm', 'clip']:
+        core.add(k, R[k].astype(np.float32))
+    core.add('offs', R['offs'].astype(np.uint8))
+    core.add('w0', R['W0'].astype(np.float32))
+    core.add('zLoss', Z['loss'].astype(np.float32))
+    core.add('zGnorm', Z['gnorm'].astype(np.float32))
+    core.add('zMaxW', Z['maxAbsW'].astype(np.float32))
+    core.add('bLoss', BG['loss'].astype(np.float32))
+    core.add('bEval', BG['evalLoss'].astype(np.float32))
+    core.add('bGnorm', BG['gnorm'].astype(np.float32))
+    core.add('bW0', BG['W0'].astype(F16))
+    core.add('bP0', np.stack([BG['p0'][0], BG['p0'][-1]]).astype(F16))
+    core.add('zP0', np.stack([Z['p0'][0], Z['p0'][-1]]).astype(F16))
+    core.add('zAtt0', Z['att0'][0][:, ti, tj].astype(F16))
+
+    # ---- 权重分块：W（float16，按帧做差）、第 0 段的预测概率、注意力、−ln p
+    groups = [FR[i:i + W_GROUP] for i in range(0, NF, W_GROUP)]
+    wspans = []
+    for gi, grp in enumerate(groups):
+        idx = [FR.index(t) for t in grp]
+        p = Pack()
+        p.add('w', delta16(R['W'][grp].astype(F16)))
+        p.add('p', R['f_probs'][grp].astype(F16))
+        p.add('att', R['f_att'][grp][:, :, ti, tj].astype(F16))
+        p.add('nll', R['f_nll'][grp].astype(F16))
+        files[f'glass/w{gi}.bin'] = container(p, {'frames': grp, 'delta': ['w']})
+        wspans.append([idx[0], idx[-1] + 1])
+
+    # ---- 每帧一块：梯度、更新前的 m 和 √v、这一步的 Δw（都按张量缩放成 float16），第 0 段每层的激活和激活的梯度
+    act_f = [k for k in ACT_F if k not in ('sc', 'probs', 'att', 'nll')]   # 概率、注意力、−ln p 已经在权重块里
+    for fi, t in enumerate(FR):
+        p = Pack()
+        for key, arr in [('g', R['G'][t]), ('m', Mprev[t]), ('v', np.sqrt(Vprev[t])), ('dw', R['W1'][t] - R['W'][t])]:
+            x16, sc = scaled16(arr.astype(np.float64), sl)
+            p.add(key, x16)
+            p.add(key + 'S', sc)
+        for k in act_f:
+            x = R['f_' + k][t]
+            p.add('f.' + k, (x[:, ti, tj] if k in TRI_NAMES else x).astype(F16))
+        for k in ACT_B:
+            x = R['b_' + k][t]
+            p.add('b.' + k, (x[:, ti, tj] if k in TRI_NAMES else x).astype(F16))
+        files[f'glass/f{fi:02d}.bin'] = container(p, {'t': t})
+
+    # ---- 选中参数每一步的 float32 原值
+    p = Pack()
+    p.add('idx', ex.astype(np.uint16))
+    p.add('w', np.concatenate([R['W'][:, ex], R['W1'][-1:, ex]]).astype(np.float32))      # [S+1]：第 t 步更新前（最后一行是训练完）
+    p.add('g', R['G'][:, ex].astype(np.float32))                                           # [S]：裁剪前的梯度
+    p.add('m', np.concatenate([Mprev[:, ex], R['M'][-1:, ex]]).astype(np.float32))          # [S+1]：第 t 步更新前的 m
+    p.add('v', np.concatenate([Vprev[:, ex], R['Vv'][-1:, ex]]).astype(np.float32))
+    p.add('lr', R['lr'].astype(np.float64))
+    p.add('clip', R['clip'].astype(np.float32))
+    files['glass/exact.bin'] = container(p)
+
+    meta = {
+        'model': {'vocab': V, 'd': c['d'], 'heads': H, 'headDim': c['d'] // H, 'ffn': c['ffn'], 'ctx': T, 'theta': c['theta'],
+                  'normEps': c['normEps'], 'params': P, 'tied': True, 'layers': 1},
+        'train': {k: c[k] for k in ['steps', 'batch', 'lr', 'warmup', 'floor', 'beta1', 'beta2', 'eps', 'wd', 'clip', 'std', 'seed']}
+        | {'seconds': round(float(R['seconds']), 2), 'finalEval': float(R['finalEval']), 'device': 'CPU · float32', 'torch': torch.__version__},
+        'corpus': {'poem': POEM, 'title': '静夜思', 'author': '李白', 'chars': chars, 'stream': stream, 'fixed': info['fix'], 'fixedText': FIXED},
+        'params': [{'name': n, 'shape': s, 'off': sl[n][0], 'n': sl[n][1] - sl[n][0], 'decay': dc} for n, s, dc in specs],
+        'frames': FR,
+        'chunks': {'dir': 'glass', 'w': wspans, 'f': NF, 'acts': act_f, 'grads': ACT_B, 'tri': list(TRI_NAMES), 'group': W_GROUP,
+                   'note': 'w*：权重（float16 按帧做差）+ 第 0 段的预测；f*：每帧的梯度 / m / √v / Δw（按张量缩放的 float16）+ 第 0 段的激活与梯度；exact：选中参数每一步的 float32'},
+        'exact': {'idx': exact_idx, 'note': 'g1、g2、gf 三个 RMSNorm γ 和嵌入表里“月”那一行，每一步都存 float32'},
+        'runs': {
+            'zero': {'finalEval': float(Z['finalEval']), 'maxAbsW': float(Z['maxAbsW'].max()), 'maxGnorm': float(Z['gnorm'].max()), 'nnzG': int(Z['nnzG'].max())},
+            'big': {'std': 1.0, 'finalEval': float(BG['finalEval']), 'firstLoss': float(BG['loss'][0])},
+        },
+        'bin': core.spec,
+    }
+
+    # ---- 核对
+    chk = {}
+    decays = {n: (0.0 if is_norm(n) else c['wd']) for n in sl}
+    # A. 选中参数：只用导出文件里的 float32 原值，按 torch AdamW 同样的运算重算每一步，和导出的下一步逐元素比
+    E, _ = split_data.read_container(files['glass/exact.bin'])
+    owner = [next(n for n, (a, b) in sl.items() if a <= i < b) for i in exact_idx]
+    wdv = np.array([decays[n] for n in owner])
+    errs, same = {'w': 0.0, 'm': 0.0, 'v': 0.0}, 0
+    for t in range(S):
+        g = (torch.tensor(E['g'][t]) * torch.tensor(E['clip'][t])).numpy()
+        for dec in sorted(set(wdv)):
+            q = wdv == dec
+            w1, m1, v1 = adam_ref(E['w'][t][q], g[q], E['m'][t][q], E['v'][t][q], float(E['lr'][t]), t + 1, dec, c)
+            errs['w'] = max(errs['w'], float(np.abs(w1 - E['w'][t + 1][q]).max()))
+            errs['m'] = max(errs['m'], float(np.abs(m1 - E['m'][t + 1][q]).max()))
+            errs['v'] = max(errs['v'], float(np.abs(v1 - E['v'][t + 1][q]).max()))
+            same += int((w1 == E['w'][t + 1][q]).sum())
+    chk['adamExact'] = {'params': len(exact_idx), 'steps': S, 'maxAbsErr': errs, 'bitExact': same, 'total': len(exact_idx) * S}
+    # B. 全部参数（原始 float32 记录）：同一个算式对 2,928 × 200 个更新
+    errs, same = {'w': 0.0, 'm': 0.0, 'v': 0.0}, 0
+    for t in range(S):
+        g = (torch.tensor(R['G'][t]) * torch.tensor(R['clip'][t], dtype=torch.float32)).numpy()
+        assert np.array_equal(g, R['Gc'][t]), '裁剪后的梯度应该等于 原梯度 × 裁剪系数'
+        for n, (a, b) in sl.items():
+            w1, m1, v1 = adam_ref(R['W'][t, a:b], g[a:b], Mprev[t, a:b], Vprev[t, a:b], float(R['lr'][t]), t + 1, decays[n], c)
+            errs['w'] = max(errs['w'], float(np.abs(w1 - R['W1'][t, a:b]).max()))
+            errs['m'] = max(errs['m'], float(np.abs(m1 - R['M'][t, a:b]).max()))
+            errs['v'] = max(errs['v'], float(np.abs(v1 - R['Vv'][t, a:b]).max()))
+            same += int((w1 == R['W1'][t, a:b]).sum())
+    chk['adamAll'] = {'params': P, 'steps': S, 'maxAbsErr': errs, 'bitExact': same, 'total': P * S}
+    # C. 网页上用的 float16：用导出的 w、g、m、√v 按公式算 Δw，和导出的 Δw 比
+    rel, absmax = [], 0.0
+    dec = np.concatenate([np.full(b - a, decays[n]) for n, (a, b) in sl.items()])
+    for fi, t in enumerate(FR):
+        blob, _ = split_data.read_container(files[f'glass/f{fi:02d}.bin'])
+        w16 = R['W'][t].astype(F16).astype(np.float64)
+        g = unscale(blob['g'], blob['gS'], sl) * float(R['clip'][t])
+        m0 = unscale(blob['m'], blob['mS'], sl)
+        v0 = unscale(blob['v'], blob['vS'], sl) ** 2
+        dw = unscale(blob['dw'], blob['dwS'], sl)
+        lr = float(R['lr'][t])
+        m1 = c['beta1'] * m0 + (1 - c['beta1']) * g
+        v1 = c['beta2'] * v0 + (1 - c['beta2']) * g * g
+        mh, vh = m1 / (1 - c['beta1'] ** (t + 1)), v1 / (1 - c['beta2'] ** (t + 1))
+        dwf = -lr * (mh / (np.sqrt(vh) + c['eps']) + dec * w16)
+        big = np.abs(dw) > lr * 1e-2
+        rel.append(np.abs(dwf - dw)[big] / np.abs(dw)[big])
+        absmax = max(absmax, float((np.abs(dwf - dw) / lr).max()))
+    rel = np.concatenate(rel)
+    chk['adamFp16'] = {'frames': NF, 'medianRelErr': float(np.median(rel)), 'p99RelErr': float(np.quantile(rel, 0.99)), 'maxAbsErrOverLr': absmax,
+                       'note': '|Δw| > lr/100 的更新的相对误差；maxAbsErrOverLr = 最大绝对误差 / 这一步的 lr'}
+    # D. 用导出的 float16 参数重算第 0 段的前向，和记录（float32）比
+    x0 = [stream[(info['fix'] + i) % len(stream)] for i in range(T + 1)]
+    pe = ae = pe32 = 0.0
+    for t in FR:
+        pr, at = forward_np(R['W'][t].astype(F16), sl, specs, x0[:-1], c)
+        pe = max(pe, float(np.abs(pr - R['f_probs'][t]).max()))
+        ae = max(ae, float(np.abs(at - R['f_att'][t]).max()))
+        pr32, _ = forward_np(R['W'][t], sl, specs, x0[:-1], c)
+        pe32 = max(pe32, float(np.abs(pr32 - R['f_probs'][t]).max()))
+    chk['forward'] = {'frames': NF, 'fp16MaxAbsErrProbs': pe, 'fp16MaxAbsErrAttn': ae, 'fp32MaxAbsErrProbs': pe32}
+    # E. 链式法则：上游梯度 × 本层的局部导数（原始 float32 记录）
+    shp = {n: s for n, s, _ in specs}
+    Wm = lambda t, n: R['W'][t, sl[n][0]:sl[n][1]].reshape(shp[n])
+    ce = {'dlogits': 0.0, 'ao': 0.0, 'act': 0.0, 'n2': 0.0, 'nf': 0.0}
+    oh = np.eye(V)[np.array(x0[1:])]
+    for t in FR:
+        ce['dlogits'] = max(ce['dlogits'], float(np.abs((R['f_probs'][t] - oh) / (B * T) - R['b_logits'][t]).max()))
+        ce['ao'] = max(ce['ao'], float(np.abs(R['b_h1'][t] @ Wm(t, 'Wo').T - R['b_ao'][t]).max()))
+        ce['act'] = max(ce['act'], float(np.abs(R['b_h2'][t] @ Wm(t, 'Wd').T - R['b_act'][t]).max()))
+        ce['n2'] = max(ce['n2'], float(np.abs(R['b_gate'][t] @ Wm(t, 'Wg').T + R['b_up'][t] @ Wm(t, 'Wu').T - R['b_n2'][t]).max()))
+        ce['nf'] = max(ce['nf'], float(np.abs(R['b_logits'][t] @ Wm(t, 'E') - R['b_nf'][t]).max()))
+    chk['chainRule'] = {'frames': NF, 'maxAbsErr': ce, 'note': 'dlogits = (p − onehot)/(B·T)；∂L/∂ao = ∂L/∂h1 · W_oᵀ；∂L/∂act = ∂L/∂h2 · W_downᵀ；∂L/∂n2 = ∂L/∂gate · W_gateᵀ + ∂L/∂up · W_upᵀ；∂L/∂nf = ∂L/∂logits · E'}
+    meta['check'] = chk
+
+    files['glass.json'] = dumps(meta)
+    files['glass.bin'] = core.bytes()
+    sizes = split_data.write(files, out, keep_raw={'glass.json', 'glass.bin'})
+    verify_glass(out, files)
+    tot = sum(z for _, z in sizes.values())
+    first = sizes['glass.json'][1] + sizes['glass.bin'][1]
+    part = lambda key: sum(z for k, (_, z) in sizes.items() if k.startswith(key)) / 1024
+    print(f'导出 {len(files)} 个文件，gzip 后共 {tot / 1024:.0f} KB（首屏 {first / 1024:.1f} KB；权重块 {part("glass/w"):.0f} KB；'
+          f'每帧块 {part("glass/f"):.0f} KB；exact {part("glass/exact"):.0f} KB），{time.time() - t0:.1f} s')
+    print(json.dumps(chk, ensure_ascii=False, indent=1))
+
+
+def verify_glass(out, files):
+    """写出的 .gz 读回来和内存里的原文逐字节比；首屏的未压缩版本也比一遍"""
+    import gzip as _gz
+    for name, blob in files.items():
+        assert _gz.decompress((out / (name + '.gz')).read_bytes()) == blob, f'{name}.gz 和原文不一致'
+    for name in ('glass.json', 'glass.bin'):
+        assert (out / name).read_bytes() == files[name], f'{name} 和原文不一致'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--work', default='/mnt/d/cjc/train-viz/glass')
@@ -253,8 +546,7 @@ def main():
             print(f'{init}: final eval {float(R["finalEval"]):.4f}, {float(R["seconds"]):.1f} s')
         (work / 'info.json').write_text(json.dumps({'cfg': CFG, **info}, ensure_ascii=False))
     if a.stage in ('all', 'export'):
-        import glassbox_export
-        glassbox_export.export(work, pathlib.Path(a.out))
+        export(work, pathlib.Path(a.out))
 
 
 if __name__ == '__main__':
