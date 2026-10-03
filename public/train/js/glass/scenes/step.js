@@ -63,8 +63,8 @@ export class GStep {
       this.W = 380;
       this.col = { label: 0, val: 16, grad: 16, w: 16 };
       this.slot = 360;
-      this.batch = { x: 0, y: 70, w: 380, h: 420 };
-      let y = 520;
+      this.batch = { x: 0, y: 70, w: 380, h: 360 };
+      let y = 460;
       for (const r of ROWS) { const h = 470; this.rows.push({ ...r, y, h }); y += h + 14; }
       this.lossRow = { y, h: 260 };
       this.H = y + 280;

@@ -177,10 +177,10 @@ function fwdExplain(op, D, k) {
     case 'norm1': { const inv = D.act(k, 'inv1'); return L(`RMSNorm：每个位置的向量除以自己的均方根，再逐维乘 γ₁。位置 0 的均方根是 ${f4(1 / inv[0])}，除完以后大小拉回 1 左右——后面的乘法就不会越乘越大或越乘越小。`, `RMSNorm: divide each position’s vector by its root mean square, then scale each dimension by γ₁. Position 0’s RMS is ${f4(1 / inv[0])}; after dividing, sizes are back around 1, so later multiplications neither blow up nor fade away.`); }
     case 'qkv': return L(`n₁ 分别乘 W_q、W_k、W_v，得到 q、k、v（各 16 维 = 2 个头 × 8 维）。q 像“我要找什么”，k 像“我这里有什么”，v 像“我能提供什么”。`, `n₁ is multiplied by W_q, W_k, W_v to give q, k, v (16 dims each = 2 heads × 8). Think of q as “what I’m looking for”, k as “what I have”, v as “what I can pass on”.`);
     case 'attn': {
-      const a = D.act(k, 'att');
-      const best = (h) => { let b = 0; for (let j = 0; j < T; j++) if (a[(h * T + T - 1) * T + j] > a[(h * T + T - 1) * T + b]) b = j; return b; };
+      const a = (h, j) => D.att(k, h, T - 1, j);   // 最后一个位置的注意力（在权重块里）
+      const best = (h) => { let b = 0; for (let j = 0; j < T; j++) if (a(h, j) > a(h, b)) b = j; return b; };
       const b0 = best(0), b1 = best(1);
-      return L(`每个头里，每个位置拿自己的 q 和前面每个位置的 k 做点积（先按位置用 RoPE 旋转），除以 √8，softmax 成注意力，再对 v 加权求和。最后一个位置「头」：头 0 把 ${P(a[(0 * T + T - 1) * T + b0])} 给了「${ch(D, x[b0])}」，头 1 把 ${P(a[(1 * T + T - 1) * T + b1])} 给了「${ch(D, x[b1])}」。`, `In each head, every position dots its q with the k of every earlier position (after rotating them by position with RoPE), divides by √8, applies softmax, and takes the weighted sum of v. The last position 头: head 0 gives ${P(a[(0 * T + T - 1) * T + b0])} to “${ch(D, x[b0])}”, head 1 gives ${P(a[(1 * T + T - 1) * T + b1])} to “${ch(D, x[b1])}”.`);
+      return L(`每个头里，每个位置拿自己的 q 和前面每个位置的 k 做点积（先按位置用 RoPE 旋转），除以 √8，softmax 成注意力，再对 v 加权求和。最后一个位置「头」：头 0 把 ${P(a(0, b0))} 给了「${ch(D, x[b0])}」，头 1 把 ${P(a(1, b1))} 给了「${ch(D, x[b1])}」。`, `In each head, every position dots its q with the k of every earlier position (after rotating them by position with RoPE), divides by √8, applies softmax, and takes the weighted sum of v. The last position 头: head 0 gives ${P(a(0, b0))} to “${ch(D, x[b0])}”, head 1 gives ${P(a(1, b1))} to “${ch(D, x[b1])}”.`);
     }
     case 'wo': return L(`两个头的输出拼回 16 维，乘 W_o 得到 o，再加回残差：h₁ = h₀ + o。残差让原来的信息（以及反向时的梯度）可以不经过注意力直接通过。`, `The two heads’ outputs are joined back into 16 dims and multiplied by W_o to give o, which is added onto the residual: h₁ = h₀ + o. The residual lets the original information (and, on the way back, the gradient) pass straight through without going through attention.`);
     case 'norm2': return L(`再做一次 RMSNorm（缩放是 γ₂），给前馈层准备输入 n₂。`, `Another RMSNorm (scale γ₂) prepares the FFN’s input n₂.`);

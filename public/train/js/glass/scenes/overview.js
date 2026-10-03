@@ -47,18 +47,21 @@ export class GInit extends Base {
       this.cards = { list: { x, y: 60, w, h: 222 }, hist: { x, y: 296, w, h: 200 }, runs: { x, y: 510, w, h: 206 } };
       this.bounds = { x: -10, y: -6, w: 1290, h: 730 };
     } else {
-      this.cards = { list: { x: 0, y: 60, w: 380, h: 236 }, hist: { x: 0, y: 310, w: 380, h: 200 }, runs: { x: 0, y: 524, w: 380, h: 196 } };
-      this.map.layout(true, 0, 744);
-      this.bounds = { x: -8, y: -6, w: 396, h: 744 + this.map.H + 10 };
+      // 竖屏：对照组的损失曲线、直方图放在全景图前面（全零 / 放大 50 倍时先看到证据），参数清单放最后
+      this.cards = { runs: { x: 0, y: 70, w: 380, h: 206 }, hist: { x: 0, y: 290, w: 380, h: 200 } };
+      this.map.layout(true, 0, 540);
+      const y = 540 + this.map.H + 10;
+      this.cards.list = { x: 0, y, w: 380, h: 222 };
+      this.bounds = { x: -8, y: -6, w: 396, h: y + 232 };
     }
   }
 
   focus(st) {
     if (!this.portrait) return this.bounds;
     const sub = st.step.sub;
-    if (sub === 'model') return { x: -8, y: 690, w: 396, h: 560 };
-    const c = sub === 'hist' ? this.cards.hist : this.cards.runs;
-    return { x: -8, y: c.y - 60, w: 396, h: c.h + 330 };
+    if (sub === 'model') return { x: -8, y: 480, w: 396, h: 620 };
+    if (sub === 'hist') return { x: -8, y: 250, w: 396, h: 620 };
+    return { x: -8, y: -6, w: 396, h: 520 };
   }
 
   draw(g, st, env) {
