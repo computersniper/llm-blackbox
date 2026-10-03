@@ -2,6 +2,7 @@
 // 每个视图（scene）在自己的“世界坐标”里画，舞台负责相机、换场过渡（快照淡出 + 缩放）和拾取。
 // 数据分块还没到：st.blocked 时画载入占位代替视图；st.stale 时视图先画最近一个已到的检查点，调暗并在顶部标注一行。
 import { COL, rr, text, measure, waitBox, waitFade } from './draw.js';
+import { L } from './lang.js';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -282,7 +283,7 @@ export class Stage {
     g.globalAlpha = 1;
     if (st.blocked) {
       const f = this.focusRect || { x: 0, y: 0, w: 600, h: 400 };
-      waitBox(g, f.x + 12, f.y + 12, f.w - 24, Math.min(f.h - 24, f.w * 0.75), env, st.wait, { withCard: true, label: '正在载入这一步的真实记录…', size: 13 });
+      waitBox(g, f.x + 12, f.y + 12, f.w - 24, Math.min(f.h - 24, f.w * 0.75), env, st.wait, { withCard: true, label: L('正在载入这一步的真实记录…', 'Loading the real record of this step…'), size: 13 });
     } else this.scene.draw(g, st, env);
     // 换场：旧画面的快照在上面放大（下潜）或缩小（上浮）并淡出
     if (this.trans) {

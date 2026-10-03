@@ -311,3 +311,13 @@ body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
   @container (max-width: 570px) { .ctl-dname { display: none; } }
   @container (max-width: 470px) { .ctl-bar { flex-wrap: wrap; justify-content: center; } }
 }
+
+/* ---------------- 中 / EN 切换（../../js/i18n.js 的 mountLangSwitch；和 ../css/app.css 里那一段相同） ---------------- */
+
+.lang-switch { display: inline-flex; flex: none; padding: 2px; border-radius: 999px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .02); }
+.lang-switch button { border: 0; background: none; padding: 0 8px; height: 28px; border-radius: 999px; color: var(--dim); font: 600 11.5px/1 var(--mono); cursor: pointer; transition: color .2s, background .2s; }
+.lang-switch button:hover { color: var(--ink); }
+.lang-switch button[aria-pressed="true"] { color: #04121a; background: var(--acc); }
+html[lang="en"] .brand-zh { display: none; }   /* 英文模式：TRAINING 已经说明了是哪一页，把位置让给面包屑 */
+/* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的，夹在英文里会空出一大块）；诗句等中文照常落到后面的中文字体 */
+html[lang="en"] { --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }

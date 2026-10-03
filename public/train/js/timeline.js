@@ -8,8 +8,10 @@
 //
 // “＋”= 单步进入（step into），“−”= 跳出（step out），上一步 / 下一步 = 在当前深度逐步执行。
 
+import { isEn } from './lang.js';
+
 export const MAX_DEPTH = 4;
-export const DEPTH_NAMES = ['流水线', '训练全程', '一步之内', '拆开环节', '细到一个数'];
+export const DEPTH_NAMES = isEn ? ['Pipeline', 'Whole run', 'One step', 'Phase detail', 'One number'] : ['流水线', '训练全程', '一步之内', '拆开环节', '细到一个数'];
 export const PHASES = ['batch', 'fwd', 'loss', 'bwd', 'upd', 'check'];
 export const UPD_SUBS = ['clip', 'g', 'm', 'v', 'bc', 'dw', 'write'];
 export const LAYER_TENSORS = ['q', 'k', 'v', 'o', 'gate', 'up', 'down'];

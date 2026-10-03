@@ -4,13 +4,14 @@
 // 曲线、诗、地形在首屏数据里；逐字概率、注意力、嵌入、权重局部按检查点分块，没到的卡片先占位或先拿最近的检查点顶上。
 import { COL, text, rr, card, pill, seqColor, divColor, line, dot, clamp, lerp, fmtP, sciSup, fmtInt, measure, hexA, wrap, badge, waitBox, waitFade } from '../draw.js';
 import { esc } from '../../../js/ui.js';
+import { isEn, L, compact, POEM_EN } from '../lang.js';
 
 const GROUPS = [
-  { name: '标点', chars: '，。⏎', color: COL.amber },
-  { name: '数字', chars: '一二三四五六七八九十百千万', color: COL.rose },
-  { name: '季节', chars: '春夏秋冬', color: COL.green },
-  { name: '颜色', chars: '红白青黄绿紫碧金', color: COL.violet },
-  { name: '方位', chars: '东南西北', color: COL.blue },
+  { name: L('标点', 'Punctuation'), chars: '，。⏎', color: COL.amber },
+  { name: L('数字', 'Numbers'), chars: '一二三四五六七八九十百千万', color: COL.rose },
+  { name: L('季节', 'Seasons'), chars: '春夏秋冬', color: COL.green },
+  { name: L('颜色', 'Colors'), chars: '红白青黄绿紫碧金', color: COL.violet },
+  { name: L('方位', 'Directions'), chars: '东南西北', color: COL.blue },
 ];
 
 export class Overview {
@@ -51,7 +52,7 @@ export class Overview {
     const ok = !base || (D.has('ck', 0) && D.has('ck', D.K - 1));
     if (ok && D.has('ck', st.k)) return { k: st.k, stale: false };
     const k = ok ? D.nearestCk(st.k) : -1;
-    if (k < 0) { waitBox(g, area.x, area.y, area.w, area.h, env, st.wait, { label: '正在载入这个检查点…', size: 11.5 }); return null; }
+    if (k < 0) { waitBox(g, area.x, area.y, area.w, area.h, env, st.wait, { label: L('正在载入这个检查点…', 'Loading this checkpoint…'), size: 11.5 }); return null; }
     return { k, stale: true, f: waitFade(env.t - st.wait.since) };
   }
 
@@ -66,7 +67,7 @@ export class Overview {
     if (!s.stale) return;
     g.globalAlpha = s.f;
     if (s.f > 0) {
-      const lab = `载入中 · 先显示第 ${fmtInt(this.D.meta.ckpts[s.k].t)} 步`;
+      const lab = L(`载入中 · 先显示第 ${fmtInt(this.D.meta.ckpts[s.k].t)} 步`, `Loading · showing step ${fmtInt(this.D.meta.ckpts[s.k].t)} for now`);
       const w = measure(g, lab, 10) + 22, h = 22, x = C.x + (C.w - w) / 2, y = C.y + C.h / 2 - h / 2;
       rr(g, x, y, w, h, h / 2);
       g.fillStyle = 'rgba(10,17,31,0.92)';
@@ -159,7 +160,13 @@ export class Overview {
     let val = vc[0][1];
     for (let i = 1; i < vc.length; i++) if (vc[i][0] <= t) val = vc[i][1];
     const lr = this.D.lr[ti], gn = this.D.gnorm[ti];
-    const tiles = [
+    const tiles = isEn ? [
+      { k: 'STEP', v: `${fmtInt(ti + 1)}`, s: `/ ${fmtInt(this.S)} steps`, c: COL.ink },
+      { k: 'TOKENS · CHARS READ', v: compact(tokens, 1), s: `epoch ${epoch.toFixed(2)} · corpus ${compact(m.corpus.chars.train, 1)} chars`, c: COL.ink },
+      { k: 'LOSS', v: this.ema[ti].toFixed(3), s: `val ${val.toFixed(3)} · start ln ${m.model.vocab} = ${Math.log(m.model.vocab).toFixed(2)}`, c: COL.cyan },
+      { k: 'LR · LEARNING RATE', v: sciSup(lr, 3), s: ti < m.train.warmup ? `warming up (linear over ${m.train.warmup} steps)` : 'cosine annealing', c: COL.amber },
+      { k: 'GRAD · GRADIENT NORM', v: gn.toFixed(3), s: gn > m.train.clip ? `above ${m.train.clip}, clipped ×${(m.train.clip / gn).toFixed(2)}` : `≤ ${m.train.clip}, not clipped`, c: gn > m.train.clip ? COL.rose : COL.violet },
+    ] : [
       { k: 'STEP · 训练步数', v: `${fmtInt(ti + 1)}`, s: `/ ${fmtInt(this.S)} 步`, c: COL.ink },
       { k: 'TOKENS · 读过的字', v: `${(tokens / 1e4).toFixed(0)} 万`, s: `第 ${epoch.toFixed(2)} 轮（语料 ${(m.corpus.chars.train / 1e4).toFixed(0)} 万字）`, c: COL.ink },
       { k: 'LOSS · 损失', v: this.ema[ti].toFixed(3), s: `验证 ${val.toFixed(3)} · 起点 ln ${m.model.vocab} = ${Math.log(m.model.vocab).toFixed(2)}`, c: COL.cyan },
@@ -188,7 +195,7 @@ export class Overview {
 
   drawChart(g, st, env, t) {
     const C = this.chart, m = this.D.meta;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: 'LOSS CURVE · 真实训练记录', title: '损失曲线', accent: COL.cyan, active: st.depth === 1 });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('LOSS CURVE · 真实训练记录', 'LOSS CURVE · REAL TRAINING LOG'), title: L('损失曲线', 'Loss curve'), accent: COL.cyan, active: st.depth === 1 });
     const px = C.x + 44, pw = C.w - 64;
     const ly0 = C.y + 62, ly1 = C.y + C.h - 128;
     const lo = 3.5, hi = 9.3;
@@ -206,11 +213,11 @@ export class Overview {
       g.beginPath(); g.moveTo(X(tt), ly0); g.lineTo(X(tt), C.y + C.h - 22); g.stroke();
       text(g, tt === this.S ? `${this.S}` : tt, X(tt), C.y + C.h - 9, { size: 9.5, kind: 'mono', color: COL.faint, align: 'center' });
     }
-    text(g, '步数（对数刻度）', px + pw, C.y + C.h - 9, { size: 9.5, color: COL.faint, align: 'right' });
+    text(g, L('步数（对数刻度）', 'step (log scale)'), px + pw, C.y + C.h - 9, { size: 9.5, color: COL.faint, align: 'right' });
     // 关键时刻：预热结束、每读完一轮
-    const marks = [[m.train.warmup, '预热结束']];
+    const marks = [[m.train.warmup, L('预热结束', 'warmup ends')]];
     const per = m.corpus.chars.train / m.train.tokensPerStep;
-    for (let e = 1; e * per < this.S; e++) marks.push([e * per, `读完第 ${e} 轮`]);
+    for (let e = 1; e * per < this.S; e++) marks.push([e * per, L(`读完第 ${e} 轮`, `epoch ${e}`)]);
     g.setLineDash([3, 4]);
     for (const [tt, s] of marks) {
       g.strokeStyle = 'rgba(255,182,92,0.25)';
@@ -224,18 +231,18 @@ export class Overview {
     g.setLineDash([2, 3]);
     g.beginPath(); g.moveTo(px, Y(lnV)); g.lineTo(px + pw, Y(lnV)); g.stroke();
     g.setLineDash([]);
-    text(g, `瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, X(30), Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)' });
+    text(g, L(`瞎猜：ln ${m.model.vocab} = ${lnV.toFixed(2)}`, `blind guess: ln ${m.model.vocab} = ${lnV.toFixed(2)}`), X(30), Y(lnV) - 5, { size: 9.5, color: 'rgba(255,107,147,0.7)' });
 
     const tEnd = Math.max(1, Math.round(t));
     // 原始损失（每一步，淡）+ 平滑损失（亮）
-    const L = this.D.loss;
+    const LS = this.D.loss;
     g.beginPath();
-    for (let i = 0; i <= tEnd && i < L.length; i += i < 200 ? 1 : 2) { const xx = X(i), yy = Y(L[i]); i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
+    for (let i = 0; i <= tEnd && i < LS.length; i += i < 200 ? 1 : 2) { const xx = X(i), yy = Y(LS[i]); i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
     g.strokeStyle = 'rgba(94,240,212,0.22)';
     g.lineWidth = 1;
     g.stroke();
     g.beginPath();
-    for (let i = 0; i <= tEnd && i < L.length; i += i < 200 ? 1 : 3) { const xx = X(i), yy = Y(this.ema[i]); i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
+    for (let i = 0; i <= tEnd && i < LS.length; i += i < 200 ? 1 : 3) { const xx = X(i), yy = Y(this.ema[i]); i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
     g.strokeStyle = COL.cyan;
     g.lineWidth = 2;
     g.stroke();
@@ -259,8 +266,8 @@ export class Overview {
     text(g, this.ema[ti].toFixed(3), hx + 8, hy - 8, { size: 11, kind: 'mono', color: COL.amber, weight: 700 });
     // 图例
     const lgx = C.x + C.w - 18;
-    text(g, '— 训练损失（平滑）', lgx, C.y + 22, { size: 10, color: COL.cyan, align: 'right' });
-    text(g, '● 验证损失（没训练过的诗）', lgx, C.y + 37, { size: 10, color: COL.amber, align: 'right' });
+    text(g, L('— 训练损失（平滑）', '— training loss (smoothed)'), lgx, C.y + 22, { size: 10, color: COL.cyan, align: 'right' });
+    text(g, L('● 验证损失（没训练过的诗）', '● validation loss (unseen poems)'), lgx, C.y + 37, { size: 10, color: COL.amber, align: 'right' });
 
     // 学习率、梯度范数两条小图
     const mini = (y0, h, arr, max, color, label, fmt) => {
@@ -274,8 +281,8 @@ export class Overview {
       g.stroke();
       text(g, fmt(arr[ti]), Math.min(hx + 6, px + pw - 40), y0 + 10, { size: 9.5, kind: 'mono', color });
     };
-    mini(ly1 + 20, 34, this.D.lr, m.train.peakLr * 1.05, COL.amber, '学习率', (v) => sciSup(v, 2));
-    mini(ly1 + 66, 30, this.D.gnorm, 2.6, COL.violet, '梯度范数', (v) => v.toFixed(2));
+    mini(ly1 + 20, 34, this.D.lr, m.train.peakLr * 1.05, COL.amber, L('学习率', 'LR'), (v) => sciSup(v, 2));
+    mini(ly1 + 66, 30, this.D.gnorm, 2.6, COL.violet, L('梯度范数', '‖g‖'), (v) => v.toFixed(2));
     // 裁剪线
     const gy = ly1 + 66 + 30 - (m.train.clip / 2.6) * 30;
     g.setLineDash([2, 3]);
@@ -299,6 +306,7 @@ export class Overview {
       },
       tipAt: (wx) => {
         const tt = Math.round(clamp(toT(wx), 0, this.S - 1));
+        if (isEn) return `<span class="k">Step ${fmtInt(tt + 1)}</span>loss <span class="v">${this.D.loss[tt].toFixed(3)}</span> (smoothed ${this.ema[tt].toFixed(3)})<br>learning rate <span class="a">${sciSup(this.D.lr[tt], 3)}</span> · grad norm ${this.D.gnorm[tt].toFixed(3)}<br><span style="color:var(--dim)">Drag to jump to a nearby checkpoint</span>`;
         return `<span class="k">第 ${fmtInt(tt + 1)} 步</span>损失 <span class="v">${this.D.loss[tt].toFixed(3)}</span>（平滑 ${this.ema[tt].toFixed(3)}）<br>学习率 <span class="a">${sciSup(this.D.lr[tt], 3)}</span>　梯度范数 ${this.D.gnorm[tt].toFixed(3)}<br><span style="color:var(--dim)">按住拖动，跳到附近的检查点</span>`;
       },
     });
@@ -308,15 +316,15 @@ export class Overview {
 
   drawSamples(g, st, env) {
     const C = this.samp, m = this.D.meta, k = st.k;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: `SAMPLES · 第 ${fmtInt(m.ckpts[k].t)} 步的模型`, title: '它此刻写的诗', accent: COL.amber });
-    text(g, `温度 ${m.train.sampleTemp} · 每个检查点用同一组随机数`, C.x + C.w - 14, C.y + 19, { size: 9.5, color: COL.dim, align: 'right' });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L(`SAMPLES · 第 ${fmtInt(m.ckpts[k].t)} 步的模型`, `SAMPLES · MODEL AT STEP ${fmtInt(m.ckpts[k].t)}`), title: L('它此刻写的诗', 'Poems it writes right now'), accent: COL.amber });
+    text(g, L(`温度 ${m.train.sampleTemp} · 每个检查点用同一组随机数`, `temp ${m.train.sampleTemp} · same seed each time`), C.x + C.w - 14, C.y + 19, { size: 9.5, color: COL.dim, align: 'right' });
     const age = (env.t - this.reveal.t0) * Math.max(1, st.speed) * 60;
     const n = m.prefixes.length;
     const bh = (C.h - 54) / n;
     m.ckpts[k].samples.forEach((s, i) => {
       const y = C.y + 52 + i * bh;
       const pf = m.prefixes[i];
-      text(g, pf ? `开头「${pf}」` : '不给开头', C.x + 14, y + 12, { size: 9.5, color: COL.dim });
+      text(g, pf ? L(`开头「${pf}」`, `starts with 「${pf}」`) : L('不给开头', 'no opening given'), C.x + 14, y + 12, { size: 9.5, color: COL.dim });
       const fm = checkForm(s);
       if (fm) badge(g, C.x + C.w - 14, y + 1, fm.ok ? `✓ ${fm.name}` : fm.name, fm.ok ? COL.cyan : COL.faint, 'right', 9.5);
       // 一句一行（按“，。”断开），太长的乱码就按宽度折行
@@ -337,7 +345,7 @@ export class Overview {
 
   drawVal(g, st, env) {
     const C = this.val, D = this.D, m = D.meta;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: 'HELD-OUT · 训练时从没见过', title: '《登鹳雀楼》每个字的概率', accent: COL.cyan });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('HELD-OUT · 训练时从没见过', 'HELD-OUT · NEVER SEEN IN TRAINING'), title: L('《登鹳雀楼》每个字的概率', 'Probability per character'), accent: COL.cyan });
     const s = this.src(g, this.body(C), st, env);
     if (!s) return;
     const k = s.k, hit = this.staleBegin(g, s, env);
@@ -359,12 +367,13 @@ export class Overview {
       text(g, fmtP(p), x + tw / 2, y + th - 4, { size: 8.5, kind: 'mono', color: p > 0.5 ? '#04121a' : COL.dim, align: 'center' });
       hit(x, y, tw, th, { tip: () => {
         const top = D.valTop(k, i).map((tt) => `<tr><td class="${tt.id === m.held.ids[i + 1] ? 'tg' : ''}">${esc(tt.id === 0 ? '⏎' : D.ch(tt.id))}</td><td>${fmtP(tt.p)}</td></tr>`).join('');
-        const ctxs = m.held.text.slice(0, i) || '（只有开头标记）';
+        const ctxs = m.held.text.slice(0, i) || L('（只有开头标记）', '(only the start marker)');
+        if (isEn) return `<span class="k">after “${esc(ctxs.slice(-8))}”</span>probability of the correct answer “<b>${esc(textS[i])}</b>”: <span class="v">${fmtP(p)}</span><table>${top}</table><span style="color:var(--dim)">${POEM_EN}</span>`;
         return `<span class="k">看到「${esc(ctxs.slice(-8))}」之后</span>正确答案「<b>${esc(textS[i])}</b>」的概率 <span class="v">${fmtP(p)}</span><table>${top}</table>`;
       } });
     }
     const n = D.Lv;
-    text(g, `平均损失 ${(mean / n).toFixed(2)}（每个字 −ln p 的平均）`, C.x + 14, C.y + C.h - 14, { size: 10, color: COL.dim });
+    text(g, L(`平均损失 ${(mean / n).toFixed(2)}（每个字 −ln p 的平均）`, `mean loss ${(mean / n).toFixed(2)} (avg −ln p per char)`), C.x + 14, C.y + C.h - 14, { size: 10, color: COL.dim, max: isEn ? C.w - 28 : 0 });
     this.staleEnd(g, C, s);
   }
 
@@ -373,7 +382,7 @@ export class Overview {
   drawAttn(g, st, env) {
     const C = this.attnC, D = this.D, m = D.meta;
     this.initHeads();
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: this.head ? `ATTENTION · 第 ${this.head[0]} 层第 ${this.head[1]} 头` : 'ATTENTION', title: '一个注意力头的样子', accent: COL.violet });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: this.head ? L(`ATTENTION · 第 ${this.head[0]} 层第 ${this.head[1]} 头`, `ATTENTION · LAYER ${this.head[0]} HEAD ${this.head[1]}`) : 'ATTENTION', title: L('一个注意力头的样子', 'One attention head'), accent: COL.violet });
     const s = this.src(g, this.body(C), st, env, true);
     if (!s) return;
     const k = s.k, hit = this.staleBegin(g, s, env);
@@ -395,13 +404,14 @@ export class Overview {
     if (cs > 6) for (let i = 0; i < Lv; i++) text(g, chars[i], x0 - 3, y0 + i * cs + cs * 0.75, { size: Math.min(9, cs * 0.9), color: COL.dim, align: 'right' });
     hit(x0, y0, side, side, { tipAt: (wx, wy) => {
       const i = clamp(Math.floor((wy - y0) / cs), 0, Lv - 1), j = clamp(Math.floor((wx - x0) / cs), 0, Lv - 1);
-      if (j > i) return '<span class="k">因果遮罩</span>只能看前面的字，不能偷看后面';
+      if (j > i) return L('<span class="k">因果遮罩</span>只能看前面的字，不能偷看后面', '<span class="k">causal mask</span>it can only look at earlier characters, never peek ahead');
+      if (isEn) return `<span class="k">row ${i} · column ${j}</span>“${esc(chars[i])}” looks at “${esc(chars[j])}” <span class="v">${fmtP(D.attn(k, l, h, i, j))}</span>`;
       return `<span class="k">第 ${i} 行 · 第 ${j} 列</span>「${esc(chars[i])}」看「${esc(chars[j])}」　<span class="v">${fmtP(D.attn(k, l, h, i, j))}</span>`;
     } });
     // 选头：6 层 × 4 头
     const gx = x0 + side + 16, gy = y0;
     const bw = Math.min(16, (C.x + C.w - 14 - gx) / D.H - 3);
-    text(g, '选头', gx, gy - 6, { size: 9, color: COL.dim });
+    text(g, L('选头', 'pick'), gx, gy - 6, { size: 9, color: COL.dim });
     for (let ll = 0; ll < D.NL; ll++) {
       for (let hh = 0; hh < D.H; hh++) {
         const bx = gx + hh * (bw + 3), by = gy + ll * (bw + 5);
@@ -412,13 +422,13 @@ export class Overview {
         g.fill();
         g.strokeStyle = on ? COL.violet : COL.line2;
         g.stroke();
-        env.hit(bx, by, bw, bw, { click: true, act: () => { this.head = [ll, hh]; this.app.sfx('click'); this.app.discover('head'); }, tip: `<span class="k">第 ${ll} 层第 ${hh} 头</span>最终：看前一个字 ${fmtP(sAll.prev)} · 看上一句同位置 ${fmtP(sAll.back6)} · 看开头 ${fmtP(sAll.first)}` });
+        env.hit(bx, by, bw, bw, { click: true, act: () => { this.head = [ll, hh]; this.app.sfx('click'); this.app.discover('head'); }, tip: L(`<span class="k">第 ${ll} 层第 ${hh} 头</span>最终：看前一个字 ${fmtP(sAll.prev)} · 看上一句同位置 ${fmtP(sAll.back6)} · 看开头 ${fmtP(sAll.first)}`, `<span class="k">layer ${ll} head ${hh}</span>at the end: previous char ${fmtP(sAll.prev)} · same spot in the previous line ${fmtP(sAll.back6)} · the start ${fmtP(sAll.first)}`) });
       }
       text(g, `L${ll}`, gx + D.H * (bw + 3) + 2, gy + ll * (bw + 5) + bw - 3, { size: 8, kind: 'mono', color: COL.faint });
     }
     // 这个头此刻在干什么（真实统计）
     const one = this.computeOne(k, l, h);
-    const desc = [['看前一个字', one.prev], ['看上一句同位置', one.back6], ['看自己', one.self], ['看开头', one.first]].sort((a, b) => b[1] - a[1]);
+    const desc = [[L('看前一个字', 'previous char'), one.prev], [L('看上一句同位置', 'previous line'), one.back6], [L('看自己', 'itself'), one.self], [L('看开头', 'the start'), one.first]].sort((a, b) => b[1] - a[1]);
     const ty = y0 + side + 18;
     desc.slice(0, 3).forEach(([n, v], i) => {
       const yy = ty + i * 16;
@@ -442,8 +452,8 @@ export class Overview {
 
   drawEmb(g, st, env) {
     const C = this.emb, D = this.D, m = D.meta;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: 'EMBEDDING · PCA 前两维', title: '字的地图', accent: COL.green });
-    const bx = C.x + 14, by = C.y + 54, bw = C.w - 28, bh = C.h - 100;
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('EMBEDDING · PCA 前两维', 'EMBEDDING · TOP 2 PCA DIMS'), title: L('字的地图', 'Map of characters'), accent: COL.green });
+    const bx = C.x + 14, by = C.y + 54, bw = C.w - 28, bh = C.h - (isEn && !this.portrait ? 114 : 100);
     rr(g, bx, by, bw, bh, 8);
     g.fillStyle = 'rgba(255,255,255,0.015)';
     g.fill();
@@ -476,7 +486,8 @@ export class Overview {
         if (d < bd) { bd = d; best = n; }
       }
       if (best < 0 || bd > 14) return null;
-      const ch = D.pcaChars[best] === '<|endoftext|>' ? '⏎（诗与诗之间的分隔）' : D.pcaChars[best];
+      const ch = D.pcaChars[best] === '<|endoftext|>' ? L('⏎（诗与诗之间的分隔）', '⏎ (separator between poems)') : D.pcaChars[best];
+      if (isEn) return `<span class="k">embedding · ${m.model.hidden} dims projected to 2</span><b>${esc(ch)}</b> · #${m.pcaIds[best]} most common in the training set`;
       return `<span class="k">嵌入向量 · ${m.model.hidden} 维投影到 2 维</span><b>${esc(ch)}</b>　训练集里排第 ${m.pcaIds[best]} 常见`;
     } });
     this.staleEnd(g, C, s);
@@ -486,13 +497,16 @@ export class Overview {
   drawLegend(g, C) {
     const N = this.D.NP;
     let lx = C.x + 14;
-    const ly = C.y + C.h - 32;
+    let ly = C.y + C.h - 32;
+    if (isEn && !this.portrait) ly -= 14;
     for (const gp of GROUPS) {
+      // 英文的组名更长：放不下就折到第二行
+      if (isEn && lx + 12 + measure(g, gp.name, 10) > C.x + C.w - 14) { lx = C.x + 14; ly += 14; }
       text(g, '■', lx, ly, { size: 10, color: gp.color });
       text(g, gp.name, lx + 12, ly, { size: 10, color: COL.dim });
-      lx += 24 + measure(g, gp.name, 10);
+      lx += (isEn ? 20 : 24) + measure(g, gp.name, 10);
     }
-    text(g, `${N} 个字（最常见的 300 个 + 几组同类字），每个检查点各自做 PCA 再旋转对齐`, C.x + 14, C.y + C.h - 14, { size: 9, color: COL.faint, max: C.w - 28 });
+    text(g, L(`${N} 个字（最常见的 300 个 + 几组同类字），每个检查点各自做 PCA 再旋转对齐`, `${N} characters (the 300 most common + a few groups); PCA per checkpoint, rotated to align`), C.x + 14, C.y + C.h - 14, { size: 9, color: COL.faint, max: C.w - 28 });
   }
 
   /* ---------------------------------------------------------------- 权重局部 */
@@ -517,12 +531,12 @@ export class Overview {
 
   drawWeights(g, st, env) {
     const C = this.wts, D = this.D, m = D.meta;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: 'WEIGHTS · 48×48 个真实数值', title: '权重在变', accent: COL.amber });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: L('WEIGHTS · 48×48 个真实数值', 'WEIGHTS · 48×48 REAL VALUES'), title: L('权重在变', 'Weights on the move'), accent: COL.amber });
     this.drawModes(g, C, env);
     const s = this.src(g, this.body(C, 50, 46), st, env, true);
     if (!s) return;
     const k = s.k, hit = this.staleBegin(g, s, env);
-    const names = ['嵌入（最常见 48 字）', `第 2 层 W_q`, `第 4 层 W_down`];
+    const names = isEn ? ['Embedding', 'L2 · W_q', 'L4 · W_down'] : ['嵌入（最常见 48 字）', `第 2 层 W_q`, `第 4 层 W_down`];
     const n = 3, gap = 10;
     const sz = Math.min((C.w - 28 - gap * (n - 1)) / n, C.h - 130);
     const y0 = C.y + 62;
@@ -542,7 +556,8 @@ export class Overview {
       hit(x0, y0, sz, sz, { tipAt: (wx, wy) => {
         const i = clamp(Math.floor(((wy - y0) / sz) * D.C), 0, D.C - 1), j = clamp(Math.floor(((wx - x0) / sz) * D.C), 0, D.C - 1);
         const w = D.wcrop(k, c, i, j), w0 = D.wcrop(0, c, i, j), gr = D.gcrop(k, c, i, j);
-        const row = c === 0 ? `「${D.ch(i + 1)}」第 ${j} 维` : `[${i}, ${j}]`;
+        const row = c === 0 ? L(`「${D.ch(i + 1)}」第 ${j} 维`, `“${D.ch(i + 1)}” dim ${j}`) : `[${i}, ${j}]`;
+        if (isEn) return `<span class="k">${names[c]} ${row}</span>w = <span class="v">${w.toFixed(4)}</span> (at the start: ${w0.toFixed(4)})<br>gradient at this step: ${sciSup(gr, 2)}<br><span style="color:var(--dim)">stored as int8, about 1% error</span>`;
         return `<span class="k">${names[c]} ${row}</span>w = <span class="v">${w.toFixed(4)}</span>（开始时 ${w0.toFixed(4)}）<br>这一步的梯度 ${sciSup(gr, 2)}<br><span style="color:var(--dim)">按 int8 量化存储，误差约 1%</span>`;
       } });
     }
@@ -551,12 +566,12 @@ export class Overview {
 
   // 权重 / 变化 / 梯度 三个按钮
   drawModes(g, C, env) {
-    const modes = [['w', '权重 W'], ['d', '变化 ΔW'], ['g', '梯度 ∇W']];
+    const modes = isEn ? [['w', 'weight W'], ['d', 'change ΔW'], ['g', 'grad ∇W']] : [['w', '权重 W'], ['d', '变化 ΔW'], ['g', '梯度 ∇W']];
     const pw = (C.w - 28 - 12) / 3;
     modes.forEach(([id, s], i) => {
       const x = C.x + 14 + i * (pw + 6), y = C.y + C.h - 36;
       pill(g, x, y, pw, 24, s, { on: this.wmode === id, color: COL.amber, size: 11 });
-      env.hit(x, y, pw, 24, { click: true, act: () => { this.wmode = id; this.app.sfx('click'); }, tip: id === 'd' ? '和第 0 步（随机初始化）相比改了多少' : id === 'g' ? '这一步反向传播算出的梯度（裁剪前）' : '当前的权重值' });
+      env.hit(x, y, pw, 24, { click: true, act: () => { this.wmode = id; this.app.sfx('click'); }, tip: id === 'd' ? L('和第 0 步（随机初始化）相比改了多少', 'How much it has changed since step 0 (random init)') : id === 'g' ? L('这一步反向传播算出的梯度（裁剪前）', 'The gradient backprop computed at this step (before clipping)') : L('当前的权重值', 'The current weight values') });
     });
   }
 
@@ -564,7 +579,7 @@ export class Overview {
 
   drawLand(g, st, env) {
     const C = this.land, D = this.D, m = D.meta, L = m.land;
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: `LANDSCAPE · 真实计算的 ${L.G}×${L.G} 个点`, title: '损失地形', accent: COL.rose });
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: isEn ? `LANDSCAPE · ${L.G}×${L.G} REAL EVALUATIONS` : `LANDSCAPE · 真实计算的 ${L.G}×${L.G} 个点`, title: isEn ? 'Loss landscape' : '损失地形', accent: COL.rose });
     const bx = C.x + 14, by = C.y + 54, bw = C.w - 28, bh = C.h - 104;
     if (!this.landImg) {
       const c = document.createElement('canvas');
@@ -598,15 +613,16 @@ export class Overview {
     const [hx, hy] = pts[pts.length - 1];
     dot(g, hx, hy, 4.5, COL.amber, '#fff');
     dot(g, X(0), Y(0), 2.5, COL.rose);
-    text(g, '终点', X(0) + 5, Y(0) - 5, { size: 9.5, color: COL.rose });
+    text(g, isEn ? 'end' : '终点', X(0) + 5, Y(0) - 5, { size: 9.5, color: COL.rose });
     const [sx, sy] = [X(L.path[0][0]), Y(L.path[0][1])];
-    text(g, '起点', sx - 4, sy - 7, { size: 9.5, color: COL.ink2, align: 'right' });
+    text(g, isEn ? 'start' : '起点', sx - 4, sy - 7, { size: 9.5, color: COL.ink2, align: 'right' });
     env.hit(bx, by, bw, bh, { tipAt: (wx, wy) => {
       const ix = clamp(Math.round(((wx - bx) / bw) * (L.G - 1)), 0, L.G - 1), iy = clamp(Math.round(((by + bh - wy) / bh) * (L.G - 1)), 0, L.G - 1);
+      if (isEn) return `<span class="k">a point on the plane</span>validation loss <span class="v">${D.land(iy, ix).toFixed(3)}</span><br>trajectory at step ${fmtInt(m.ckpts[k].t)}: ${L.pathLoss[k].toFixed(3)}`;
       return `<span class="k">平面上的一点</span>验证损失 <span class="v">${D.land(iy, ix).toFixed(3)}</span><br>轨迹上第 ${fmtInt(m.ckpts[k].t)} 步：${L.pathLoss[k].toFixed(3)}`;
     } });
-    text(g, `横：主成分 1（${(L.evr[0] * 100).toFixed(1)}%）　纵：主成分 2（${(L.evr[1] * 100).toFixed(1)}%）`, C.x + 14, C.y + C.h - 32, { size: 9.5, color: COL.dim, max: C.w - 28 });
-    text(g, '41 个检查点的参数轨迹 → 前两个主成分张成的平面', C.x + 14, C.y + C.h - 15, { size: 9, color: COL.faint, max: C.w - 28 });
+    text(g, isEn ? `x: PC 1 (${(L.evr[0] * 100).toFixed(1)}%)   y: PC 2 (${(L.evr[1] * 100).toFixed(1)}%)` : `横：主成分 1（${(L.evr[0] * 100).toFixed(1)}%）　纵：主成分 2（${(L.evr[1] * 100).toFixed(1)}%）`, C.x + 14, C.y + C.h - 32, { size: 9.5, color: COL.dim, max: C.w - 28 });
+    text(g, isEn ? 'plane spanned by the top 2 PCs of the 41 checkpoints' : '41 个检查点的参数轨迹 → 前两个主成分张成的平面', C.x + 14, C.y + C.h - 15, { size: 9, color: COL.faint, max: C.w - 28 });
   }
 
   // 卡片：点一下飞过去
@@ -654,8 +670,8 @@ export function checkForm(s) {
   let idx = 0;
   for (const ch of s) if (ch === '，' || ch === '。') { if (ch !== (idx % 2 === 0 ? '，' : '。')) alt = false; idx++; }
   const ok = (n === 5 || n === 7) && (lines === 4 || lines === 8) && parts.every((p) => p.length === n) && alt && s.endsWith('。');
-  if (ok) return { ok, name: `${n === 5 ? '五' : '七'}言${lines === 4 ? '绝句' : '律诗'}` };
-  return { ok: false, name: '格式还不对' };
+  if (ok) return { ok, name: isEn ? `${n}-char ${lines === 4 ? 'quatrain' : 'regulated verse'}` : `${n === 5 ? '五' : '七'}言${lines === 4 ? '绝句' : '律诗'}` };
+  return { ok: false, name: L('格式还不对', 'not a valid form yet') };
 }
 
 // 画一行字（自动折行），返回用掉的行数

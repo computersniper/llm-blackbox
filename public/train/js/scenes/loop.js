@@ -2,13 +2,14 @@
 import { COL, text, rr, card, dot, hexA, wrap, fmtInt, fmtP, clamp, lerp, ease, sciSup, seqColor, heatColor, arrow, badge } from '../draw.js';
 import { rowLayout, tileBase, disp } from './row.js';
 import { esc } from '../../../js/ui.js';
+import { isEn, L, compact, featLabel } from '../lang.js';
 
 const NODES = [
-  { ph: 'batch', name: '批次', en: 'BATCH', a: -90, c: COL.blue },
-  { ph: 'fwd', name: '前向', en: 'FORWARD', a: -18, c: COL.cyan },
-  { ph: 'loss', name: '损失', en: 'LOSS', a: 54, c: COL.amber },
-  { ph: 'bwd', name: '反向', en: 'BACKWARD', a: 126, c: COL.rose },
-  { ph: 'upd', name: '更新', en: 'UPDATE', a: 198, c: COL.violet },
+  { ph: 'batch', name: L('批次', 'Batch'), en: 'BATCH', a: -90, c: COL.blue },
+  { ph: 'fwd', name: L('前向', 'Forward'), en: 'FORWARD', a: -18, c: COL.cyan },
+  { ph: 'loss', name: L('损失', 'Loss'), en: 'LOSS', a: 54, c: COL.amber },
+  { ph: 'bwd', name: L('反向', 'Backward'), en: 'BACKWARD', a: 126, c: COL.rose },
+  { ph: 'upd', name: L('更新', 'Update'), en: 'UPDATE', a: 198, c: COL.violet },
 ];
 
 export class Loop {
@@ -68,16 +69,16 @@ export class Loop {
     // 中心
     const T = R.kind === 'tiny';
     text(g, T ? 'STEP' : 'SFT STEP', RG.cx, RG.cy - 34, { size: 10, kind: 'mono', color: COL.dim, align: 'center' });
-    text(g, `第 ${fmtInt(R.stepNo(k))} 步`, RG.cx, RG.cy - 4, { size: this.portrait ? 22 : 28, kind: 'serif', weight: 900, color: COL.ink, align: 'center' });
+    text(g, L(`第 ${fmtInt(R.stepNo(k))} 步`, `Step ${fmtInt(R.stepNo(k))}`), RG.cx, RG.cy - 4, { size: this.portrait ? 22 : 28, kind: 'serif', weight: 900, color: COL.ink, align: 'center' });
     text(g, `loss ${R.loss(k).toFixed(4)}`, RG.cx, RG.cy + 22, { size: 12, kind: 'mono', color: COL.cyan, align: 'center' });
     text(g, `lr ${sciSup(R.lr(k), 3)}`, RG.cx, RG.cy + 40, { size: 11, kind: 'mono', color: COL.amber, align: 'center' });
     // 节点
     const info = {
       batch: R.batchShape,
-      fwd: `${R.model.layers} 层 · 并行`,
+      fwd: L(`${R.model.layers} 层 · 并行`, `${R.model.layers} layers`),
       loss: R.loss(k).toFixed(3),
       bwd: `‖g‖ ${R.gradNorm(k).toFixed(T ? 3 : 1)}`,
-      upd: `${fmtInt(R.model.params / 1e4)} 万个权重`,
+      upd: L(`${fmtInt(R.model.params / 1e4)} 万个权重`, `${compact(R.model.params, 1)} weights`),
     };
     NODES.forEach((n, i) => {
       const [x, y] = this.pos(i);
@@ -93,7 +94,7 @@ export class Loop {
       text(g, n.en, x, y - 12, { size: 8.5, kind: 'mono', color: on ? n.c : COL.dim, align: 'center' });
       text(g, n.name, x, y + 8, { size: this.portrait ? 15 : 17, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2, align: 'center' });
       text(g, info[n.ph], x, y + 26, { size: 9.5, kind: 'mono', color: COL.dim, align: 'center', max: r * 2 - 8 });
-      env.hit(x - r, y - r, r * 2, r * 2, { click: true, act: () => { this.app.seek((b) => b.ph === n.ph); this.app.sfx('click'); }, tip: `<span class="k">${n.en}</span>${n.name}：点一下跳到这里，再按 ＋ 拆开` });
+      env.hit(x - r, y - r, r * 2, r * 2, { click: true, act: () => { this.app.seek((b) => b.ph === n.ph); this.app.sfx('click'); }, tip: L(`<span class="k">${n.en}</span>${n.name}：点一下跳到这里，再按 ＋ 拆开`, `<span class="k">${n.en}</span>Click to jump here, then press + to open it up`) });
     });
     // 演示用的“重新前向”
     {
@@ -111,17 +112,17 @@ export class Loop {
       g.strokeStyle = on ? COL.amber : hexA(COL.amber, 0.4);
       g.stroke();
       g.setLineDash([]);
-      text(g, '重新前向', cx, cy, { size: 12, color: on ? COL.amber : COL.ink2, align: 'center', weight: 600 });
-      text(g, '演示 · 不是训练的一部分', cx, cy + 14, { size: 8.5, color: COL.dim, align: 'center' });
-      env.hit(cx - 46, cy - 18, 92, 40, { click: true, act: () => { this.app.seek((b) => b.ph === 'check'); this.app.sfx('click'); }, tip: '更新完以后，对同一批数据再算一次损失，看这一步改变了什么（演示用）' });
+      text(g, L('重新前向', 'Forward again'), cx, cy, { size: 12, color: on ? COL.amber : COL.ink2, align: 'center', weight: 600 });
+      text(g, L('演示 · 不是训练的一部分', 'demo · not training'), cx, cy + 14, { size: 8.5, color: COL.dim, align: 'center' });
+      env.hit(cx - 46, cy - 18, 92, 40, { click: true, act: () => { this.app.seek((b) => b.ph === 'check'); this.app.sfx('click'); }, tip: L('更新完以后，对同一批数据再算一次损失，看这一步改变了什么（演示用）', 'After the update, compute the loss on the same batch again to see what this step changed (demo only)') });
     }
     this.drawPanel(g, st, env, s.ph);
   }
 
   drawPanel(g, st, env, ph) {
     const R = this.R, k = st.k, C = this.panel, T = R.kind === 'tiny';
-    const titles = { batch: '这一步的数据', fwd: '前向：每个位置同时预测下一个', loss: '损失：猜中正确答案的概率', bwd: '反向：梯度流回到每个输入位置', upd: '更新：每个权重挪一小步', check: '重新前向：同一批数据，更新前后' };
-    card(g, C.x, C.y, C.w, C.h, { eyebrow: T ? `BATCH ROW 0 · 第 0 行的前 ${R.rowLen} 个位置` : `CONVERSATION · ${R.rowLen + 1} 个词元`, title: titles[ph] || '', accent: COL.cyan, demo: ph === 'check' });
+    const titles = isEn ? { batch: 'The data for this step', fwd: 'Forward: all positions predict at once', loss: 'Loss: probability of the right answer', bwd: 'Backward: gradients flow back to every input', upd: 'Update: every weight takes a small step', check: 'Forward again: same batch, before vs. after' } : { batch: '这一步的数据', fwd: '前向：每个位置同时预测下一个', loss: '损失：猜中正确答案的概率', bwd: '反向：梯度流回到每个输入位置', upd: '更新：每个权重挪一小步', check: '重新前向：同一批数据，更新前后' };
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: T ? L(`BATCH ROW 0 · 第 0 行的前 ${R.rowLen} 个位置`, `BATCH ROW 0 · FIRST ${R.rowLen} POSITIONS`) : L(`CONVERSATION · ${R.rowLen + 1} 个词元`, `CONVERSATION · ${R.rowLen + 1} TOKENS`), title: titles[ph] || '', accent: COL.cyan, demo: ph === 'check' });
     const rows = rowLayout(g, R, k, C.x + 16, C.y + 64, C.w - 32, T ? { tile: this.portrait ? 30 : 38, th: this.portrait ? 36 : 42, gap: this.portrait ? 3 : 4, lineGap: this.portrait ? 14 : 18 } : { tile: 34, th: this.portrait ? 36 : 42, gap: 5, lineGap: this.portrait ? 18 : 22 });
     // 反向用：嵌入处每个位置的梯度（对数刻度）
     let gmax = 1e-30;
@@ -157,6 +158,13 @@ export class Loop {
         }
       }
       env.hit(r.x, r.y, r.w, r.h, { tip: () => {
+        if (isEn) {
+          let h = `<span class="k">${T ? 'character' : 'token'} ${j}${T ? '' : ` · ${{ user: 'question', answer: 'answer', tpl: 'template' }[r.role]}`}</span><b>${esc(disp(R.tok(k, j)))}</b> · ID <span class="v">${R.tokId(k, j)}</span>`;
+          if (has) h += `<br>probability of guessing it from the context <span class="v">${fmtP(p)}</span>${counted ? `, loss ${(-Math.log(Math.max(p, 1e-12))).toFixed(3)}` : ' (not in the loss)'}`;
+          if (has && ph === 'check') h += `<br>after the update <span class="a">${fmtP(R.pAfter(k, pi))}</span>`;
+          if (ph === 'bwd' && j < R.rowLen) h += `<br>gradient at the embedding ‖∂L/∂h‖ = ${sciSup(R.residGrad(k, 0, j), 3)}`;
+          return h;
+        }
         let h = `<span class="k">第 ${j} 个${T ? '字' : '词元'}${T ? '' : ` · ${{ user: '用户', answer: '回答', tpl: '模板' }[r.role]}`}</span><b>${esc(disp(R.tok(k, j)))}</b>　编号 <span class="v">${R.tokId(k, j)}</span>`;
         if (has) h += `<br>从前面猜中它的概率 <span class="v">${fmtP(p)}</span>${counted ? `，损失 ${(-Math.log(Math.max(p, 1e-12))).toFixed(3)}` : '（不计入损失）'}`;
         if (has && ph === 'check') h += `<br>更新后 <span class="a">${fmtP(R.pAfter(k, pi))}</span>`;
@@ -173,36 +181,36 @@ export class Loop {
     const big = (v, lab, col, xx, yy) => { text(g, v, xx, yy, { size: this.portrait ? 20 : 24, kind: 'mono', weight: 700, color: col }); text(g, lab, xx, yy + 18, { size: 10.5, color: COL.dim }); };
     const cw = w / 3;
     if (ph === 'batch') {
-      big(T ? `${m.train.batch}` : '1', T ? '行（每行一段连续的诗）' : '条对话', COL.blue, x, y + 20);
-      big(T ? `${m.train.seq}` : `${R.rowLen}`, '个位置 / 行', COL.blue, x + cw, y + 20);
-      big(T ? fmtInt(m.train.tokensPerStep) : `${R.D.sftPos.length}`, T ? '道“猜下一个字”的题' : '个位置计入损失', COL.cyan, x + 2 * cw, y + 20);
+      big(T ? `${m.train.batch}` : '1', T ? L('行（每行一段连续的诗）', 'rows of poems') : L('条对话', 'conversation'), COL.blue, x, y + 20);
+      big(T ? `${m.train.seq}` : `${R.rowLen}`, L('个位置 / 行', 'positions per row'), COL.blue, x + cw, y + 20);
+      big(T ? fmtInt(m.train.tokensPerStep) : `${R.D.sftPos.length}`, T ? L('道“猜下一个字”的题', 'next-char questions') : L('个位置计入损失', 'positions in the loss'), COL.cyan, x + 2 * cw, y + 20);
     } else if (ph === 'fwd') {
       let ok = 0, n = 0;
       for (let i = 0; i < R.rowLen; i++) if (R.counted(i)) { n++; if (R.lensTop(k, R.NL, i).ok) ok++; }
-      big(`${R.model.layers}`, '层，所有位置一起算', COL.cyan, x, y + 20);
-      big(fmtP(ok / n), '第一名就猜对的位置', COL.green, x + cw, y + 20);
-      text(g, '格子右上角的小字是模型最想说的下一个字（绿色 = 猜对）', x, y + 64, { size: 10.5, color: COL.dim, max: w });
+      big(`${R.model.layers}`, L('层，所有位置一起算', 'layers, all at once'), COL.cyan, x, y + 20);
+      big(fmtP(ok / n), L('第一名就猜对的位置', 'right at top-1'), COL.green, x + cw, y + 20);
+      text(g, L('格子右上角的小字是模型最想说的下一个字（绿色 = 猜对）', `Small text in each tile’s corner: the model’s top guess for the next ${T ? 'character' : 'token'} (green = right)`), x, y + 64, { size: 10.5, color: COL.dim, max: w });
     } else if (ph === 'loss') {
-      big(R.loss(k).toFixed(4), T ? `整批 ${fmtInt(m.train.tokensPerStep)} 个位置的平均` : '回答 8 个位置的平均', COL.amber, x, y + 20);
-      big(Math.log(R.model.vocab).toFixed(2), '完全瞎猜时的损失', COL.faint, x + cw * 1.4, y + 20);
-      text(g, '格子底色 = 猜中它的概率；下面的短条 = 损失 −ln p', x, y + 64, { size: 10.5, color: COL.dim, max: w });
+      big(R.loss(k).toFixed(4), T ? L(`整批 ${fmtInt(m.train.tokensPerStep)} 个位置的平均`, `mean over all ${fmtInt(m.train.tokensPerStep)} positions`) : L('回答 8 个位置的平均', 'mean over the 8 answer positions'), COL.amber, x, y + 20);
+      big(Math.log(R.model.vocab).toFixed(2), L('完全瞎猜时的损失', 'loss of a blind guess'), COL.faint, x + cw * 1.4, y + 20);
+      text(g, L('格子底色 = 猜中它的概率；下面的短条 = 损失 −ln p', 'Tile color = probability of guessing it; bar below = loss −ln p'), x, y + 64, { size: 10.5, color: COL.dim, max: w });
     } else if (ph === 'bwd') {
-      big(R.gradNorm(k).toFixed(T ? 3 : 1), '全部梯度合起来的长度', COL.rose, x, y + 20);
-      big(R.clip(k) < 1 ? `×${R.clip(k).toFixed(4)}` : '不裁剪', '裁剪到 1.0', COL.violet, x + cw * 1.2, y + 20);
-      text(g, '格子底色 = 梯度流回到这个位置的嵌入时有多大（对数刻度）', x, y + 64, { size: 10.5, color: COL.dim, max: w });
+      big(R.gradNorm(k).toFixed(T ? 3 : 1), L('全部梯度合起来的长度', 'length of all gradients'), COL.rose, x, y + 20);
+      big(R.clip(k) < 1 ? `×${R.clip(k).toFixed(4)}` : L('不裁剪', 'no clip'), L('裁剪到 1.0', 'clipped to 1.0'), COL.violet, x + cw * 1.2, y + 20);
+      text(g, L('格子底色 = 梯度流回到这个位置的嵌入时有多大（对数刻度）', 'Tile color = size of the gradient reaching this position’s embedding (log scale)'), x, y + 64, { size: 10.5, color: COL.dim, max: w });
     } else if (ph === 'upd') {
-      text(g, '跟踪的几个权重（真实数值）', x, y, { size: 11, color: COL.ink2 });
+      text(g, L('跟踪的几个权重（真实数值）', 'A few tracked weights (real values)'), x, y, { size: 11, color: COL.ink2 });
       R.feats.forEach((f, i) => {
         const a = R.adam(k, i);
         const yy = y + 22 + i * 20;
         if (yy > y + h) return;
-        text(g, f.label, x, yy, { size: 10.5, color: COL.dim, max: w * 0.5 });
+        text(g, featLabel(f, R.kind), x, yy, { size: 10.5, color: COL.dim, max: w * 0.5 });
         text(g, `${a.w0.toPrecision(6)} → ${a.w1.toPrecision(6)}`, x + w, yy, { size: 10.5, kind: 'mono', color: COL.ink, align: 'right' });
       });
     } else if (ph === 'check') {
       const a = R.loss(k), b = R.lossAfter(k);
-      big(`${a.toFixed(4)} → ${b.toFixed(4)}`, T ? '同一批数据，更新前 → 更新后' : '回答的损失，更新前 → 更新后', b <= a ? COL.cyan : COL.rose, x, y + 20);
-      text(g, '格子下方：灰 = 更新前的概率，亮 = 更新后', x, y + 64, { size: 10.5, color: COL.dim, max: w });
+      big(`${a.toFixed(4)} → ${b.toFixed(4)}`, T ? L('同一批数据，更新前 → 更新后', 'same batch, before → after the update') : L('回答的损失，更新前 → 更新后', 'answer loss, before → after the update'), b <= a ? COL.cyan : COL.rose, x, y + 20);
+      text(g, L('格子下方：灰 = 更新前的概率，亮 = 更新后', 'Under each tile: gray = probability before, bright = after'), x, y + 64, { size: 10.5, color: COL.dim, max: w });
     }
   }
 }

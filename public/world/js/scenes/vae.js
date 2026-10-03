@@ -1,10 +1,11 @@
 // D3 V 的内部：上面一排是编码器（真实画面 → 4 层卷积 → μ / σ），右边经过 M，下面一排是解码器
 // （M 预测的 ẑ → 全连接 → 4 层反卷积 → 梦见的画面），排成一个 U。每一层的特征图都是这一帧真实算出来的；
 // 点任意一格选中它，按 ＋ 看它的一次乘加。走到 z 时，下面把用得最多的几维各扫一遍。
-import { COL, rr, text, card, hexA, line, ease, seg } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, ease, seg, font } from '../../../train/js/draw.js';
 import { Pix, featGrid } from '../pix.js';
 import { dimOrder, dimMeaning, used as isUsed, OP_LABEL, fmtMSE } from '../explain.js';
 import { ENC, DEC } from '../nn.js';
+import { isEn, L as Lx } from '../../../js/i18n.js';
 
 const LAYERS = {
   e1: { C: 16, H: 31, cols: 4 }, e2: { C: 32, H: 14, cols: 8 }, e3: { C: 64, H: 6, cols: 8 }, e4: { C: 128, H: 2, cols: 16 },
@@ -85,7 +86,7 @@ export class VaeView {
     const sel = this.app.sel;
 
     // ---- 编码器
-    this.pixBox(g, B.in, this.inp, '真实画面 obs', '64×64×3', COL.cyan, 'done', env);
+    this.pixBox(g, B.in, this.inp, Lx('真实画面 obs', 'Real frame obs'), '64×64×3', COL.cyan, 'done', env);
     const encOps = ['e1', 'e2', 'e3', 'e4'];
     let prev = B.in;
     for (const op of encOps) {
@@ -104,15 +105,15 @@ export class VaeView {
       const m = B.M;
       card(g, m.x, m.y, m.w, m.h, { r: 10, active: curOp === 'M', accent: COL.violet });
       text(g, 'M', m.x + m.w / 2, m.y + 32, { size: 20, kind: 'serif', weight: 600, align: 'center', color: curOp === 'M' ? COL.ink : COL.ink2 });
-      text(g, 'D4 拆开', m.x + m.w / 2, m.y + 52, { size: 10, color: COL.dim, align: 'center' });
+      text(g, Lx('D4 拆开', 'opened at D4'), m.x + m.w / 2, m.y + 52, { size: 10, color: COL.dim, align: 'center' });
       line(g, [[B.mu.x + B.mu.w / 2, B.mu.y + B.mu.h + 4], [m.x + m.w / 2, m.y - 4]], hexA(COL.violet, 0.5), 1.2);
       line(g, [[m.x + m.w / 2, m.y + m.h + 4], [B.zd.x + B.zd.w / 2, B.zd.y - 18]], hexA(COL.amber, 0.5), 1.2);
-      text(g, rec.src === 'dream' ? '闭眼：M 的输入是上一步的 ẑ' : 'z = μ', m.x - 10, m.y + 20, { size: 10, color: COL.dim, align: 'right' });
+      text(g, rec.src === 'dream' ? Lx('闭眼：M 的输入是上一步的 ẑ', 'eyes closed: M’s input is last step’s ẑ') : 'z = μ', m.x - 10, m.y + 20, { size: 10, color: COL.dim, align: 'right' });
     }
     // ---- 解码器（M 预测的 ẑ）
-    this.zBox(g, B.zd, rec.S.z, 'ẑ（M 预测的下一帧）', curOp === 'dfc' || curOp === 'M', env);
+    this.zBox(g, B.zd, rec.S.z, Lx('ẑ（M 预测的下一帧）', "ẑ (M's prediction)"), curOp === 'dfc' || curOp === 'M', env);
     this.arrow(g, B.zd, B.dfc, st8('dfc') === 'on' ? p : st8('dfc') === 'done' ? 1 : 0, COL.amber, pt, true);
-    this.gridBox(g, B.dfc, 'dfc', '全连接', '1×1×512', st8('dfc'), p, env, sel, true, true);
+    this.gridBox(g, B.dfc, 'dfc', Lx('全连接', 'Fully connected'), '1×1×512', st8('dfc'), p, env, sel, true, true);
     prev = B.dfc;
     for (const op of ['d1', 'd2', 'd3']) {
       const L = DEC.find((l) => l.id === op);
@@ -122,19 +123,22 @@ export class VaeView {
     }
     this.arrow(g, B.d3, B.out, st8('d4') === 'on' ? p : st8('d4') === 'done' ? 1 : 0, COL.amber, pt, true);
     const rev = st8('d4') === 'on' ? ease(seg(p, 0.2, 1)) : st8('d4') === 'done' ? 1 : 0;
-    this.pixBox(g, B.out, this.out, '梦见的下一帧 ô', '64×64×3', COL.amber, st8('d4'), env, rev, 'd4');
+    this.pixBox(g, B.out, this.out, Lx('梦见的下一帧 ô', 'Dreamed next frame ô'), '64×64×3', COL.amber, st8('d4'), env, rev, 'd4');
     // ---- z 的每一维扫一遍
     if (s.op === 'z' || s.op === 'mu') this.sweepPanel(g, B.sweep, det, env, s.op === 'z');
     else {
       const sw = B.sweep;
-      text(g, '走到 z 这一步时，这里会把用得最多的几维各扫一遍', sw.x, sw.y + 18, { size: 11.5, color: COL.faint });
+      text(g, Lx('走到 z 这一步时，这里会把用得最多的几维各扫一遍', 'At the z step, the most-used dimensions are each swept here'), sw.x, sw.y + 18, { size: 11.5, color: COL.faint });
     }
   }
 
   pixBox(g, r, pix, title, sub, accent, state, env, reveal = 1, selOp = null) {
     const on = state === 'on';
     text(g, title, r.x, r.y - 10, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
-    if (!this.portrait) text(g, sub, r.x + r.w, r.y - 10, { size: 9, kind: 'mono', color: COL.dim, align: 'right' });
+    // 英文标题更长（“Dreamed next frame ô”），会压到右边的尺寸标注：放不下就不画尺寸
+    let fits = true;
+    if (isEn) { const tw = g.measureText(title).width; font(g, 9, 'mono'); fits = tw + g.measureText(sub).width + 6 <= r.w; }
+    if (!this.portrait && fits) text(g, sub, r.x + r.w, r.y - 10, { size: 9, kind: 'mono', color: COL.dim, align: 'right' });
     rr(g, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
     g.fillStyle = 'rgba(4,8,16,0.92)'; g.fill();
     g.strokeStyle = hexA(on ? COL.amber : accent, on ? 0.85 : 0.35); g.lineWidth = on ? 1.6 : 1; g.stroke();
@@ -151,7 +155,7 @@ export class VaeView {
         g.strokeRect(r.x + sl.x * cs - 1, r.y + sl.y * cs - 1, cs + 2, cs + 2);
       }
       env.hit(r.x, r.y, r.w, r.h, {
-        tipAt: (wx, wy) => { const x = Math.floor((wx - r.x) / (r.w / 64)), y = Math.floor((wy - r.y) / (r.h / 64)); const d = this.app.sim.detail().dec; if (!d) return ''; const i = y * 64 + x; return `<span class="k">梦里的像素 (${y}, ${x})</span>R ${d.y[i].toFixed(3)} · G ${d.y[4096 + i].toFixed(3)} · B ${d.y[8192 + i].toFixed(3)}<br><span class="v">点一下选中它（绿色通道），按 ＋ 看它怎么算出来</span>`; },
+        tipAt: (wx, wy) => { const x = Math.floor((wx - r.x) / (r.w / 64)), y = Math.floor((wy - r.y) / (r.h / 64)); const d = this.app.sim.detail().dec; if (!d) return ''; const i = y * 64 + x; return Lx(`<span class="k">梦里的像素 (${y}, ${x})</span>R ${d.y[i].toFixed(3)} · G ${d.y[4096 + i].toFixed(3)} · B ${d.y[8192 + i].toFixed(3)}<br><span class="v">点一下选中它（绿色通道），按 ＋ 看它怎么算出来</span>`, `<span class="k">Dream pixel (${y}, ${x})</span>R ${d.y[i].toFixed(3)} · G ${d.y[4096 + i].toFixed(3)} · B ${d.y[8192 + i].toFixed(3)}<br><span class="v">Click to select it (green channel), then press ＋ to see how it is computed</span>`); },
         clickAt: (wx, wy) => { const x = Math.floor((wx - r.x) / (r.w / 64)), y = Math.floor((wy - r.y) / (r.h / 64)); this.app.select('d4', { c: 1, y, x }); },
       });
     }
@@ -164,7 +168,7 @@ export class VaeView {
     rr(g, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
     g.fillStyle = 'rgba(4,8,16,0.92)'; g.fill();
     g.strokeStyle = on ? hexA(COL.amber, 0.85) : COL.line2; g.lineWidth = on ? 1.6 : 1; g.stroke();
-    if (!G || !live) { text(g, '闭眼：这一帧没用到', r.x + r.w / 2, r.y + r.h / 2 + 4, { size: 10, color: COL.faint, align: 'center' }); return; }
+    if (!G || !live) { text(g, Lx('闭眼：这一帧没用到', 'eyes closed: not used this frame'), r.x + r.w / 2, r.y + r.h / 2 + 4, { size: 10, color: COL.faint, align: 'center' }); return; }
     const reveal = state === 'todo' ? 0 : on ? ease(seg(p, 0, 0.75)) : 1;
     if (reveal > 0) {
       g.save(); g.beginPath(); g.rect(r.x, r.y, r.w, r.h * reveal); g.clip();
@@ -199,7 +203,7 @@ export class VaeView {
       return a[(q.c * L.H + q.y) * L.H + q.x];
     };
     env.hit(r.x, r.y, r.w, r.h, {
-      tipAt: (wx, wy) => { const q = pick(wx, wy); if (!q) return ''; return `<span class="k">${OP_LABEL[op]} · ${flat ? `第 ${q.j} 个` : `通道 ${q.c} · (${q.y}, ${q.x})`}</span>值 <span class="v">${val(q).toFixed(4)}</span><br><span class="v">点一下选中，按 ＋ 看它怎么乘加出来</span>`; },
+      tipAt: (wx, wy) => { const q = pick(wx, wy); if (!q) return ''; return Lx(`<span class="k">${OP_LABEL[op]} · ${flat ? `第 ${q.j} 个` : `通道 ${q.c} · (${q.y}, ${q.x})`}</span>值 <span class="v">${val(q).toFixed(4)}</span><br><span class="v">点一下选中，按 ＋ 看它怎么乘加出来</span>`, `<span class="k">${OP_LABEL[op]} · ${flat ? `#${q.j}` : `channel ${q.c} · (${q.y}, ${q.x})`}</span>value <span class="v">${val(q).toFixed(4)}</span><br><span class="v">Click to select, then press ＋ to see its multiply-add</span>`); },
       clickAt: (wx, wy) => { const q = pick(wx, wy); if (q) this.app.select(op, q); },
     });
   }
@@ -224,7 +228,7 @@ export class VaeView {
   // μ 和 σ：每一维一根柱子（μ），两边的细线是 ±σ
   muBox(g, r, enc, on, env) {
     const { meta } = this.app;
-    text(g, 'μ 和 σ（32 维）', r.x, r.y - 10, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
+    text(g, Lx('μ 和 σ（32 维）', 'μ and σ (32 dims)'), r.x, r.y - 10, { size: this.portrait ? 10.5 : 12, kind: 'serif', weight: 600, color: on ? COL.ink : COL.ink2 });
     card(g, r.x, r.y, r.w, r.h, { r: 8, active: on });
     const order = dimOrder(meta), pad = 6, bw = (r.w - pad * 2) / 32, mid = r.y + r.h / 2, R = 3.2;
     line(g, [[r.x + pad, mid], [r.x + r.w - pad, mid]], COL.line2, 1);
@@ -238,7 +242,7 @@ export class VaeView {
       g.fillStyle = used ? hexA(COL.violet, 0.9) : 'rgba(122,133,158,0.4)';
       g.fillRect(x + 1, Math.min(mid, y(m)), Math.max(1, bw - 2), Math.max(0.8, Math.abs(y(m) - mid)));
     });
-    env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">μ 和 σ</span>柱子是 μ，淡紫色的带子是 ±σ。没用上的维度（灰色）μ≈0、σ≈1：编码器对它们“什么都没说”。' });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx('<span class="k">μ 和 σ</span>柱子是 μ，淡紫色的带子是 ±σ。没用上的维度（灰色）μ≈0、σ≈1：编码器对它们“什么都没说”。', '<span class="k">μ and σ</span>The bars are μ; the pale violet band is ±σ. Unused dimensions (grey) sit at μ≈0, σ≈1: the encoder “says nothing” about them.') });
   }
 
   zBox(g, r, z, title, on, env) {
@@ -253,21 +257,21 @@ export class VaeView {
       g.fillStyle = used ? hexA(COL.amber, 0.85) : 'rgba(122,133,158,0.4)';
       g.fillRect(r.x + pad + i * bw + 1, Math.min(mid, mid - v), Math.max(1, bw - 2), Math.max(0.8, Math.abs(v)));
     });
-    env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">ẑ</span>M 预测、按温度采样出来的下一帧 z，解码器把它画成梦。' });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx('<span class="k">ẑ</span>M 预测、按温度采样出来的下一帧 z，解码器把它画成梦。', '<span class="k">ẑ</span>The next frame’s z, predicted by M and sampled at temperature τ; the decoder paints it into the dream.') });
   }
 
   recon(g, r, det, F) {
     const pt = this.portrait;
-    text(g, pt ? 'V 自己的重建' : '只看 V：μ 直接解码回去', r.x, r.y - 8, { size: 10.5, color: COL.ink2 });
+    text(g, pt ? Lx('V 自己的重建', 'V’s own reconstruction') : Lx('只看 V：μ 直接解码回去', 'V alone: μ decoded straight back'), r.x, r.y - 8, { size: 10.5, color: COL.ink2 });
     rr(g, r.x - 2, r.y - 2, r.w + 4, r.h + 4, 5);
     g.fillStyle = 'rgba(4,8,16,0.92)'; g.fill(); g.strokeStyle = COL.line2; g.lineWidth = 1; g.stroke();
     this.rec.draw(g, r.x, r.y, r.w, r.h);
     const x = new Float32Array(det.enc.x);
     let s = 0;
     for (let i = 0; i < x.length; i++) { const d = x[i] - det.recon[i]; s += d * d; }
-    text(g, `重建误差 ${fmtMSE(s / x.length)}`, r.x + r.w + 10, r.y + 16, { size: 10.5, kind: 'mono', color: COL.ink2 });
-    text(g, '草丛、虚线的位置', r.x + r.w + 10, r.y + 34, { size: 10, color: COL.dim });
-    text(g, '这类小细节被抹平了', r.x + r.w + 10, r.y + 48, { size: 10, color: COL.dim });
+    text(g, Lx(`重建误差 ${fmtMSE(s / x.length)}`, `${pt ? 'err' : 'recon error'} ${fmtMSE(s / x.length)}`), r.x + r.w + 10, r.y + 16, { size: 10.5, kind: 'mono', color: COL.ink2 });
+    text(g, Lx('草丛、虚线的位置', pt ? 'grass, dashes:' : 'grass, dash positions:'), r.x + r.w + 10, r.y + 34, { size: 10, color: COL.dim });
+    text(g, Lx('这类小细节被抹平了', pt ? 'smoothed away' : 'small details get smoothed'), r.x + r.w + 10, r.y + 48, { size: 10, color: COL.dim });
   }
 
   // 潜变量每一维扫一遍：以这一帧的 μ 为底，只改一维（从数据里的 1% 分位到 99% 分位），其余不动，解码
@@ -292,7 +296,7 @@ export class VaeView {
       }
     }
     const pt = this.portrait;
-    text(g, '潜空间每一维的含义：只改这一维，其余不动，解码出来的画面', r.x, r.y + 2, { size: pt ? 11 : 13, kind: 'serif', weight: 600, color: active ? COL.ink : COL.ink2 });
+    text(g, Lx('潜空间每一维的含义：只改这一维，其余不动，解码出来的画面', 'What each latent dimension means: change only that one, keep the rest, decode'), r.x, r.y + 2, { size: pt ? 11 : 13, kind: 'serif', weight: 600, color: active ? COL.ink : COL.ink2 });
     const cols = pt ? 1 : 2, rows = Math.ceil(dims.length / cols);
     const cw = r.w / cols, rh = (r.h - 18) / rows;
     const th = Math.min(rh - 8, pt ? 34 : 44);
@@ -301,16 +305,16 @@ export class VaeView {
       const info = meta.dims[d];
       const lw = pt ? 108 : 150;
       text(g, `z${d}`, cx, cy + th / 2 - 3, { size: 11, kind: 'mono', color: COL.amber });
-      const mean = dimMeaning(meta, d), cut = mean.indexOf('，');
+      const sep = isEn ? ', ' : '，', mean = dimMeaning(meta, d), cut = mean.indexOf(sep);
       text(g, cut > 0 ? mean.slice(0, cut) : mean, cx + 28, cy + th / 2 - 3, { size: pt ? 9.5 : 10.5, color: COL.ink2, max: lw - 28 });
-      text(g, `${cut > 0 ? mean.slice(cut + 1) + ' · ' : ''}KL ${info.kl.toFixed(2)}`, cx + 28, cy + th / 2 + 11, { size: 9, color: COL.dim, max: lw - 28 });
+      text(g, `${cut > 0 ? mean.slice(cut + sep.length) + ' · ' : ''}KL ${info.kl.toFixed(2)}`, cx + 28, cy + th / 2 + 11, { size: 9, color: COL.dim, max: lw - 28 });
       SWEEP.forEach((v, j) => {
         const x = cx + lw + j * (th + 4);
         rr(g, x - 1, cy - 1, th + 2, th + 2, 3); g.fillStyle = 'rgba(4,8,16,0.9)'; g.fill();
         const px = sw.pix[i]?.[j];
         if (px) px.draw(g, x, cy, th, th);
       });
-      env.hit(cx, cy, cw - 10, th, { tip: `<span class="k">z<sub>${d}</sub> 扫一遍</span>从左到右：${info.lo.toFixed(2)} → ${info.hi.toFixed(2)}（数据里 1% 到 99% 的范围），其余 31 维固定为这一帧的 μ。<br>导出时在 32 帧上量的：<span class="v">${dimMeaning(meta, d)}</span>` });
+      env.hit(cx, cy, cw - 10, th, { tip: Lx(`<span class="k">z<sub>${d}</sub> 扫一遍</span>从左到右：${info.lo.toFixed(2)} → ${info.hi.toFixed(2)}（数据里 1% 到 99% 的范围），其余 31 维固定为这一帧的 μ。<br>导出时在 32 帧上量的：<span class="v">${dimMeaning(meta, d)}</span>`, `<span class="k">Sweeping z<sub>${d}</sub></span>Left to right: ${info.lo.toFixed(2)} → ${info.hi.toFixed(2)} (the 1st–99th percentile range in the data); the other 31 dims stay at this frame’s μ.<br>Measured on 32 frames at export time: <span class="v">${dimMeaning(meta, d)}</span>`) });
     });
   }
 }

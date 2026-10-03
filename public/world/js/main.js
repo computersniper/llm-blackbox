@@ -16,6 +16,82 @@ import { Background } from '../../js/bg.js';
 import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, $$, esc } from '../../js/ui.js';
 import { initPanes } from '../../js/resize.js';
+import { isEn, L, addDict, applyDom, mountLangSwitch } from '../../js/i18n.js';
+
+/* ---------------------------------------------------------------- 中英文 */
+
+// index.html 里带 data-i18n 的文字：中文就是 HTML 里原样的文字（启动时从 DOM 里收集），这里只写英文
+const EN = {
+  'w.brandLabel': 'Black Box · World Models',
+  'w.brand': 'World Models',
+  'w.crumbs': 'Current depth',
+  'w.codex': 'Insight codex',
+  'w.stage': 'World model',
+  'w.chapters': 'Chapters',
+  'w.ch1': 'Playable world model',
+  'w.ch1s': 'Trained from scratch · runs live in your browser',
+  'w.ch2': 'World map inside an LLM',
+  'w.ch2s': 'Probes · a real LLM',
+  'w.follow': '◎ Back to follow view <kbd>F</kbd>',
+  'w.hint': 'Controls',
+  'w.hintT': 'Controls (H)',
+  'w.eyeL': 'Does the dream look at the real frame?',
+  'w.open': 'Eyes open',
+  'w.openT': 'Every step, encode the real frame into z and feed it to the model (O)',
+  'w.closed': 'Eyes closed',
+  'w.closedT': 'Ignore the real frame: the dream keeps going from the z it imagined last step (O)',
+  'w.tauT': 'Sampling temperature τ: higher makes the dream wilder, lower makes it more conservative',
+  'w.tau': 'Temp τ',
+  'w.sync': '⟲ Sync',
+  'w.syncT': 'Snap the dream back to the same frame as the real world (R)',
+  'w.autoL': 'Who drives',
+  'w.me': 'I drive',
+  'w.meT': 'You drive: A / D (← → also work while playing)',
+  'w.heur': 'Autopilot',
+  'w.heurT': 'The heuristic driver that collected the training data (it sees the real road)',
+  'w.ctrl': 'C drives',
+  'w.ctrlT': 'Controller C: a linear policy trained only inside the dream; it looks at z and h',
+  'w.new': 'New game',
+  'w.newT': 'Start over on a new road (N)',
+  'w.pad': 'Steering',
+  'w.left': 'Steer left',
+  'w.right': 'Steer right',
+  'w.stageHint': '<b>Drive in the dream</b><span><kbd>A</kbd>/<kbd>D</kbd> steer (<kbd>←</kbd>/<kbd>→</kbd> also work while playing)</span><span><kbd>O</kbd> eyes open / closed</span><span><kbd>R</kbd> sync</span><span><kbd>N</kbd> new game</span><span>Drag the 32 bars below to edit the dream</span><span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> change depth</span><span><kbd>Space</kbd> play / pause</span><span>While paused, <kbd>←</kbd>/<kbd>→</kbd> step</span><span><kbd>1</kbd>–<kbd>6</kbd> speed</span><span>Stage: drag to pan, scroll to zoom, double-click to zoom in</span>',
+  'w.loading': 'Loading the world model’s real weights…',
+  'w.dbg': 'Debugger',
+  'w.fold': 'Collapse',
+  'w.track': 'Steps at this depth',
+  'w.outT': 'Back out one level (−)',
+  'w.inT': 'Step into the next level (+)',
+  'w.prevT': 'Previous step (←)',
+  'w.playT': 'Play / pause (Space)',
+  'w.nextT': 'Next step (→)',
+  'w.speed': 'Speed',
+  'w.cxEyebrow': 'CODEX · INSIGHTS FROM THE WORLD MODEL',
+  'w.cxTitle': 'What you found in the dream',
+  'w.close': 'Close',
+  'w.reset': 'Reset progress',
+};
+
+function initLang() {
+  const zh = {};
+  const own = (k) => k && !k.startsWith('nav.');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { if (own(el.dataset.i18n)) zh[el.dataset.i18n] = el.textContent; });
+  document.querySelectorAll('[data-i18n-html]').forEach((el) => { zh[el.dataset.i18nHtml] = el.innerHTML; });
+  document.querySelectorAll('[data-i18n-attr]').forEach((el) => {
+    for (const pair of el.dataset.i18nAttr.split(';')) {
+      const [a, k] = pair.split(':').map((x) => x.trim());
+      if (a && own(k) && el.hasAttribute(a)) zh[k] = el.getAttribute(a);
+    }
+  });
+  addDict({ zh, en: EN });
+  applyDom();
+  mountLangSwitch($('#langSwitch'));
+  if (isEn) {
+    document.title = 'World Models · Driving in a Model’s Dream';
+    document.querySelector('meta[name="description"]')?.setAttribute('content', 'A small world model that was really trained and runs in your browser (the V + M architecture from Ha & Schmidhuber’s 2018 “World Models”): you drive in the dream while the real game runs on the same actions beside it, and watch the dream slowly drift. Then peel it open layer by layer like a debugger — encoder, memory, mixture density, decoder — down to a single multiply-add.');
+  }
+}
 
 const KEY = 'blackbox:world:v1';
 function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
@@ -49,12 +125,13 @@ const app = {
 /* ---------------------------------------------------------------- 启动 */
 
 async function boot() {
+  initLang();
   bg = new Background($('#bg'));
   try {
     ({ meta, model } = await loadWorld());
   } catch (e) {
     console.error(e);
-    $('#loading').innerHTML = `<span style="color:var(--rose)">模型载入失败：${esc(e.message)}</span>`;
+    $('#loading').innerHTML = `<span style="color:var(--rose)">${L('模型载入失败：', 'Failed to load the model: ')}${esc(e.message)}</span>`;
     return;
   }
   sim = new Sim(model, { seed: Number(qs.get('seed')) || 20261002 });
@@ -94,7 +171,8 @@ async function boot() {
   bindChrome();
   bindPlayUi();
   renderCodexCount();
-  $('#cxFoot').textContent = `模型：V（卷积 VAE，${meta.params.V.toLocaleString()} 个参数）+ M（LSTM 256 + 5 个高斯的混合密度输出，${meta.params.M.toLocaleString()} 个参数）${meta.params.C ? ` + C（线性，${meta.params.C} 个参数）` : ''}，结构照 Ha & Schmidhuber 2018《World Models》。在本地 ${meta.train.gpu || 'GPU'} 上用 ${meta.train.collect.frames.toLocaleString()} 帧真实游戏画面训练；网页下载的是它的真实权重（float16，约 ${(meta.params.total * 2 / 1048576).toFixed(1)} MB），每一帧的梦都是浏览器现场算出来的。`;
+  $('#cxFoot').textContent = L(`模型：V（卷积 VAE，${meta.params.V.toLocaleString()} 个参数）+ M（LSTM 256 + 5 个高斯的混合密度输出，${meta.params.M.toLocaleString()} 个参数）${meta.params.C ? ` + C（线性，${meta.params.C} 个参数）` : ''}，结构照 Ha & Schmidhuber 2018《World Models》。在本地 ${meta.train.gpu || 'GPU'} 上用 ${meta.train.collect.frames.toLocaleString()} 帧真实游戏画面训练；网页下载的是它的真实权重（float16，约 ${(meta.params.total * 2 / 1048576).toFixed(1)} MB），每一帧的梦都是浏览器现场算出来的。`,
+    `Model: V (convolutional VAE, ${meta.params.V.toLocaleString('en-US')} parameters) + M (LSTM 256 with a 5-Gaussian mixture density output, ${meta.params.M.toLocaleString('en-US')} parameters)${meta.params.C ? ` + C (linear, ${meta.params.C} parameters)` : ''}, following Ha & Schmidhuber’s 2018 “World Models”. Trained locally on an ${meta.train.gpu || 'GPU'} with ${meta.train.collect.frames.toLocaleString('en-US')} frames of real gameplay; the page downloads its real weights (float16, about ${(meta.params.total * 2 / 1048576).toFixed(1)} MB) and every dream frame is computed live in your browser.`);
   updateInsets();
   refresh();
   $('#loading').hidden = true;
@@ -330,8 +408,9 @@ async function setChapter(ch) {
       probeApi?.setLayer?.(probeL);
     } catch (e) {
       probeApi = null;
-      $('#probeHost').innerHTML = `<div class="probe-soon"><div class="eyebrow">CHAPTER 2</div><h2>大模型里的世界地图</h2><p>一个只读过文字的大模型，脑子里有没有一张世界地图？把城市名喂给真实的开源模型，从它某一层的隐状态里，能不能用一个线性探针读出经纬度？</p><p class="soon">即将上线</p></div>`;
-      $('#explain').innerHTML = '<div class="eyebrow" style="margin-bottom:4px">第二章</div><p>这一章正在制作中。先回到「能玩的世界模型」，在模型的梦里开开车。</p>';
+      $('#probeHost').innerHTML = L(`<div class="probe-soon"><div class="eyebrow">CHAPTER 2</div><h2>大模型里的世界地图</h2><p>一个只读过文字的大模型，脑子里有没有一张世界地图？把城市名喂给真实的开源模型，从它某一层的隐状态里，能不能用一个线性探针读出经纬度？</p><p class="soon">即将上线</p></div>`,
+        `<div class="probe-soon"><div class="eyebrow">CHAPTER 2</div><h2>The world map inside an LLM</h2><p>Does a language model that has only ever read text carry a map of the world in its head? Feed city names to a real open model: can a linear probe read latitude and longitude out of one layer’s hidden states?</p><p class="soon">Coming soon</p></div>`);
+      $('#explain').innerHTML = L('<div class="eyebrow" style="margin-bottom:4px">第二章</div><p>这一章正在制作中。先回到「能玩的世界模型」，在模型的梦里开开车。</p>', '<div class="eyebrow" style="margin-bottom:4px">Chapter 2</div><p>This chapter is still being built. Head back to “Playable world model” and take a drive in the model’s dream.</p>');
     }
   }
   renderProbeChrome();
@@ -349,8 +428,9 @@ function probeLayer(d) {
 }
 function renderProbeChrome() {
   if (chapter !== 'probe') return;
-  $('#crumbs').innerHTML = `<button type="button" data-d="0"><span class="d">CH1</span>能玩的世界模型</button><span class="sep">›</span><button type="button" class="on" data-d="${probeL}"><span class="d">CH2</span>大模型里的世界地图 · Qwen 第 ${probeL} 层</button>`;
-  $('#dname').innerHTML = `第 ${probeL} 层<small>LAYER ${probeL} / ${PROBE_LAST}</small>`;
+  $('#crumbs').innerHTML = L(`<button type="button" data-d="0"><span class="d">CH1</span>能玩的世界模型</button><span class="sep">›</span><button type="button" class="on" data-d="${probeL}"><span class="d">CH2</span>大模型里的世界地图 · Qwen 第 ${probeL} 层</button>`,
+    `<button type="button" data-d="0"><span class="d">CH1</span>Playable world model</button><span class="sep">›</span><button type="button" class="on" data-d="${probeL}"><span class="d">CH2</span>LLM world map · Qwen layer ${probeL}</button>`);
+  $('#dname').innerHTML = L(`第 ${probeL} 层<small>LAYER ${probeL} / ${PROBE_LAST}</small>`, `Layer ${probeL}<small>LAYER ${probeL} / ${PROBE_LAST}</small>`);
   $('#btnIn').disabled = !probeApi || probeL >= PROBE_LAST;
   $('#btnOut').disabled = !probeApi || probeL <= 0;
 }
@@ -382,7 +462,7 @@ function discover(id) {
   const t = document.createElement('button');
   t.type = 'button';
   t.className = 'toast';
-  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">发现知识碎片 · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
+  t.innerHTML = `<span class="t-icon" aria-hidden="true">✦</span><span class="t-body"><span class="t-k">${L('发现知识碎片', 'Insight found')} · ${store.found.size}/${INSIGHTS.length}</span><span class="t-title">${esc(ins.title)}</span><span class="t-text">${esc(ins.text)}</span></span>`;
   t.addEventListener('click', () => { openCodex(); t.remove(); });
   box.prepend(t);
   const maxToasts = small() ? 1 : 2;
@@ -399,7 +479,7 @@ function openCodex() {
   const c = $('#codex');
   $('.cx-grid', c).innerHTML = INSIGHTS.map((x) => (store.found.has(x.id)
     ? `<article class="cx-card found"><div class="where">${esc(x.where)}</div><h4>✦ ${esc(x.title)}</h4><p>${esc(x.text)}</p></article>`
-    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>？？？</h4><p>在「${esc(x.where)}」附近找找。</p></article>`)).join('');
+    : `<article class="cx-card locked"><div class="where">${esc(x.where)}</div><h4>${L('？？？', '???')}</h4><p>${L(`在「${esc(x.where)}」附近找找。`, `Look around “${esc(x.where)}”.`)}</p></article>`)).join('');
   $('.cx-progress b', c).textContent = `${store.found.size} / ${INSIGHTS.length}`;
   $('.cx-bar i', c).style.width = `${(store.found.size / INSIGHTS.length) * 100}%`;
   c.classList.add('on');
@@ -448,9 +528,9 @@ function bindChrome() {
   $('#btnCodex').addEventListener('click', openCodex);
   $('.cx-close').addEventListener('click', closeCodex);
   $('#codex').addEventListener('click', (e) => { if (e.target.id === 'codex') closeCodex(); });
-  $('#btnReset').addEventListener('click', () => { if (!confirm('清空已收集的知识碎片？')) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
+  $('#btnReset').addEventListener('click', () => { if (!confirm(L('清空已收集的知识碎片？', 'Clear all collected insights?'))) return; store.found.clear(); save(); renderCodexCount(); closeCodex(); });
   const sb = $('#btnSound');
-  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? '关闭声音' : '打开声音'; };
+  const renderSound = () => { sb.classList.toggle('on', soundOn()); sb.setAttribute('aria-pressed', soundOn()); sb.title = soundOn() ? L('关闭声音', 'Sound off') : L('打开声音', 'Sound on'); };
   sb.addEventListener('click', () => { setSound(!soundOn()); renderSound(); save(); sfx.click(); });
   renderSound();
   $('#btnFollow').addEventListener('click', () => { stage.exitFree(); sfx.click(); });
@@ -462,7 +542,9 @@ function bindChrome() {
   new ResizeObserver(() => updateInsets()).observe($('#dbg'));
   new ResizeObserver(() => updateInsets()).observe($('#board'));
   new ResizeObserver(() => updateInsets()).observe($('#ctl'));
-  initPanes('world', { right: { el: '#dbg', v: '--dbg-w', name: '调试器' }, reserve: 640, onChange: updateInsets });
+  initPanes('world', { right: { el: '#dbg', v: '--dbg-w', name: L('调试器', 'debugger') }, reserve: 640, onChange: updateInsets });
+  // 拖动手柄的提示文字写在共用的 resize.js 里（中文）：英文模式在这里换掉
+  if (isEn) { const gr = $('#dbg .pane-grip'); if (gr) { gr.setAttribute('aria-label', 'Resize the debugger'); gr.title = 'Drag to resize, double-click to reset'; } }
 }
 
 function bindKeys() {

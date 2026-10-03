@@ -6,6 +6,9 @@ import { Roadmap } from './roadmap.js';
 import { Library } from './library.js';
 import { Glossary } from './glossary.js';
 import { TryIt } from './tryit.js';
+import { initLang, isEn, t } from './lang.js';
+
+initLang();
 
 const getJSON = (p) => fetch(p).then((r) => { if (!r.ok) throw new Error(`${p}: HTTP ${r.status}`); return r.json(); });
 
@@ -27,7 +30,7 @@ function setProgress(k, n) {
   top.style.setProperty('--p', p);
   $('b', top).textContent = k;
   $('.lp-prog-txt', top).lastChild.textContent = `/${n}`;
-  top.title = `学习路线：已学完 ${k} / ${n} 站（进度存在这台设备的浏览器里）`;
+  top.title = t('lp.progTitleN', { k, n });
   $('.rm-bar i').style.width = `${p * 100}%`;
   $('.rm-count').textContent = `${k} / ${n}`;
 }
@@ -35,6 +38,17 @@ function setProgress(k, n) {
 function heroStats(RM, RES, GL, SN) {
   const nodes = RM.stages.reduce((a, s) => a + s.nodes.length, 0);
   const zh = RES.items.filter((x) => x.lang === 'zh').length;
+  if (isEn) {
+    const en = RES.items.length - zh;
+    $('#heroStats').innerHTML = `
+    <div><dt>Route</dt><dd><b>${RM.stages.length}</b> stages, <b>${nodes}</b> stops</dd></div>
+    <div><dt>Resources</dt><dd><b>${RES.items.length}</b> in all, <b>${en}</b> in English</dd></div>
+    <div><dt>Glossary</dt><dd><b>${GL.terms.length}</b> terms</dd></div>
+    <div><dt>Code</dt><dd><b>${SN.items.length}</b> snippets, all CPU-friendly</dd></div>
+    <div class="checked">External links last checked one by one: ${esc(RES.checked)}</div>`;
+    $('#libDesc').textContent = `${RES.items.length} resources, each one opened and checked (${RES.checked}); titles, authors and years are copied from the pages themselves. English resources are shown by default — many of the best plain-language lectures are in Chinese, one click away under Language.`;
+    return;
+  }
   $('#heroStats').innerHTML = `
     <div><dt>路线</dt><dd><b>${RM.stages.length}</b> 段 <b>${nodes}</b> 站</dd></div>
     <div><dt>资源</dt><dd><b>${RES.items.length}</b> 条，其中中文 <b>${zh}</b> 条</dd></div>
@@ -64,9 +78,11 @@ async function main() {
   try {
     [RM, RES, GL, SN] = await Promise.all(['data/roadmap.json', 'data/resources.json', 'data/glossary.json', 'data/snippets.json'].map(getJSON));
   } catch (e) {
-    $('.lp-loading').textContent = `数据载入失败：${e.message}`;
+    $('.lp-loading').textContent = t('lp.loadFail', { msg: e.message });
     return;
   }
+  // 只为英文读者补的英文资源（enOnly），中文模式不出现：中文模式已经有同一内容的中文版
+  if (!isEn) RES.items = RES.items.filter((x) => !x.enOnly);
   heroStats(RM, RES, GL, SN);
   const rm = new Roadmap($('#roadmap'), RM, RES, { onProgress: setProgress });
   new Library($('#library'), RES, { stationOf: (id) => rm.stationOf(id), focusStation: (id) => rm.focus(id) });

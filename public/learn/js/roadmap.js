@@ -4,16 +4,19 @@
 
 import { $, esc, reducedMotion } from '../../js/ui.js';
 import { loadDone, saveDone, onDoneChange } from './store.js';
+import { isEn, L, t, tx } from './lang.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.4 6.3 5 8.8 9.7 3.4" fill="none" stroke="#04121a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const pad2 = (n) => String(n).padStart(2, '0');
+const stop = (no) => L(`第 ${pad2(no)} 站`, `Stop ${pad2(no)}`);
 
 export class Roadmap {
   constructor(root, RM, RES, { onProgress } = {}) {
     this.root = root;
     this.svg = $('#rmSvg', root);
     this.res = new Map(RES.items.map((x) => [x.id, x]));
+    this.platforms = RES.platforms_en || {};
     this.stages = RM.stages;
     this.nodes = [];
     this.stages.forEach((s, si) => s.nodes.forEach((n) => this.nodes.push({ ...n, si, no: this.nodes.length + 1 })));
@@ -41,10 +44,11 @@ export class Roadmap {
     const html = this.stages.map((s, si) => {
       const nodes = this.nodes.filter((n) => n.si === si);
       const end = si === last
-        ? `<div class="rm-end" id="rmEnd"><span class="rm-dot" aria-hidden="true"></span><b>终点</b><br>走到这里，你已经可以自己读论文、跑实验了。<br><a href="#try">去「动手试试」→</a></div>`
+        ? L(`<div class="rm-end" id="rmEnd"><span class="rm-dot" aria-hidden="true"></span><b>终点</b><br>走到这里，你已经可以自己读论文、跑实验了。<br><a href="#try">去「动手试试」→</a></div>`,
+          `<div class="rm-end" id="rmEnd"><span class="rm-dot" aria-hidden="true"></span><b>The end</b><br>By now you can read papers and run experiments on your own.<br><a href="#try">Go to Hands-on →</a></div>`)
         : '';
-      return `<section class="rm-stage${si % 2 ? ' rev' : ''}" id="st-${esc(s.id)}" aria-label="第 ${s.no} 段 ${esc(s.title)}">
-        <div class="rm-stage-h"><span class="rm-no">${esc(s.no)}</span><h3>${esc(s.title)}</h3><span class="sub">${esc(s.sub)}</span><span class="cnt" data-cnt="${si}"></span></div>
+      return `<section class="rm-stage${si % 2 ? ' rev' : ''}" id="st-${esc(s.id)}" aria-label="${L(`第 ${s.no} 段 ${esc(s.title)}`, `Stage ${s.no}: ${esc(tx(s, 'title'))}`)}">
+        <div class="rm-stage-h"><span class="rm-no">${esc(s.no)}</span><h3>${esc(tx(s, 'title'))}</h3><span class="sub">${esc(tx(s, 'sub'))}</span><span class="cnt" data-cnt="${si}"></span></div>
         <div class="rm-row">${nodes.map((n) => this.nodeHTML(n)).join('')}${end}</div>
       </section>`;
     }).join('');
@@ -56,22 +60,23 @@ export class Roadmap {
     // 首屏的深度计
     this.gauge = $('#heroGauge');
     if (this.gauge) {
-      this.gauge.innerHTML = `<div class="gauge-h"><span>DEPTH · 路线</span><span>学完</span></div><ol>${this.stages.map((s, si) => `<li style="--i:${si}" data-g="${si}"><a href="#st-${esc(s.id)}"><span class="g-dot"></span><span class="g-no">${esc(s.no)}</span><span class="g-t">${esc(s.title)}</span><span class="g-cells">${s.nodes.map(() => '<i></i>').join('')}</span></a></li>`).join('')}</ol><div class="gauge-f">从上往下，一段比一段深。进度只存在这台设备的浏览器里。</div>`;
+      this.gauge.innerHTML = `<div class="gauge-h"><span>${L('DEPTH · 路线', 'DEPTH · ROUTE')}</span><span>${L('学完', 'Done')}</span></div><ol>${this.stages.map((s, si) => `<li style="--i:${si}" data-g="${si}"><a href="#st-${esc(s.id)}"><span class="g-dot"></span><span class="g-no">${esc(s.no)}</span><span class="g-t">${esc(tx(s, 'title'))}</span><span class="g-cells">${s.nodes.map(() => '<i></i>').join('')}</span></a></li>`).join('')}</ol><div class="gauge-f">${L('从上往下，一段比一段深。进度只存在这台设备的浏览器里。', 'Top to bottom, each stage goes deeper. Progress is saved only in this browser.')}</div>`;
     }
   }
 
   nodeHTML(n) {
-    const site = n.site.map((x) => `<a class="site-chip" href="${esc(x.href)}">${esc(x.label)}</a>`).join('');
-    const res = n.res.map((id) => this.res.get(id)).filter(Boolean).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(r.title)}"><span class="pf${r.lang === 'zh' ? ' zh' : ''}">${esc(r.platform)}·${r.lang === 'zh' ? '中' : 'EN'}</span><span class="t">${esc(r.title)}</span></a></li>`).join('');
+    const site = n.site.map((x) => `<a class="site-chip" href="${esc(x.href)}">${esc(tx(x, 'label'))}</a>`).join('');
+    const pf = (r) => (isEn ? `${esc(this.platforms[r.platform] || r.platform)}·${r.lang === 'zh' ? 'ZH' : 'EN'}` : `${esc(r.platform)}·${r.lang === 'zh' ? '中' : 'EN'}`);
+    const res = this.resOf(n).map((id) => this.res.get(id)).filter(Boolean).map((r) => `<li><a href="${esc(r.url)}" target="_blank" rel="noopener" title="${esc(tx(r, 'title'))}"><span class="pf${r.lang === 'zh' ? ' zh' : ''}">${pf(r)}</span><span class="t">${esc(tx(r, 'title'))}</span></a></li>`).join('');
     return `<article class="rm-node" id="n-${esc(n.id)}" data-id="${esc(n.id)}">
       <span class="rm-dot" aria-hidden="true">${CHECK}</span>
-      <div class="rm-k">第 ${pad2(n.no)} 站</div>
-      <h4>${esc(n.title)}</h4>
-      <p class="rm-goal">${esc(n.goal)}</p>
-      <div class="rm-site"><span class="rm-lab">在本站看</span>${site}</div>
-      <span class="rm-lab">延伸</span>
+      <div class="rm-k">${stop(n.no)}</div>
+      <h4>${esc(tx(n, 'title'))}</h4>
+      <p class="rm-goal">${esc(tx(n, 'goal'))}</p>
+      <div class="rm-site"><span class="rm-lab">${L('在本站看', 'See it on this site')}</span>${site}</div>
+      <span class="rm-lab">${L('延伸', 'Go further')}</span>
       <ul class="rm-res">${res}</ul>
-      <div class="rm-foot"><button class="rm-done" type="button" aria-pressed="false" aria-label="第 ${pad2(n.no)} 站 ${esc(n.title)}：标记为学完"><span class="box">${CHECK}</span><span class="rm-lbl">标记学完</span></button></div>
+      <div class="rm-foot"><button class="rm-done" type="button" aria-pressed="false" aria-label="${L(`第 ${pad2(n.no)} 站 ${esc(n.title)}：标记为学完`, `Stop ${pad2(n.no)} ${esc(tx(n, 'title'))}: mark as done`)}"><span class="box">${CHECK}</span><span class="rm-lbl">${L('标记学完', 'Mark as done')}</span></button></div>
     </article>`;
   }
 
@@ -88,12 +93,12 @@ export class Roadmap {
       if (!this.done.size) return;
       if (Date.now() - armed > 3000) {
         armed = Date.now();
-        reset.textContent = '再点一次，清空全部进度';
-        setTimeout(() => { if (Date.now() - armed >= 2900) reset.textContent = '清空进度'; }, 3000);
+        reset.textContent = t('lp.resetConfirm');
+        setTimeout(() => { if (Date.now() - armed >= 2900) reset.textContent = t('lp.reset'); }, 3000);
         return;
       }
       armed = 0;
-      reset.textContent = '清空进度';
+      reset.textContent = t('lp.reset');
       this.done.clear();
       saveDone(this.done);
       this.refresh(true);
@@ -121,8 +126,8 @@ export class Roadmap {
       el.classList.toggle('done', on);
       const b = $('.rm-done', el);
       b.setAttribute('aria-pressed', String(on));
-      $('.rm-lbl', b).textContent = on ? '已学完' : '标记学完';
-      b.setAttribute('aria-label', `第 ${pad2(n.no)} 站 ${n.title}：${on ? '已学完，点一下取消' : '标记为学完'}`);
+      $('.rm-lbl', b).textContent = on ? L('已学完', 'Done') : L('标记学完', 'Mark as done');
+      b.setAttribute('aria-label', L(`第 ${pad2(n.no)} 站 ${n.title}：${on ? '已学完，点一下取消' : '标记为学完'}`, `Stop ${pad2(n.no)} ${tx(n, 'title')}: ${on ? 'done — click to undo' : 'mark as done'}`));
     });
     this.stages.forEach((s, si) => {
       const ns = this.nodes.filter((n) => n.si === si);
@@ -134,7 +139,7 @@ export class Roadmap {
       if (g) {
         g.classList.toggle('full', k === ns.length);
         [...g.querySelectorAll('.g-cells i')].forEach((cell, j) => cell.classList.toggle('on', this.done.has(ns[j].id)));
-        $('a', g).setAttribute('aria-label', `第 ${s.no} 段 ${s.title}，学完 ${k} / ${ns.length} 站`);
+        $('a', g).setAttribute('aria-label', L(`第 ${s.no} 段 ${s.title}，学完 ${k} / ${ns.length} 站`, `Stage ${s.no} ${tx(s, 'title')}: ${k} / ${ns.length} stops done`));
       }
     });
     this.paintSegs();
@@ -283,6 +288,11 @@ export class Roadmap {
   }
 
   stationOf(resId) {
-    return this.nodes.find((n) => n.res.includes(resId));
+    return this.nodes.find((n) => this.resOf(n).includes(resId));
+  }
+
+  // 英文模式下每一站挂的是 res_en（全部英文资源）
+  resOf(n) {
+    return (isEn && n.res_en) || n.res;
   }
 }

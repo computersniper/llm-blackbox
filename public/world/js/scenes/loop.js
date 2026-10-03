@@ -1,10 +1,13 @@
 // D2 循环：一帧之内，真实画面 → V 编码 → z → M（LSTM + MDN）→ 采样 ẑ → V 解码 → 梦见的下一帧，
 // 上面一条是真实世界自己走一步。闭眼时从真实画面进来的那条路熄灭，ẑ 从下面绕回来当下一步的 z。
 // 底下三张卡片是 V、M、C 真实的训练记录。
-import { COL, rr, text, card, hexA, line, clamp, ease, seg } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, clamp, ease, seg, font, measure } from '../../../train/js/draw.js';
 import { Pix, vecGrid } from '../pix.js';
-import { ACTIONS, toCHW } from '../game.js';
-import { dimOrder, used as isUsed, fmtMSE } from '../explain.js';
+import { toCHW } from '../game.js';
+import { dimOrder, used as isUsed, fmtMSE, actName, byTag } from '../explain.js';
+import { isEn, L as Lx } from '../../../js/i18n.js';
+
+const ENC_LABEL = Lx('编码', 'encode'), DEC_LABEL = Lx('解码', 'decode');
 
 const ORDER_STAGE = ['obs', 'enc', 'rnn', 'sample', 'dec', 'cmp'];
 
@@ -53,19 +56,19 @@ export class LoopView {
 
     // ---- 真实画面
     this.obs.palette(F.o, F.o);
-    this.screen(g, L.O, this.obs, pt ? '真实画面 obs' : '真实画面 obsₜ', COL.cyan, on('obs'), env);
+    this.screen(g, L.O, this.obs, pt ? Lx('真实画面 obs', 'Real frame obs') : Lx('真实画面 obsₜ', 'Real frame obsₜ'), COL.cyan, on('obs'), env);
     // ---- 编码
     const encLive = !closed;
-    this.trap(g, L.VE, 'V', '编码', pt ? 'down' : 'right', on('enc') && encLive, encLive ? 1 : 0.3, env);
+    this.trap(g, L.VE, 'V', ENC_LABEL, pt ? 'down' : 'right', on('enc') && encLive, encLive ? 1 : 0.3, env);
     this.flow(g, [[L.O.x + L.O.w + 4, L.O.y + L.O.h / 2], [L.VE.x - 4, L.VE.y + L.VE.h / 2]], COL.cyan, on('enc') && encLive ? p : done('enc') && encLive ? 1 : 0, encLive ? 1 : 0.25);
     this.flow(g, [[L.VE.x + L.VE.w + 4, L.VE.y + L.VE.h / 2], [L.ZT.x - 4, L.ZT.y + L.ZT.h / 2]], COL.cyan, on('enc') ? p : done('enc') ? 1 : 0, encLive ? 1 : 0.25);
-    if (!encLive) text(g, '闭眼：不看', L.VE.x + L.VE.w / 2, L.VE.y - 8, { size: 10, color: COL.amber, align: 'center' });
+    if (!encLive) text(g, Lx('闭眼：不看', 'eyes closed: skipped'), L.VE.x + L.VE.w / 2, L.VE.y - 8, { size: 10, color: COL.amber, align: 'center' });
     // ---- z_t
     const zFill = on('enc') ? ease(p) : done('enc') || on('obs') === false ? 1 : 0;
-    this.bars(g, L.ZT, rec.z, pt ? 'z（32）' : 'zₜ · 32 个数', closed ? COL.amber : COL.violet, k >= 1 ? zFill : 0, on('enc'), env, closed ? '来自上一步的 ẑ' : 'V 编码出来的 μ');
+    this.bars(g, L.ZT, rec.z, pt ? Lx('z（32）', 'z (32)') : Lx('zₜ · 32 个数', 'zₜ · 32 numbers'), closed ? COL.amber : COL.violet, k >= 1 ? zFill : 0, on('enc'), env, closed ? Lx('来自上一步的 ẑ', 'last step’s ẑ') : Lx('V 编码出来的 μ', 'μ encoded by V'));
     // ---- 动作
     const ax = L.M.x + L.M.w / 2, ay = pt ? L.M.y - 10 : L.M.y - 22;
-    const aTxt = `a = ${ACTIONS[rec.a]}${rec.by === 'key' ? '（你按的）' : rec.by === 'heur' ? '（自动驾驶）' : rec.by === 'ctrl' ? '（C）' : ''}`;
+    const aTxt = `a = ${actName(rec.a)}${byTag(rec.by)}`;
     // ---- M
     this.mBox(g, L.M, F, rec, on('rnn') || on('sample'), on('rnn') ? p : done('rnn') ? 1 : 0, env);
     this.flow(g, pt ? [[L.ZT.x + L.ZT.w / 2, L.ZT.y + L.ZT.h + 4], [L.ZT.x + L.ZT.w / 2, L.M.y - 4]] : [[L.ZT.x + L.ZT.w + 4, L.ZT.y + L.ZT.h / 2], [L.M.x - 4, L.ZT.y + L.ZT.h / 2]], COL.violet, on('rnn') ? Math.min(1, p * 2) : done('rnn') ? 1 : 0, 1);
@@ -73,9 +76,9 @@ export class LoopView {
     // ---- 采样 ẑ_{t+1}
     const zn = on('sample') ? ease(p) : done('sample') ? 1 : 0;
     this.flow(g, pt ? [[L.M.x + 46, L.M.y + L.M.h + 4], [L.ZN.x + L.ZN.w / 2, L.ZN.y - 4]] : [[L.M.x + L.M.w + 4, L.ZN.y + L.ZN.h / 2], [L.ZN.x - 4, L.ZN.y + L.ZN.h / 2]], COL.amber, on('sample') ? p : done('sample') ? 1 : 0, 1);
-    this.bars(g, L.ZN, rec.S.z, pt ? 'ẑ（采样）' : `ẑₜ₊₁ · 采样 τ=${rec.tau.toFixed(2)}`, COL.amber, zn, on('sample'), env, '从 M 给的分布里抽出来的');
+    this.bars(g, L.ZN, rec.S.z, pt ? Lx('ẑ（采样）', 'ẑ (sampled)') : Lx(`ẑₜ₊₁ · 采样 τ=${rec.tau.toFixed(2)}`, `ẑₜ₊₁ · sampled τ=${rec.tau.toFixed(2)}`), COL.amber, zn, on('sample'), env, Lx('从 M 给的分布里抽出来的', 'drawn from M’s distribution'));
     // ---- 解码
-    this.trap(g, L.VD, 'V', '解码', pt ? 'right-open' : 'left', on('dec'), 1, env);
+    this.trap(g, L.VD, 'V', DEC_LABEL, pt ? 'right-open' : 'left', on('dec'), 1, env);
     this.flow(g, [[L.ZN.x + L.ZN.w + 4, L.ZN.y + L.ZN.h / 2], [L.VD.x - 4, L.VD.y + L.VD.h / 2]], COL.amber, on('dec') ? Math.min(1, p * 2) : done('dec') ? 1 : 0, 1);
     this.flow(g, [[L.VD.x + L.VD.w + 4, L.VD.y + L.VD.h / 2], [L.D.x - 4, L.D.y + L.D.h / 2]], COL.amber, on('dec') ? Math.max(0, p * 2 - 1) : done('dec') ? 1 : 0, 1);
     // 梦见的下一帧：解码时从上往下一行行显现
@@ -83,15 +86,15 @@ export class LoopView {
       const y = sim.dreamOf(G);
       this.dream.chw(y, y);
       const rev = on('dec') ? ease(seg(p, 0.35, 1)) : done('dec') ? 1 : 0;
-      this.screen(g, L.D, this.dream, pt ? '梦见的下一帧 ô' : '梦见的下一帧 ôₜ₊₁', COL.amber, on('dec') || on('cmp'), env, rev);
+      this.screen(g, L.D, this.dream, pt ? Lx('梦见的下一帧 ô', 'Dreamed next frame ô') : Lx('梦见的下一帧 ôₜ₊₁', 'Dreamed next frame ôₜ₊₁'), COL.amber, on('dec') || on('cmp'), env, rev);
       // 真实世界的下一帧
       this.real1.palette(G.o, G.o);
       const realRev = on('cmp') ? 1 : done('cmp') ? 1 : 0.0;
-      this.screen(g, L.R1, this.real1, pt ? '真实下一帧' : '真实世界的下一帧 obsₜ₊₁', COL.cyan, on('cmp'), env, realRev, !realRev ? '对照时揭晓' : '');
+      this.screen(g, L.R1, this.real1, pt ? Lx('真实下一帧', 'Real next frame') : Lx('真实世界的下一帧 obsₜ₊₁', 'Real next frame obsₜ₊₁'), COL.cyan, on('cmp'), env, realRev, !realRev ? Lx('对照时揭晓', 'revealed at compare') : '');
       if (on('cmp')) {
         const a = ease(p);
         const mx = pt ? L.R1.x + L.R1.w / 2 : L.D.x + L.D.w / 2, my = pt ? L.R1.y + L.R1.h + 16 : L.R1.y + L.R1.h + 16;
-        text(g, `差 ${fmtMSE(G.mse)}`, mx, my, { size: pt ? 11 : 12.5, kind: 'mono', color: hexA(COL.rose, 0.4 + 0.6 * a), align: 'center' });
+        text(g, Lx(`差 ${fmtMSE(G.mse)}`, `diff ${fmtMSE(G.mse)}`), mx, my, { size: pt ? 11 : 12.5, kind: 'mono', color: hexA(COL.rose, 0.4 + 0.6 * a), align: 'center' });
       }
     }
     // ---- 真实世界自己走一步（上面那条）
@@ -100,8 +103,8 @@ export class LoopView {
       rr(g, E.x, E.y, E.w, E.h, 10);
       g.fillStyle = on('cmp') ? 'rgba(94,240,212,0.08)' : COL.panel; g.fill();
       g.strokeStyle = on('cmp') ? hexA(COL.cyan, 0.6) : COL.line2; g.lineWidth = 1; g.stroke();
-      text(g, '真实世界：env.step(a)', E.x + E.w / 2, E.y + 28, { size: 13, kind: 'serif', weight: 600, align: 'center' });
-      text(g, '游戏引擎，不经过模型', E.x + E.w / 2, E.y + 48, { size: 10.5, color: COL.dim, align: 'center' });
+      text(g, Lx('真实世界：env.step(a)', 'Real world: env.step(a)'), E.x + E.w / 2, E.y + 28, { size: 13, kind: 'serif', weight: 600, align: 'center' });
+      text(g, Lx('游戏引擎，不经过模型', 'the game engine — no model involved'), E.x + E.w / 2, E.y + 48, { size: 10.5, color: COL.dim, align: 'center' });
       const pr = on('cmp') ? p : done('cmp') ? 1 : 0;
       this.flow(g, [[L.O.x + L.O.w / 2, L.O.y - 6], [L.O.x + L.O.w / 2, E.y + E.h / 2], [E.x - 4, E.y + E.h / 2]], COL.cyan, pr > 0 ? Math.min(1, pr * 2) : 0, 0.8);
       this.flow(g, [[E.x + E.w + 4, E.y + E.h / 2], [L.R1.x - 4, E.y + E.h / 2]], COL.cyan, pr > 0 ? Math.max(0, pr * 2 - 1) : 0, 0.8);
@@ -118,7 +121,7 @@ export class LoopView {
       g.setLineDash([4, 4]);
       line(g, pts, hexA(COL.amber, nowClosed ? 0.55 : 0.18), 1.2);
       g.setLineDash([]);
-      text(g, nowClosed ? '闭眼：这个 ẑ 就是下一帧的 z（梦自己往下想）' : '闭眼时走这条：ẑ 当作下一帧的 z', (L.ZT.x + L.ZN.x + L.ZN.w) / 2, y0 + 16, { size: 11, color: nowClosed ? COL.amber : COL.faint, align: 'center' });
+      text(g, nowClosed ? Lx('闭眼：这个 ẑ 就是下一帧的 z（梦自己往下想）', 'Eyes closed: this ẑ becomes the next frame’s z (the dream carries on by itself)') : Lx('闭眼时走这条：ẑ 当作下一帧的 z', 'With eyes closed, ẑ loops back this way as the next z'), (L.ZT.x + L.ZN.x + L.ZN.w) / 2, y0 + 16, { size: 11, color: nowClosed ? COL.amber : COL.faint, align: 'center' });
     }
     this.cards(g, L.CARDS, env);
   }
@@ -126,9 +129,9 @@ export class LoopView {
   drawReset(g, F, env) {
     const L = this.L;
     this.obs.palette(F.o, F.o);
-    this.screen(g, L.O, this.obs, '真实画面', COL.rose, true, env);
-    text(g, F.why === 'offroad' ? '冲出路面，这一局结束' : '撞车了，这一局结束', L.ZT.x, L.ZT.y + 30, { size: 16, kind: 'serif', weight: 600, color: COL.rose });
-    text(g, '下一步换一条新路；梦重新从真实画面开始，h、c 清零', L.ZT.x, L.ZT.y + 56, { size: 12, color: COL.ink2 });
+    this.screen(g, L.O, this.obs, Lx('真实画面', 'Real frame'), COL.rose, true, env);
+    text(g, F.why === 'offroad' ? Lx('冲出路面，这一局结束', 'Off the road — game over') : Lx('撞车了，这一局结束', 'Crashed — game over'), L.ZT.x, L.ZT.y + 30, { size: 16, kind: 'serif', weight: 600, color: COL.rose });
+    text(g, Lx('下一步换一条新路；梦重新从真实画面开始，h、c 清零', 'Next step starts a new road; the dream restarts from the real frame, h and c reset to zero'), L.ZT.x, L.ZT.y + 56, { size: 12, color: COL.ink2 });
     this.cards(g, L.CARDS, env);
   }
 
@@ -165,7 +168,7 @@ export class LoopView {
     text(g, a, r.x + r.w / 2, r.y + r.h / 2 - 2, { size: this.portrait ? 16 : 22, kind: 'serif', weight: 600, color: active ? COL.ink : COL.ink2, align: 'center' });
     text(g, b, r.x + r.w / 2, r.y + r.h / 2 + 15, { size: 10, color: COL.dim, align: 'center' });
     g.restore();
-    env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">V · 卷积变分自编码器</span>${b === '编码' ? '64×64×3 → 4 层卷积 → 32 个数' : '32 个数 → 全连接 + 4 层反卷积 → 64×64×3'}<br><span class="v">点 ＋ 看里面的每一层</span>`, click: true });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx(`<span class="k">V · 卷积变分自编码器</span>${b === ENC_LABEL ? '64×64×3 → 4 层卷积 → 32 个数' : '32 个数 → 全连接 + 4 层反卷积 → 64×64×3'}<br><span class="v">点 ＋ 看里面的每一层</span>`, `<span class="k">V · convolutional variational autoencoder</span>${b === ENC_LABEL ? '64×64×3 → 4 conv layers → 32 numbers' : '32 numbers → fully connected + 4 deconv layers → 64×64×3'}<br><span class="v">Press ＋ to see every layer inside</span>`), click: true });
   }
 
   bars(g, r, z, title, color, fill, active, env, sub) {
@@ -185,14 +188,14 @@ export class LoopView {
       g.fillRect(r.x + pad + i * bw + 0.5, Math.min(mid, mid - h), Math.max(1, bw - 1), Math.max(0.8, Math.abs(h)));
     });
     if (sub && !this.portrait) text(g, sub, r.x + r.w / 2, r.y + r.h + 14, { size: 9.5, color: COL.dim, align: 'center' });
-    env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">${title}</span>${sub}。按“用得多不多”排序，灰色的维度模型没用上。<br>|z| = <span class="v">${Math.sqrt(z.reduce((s, v) => s + v * v, 0)).toFixed(3)}</span>` });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx(`<span class="k">${title}</span>${sub}。按“用得多不多”排序，灰色的维度模型没用上。<br>|z| = <span class="v">${Math.sqrt(z.reduce((s, v) => s + v * v, 0)).toFixed(3)}</span>`, `<span class="k">${title}</span>${sub}. Sorted by how much each dimension is used; the grey ones the model doesn’t use.<br>|z| = <span class="v">${Math.sqrt(z.reduce((s, v) => s + v * v, 0)).toFixed(3)}</span>`) });
   }
 
   mBox(g, r, F, rec, active, p, env) {
     const pt = this.portrait;
     card(g, r.x, r.y, r.w, r.h, { r: 12, active, accent: COL.violet });
     text(g, 'M', r.x + 14, r.y + 26, { size: 22, kind: 'serif', weight: 600, color: active ? COL.ink : COL.ink2 });
-    text(g, 'LSTM + 混合密度网络', r.x + 40, r.y + 24, { size: 11, color: COL.dim });
+    text(g, Lx('LSTM + 混合密度网络', 'LSTM + mixture density network'), r.x + 40, r.y + 24, { size: 11, color: COL.dim });
     const gs = pt ? 62 : 70;
     const gy = r.y + (pt ? 42 : 46);
     if (this.hKey !== rec) { this.hKey = rec; this.h0 = vecGrid(F.h, 16, { scale: 1 }); this.h1 = vecGrid(rec.L.h, 16, { scale: 1 }); }
@@ -201,22 +204,22 @@ export class LoopView {
     h0.draw(g, x0, gy, gs, gs);
     h1.draw(g, x1, gy, gs, gs, p > 0 ? 0.3 + 0.7 * ease(p) : 0.25);
     g.strokeStyle = COL.line2; g.strokeRect(x0 - 0.5, gy - 0.5, gs + 1, gs + 1); g.strokeRect(x1 - 0.5, gy - 0.5, gs + 1, gs + 1);
-    text(g, '记忆 h', x0, gy + gs + 13, { size: 10, color: COL.dim });
-    text(g, "新的 h'", x1, gy + gs + 13, { size: 10, color: COL.dim });
+    text(g, Lx('记忆 h', 'memory h'), x0, gy + gs + 13, { size: 10, color: COL.dim });
+    text(g, Lx("新的 h'", "new h'"), x1, gy + gs + 13, { size: 10, color: COL.dim });
     line(g, [[x0 + gs + 6, gy + gs / 2], [x1 - 6, gy + gs / 2]], hexA(COL.violet, 0.6), 1.2);
     // 撞车概率
     const dx = pt ? r.x + 220 : r.x + 16, dy = pt ? r.y + 50 : r.y + r.h - 34;
     const pd = rec.M.done;
-    text(g, `撞车概率 ${(pd * 100).toFixed(pd < 0.1 ? 1 : 0)}%`, dx, dy, { size: 11, color: pd > 0.5 ? COL.rose : COL.ink2 });
+    text(g, Lx(`撞车概率 ${(pd * 100).toFixed(pd < 0.1 ? 1 : 0)}%`, `crash probability ${(pd * 100).toFixed(pd < 0.1 ? 1 : 0)}%`), dx, dy, { size: 11, color: pd > 0.5 ? COL.rose : COL.ink2 });
     rr(g, dx, dy + 6, pt ? 150 : 194, 5, 2.5); g.fillStyle = 'rgba(255,255,255,0.06)'; g.fill();
     rr(g, dx, dy + 6, (pt ? 150 : 194) * Math.min(1, pd) * (p > 0 ? ease(p) : 0), 5, 2.5); g.fillStyle = COL.rose; g.fill();
-    if (pt) text(g, '输出：下一帧 z 的分布', dx, dy + 34, { size: 10, color: COL.dim });
-    env.hit(r.x, r.y, r.w, r.h, { tip: '<span class="k">M · MDN-RNN</span>LSTM（256 维记忆）+ 混合密度输出：下一帧 z 的每一维是 5 个高斯的混合，再加一个“撞车了吗”。<br><span class="v">点 ＋ 看门和记忆</span>', click: true });
+    if (pt) text(g, Lx('输出：下一帧 z 的分布', 'output: distribution of the next z'), dx, dy + 34, { size: 10, color: COL.dim });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx('<span class="k">M · MDN-RNN</span>LSTM（256 维记忆）+ 混合密度输出：下一帧 z 的每一维是 5 个高斯的混合，再加一个“撞车了吗”。<br><span class="v">点 ＋ 看门和记忆</span>', '<span class="k">M · MDN-RNN</span>LSTM (256-dim memory) + mixture density output: each dimension of the next z is a mixture of 5 Gaussians, plus one “did we crash?”.<br><span class="v">Press ＋ to see the gates and the memory</span>'), click: true });
   }
 
   chip(g, x, y, s, color, active) {
     g.font = '11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-    const w = g.measureText(s).width + 16;
+    const w = (isEn ? measure(g, s, 11) : g.measureText(s).width) + 16;   // 英文用 text() 的字体量宽度
     rr(g, x - w / 2, y - 10, w, 20, 10);
     g.fillStyle = active ? hexA(color, 0.2) : 'rgba(10,17,31,0.9)'; g.fill();
     g.strokeStyle = hexA(color, active ? 0.8 : 0.45); g.lineWidth = 1; g.stroke();
@@ -269,14 +272,14 @@ export class LoopView {
         return { a: new Pix().palette(o), b: new Pix().chw(y), mse: s.mse };
       });
     }
-    text(g, '测试集 · 原图 / 重建', x, y - 6, { size: 9, color: COL.dim });
+    text(g, Lx('测试集 · 原图 / 重建', 'test set · original / recon'), x, y - 6, { size: 9, color: COL.dim });
     this.sp.forEach((s, k) => {
       const xx = x + k * (ts + 6);
       s.a.draw(g, xx, y, ts, ts);
       s.b.draw(g, xx, y + ts + 4, ts, ts);
       g.strokeStyle = COL.line2; g.lineWidth = 1;
       g.strokeRect(xx - 0.5, y - 0.5, ts + 1, ts + 1); g.strokeRect(xx - 0.5, y + ts + 3.5, ts + 1, ts + 1);
-      env.hit(xx, y, ts, ts * 2 + 4, { tip: `<span class="k">测试集第 ${k + 1} 帧</span>上：真实画面；下：V 编码再解码（浏览器里现场算）。<br>每像素均方误差 <span class="v">${s.mse.toFixed(4)}</span>（导出时 PyTorch 算的）` });
+      env.hit(xx, y, ts, ts * 2 + 4, { tip: Lx(`<span class="k">测试集第 ${k + 1} 帧</span>上：真实画面；下：V 编码再解码（浏览器里现场算）。<br>每像素均方误差 <span class="v">${s.mse.toFixed(4)}</span>（导出时 PyTorch 算的）`, `<span class="k">Test frame ${k + 1}</span>Top: the real frame; bottom: encoded and decoded by V (computed live in your browser).<br>MSE per pixel <span class="v">${s.mse.toFixed(4)}</span> (computed by PyTorch at export time)`) });
     });
   }
 
@@ -285,11 +288,15 @@ export class LoopView {
     const { meta } = this.app;
     const T = meta.train;
     const pt = this.portrait;
-    const items = [
+    const items = Lx([
       { t: 'V 怎么训出来的', a: `${(T.collect.frames / 1e4).toFixed(0)} 万帧 · ${T.V.epochs} 轮 · ${Math.round(T.V.seconds)} 秒`, b: `重建 ${T.V.finalRecon.toFixed(1)} · KL ${T.V.finalKL.toFixed(1)} · 测试 MSE ${T.V.testMSE.toFixed(4)}`, curve: T.Vcurve.map((c) => c[1]), color: COL.violet },
       { t: 'M 怎么训出来的', a: `${T.M.iters.toLocaleString()} 步 · 每批 ${T.M.batch}×${T.M.seqLen} · ${Math.round(T.M.seconds)} 秒`, b: `负对数似然 ${T.M.finalNLL} · 测试集 ${T.M.testNLL}`, curve: T.Mcurve.map((c) => c[1]), color: COL.amber },
-    ];
-    if (T.C) items.push({ t: 'C 在梦里学开车', a: `CMA-ES ${T.C.gens} 代 × ${T.C.pop} 个 · ${Math.round(T.C.seconds)} 秒`, b: `梦里活 ${T.C.dreamLife} 步 · 真实游戏 ${T.C.realLife} 步（乱开 ${T.C.randomLife}）`, curve: T.Ccurve.map((c) => c[1]), color: COL.cyan });
+    ], [
+      { t: 'How V was trained', a: `${(T.collect.frames / 1e3).toFixed(0)}K frames · ${T.V.epochs} epochs · ${Math.round(T.V.seconds)} s`, b: `recon ${T.V.finalRecon.toFixed(1)} · KL ${T.V.finalKL.toFixed(1)} · test MSE ${T.V.testMSE.toFixed(4)}`, curve: T.Vcurve.map((c) => c[1]), color: COL.violet },
+      { t: 'How M was trained', a: `${T.M.iters.toLocaleString('en-US')} steps · batch ${T.M.batch}×${T.M.seqLen} · ${Math.round(T.M.seconds)} s`, b: `negative log-likelihood ${T.M.finalNLL} · test ${T.M.testNLL}`, curve: T.Mcurve.map((c) => c[1]), color: COL.amber },
+    ]);
+    if (T.C) items.push(Lx({ t: 'C 在梦里学开车', a: `CMA-ES ${T.C.gens} 代 × ${T.C.pop} 个 · ${Math.round(T.C.seconds)} 秒`, b: `梦里活 ${T.C.dreamLife} 步 · 真实游戏 ${T.C.realLife} 步（乱开 ${T.C.randomLife}）`, curve: T.Ccurve.map((c) => c[1]), color: COL.cyan },
+      { t: 'C learns to drive in the dream', a: `CMA-ES ${T.C.gens} generations × ${T.C.pop} · ${Math.round(T.C.seconds)} s`, b: `lasts ${T.C.dreamLife} steps in the dream · ${T.C.realLife} in the real game (random: ${T.C.randomLife})`, curve: T.Ccurve.map((c) => c[1]), color: COL.cyan }));
     const n = items.length;
     const gap = 14;
     const w = pt ? r.w : (r.w - gap * (n - 1)) / n, h = pt ? (r.h - gap * (n - 1)) / n : r.h;
@@ -300,7 +307,10 @@ export class LoopView {
       card(g, x, y, w, h, { r: 10, accent: it.color });
       text(g, it.t, x + 14, y + 24, { size: pt ? 12 : 13.5, kind: 'serif', weight: 600 });
       text(g, it.a, x + 14, y + 42, { size: pt ? 9.5 : 10.5, kind: 'mono', color: COL.ink2, max: tw });
-      text(g, it.b, x + 14, y + 57, { size: pt ? 9.5 : 10.5, color: COL.dim, max: tw });
+      // 英文这一行更长（V 的卡片右边还有缩略图）：放不下时先把字号缩小一点，再不行才截断
+      let bs = pt ? 9.5 : 10.5;
+      if (isEn) { font(g, bs); while (bs > 8.5 && g.measureText(it.b).width > tw) font(g, bs -= 0.5); }
+      text(g, it.b, x + 14, y + 57, { size: bs, color: COL.dim, max: tw });
       if (ns) this.samples(g, x + w - 14 - ns * (ts + 6) + 6, y + 30, ts, ns, env);
       const P = { x: x + 14, y: y + (pt ? 64 : 70), w: w - 28 - (ns ? ns * (ts + 6) + 4 : 0), h: h - (pt ? 72 : 82) };
       if (P.h > 14) {

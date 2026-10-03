@@ -1,6 +1,7 @@
 // D1 玩：左边是真实的游戏，右边是模型的梦，同一串动作驱动两边。
 // 右上是两幅画面逐像素的差，差异曲线记着梦怎么一点点走样；下面 32 根柱子是梦此刻的 z，可以拖。
-import { COL, rr, text, card, hexA, line, clamp } from '../../../train/js/draw.js';
+import { COL, rr, text, card, hexA, line, clamp, measure } from '../../../train/js/draw.js';
+import { isEn, L as Lx } from '../../../js/i18n.js';
 import { Pix } from '../pix.js';
 import { toCHW } from '../game.js';
 import { dimOrder, dimShort, dimMeaning, used as isUsed, fmtMSE } from '../explain.js';
@@ -45,16 +46,16 @@ export class PlayView {
     this.dream.chw(y, y);
     const pt = this.portrait;
     // ---- 两块屏幕
-    this.screen(g, this.R, this.real, '真实世界', 'game.js · 和训练数据同一个游戏', COL.cyan, env);
+    this.screen(g, this.R, this.real, Lx('真实世界', 'Real world'), Lx('game.js · 和训练数据同一个游戏', 'game.js · the training game'), COL.cyan, env);
     const closed = sim.mode === 'closed';
-    const eyeTxt = closed ? (F.dreamAge > 0 ? `闭眼 · 自己想了 ${F.dreamAge} 步` : '闭眼') : '睁眼 · 每步看着真实画面预测';
-    this.screen(g, this.D, this.dream, '模型的梦', pt ? 'V 解码 M 的预测' : 'V.decode(M 预测的 z) · 浏览器现场算', closed ? COL.amber : COL.violet, env, eyeTxt);
+    const eyeTxt = closed ? (F.dreamAge > 0 ? Lx(`闭眼 · 自己想了 ${F.dreamAge} 步`, pt ? `Eyes closed · ${F.dreamAge} steps alone` : `Eyes closed · dreaming alone for ${F.dreamAge} steps`) : Lx('闭眼', 'Eyes closed')) : Lx('睁眼 · 每步看着真实画面预测', pt ? 'Eyes open · sees the real frame' : 'Eyes open · predicting from the real frame each step');
+    this.screen(g, this.D, this.dream, Lx('模型的梦', "The model's dream"), pt ? Lx('V 解码 M 的预测', 'V decodes M’s prediction') : Lx('V.decode(M 预测的 z) · 浏览器现场算', 'V.decode(ẑ) · live'), closed ? COL.amber : COL.violet, env, eyeTxt);
     // 里程、撞车
-    text(g, `里程 ${F.t}${sim.best > F.t ? `  最远 ${sim.best}` : ''}`, this.R.x + 8, this.R.y + this.R.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: 'rgba(233,239,249,0.75)' });
-    if (F.realDone) this.flash(g, this.R, F.why === 'offroad' ? '冲出路面' : '撞车了', '下一步换一条新路', env);
-    if (F.dreamDone > 0.5) this.flash(g, this.D, '梦里撞车了', `M 预测撞车的概率 ${(F.dreamDone * 100).toFixed(0)}%`, env);
-    else if (F.dreamDone > 0.15) text(g, `撞车概率 ${(F.dreamDone * 100).toFixed(0)}%`, this.D.x + this.D.w - 8, this.D.y + this.D.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: COL.rose, align: 'right' });
-    if (F.edited) text(g, '改过的 z', this.D.x + 8, this.D.y + this.D.h - 8, { size: pt ? 9.5 : 11, color: COL.amber });
+    text(g, Lx(`里程 ${F.t}${sim.best > F.t ? `  最远 ${sim.best}` : ''}`, `Dist ${F.t}${sim.best > F.t ? `  best ${sim.best}` : ''}`), this.R.x + 8, this.R.y + this.R.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: 'rgba(233,239,249,0.75)' });
+    if (F.realDone) this.flash(g, this.R, F.why === 'offroad' ? Lx('冲出路面', 'Off the road') : Lx('撞车了', 'Crashed'), Lx('下一步换一条新路', 'New road next step'), env);
+    if (F.dreamDone > 0.5) this.flash(g, this.D, Lx('梦里撞车了', 'Dream crash'), Lx(`M 预测撞车的概率 ${(F.dreamDone * 100).toFixed(0)}%`, `M’s crash probability ${(F.dreamDone * 100).toFixed(0)}%`), env);
+    else if (F.dreamDone > 0.15) text(g, Lx(`撞车概率 ${(F.dreamDone * 100).toFixed(0)}%`, `crash ${(F.dreamDone * 100).toFixed(0)}%`), this.D.x + this.D.w - 8, this.D.y + this.D.h - 8, { size: pt ? 9.5 : 11, kind: 'mono', color: COL.rose, align: 'right' });
+    if (F.edited) text(g, Lx('改过的 z', 'edited z'), this.D.x + 8, this.D.y + this.D.h - 8, { size: pt ? 9.5 : 11, color: COL.amber });
     // 动作
     const a = F.rec?.a ?? sim.keys();
     const ax = (this.R.x + this.R.w + this.D.x) / 2, ay = this.R.y + this.R.h / 2;
@@ -64,18 +65,18 @@ export class PlayView {
     if (this.HM) {
       this.dpix.diff(x, y, y);
       const r = this.HM;
-      text(g, '|真实 − 梦|', r.x, r.y - 12, { size: 12.5, kind: 'serif', weight: 600, color: COL.ink });
+      text(g, Lx('|真实 − 梦|', '|real − dream|'), r.x, r.y - 12, { size: 12.5, kind: 'serif', weight: 600, color: COL.ink });
       rr(g, r.x - 3, r.y - 3, r.w + 6, r.h + 6, 6);
       g.fillStyle = COL.panel; g.fill(); g.strokeStyle = COL.line2; g.lineWidth = 1; g.stroke();
       this.dpix.draw(g, r.x, r.y, r.w, r.h);
       const tx = r.x + r.w + 14;
-      text(g, '每像素均方误差', tx, r.y + 14, { size: 10.5, color: COL.dim });
+      text(g, Lx('每像素均方误差', 'MSE per pixel'), tx, r.y + 14, { size: 10.5, color: COL.dim });
       text(g, fmtMSE(F.mse), tx, r.y + 38, { size: 20, kind: 'mono', color: closed ? COL.amber : COL.cyan });
       const ref = meta.drift;
-      text(g, `睁眼平均 ${fmtMSE(ref.open[0])}`, tx, r.y + 62, { size: 10, kind: 'mono', color: COL.dim });
-      text(g, `只看 V 的重建 ${fmtMSE(ref.recon)}`, tx, r.y + 78, { size: 10, kind: 'mono', color: COL.dim });
-      text(g, closed ? '闭眼越久，差得越多' : '每一步都重新看一眼', tx, r.y + 100, { size: 10.5, color: COL.ink2 });
-      env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">逐像素的差</span>真实画面和梦里那一帧每个像素差了多少，越亮差得越多。<br>均方误差 <span class="v">${fmtMSE(F.mse)}</span>` });
+      text(g, Lx(`睁眼平均 ${fmtMSE(ref.open[0])}`, `eyes-open avg ${fmtMSE(ref.open[0])}`), tx, r.y + 62, { size: 10, kind: 'mono', color: COL.dim });
+      text(g, Lx(`只看 V 的重建 ${fmtMSE(ref.recon)}`, `V recon only ${fmtMSE(ref.recon)}`), tx, r.y + 78, { size: 10, kind: 'mono', color: COL.dim });
+      text(g, closed ? Lx('闭眼越久，差得越多', 'Gap grows while closed') : Lx('每一步都重新看一眼', 'Fresh look every step'), tx, r.y + 100, { size: 10.5, color: COL.ink2 });
+      env.hit(r.x, r.y, r.w, r.h, { tip: Lx(`<span class="k">逐像素的差</span>真实画面和梦里那一帧每个像素差了多少，越亮差得越多。<br>均方误差 <span class="v">${fmtMSE(F.mse)}</span>`, `<span class="k">Per-pixel difference</span>How much each pixel of the real frame differs from the dream frame — the brighter, the bigger the gap.<br>Mean squared error <span class="v">${fmtMSE(F.mse)}</span>`) });
     }
     this.chart(g, this.CH, env);
     this.equalizer(g, this.EQ, env, st);
@@ -84,7 +85,9 @@ export class PlayView {
   screen(g, r, pix, title, sub, accent, env, chip = '') {
     const pt = this.portrait;
     text(g, title, r.x, r.y - (pt ? 10 : 14), { size: pt ? 13 : 16, kind: 'serif', weight: 600, color: COL.ink });
-    if (!pt) text(g, sub, r.x + (title.length * 16 + 10), r.y - 14, { size: 10.5, kind: 'mono', color: COL.dim, max: r.w - title.length * 16 - 10 });
+    // 中文按每字 16 像素估；英文字宽不一，量出来
+    const tw = isEn ? measure(g, title, 16, 'serif', 600) : title.length * 16;
+    if (!pt) text(g, sub, r.x + (tw + 10), r.y - 14, { size: 10.5, kind: 'mono', color: COL.dim, max: r.w - tw - 10 });
     rr(g, r.x - 4, r.y - 4, r.w + 8, r.h + 8, 8);
     g.fillStyle = 'rgba(4,8,16,0.9)'; g.fill();
     g.strokeStyle = hexA(accent, 0.55); g.lineWidth = 1.2; g.stroke();
@@ -92,7 +95,8 @@ export class PlayView {
     if (chip) {
       const fs = pt ? 9 : 10.5;
       g.font = `${fs}px ${'-apple-system, "PingFang SC", "Microsoft YaHei", sans-serif'}`;
-      const w = g.measureText(chip).width + 14;
+      // 英文用和下面 text() 同一套字体量宽度（英文模式拉丁字体排在前面，用中文字体量会短一截）
+      const w = (isEn ? measure(g, chip, fs) : g.measureText(chip).width) + 14;
       rr(g, r.x + 6, r.y + 6, w, fs + 9, (fs + 9) / 2);
       g.fillStyle = 'rgba(6,12,24,0.82)'; g.fill();
       g.strokeStyle = hexA(accent, 0.6); g.stroke();
@@ -123,9 +127,9 @@ export class PlayView {
       g.strokeStyle = on ? hexA(COL.amber, 0.7) : COL.line2; g.lineWidth = 1; g.stroke();
       text(g, ch, cx, cy + s * 0.32, { size: s * 0.8, color: on ? COL.amber : COL.faint, align: 'center' });
     });
-    if (pt) text(g, '两边同一个动作', x + s * 3 + 18, y + 3.5, { size: 9, color: COL.dim });
-    else text(g, '同一', x, y + (s + 10) * 1.5 + s * 0.4, { size: 9.5, color: COL.dim, align: 'center' });
-    if (!pt) text(g, '动作', x, y + (s + 10) * 1.5 + s * 0.4 + 12, { size: 9.5, color: COL.dim, align: 'center' });
+    if (pt) text(g, Lx('两边同一个动作', 'same action on both sides'), x + s * 3 + 18, y + 3.5, { size: 9, color: COL.dim });
+    else text(g, Lx('同一', 'same'), x, y + (s + 10) * 1.5 + s * 0.4, { size: 9.5, color: COL.dim, align: 'center' });
+    if (!pt) text(g, Lx('动作', 'action'), x, y + (s + 10) * 1.5 + s * 0.4 + 12, { size: 9.5, color: COL.dim, align: 'center' });
   }
 
   // 差异曲线：最近 120 帧；闭眼时叠上“平均来说会涨成这样”（测试集上的离线统计）
@@ -133,8 +137,8 @@ export class PlayView {
     const { sim, meta } = this.app;
     const pt = this.portrait;
     card(g, r.x, r.y, r.w, r.h, { r: 10 });
-    text(g, '梦和真实差多少', r.x + 10, r.y + 17, { size: pt ? 11 : 12.5, kind: 'serif', weight: 600 });
-    text(g, '每像素均方误差 · 最近 120 帧', r.x + r.w - 10, r.y + 16, { size: 9.5, color: COL.dim, align: 'right' });
+    text(g, Lx('梦和真实差多少', 'Dream vs. real'), r.x + 10, r.y + 17, { size: pt ? 11 : 12.5, kind: 'serif', weight: 600 });
+    text(g, Lx('每像素均方误差 · 最近 120 帧', 'MSE per pixel · last 120 frames'), r.x + r.w - 10, r.y + 16, { size: 9.5, color: COL.dim, align: 'right' });
     const P = { x: r.x + 10, y: r.y + 26, w: r.w - 20, h: r.h - 36 };
     const frames = sim.recent(120);
     const ref = meta.drift;
@@ -177,10 +181,10 @@ export class PlayView {
     const last = frames[frames.length - 1];
     if (last?.mse != null) { g.beginPath(); g.arc(X(119), Y(last.mse), 3, 0, Math.PI * 2); g.fillStyle = last.dreamAge > 0 ? COL.amber : COL.cyan; g.fill(); }
     if (!pt) {
-      text(g, '— 睁眼', P.x + 60, P.y + 9, { size: 9, color: COL.cyan });
-      text(g, '— 闭眼', P.x + 104, P.y + 9, { size: 9, color: COL.amber });
+      text(g, Lx('— 睁眼', '— open'), P.x + 60, P.y + 9, { size: 9, color: COL.cyan });
+      text(g, Lx('— 闭眼', '— closed'), P.x + 104, P.y + 9, { size: 9, color: COL.amber });
     }
-    env.hit(r.x, r.y, r.w, r.h, { tip: `<span class="k">梦和真实的差异</span>青色：睁眼（每一步都看一眼真实画面再预测下一帧）；琥珀色：闭眼（梦用自己上一步想出来的 z 往下想）。<br>虚线是测试集上 ${ref.episodes} 局的平均：闭眼 10 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][9])}</span>，30 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][29])}</span>。` });
+    env.hit(r.x, r.y, r.w, r.h, { tip: Lx(`<span class="k">梦和真实的差异</span>青色：睁眼（每一步都看一眼真实画面再预测下一帧）；琥珀色：闭眼（梦用自己上一步想出来的 z 往下想）。<br>虚线是测试集上 ${ref.episodes} 局的平均：闭眼 10 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][9])}</span>，30 步后约 <span class="v">${fmtMSE(ref['closed_1.0'][29])}</span>。`, `<span class="k">How far the dream is from reality</span>Cyan: eyes open (look at the real frame every step, then predict the next). Amber: eyes closed (the dream carries on from the z it imagined last step).<br>Dashed lines are averages over ${ref.episodes} test games: about <span class="v">${fmtMSE(ref['closed_1.0'][9])}</span> after 10 closed-eye steps, about <span class="v">${fmtMSE(ref['closed_1.0'][29])}</span> after 30.`) });
   }
 
   // 32 根柱子：梦此刻的 z（按 KL 从大到小排，KL≈0 的维度模型没用上）。白色小刻度是真实画面编码出来的 z
@@ -191,8 +195,10 @@ export class PlayView {
     const order = dimOrder(meta);
     // 白色刻度要把真实画面再编码一次：闭眼播放时省掉（睁眼时本来就要编码）
     const enc = sim.mode === 'open' || !st.playing || F.enc ? sim.encOf(F).mu : null;
-    text(g, '梦此刻的 z：32 个数', r.x, r.y + 2, { size: pt ? 12 : 14, kind: 'serif', weight: 600 });
-    text(g, pt ? '拖动柱子改梦（会自动闭眼）' : '拖动柱子改梦里的画面（会自动闭眼）· 白色刻度 = 真实画面编码出来的 z · 按“用得多不多”（KL）排序', r.x + (pt ? 128 : 160), r.y + 2, { size: pt ? 9 : 10.5, color: COL.dim, max: r.w - (pt ? 128 : 160) });
+    const ttl = Lx('梦此刻的 z：32 个数', "The dream's z now: 32 numbers");
+    text(g, ttl, r.x, r.y + 2, { size: pt ? 12 : 14, kind: 'serif', weight: 600 });
+    const sx = isEn ? Math.ceil(measure(g, ttl, pt ? 12 : 14, 'serif', 600)) + (pt ? 10 : 16) : (pt ? 128 : 160);
+    text(g, pt ? Lx('拖动柱子改梦（会自动闭眼）', 'drag a bar to edit (closes eyes)') : Lx('拖动柱子改梦里的画面（会自动闭眼）· 白色刻度 = 真实画面编码出来的 z · 按“用得多不多”（KL）排序', 'Drag a bar to edit the dream (its eyes close) · white tick = z encoded from the real frame · sorted by usage (KL)'), r.x + sx, r.y + 2, { size: pt ? 9 : 10.5, color: COL.dim, max: r.w - sx });
     const top = r.y + 14, bh = r.h - (pt ? 34 : 40);
     const gap = pt ? 2 : 4, bw = (r.w - gap * 31) / 32;
     const mid = top + bh / 2;
@@ -223,7 +229,7 @@ export class PlayView {
       if (!pt && used && k < 12) text(g, dimShort(meta, d), x + bw / 2, top + bh + 24, { size: 9.5, color: COL.ink2, align: 'center', max: bw + gap });
       env.hit(x, top, bw, bh, {
         dim: d,
-        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${used ? `扫一遍：${dimMeaning(meta, d)}` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${sim.encOf(F).mu[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`,
+        tip: () => `<span class="k">z<sub>${d}</sub> · KL ${info.kl.toFixed(2)}</span>${Lx(`${used ? `扫一遍：${dimMeaning(meta, d)}` : '这一维几乎没被用上（KL≈0）：编码器总给它同一个数，解码器也不看它'}<br>梦：<span class="v">${F.zhat[d].toFixed(3)}</span>　真实画面：<span class="v">${sim.encOf(F).mu[d].toFixed(3)}</span><br><span class="v">上下拖动改梦</span>`, `${used ? `Sweep: ${dimMeaning(meta, d)}` : 'This dimension is barely used (KL≈0): the encoder always gives it the same number and the decoder ignores it'}<br>Dream: <span class="v">${F.zhat[d].toFixed(3)}</span>　Real frame: <span class="v">${sim.encOf(F).mu[d].toFixed(3)}</span><br><span class="v">Drag up / down to edit the dream</span>`)}`,
         drag: (wx, wy, phase) => {
           if (phase === 'start') { this.drag = { d }; this.app.dragStart?.(); }
           if (phase === 'end') { this.drag = null; this.app.dragEnd?.(); return; }
