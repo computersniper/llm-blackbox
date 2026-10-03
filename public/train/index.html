@@ -6,7 +6,7 @@
   <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>大模型训练 · 揭开黑箱</title>
-  <meta name="description" content="看一个大模型是怎么被训练出来的：先拿一个小到每个参数都画得出来的玻璃模型（2,928 个参数，学李白《静夜思》），看初始化、每一步的前向、反向、更新，细到一个参数的一生；再放大到从零训练的唐宋诗小模型，和真实 Qwen3-0.6B 的监督微调。所有数据都来自真实运行。">
+  <meta name="description" content="看一个大模型是怎么被训练出来的：先拿一个小到每个参数都画得出来的玻璃模型（2,928 个参数，学李白《静夜思》），在一台 3D 机器上看它一批批吃数据：进料、前向、反向、更新，细到一个参数的一生；再放大到从零训练的唐宋诗小模型，和真实 Qwen3-0.6B 的监督微调。所有数据都来自真实运行。">
   <meta name="theme-color" content="#060d1a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -15,7 +15,7 @@
        另外两章的首屏数据在玻璃小模型画出来以后才取 -->
   <link rel="preload" href="data/glass.json.gz" as="fetch" crossorigin>
   <link rel="preload" href="data/glass.bin.gz" as="fetch" crossorigin>
-  <!-- 模块依赖有三层（main → 各个视图 → 绘图工具），预先声明，浏览器一开始就并行取完，不用一层层等 -->
+  <!-- 模块依赖有好几层（main → 各个视图 / 3D 舞台 → 绘图工具 / Three.js），预先声明，浏览器一开始就并行取完，不用一层层等 -->
   <link rel="modulepreload" href="js/main.js">
   <link rel="modulepreload" href="js/lang.js">
   <link rel="modulepreload" href="../js/i18n.js">
@@ -41,10 +41,30 @@
   <link rel="modulepreload" href="js/glass/timeline.js">
   <link rel="modulepreload" href="js/glass/explain.js">
   <link rel="modulepreload" href="js/glass/heat.js">
-  <link rel="modulepreload" href="js/glass/model.js">
-  <link rel="modulepreload" href="js/glass/scenes/overview.js">
-  <link rel="modulepreload" href="js/glass/scenes/step.js">
-  <link rel="modulepreload" href="js/glass/scenes/param.js">
+  <link rel="modulepreload" href="js/glass/math.js">
+  <link rel="modulepreload" href="js/glass3d/stage.js">
+  <link rel="modulepreload" href="js/glass3d/machine.js">
+  <link rel="modulepreload" href="js/glass3d/layout.js">
+  <link rel="modulepreload" href="js/glass3d/palette.js">
+  <link rel="modulepreload" href="js/glass3d/board.js">
+  <link rel="modulepreload" href="js/glass3d/cards.js">
+  <!-- 3D 舞台：和推理页共用的引擎 + 自托管的 Three.js r186 -->
+  <link rel="modulepreload" href="../js/stage/engine.js">
+  <link rel="modulepreload" href="../js/vendor/three/three.module.js">
+  <link rel="modulepreload" href="../js/vendor/three/three.core.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/EffectComposer.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/ShaderPass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/MaskPass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/Pass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/RenderPass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/UnrealBloomPass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/postprocessing/OutputPass.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/shaders/CopyShader.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/shaders/LuminosityHighPassShader.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/shaders/OutputShader.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/renderers/CSS2DRenderer.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/environments/RoomEnvironment.js">
+  <link rel="modulepreload" href="../js/vendor/three/addons/geometries/RoundedBoxGeometry.js">
   <link rel="modulepreload" href="../js/bg.js">
   <link rel="modulepreload" href="../js/audio.js">
   <link rel="modulepreload" href="../js/ui.js">
@@ -81,6 +101,7 @@
 
   <main class="stage" id="stage" aria-label="训练过程" data-i18n-attr="aria-label:tr.stage">
     <div class="gl" id="gl"><canvas id="cv"></canvas></div>
+    <div class="gl3" id="gl3"></div>
     <div class="stage-top">
       <div class="runs" id="runs" role="tablist" aria-label="选择一章" data-i18n-attr="aria-label:tr.runs">
         <button type="button" role="tab" data-run="glass" class="on" aria-selected="true"><b data-i18n="tr.runGlass">玻璃小模型</b><i data-i18n="tr.runGlassShort">玻璃小模型</i><span data-i18n="tr.runGlassSub">2,928 个参数 · 全部看得见</span></button>
@@ -91,9 +112,12 @@
       <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）" data-i18n="tr.hint" data-i18n-attr="title:tr.hintTitle">操作说明</button>
     </div>
     <div class="stage-hint" id="stageHint">
-      <b>在训练现场自由走动</b>
+      <div class="h3d"><b>在机器里自由走动</b>
+      <span><kbd>拖动</kbd>旋转</span><span><kbd>右键</kbd>/<kbd>Shift</kbd>+拖动 平移</span><span><kbd>滚轮</kbd>推进（到头会穿过去）</span><span><kbd>双击</kbd>飞到那块面板跟前</span>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>Q</kbd>/<kbd>E</kbd> 下降 / 上升</span><span><kbd>F</kbd> 回到跟随</span><span>点一个方块：看这个参数的一生</span></div>
+      <div class="h2d"><b>在训练现场自由走动</b>
       <span><kbd>拖动</kbd>平移</span><span><kbd>滚轮</kbd>/双指 缩放</span><span><kbd>双击</kbd>放大那一处</span>
-      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>Q</kbd>/<kbd>E</kbd> 缩小 / 放大</span><span><kbd>F</kbd> 回到跟随</span>
+      <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>Q</kbd>/<kbd>E</kbd> 缩小 / 放大</span><span><kbd>F</kbd> 回到跟随</span></div>
       <span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> 或 <kbd>↓</kbd>/<kbd>↑</kbd> 换层</span><span><kbd>空格</kbd> 播放</span><span><kbd>←</kbd>/<kbd>→</kbd> 单步</span><span><kbd>1</kbd>–<kbd>6</kbd> 倍速</span>
     </div>
     <div class="stage-loading" id="loading"><span class="spin"></span><span data-i18n="tr.loading">正在载入真实训练记录…</span></div>

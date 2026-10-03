@@ -83,9 +83,13 @@ addDict({
   },
 });
 
-const HINT_EN = '<b>Walk around the training floor</b>'
+// 两套：玻璃小模型是 3D 机器（.h3d），另外两章是 2D 画布（.h2d），train.css 按 body.g3d 只显示一套
+const HINT_EN = '<div class="h3d"><b>Walk around the machine</b>'
+  + '<span><kbd>Drag</kbd> rotate</span><span><kbd>Right</kbd>/<kbd>Shift</kbd>+drag pan</span><span><kbd>Wheel</kbd> move in (keep going to pass through)</span><span><kbd>Double-click</kbd> fly to a panel</span>'
+  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> down / up</span><span><kbd>F</kbd> follow again</span><span>Click a cube: that parameter’s life</span></div>'
+  + '<div class="h2d"><b>Walk around the training floor</b>'
   + '<span><kbd>Drag</kbd> pan</span><span><kbd>Wheel</kbd>/pinch zoom</span><span><kbd>Double-click</kbd> zoom into a spot</span>'
-  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> zoom out / in</span><span><kbd>F</kbd> follow again</span>'
+  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> zoom out / in</span><span><kbd>F</kbd> follow again</span></div>'
   + '<span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> change level</span><span><kbd>Space</kbd> play</span><span><kbd>←</kbd>/<kbd>→</kbd> step</span><span><kbd>1</kbd>–<kbd>6</kbd> speed</span>';
 
 // 页面启动时调用：替换静态文案、标题、描述，放上中 / EN 开关

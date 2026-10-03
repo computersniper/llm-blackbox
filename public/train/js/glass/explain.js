@@ -4,9 +4,14 @@ import { esc } from '../../../js/ui.js';
 import { fmtP, sciSup, fmtInt } from '../draw.js';
 import { isEn, L } from '../lang.js';
 import { TENSOR_LABEL } from './data.js';
-import { OP_NAME } from './scenes/step.js';
 import { paramName } from './heat.js';
-import { adamAt, chainTerms, defaultParam } from './scenes/param.js';
+import { adamAt, chainTerms, fwdTerms, defaultParam, MM_IO } from './math.js';
+
+export const OP_NAME = isEn
+  ? { emb: 'Embedding lookup', norm1: 'RMSNorm ①', qkv: 'q, k, v', attn: 'Attention (2 heads)', wo: 'W_o + residual', norm2: 'RMSNorm ②', ffn: 'SwiGLU', wd: 'W_down + residual', normf: 'Final RMSNorm', logits: 'logits → probabilities' }
+  : { emb: '查嵌入表', norm1: 'RMSNorm ①', qkv: '算 q、k、v', attn: '注意力（两个头）', wo: 'W_o + 残差', norm2: 'RMSNorm ②', ffn: 'SwiGLU 前馈', wd: 'W_down + 残差', normf: '最后的 RMSNorm', logits: 'logits → 概率' };
+// 张量在某个算子里的名字（E 在输出层画成 Eᵀ）
+const TL = (t, op) => (t === 'E' && op === 'logits' ? 'Eᵀ' : TENSOR_LABEL[t]);
 
 const K_ = (s) => `<span class="kw">${s}</span>`;
 const F_ = (s) => `<span class="fn">${s}</span>`;
@@ -68,9 +73,9 @@ export function stepLabel(s, R, depth, ctx) {
   if (!s.sub) return PH[s.ph];
   switch (s.ph) {
     case 'batch': return `${PH.batch} · ${s.sub === 'pick' ? L('取 8 段', 'pick 8 windows') : L('错开一位', 'shift by one')}`;
-    case 'fwd': return `${PH.fwd} · ${OP_NAME[s.sub]}`;
+    case 'fwd': return s.mi ? `${PH.fwd} · ${ctx ? esc(paramName(D, selOf(D, ctx, s))) : TL(s.t, s.sub)} ${L('乘了谁', 'multiplies')}` : s.t ? `${PH.fwd} · ${OP_NAME[s.sub]} · ${TL(s.t, s.sub)}` : `${PH.fwd} · ${OP_NAME[s.sub]}`;
     case 'loss': return s.sub === 'mean' ? `${PH.loss} · ${L('平均', 'mean')}` : `${PH.loss} · ${L(`位置 ${s.i}`, `position ${s.i}`)}「${ch(D, D.fixed[s.i])}→${ch(D, D.fixed[s.i + 1])}」`;
-    case 'bwd': return s.mi ? `${PH.bwd} · ${ctx ? esc(paramName(D, selOf(D, ctx, s))) : TENSOR_LABEL[s.t]} ${L('的梯度', 'gradient')}` : `${PH.bwd} · ${OP_NAME[s.sub]}`;
+    case 'bwd': return s.mi ? `${PH.bwd} · ${ctx ? esc(paramName(D, selOf(D, ctx, s))) : TENSOR_LABEL[s.t]} ${L('的梯度', 'gradient')}` : s.t ? `${PH.bwd} · ${TL(s.t, s.sub)} ${L('的梯度', 'gradient')}` : `${PH.bwd} · ${OP_NAME[s.sub]}`;
     case 'upd': return s.sub === 'clip' ? `${PH.upd} · ${L('梯度裁剪', 'gradient clipping')}` : `${PH.upd} · ${TENSOR_LABEL[s.t]}${s.mi ? ` · ${ADAM[s.mi]}` : ''}`;
   }
   return '';
@@ -83,7 +88,8 @@ export function crumbs(depth, s, R, ctx) {
   out.push({ d: 1, label: L('训练全程', 'Whole run') });
   if (depth >= 2) out.push({ d: 2, label: L(`第 ${D.FR[s.k] + 1} 步`, `Step ${D.FR[s.k] + 1}`) });
   if (depth >= 3 && s.sub) out.push({ d: 3, label: PH[s.ph] });
-  if (depth >= 4 && s.mi) out.push({ d: 4, label: paramName(D, selOf(D, ctx, s)) });
+  if (depth >= 4 && s.t) out.push({ d: 4, label: TL(s.t, s.sub) });
+  if (depth >= 5 && s.mi) out.push({ d: 5, label: paramName(D, selOf(D, ctx, s)) });
   return out;
 }
 
@@ -94,12 +100,25 @@ export function shapeOf(s, R) {
   if (s.ph === 'batch') return L(`x <b>[${B} × ${T + 1}]</b> → inp <b>[${B} × ${T}]</b>，tgt <b>[${B} × ${T}]</b>`, `x <b>[${B} × ${T + 1}]</b> → inp <b>[${B} × ${T}]</b>, tgt <b>[${B} × ${T}]</b>`);
   if (s.ph === 'fwd') {
     const sh = { emb: `h₀ <b>[${B} × ${T} × 16]</b>`, norm1: `n₁ <b>[${B} × ${T} × 16]</b>`, qkv: `q, k, v <b>[${B} × ${T} × 2 × 8]</b>`, attn: L(`注意力 <b>[${B} × 2 × ${T} × ${T}]</b>`, `attention <b>[${B} × 2 × ${T} × ${T}]</b>`), wo: `h₁ <b>[${B} × ${T} × 16]</b>`, norm2: `n₂ <b>[${B} × ${T} × 16]</b>`, ffn: `gate, up, act <b>[${B} × ${T} × 32]</b>`, wd: `h₂ <b>[${B} × ${T} × 16]</b>`, normf: `n_f <b>[${B} × ${T} × 16]</b>`, logits: `logits <b>[${B} × ${T} × 20]</b>` };
-    return s.sub ? `${sh[s.sub]}${L('；舞台上画第 0 段', '; the stage shows row 0')}` : L(`inp <b>[${B} × ${T}]</b> → … → logits <b>[${B} × ${T} × 20]</b>；舞台上画第 0 段 <b>[${T} × ·]</b>`, `inp <b>[${B} × ${T}]</b> → … → logits <b>[${B} × ${T} × 20]</b>; the stage shows row 0 <b>[${T} × ·]</b>`);
+    if (s.t) return tensorShape(s.t, s.sub, D);
+    return s.sub ? `${sh[s.sub]}${L('；机器上画第 0 段', '; the machine shows row 0')}` : L(`inp <b>[${B} × ${T}]</b> → … → logits <b>[${B} × ${T} × 20]</b>；机器上画第 0 段 <b>[${T} × ·]</b>`, `inp <b>[${B} × ${T}]</b> → … → logits <b>[${B} × ${T} × 20]</b>; the machine shows row 0 <b>[${T} × ·]</b>`);
   }
   if (s.ph === 'loss') return L(`logits <b>[${B} × ${T} × 20]</b> → 每个位置 −ln p → 64 个数平均成 1 个`, `logits <b>[${B} × ${T} × 20]</b> → −ln p per position → 64 numbers averaged into 1`);
+  if (s.ph === 'bwd' && s.t) return L(`∂L/∂${TL(s.t, s.sub)} <b>${TL(s.t, s.sub) === 'Eᵀ' ? '[16 × 20]' : shp(D, s.t)}</b>：和参数同形状，每个方块一个梯度`, `∂L/∂${TL(s.t, s.sub)} <b>${TL(s.t, s.sub) === 'Eᵀ' ? '[16 × 20]' : shp(D, s.t)}</b>: same shape as the parameter, one gradient per cube`);
   if (s.ph === 'bwd') return L(`每个激活、每个参数都得到同形状的梯度：参数的梯度共 <b>${fmtInt(D.P)}</b> 个数`, `every activation and parameter gets a gradient of the same shape: <b>${fmtInt(D.P)}</b> numbers for the parameters`);
   if (s.ph === 'upd') return L(`m、v：和参数同形状，各 <b>${fmtInt(D.P)}</b> 个`, `m, v: same shape as the parameters, <b>${fmtInt(D.P)}</b> each`);
   return '';
+}
+
+const shp = (D, t) => { const p = D.pIndex.get(t); return p.norm ? `[${p.rows}]` : `[${p.rows} × ${p.cols}]`; };
+// D4：一块矩阵的输入 / 输出形状（第 0 段）
+function tensorShape(t, op, D) {
+  const T = D.T;
+  if (t === 'E') return op === 'logits' ? `n_f <b>[${T} × 16]</b> @ Eᵀ <b>[16 × 20]</b> → logits <b>[${T} × 20]</b>` : L(`E <b>[20 × 16]</b>：每个字取一行 → h₀ <b>[${T} × 16]</b>`, `E <b>[20 × 16]</b>: one row per character → h₀ <b>[${T} × 16]</b>`);
+  const p = D.pIndex.get(t);
+  if (p.norm) { const io = { g1: ['h₀', 'n₁'], g2: ['h₁', 'n₂'], gf: ['h₂', 'n_f'] }[t]; return `${io[1]} = ${io[0]} / rms(${io[0]}) ⊙ ${TENSOR_LABEL[t]} <b>[16]</b>`; }
+  const [xn, yn] = MM_IO[t], nm = (n) => ({ n1: 'n₁', n2: 'n₂' }[n] || n);
+  return `${nm(xn)} <b>[${T} × ${p.rows}]</b> @ ${TENSOR_LABEL[t]} <b>[${p.rows} × ${p.cols}]</b> → ${yn} <b>[${T} × ${p.cols}]</b>`;
 }
 
 /* ---------------------------------------------------------------- 讲解 */
@@ -125,15 +144,15 @@ export function explain(s, R, ctx, depth) {
   if (s.ph === 'run') {
     const ph = t < m.train.warmup ? L(`预热中（前 ${m.train.warmup} 步从 0 线性升到 10⁻²）`, `warming up (rising linearly to 10⁻² over the first ${m.train.warmup} steps)`) : L('余弦退火中', 'cosine annealing');
     const gap = k < D.NF - 1 ? D.FR[k + 1] - t : 0;
-    return L(`第 <b>${t + 1}</b> 步（共 ${D.S} 步）。这一步 8 段的损失 <b>${D.loss[t].toFixed(3)}</b>，全部 25 段平均 <b>${D.evalLoss[t].toFixed(3)}</b>；学习率 ${sciSup(D.lr[t], 3)}，${ph}。<br>${runNarrative(D, k)}<br><span class="dimmed">${gap > 1 ? `下一帧是第 ${D.FR[k + 1] + 1} 步（中间 ${gap - 1} 步只记了损失）。` : ''}点任意一个格子看这个参数的一生；按 ＋ 拆开这一步。</span>`,
-      `Step <b>${t + 1}</b> of ${D.S}. Loss on this step’s 8 windows <b>${D.loss[t].toFixed(3)}</b>, mean over all 25 windows <b>${D.evalLoss[t].toFixed(3)}</b>; learning rate ${sciSup(D.lr[t], 3)}, ${ph}.<br>${runNarrative(D, k)}<br><span class="dimmed">${gap > 1 ? `The next frame is step ${D.FR[k + 1] + 1} (only the loss was kept for the ${gap - 1} steps in between). ` : ''}Click any cell to see that parameter’s life; press + to open this step.</span>`);
+    return L(`第 <b>${t + 1}</b> 步（共 ${D.S} 步）。这一步 8 段的损失 <b>${D.loss[t].toFixed(3)}</b>，全部 25 段平均 <b>${D.evalLoss[t].toFixed(3)}</b>；学习率 ${sciSup(D.lr[t], 3)}，${ph}。<br>${runNarrative(D, k)}<br><span class="dimmed">${gap > 1 ? `下一帧是第 ${D.FR[k + 1] + 1} 步（中间 ${gap - 1} 步只记了损失）。` : ''}机器每一拍吃一批：字块飞进托盘 → 青色脉冲往上走（前向）→ 顶上的概率柱升起 → 玫红脉冲倒流回来（反向）→ 每个方块按 Δw 顶出 / 沉下（更新）。点任意一个方块看这个参数的一生；按 ＋ 拆开这一步。</span>`,
+      `Step <b>${t + 1}</b> of ${D.S}. Loss on this step’s 8 windows <b>${D.loss[t].toFixed(3)}</b>, mean over all 25 windows <b>${D.evalLoss[t].toFixed(3)}</b>; learning rate ${sciSup(D.lr[t], 3)}, ${ph}.<br>${runNarrative(D, k)}<br><span class="dimmed">${gap > 1 ? `The next frame is step ${D.FR[k + 1] + 1} (only the loss was kept for the ${gap - 1} steps in between). ` : ''}Each beat the machine eats one batch: tiles fly into the tray → a cyan pulse climbs (forward) → probability bars rise at the top → a rose pulse flows back (backward) → every cube pops out or sinks by its Δw (update). Click any cube to see that parameter’s life; press + to open this step.</span>`);
   }
   if (!s.sub) return phaseExplain(s.ph, D, k);
   switch (s.ph) {
     case 'batch': return batchExplain(s, D, k);
-    case 'fwd': return fwdExplain(s.sub, D, k);
+    case 'fwd': return s.mi ? mulExplain(D, k, selOf(D, ctx, s)) : s.t ? fwdTensorExplain(s.t, s.sub, D, k) : fwdExplain(s.sub, D, k);
     case 'loss': return lossExplain(s, D, k);
-    case 'bwd': return s.mi ? chainExplain(D, k, selOf(D, ctx, s)) : bwdExplain(s.sub, D, k);
+    case 'bwd': return s.mi ? chainExplain(D, k, selOf(D, ctx, s)) : s.t ? bwdTensorExplain(s.t, s.sub, D, k) : bwdExplain(s.sub, D, k);
     case 'upd': return s.sub === 'clip' ? clipExplain(D, k) : s.mi ? adamExplain(s.mi, D, k, selOf(D, ctx, s)) : updTensorExplain(s.t, D, k);
   }
   return '';
@@ -141,13 +160,13 @@ export function explain(s, R, ctx, depth) {
 
 function initExplain(sub, D) {
   const z = D.meta.runs.zero, b = D.meta.runs.big;
-  if (sub === 'model') return L(`这个小模型只有 <b>${fmtInt(D.P)}</b> 个数：一张 20 × 16 的嵌入表 E、注意力的 4 个 16 × 16 矩阵、前馈的 3 个矩阵，外加 3 条 RMSNorm 的缩放 γ。舞台上每个格子就是其中一个数（蓝 = 负，琥珀 = 正，越亮绝对值越大）。<br>它要学的是李白《静夜思》：看前面几个字，猜下一个字。`,
-    `This tiny model has just <b>${fmtInt(D.P)}</b> numbers: a 20 × 16 embedding table E, four 16 × 16 attention matrices, three FFN matrices, plus the scales γ of three RMSNorms. Every cell on the stage is one of them (blue = negative, amber = positive, brighter = larger).<br>Its job: Li Bai’s “Quiet Night Thought” (静夜思) — read the previous characters, guess the next one.`);
+  if (sub === 'model') return L(`这个小模型只有 <b>${fmtInt(D.P)}</b> 个数：一张 20 × 16 的嵌入表 E、注意力的 4 个 16 × 16 矩阵、前馈的 3 个矩阵，外加 3 条 RMSNorm 的缩放 γ。机器上每个小方块就是其中一个数（蓝 = 负，琥珀 = 正；越亮、越厚，绝对值越大），面板的形状就是矩阵的真实尺寸。<br>它要学的是李白《静夜思》：看前面几个字，猜下一个字。`,
+    `This tiny model has just <b>${fmtInt(D.P)}</b> numbers: a 20 × 16 embedding table E, four 16 × 16 attention matrices, three FFN matrices, plus the scales γ of three RMSNorms. Every little cube on the machine is one of them (blue = negative, amber = positive; brighter and thicker = larger), and each panel has the matrix’s real shape.<br>Its job: Li Bai’s “Quiet Night Thought” (静夜思) — read the previous characters, guess the next one.`);
   if (sub === 'hist') {
     let s = 0, n = 0;
     for (const p of D.params) if (!p.norm) for (let i = p.off; i < p.off + p.n; i++) { s += D.w0[i] ** 2; n++; }
-    return L(`训练开始前，每个矩阵元素都从均值 0、标准差 0.02 的正态分布里随机抽一个（种子 0）——所以图上是一片细碎的噪点。实际抽到的 ${fmtInt(n)} 个数标准差 <b>${Math.sqrt(s / n).toPrecision(3)}</b>；48 个 γ 都从 1 开始。`,
-      `Before training, every matrix entry is drawn at random from a normal distribution with mean 0 and standard deviation 0.02 (seed 0) — hence the fine-grained noise. The ${fmtInt(n)} numbers actually drawn have std <b>${Math.sqrt(s / n).toPrecision(3)}</b>; all 48 γ start at 1.`);
+    return L(`训练开始前，每个矩阵元素都从均值 0、标准差 0.02 的正态分布里随机抽一个（种子 0）——所以面板上是一片细碎的噪点，方块都很薄。实际抽到的 ${fmtInt(n)} 个数标准差 <b>${Math.sqrt(s / n).toPrecision(3)}</b>；48 个 γ 都从 1 开始。`,
+      `Before training, every matrix entry is drawn at random from a normal distribution with mean 0 and standard deviation 0.02 (seed 0) — hence the fine-grained noise and the thin cubes. The ${fmtInt(n)} numbers actually drawn have std <b>${Math.sqrt(s / n).toPrecision(3)}</b>; all 48 γ start at 1.`);
   }
   if (sub === 'zero') return L(`如果全设成 0：每个位置的隐藏向量都是 0，20 个字的 logits 全是 0，概率都是 1/20，损失 ln 20 = <b>${D.zLoss[0].toFixed(3)}</b>。反向时，误差信号要乘上全零的权重才能往回传，乘出来还是 0；参数的梯度又要乘上全零的激活，也是 0。<br>真实训练 200 步：梯度范数始终 <b>${z.maxGnorm}</b>，参数一个都没动（最大 |w| = ${z.maxAbsW}），损失一直 ${z.finalEval.toFixed(3)}。每个数一模一样，得到的梯度也一模一样——对称性没被打破，就永远分不开。`,
     `Set everything to 0 and every position’s hidden vector is 0, all 20 logits are 0, every probability is 1/20, and the loss is ln 20 = <b>${D.zLoss[0].toFixed(3)}</b>. On the way back the error signal must be multiplied by all-zero weights, which gives 0; each parameter’s gradient is multiplied by all-zero activations, also 0.<br>Real run, 200 steps: the gradient norm stays at <b>${z.maxGnorm}</b>, not one parameter moves (max |w| = ${z.maxAbsW}), and the loss stays ${z.finalEval.toFixed(3)}. Identical numbers get identical gradients — the symmetry is never broken, so they can never become different.`);
@@ -159,10 +178,10 @@ function phaseExplain(ph, D, k) {
   const t = D.FR[k];
   if (ph === 'batch') return L(`从首尾相接的《静夜思》里取 8 段、每段 9 个字：前 8 个是输入，错开一位的 8 个是答案。第 0 段固定是“举头望明月，低头思”，其余 7 段这一步从第 ${[1, 2, 3, 4, 5, 6, 7].map((b) => D.offs(t, b) + 1).join('、')} 个字开始。一共 64 道“猜下一个字”的题。`,
     `Take 8 windows of 9 characters from the looped poem: the first 8 are the input, the 8 shifted by one are the answers. Row 0 is always 举头望明月，低头思; this step the other 7 start at characters ${[1, 2, 3, 4, 5, 6, 7].map((b) => D.offs(t, b) + 1).join(', ')}. 64 “guess the next character” questions in all.`);
-  if (ph === 'fwd') return L(`8 段一起算，舞台上画第 0 段：8 个字 → 查嵌入表 → 注意力 → 前馈 → 20 个字的概率。每个格子都是这一步真实的激活值；左边那条竖线是残差，每一层的输出都是“加”到它上面的。`, `All 8 windows are computed together; the stage shows row 0: 8 characters → embedding lookup → attention → FFN → probabilities over 20 characters. Every cell is a real activation from this step; the vertical line on the left is the residual stream, and each layer’s output is added onto it.`);
+  if (ph === 'fwd') return L(`8 段一起算，机器上画第 0 段：青色脉冲沿左边 8 根光柱（残差流，8 个位置）往上走，每经过一块面板，它上面的输出激活就一列列亮起来（真实数值）：查嵌入表 → 注意力 → 前馈 → 最顶上 20 个字的概率柱升起，绿框是正确答案。每一层的输出都是“加”回光柱上的。`, `All 8 windows are computed together; the machine shows row 0: a cyan pulse climbs the 8 light columns on the left (the residual stream, one per position), and as it passes each panel, that panel’s output activations light up column by column (real values): embedding lookup → attention → FFN → the probability bars over 20 characters rise at the top, green = the answer. Each layer’s output is added back onto the columns.`);
   if (ph === 'loss') { let s = 0; for (let i = 0; i < D.T; i++) s += -Math.log(Math.max(D.probs(k, i, D.fixed[i + 1]), 1e-9)); return L(`每个位置取正确答案的概率 p，算 −ln p：猜得越准越接近 0，瞎猜是 ln 20 = 3.0。第 0 段 8 个位置平均 <b>${(s / D.T).toFixed(3)}</b>，整批 64 个位置平均 = 这一步的损失 <b>${D.loss[t].toFixed(4)}</b>。`, `At each position take the probability p of the right answer and compute −ln p: near 0 when confident and right, ln 20 = 3.0 for a blind guess. Row 0 averages <b>${(s / D.T).toFixed(3)}</b>; the mean over all 64 positions is this step’s loss <b>${D.loss[t].toFixed(4)}</b>.`); }
-  if (ph === 'bwd') return L(`从损失往回算：先是 logits 的梯度 (p − 1{正确}) / 64，再一层层往回乘（链式法则：上游梯度 × 本层的局部导数），每个激活、每个参数都拿到自己的梯度 ∂L/∂·。右边一栏是流到每一层的梯度，最右边的参数换成了它们的梯度。全部参数梯度的长度 ‖g‖ = <b>${D.gnorm[t].toFixed(3)}</b>。`, `Work back from the loss: first the logits’ gradient (p − 1{answer}) / 64, then multiply back layer by layer (chain rule: upstream gradient × this layer’s local derivative). Every activation and every parameter gets its own gradient ∂L/∂·. The right column shows the gradient reaching each layer; the parameters on the far right switch to their gradients. Length of all parameter gradients: ‖g‖ = <b>${D.gnorm[t].toFixed(3)}</b>.`);
-  return L(`AdamW 让每个参数按自己的 m、v 挪一小步，步长大约是学习率 ${sciSup(D.lr[t], 3)}。最右边的参数先显示这一步的 Δw（色标 ±lr），再变成更新后的值（实际是全部参数同时更新，这里按行依次展示）。走完这一步，回到下一步的批次。`, `AdamW moves every parameter a small step according to its own m and v — roughly one learning rate (${sciSup(D.lr[t], 3)}). The parameters on the far right first show this step’s Δw (color scale ±lr), then their updated values (in reality all parameters update at once; here they are shown row by row). Then back to the next step’s batch.`);
+  if (ph === 'bwd') return L(`从损失往回算：先是 logits 的梯度 (p − 1{正确}) / 64，再一层层往回乘（链式法则：上游梯度 × 本层的局部导数），每个激活、每个参数都拿到自己的梯度 ∂L/∂·。机器上：玫红脉冲往下倒流，激活换成它们的梯度（玫红 = 正，紫 = 负），每块面板按真实的 |∂L/∂w| 发光。全部参数梯度的长度 ‖g‖ = <b>${D.gnorm[t].toFixed(3)}</b>。`, `Work back from the loss: first the logits’ gradient (p − 1{answer}) / 64, then multiply back layer by layer (chain rule: upstream gradient × this layer’s local derivative). Every activation and every parameter gets its own gradient ∂L/∂·. On the machine a rose pulse flows back down, the activations switch to their gradients (rose = positive, violet = negative), and every panel glows by its real |∂L/∂w|. Length of all parameter gradients: ‖g‖ = <b>${D.gnorm[t].toFixed(3)}</b>.`);
+  return L(`AdamW 让每个参数按自己的 m、v 挪一小步，步长大约是学习率 ${sciSup(D.lr[t], 3)}。机器上：先裁剪梯度，然后 2,928 个方块同时按这一步真实的 Δw 往前顶出（Δw > 0）或往后沉下（Δw < 0），紫光越亮挪得越多（一个 lr 顶出约一格），再落回新的值。走完这一步，下一批进料。`, `AdamW moves every parameter a small step according to its own m and v — roughly one learning rate (${sciSup(D.lr[t], 3)}). On the machine: first the gradients are clipped, then all 2,928 cubes at once pop out (Δw > 0) or sink back (Δw < 0) by this step’s real Δw — brighter violet means a bigger move (one lr ≈ one cube) — and settle at their new values. Then the next batch comes in.`);
 }
 
 function batchExplain(s, D, k) {
@@ -218,6 +237,44 @@ function bwdExplain(op, D, k) {
   return '';
 }
 
+// D4 前向：一块矩阵把输入变成输出
+function fwdTensorExplain(t, op, D, k) {
+  const T = D.T, W = D.W(k), p = D.pIndex.get(t);
+  let mx = 0, s2 = 0;
+  for (let i = p.off; i < p.off + p.n; i++) { const v = Math.abs(p.norm ? W[i] - 1 : W[i]); mx = Math.max(mx, v); s2 += v * v; }
+  const rms = Math.sqrt(s2 / p.n);
+  if (t === 'E' && op === 'emb') return L(`查表没有乘法：「${ch(D, D.fixed[0])}」是第 ${D.fixed[0]} 号，就把 E 第 ${D.fixed[0]} 行的 16 个数原样搬进残差窗口 h₀ 的第 0 列……8 个位置的光束依次亮起。E 现在的典型大小 ${f4(rms)}（最大 ${f4(mx)}）。`, `A lookup has no multiplication: 「${ch(D, D.fixed[0])}」 is id ${D.fixed[0]}, so the 16 numbers in row ${D.fixed[0]} of E are copied as-is into column 0 of the residual window h₀… the 8 beams light up in turn. E’s typical size now is ${f4(rms)} (max ${f4(mx)}).`);
+  if (t === 'E') return L(`输出层就是 Eᵀ：n_f 的每个位置和 20 个字的嵌入各做一次点积，扫描线扫过 Eᵀ 的 20 列，logits 一列列亮起，再 softmax 成顶上的概率柱。Eᵀ 画成机器顶上的镜像，它和最下面的 E 是同一张表（共用，不另算参数）。`, `The output layer is just Eᵀ: each position of n_f takes a dot product with all 20 character embeddings — the scan line sweeps Eᵀ’s 20 columns, logits light up column by column, then softmax turns them into the bars on top. Eᵀ is drawn as a mirror at the top: it is the same table as E at the bottom (shared, not extra parameters).`);
+  if (p.norm) return L(`${TENSOR_LABEL[t]} 是一条 16 个数的缩放：每个位置先除以自己的均方根，再逐维乘上它。现在 |γ − 1| 的典型大小 ${f4(rms)}（最大 ${f4(mx)}）——从 1 开始，越练离 1 越远。`, `${TENSOR_LABEL[t]} is a scale of 16 numbers: each position is divided by its own RMS, then multiplied by it dimension by dimension. Typical |γ − 1| now ${f4(rms)} (max ${f4(mx)}) — it starts at 1 and drifts away as training goes on.`);
+  const [, yn] = MM_IO[t], y = D.act(k, yn);
+  let ys = 0;
+  for (let i = 0; i < y.length; i++) ys += y[i] * y[i];
+  return L(`y = x · W：左边的输入（${T} 个位置，竖着和 ${TENSOR_LABEL[t]} 的 ${p.rows} 行对齐）乘上这块 ${p.rows} × ${p.cols} 的矩阵，扫描线一列列扫过，上面的输出一列列亮起——每个输出格子都是 ${p.rows} 个乘积之和。这一步 ${yn} 的均方根 ${f4(Math.sqrt(ys / y.length))}；${TENSOR_LABEL[t]} 的典型大小 ${f4(rms)}。悬停任意方块看它的真实数值。`, `y = x · W: the input on the left (${T} positions, lined up with ${TENSOR_LABEL[t]}’s ${p.rows} rows) times this ${p.rows} × ${p.cols} matrix — the scan line sweeps the columns and the output above lights up column by column; each output cell is a sum of ${p.rows} products. This step ${yn} has RMS ${f4(Math.sqrt(ys / y.length))}; ${TENSOR_LABEL[t]}’s typical size is ${f4(rms)}. Hover any cube for its real value.`);
+}
+
+// D4 反向：一块矩阵的梯度热力
+function bwdTensorExplain(t, op, D, k) {
+  const G = D.G(k), p = D.pIndex.get(t);
+  let s2 = 0, mx = 0, at = p.off;
+  for (let i = p.off; i < p.off + p.n; i++) { s2 += G[i] * G[i]; if (Math.abs(G[i]) > mx) { mx = Math.abs(G[i]); at = i; } }
+  const nm = TL(t, op);
+  const how = t === 'E' ? (op === 'logits' ? L('输出一路：∂L/∂Eᵀ = n_fᵀ · ∂L/∂logits', 'output path: ∂L/∂Eᵀ = n_fᵀ · ∂L/∂logits') : L('输入一路：∂L/∂h₀ 的每一行加回查到的那一行', 'input path: each row of ∂L/∂h₀ is added back into the row it came from'))
+    : p.norm ? L(`∂L/∂${nm} = Σ（归一化后的值 × 流到输出的梯度）`, `∂L/∂${nm} = Σ (normalized value × gradient at the output)`)
+      : L(`∂L/∂${nm} = 输入ᵀ · 上游梯度（${D.T * D.B} 个位置加起来）`, `∂L/∂${nm} = inputᵀ · upstream gradient (summed over ${D.T * D.B} positions)`);
+  return L(`${how}。每个方块按自己的 |∂L/∂w| 发玫红光（满格 = 这块里第 99 百分位）：越亮，这个参数稍微一动损失变化越大。‖∂L/∂${nm}‖ = ${f4(Math.sqrt(s2))}${t === 'E' ? '（两路合计）' : ''}，最大的是 ${esc(paramName(D, at))} = ${f4(G[at])}。`, `${how}. Each cube glows rose by its own |∂L/∂w| (full = this panel’s 99th percentile): the brighter, the more the loss changes when that parameter moves a little. ‖∂L/∂${nm}‖ = ${f4(Math.sqrt(s2))}${t === 'E' ? ' (both paths)' : ''}; the largest is ${esc(paramName(D, at))} = ${f4(G[at])}.`);
+}
+
+// D5 前向：它乘了谁
+function mulExplain(D, k, gi) {
+  const ft = fwdTerms(D, k, gi), lc = D.locate(gi), nm = esc(paramName(D, gi));
+  const gp = ft.groups[ft.groups.length - 1];
+  let sum = 0;
+  for (const tm of gp.terms) sum += tm.x * ft.w;
+  if (lc.p.name === 'E') return L(`${nm} 在前向里用了两次：开头「${ch(D, lc.i)}」出现 ${ft.groups[0].terms.length} 次，每次原样搬进 h₀；最后 8 个位置给「${ch(D, lc.i)}」打分时，各乘一次 n_f 的第 ${lc.j} 维，8 项合计 ${f4(sum)}。`, `${nm} is used twice in the forward pass: 「${ch(D, lc.i)}」 appears ${ft.groups[0].terms.length} times at the input and is copied into h₀ each time; at the end, when the 8 positions score 「${ch(D, lc.i)}」, each multiplies it by dim ${lc.j} of n_f — the 8 terms add up to ${f4(sum)}.`);
+  if (lc.p.norm) return L(`${nm} = ${f4(ft.w)}：8 个位置归一化后的第 ${lc.i} 维都乘上它，得到 ${gp.yl.replace('[t, ', '[·, ')}（框出的那一行）。`, `${nm} = ${f4(ft.w)}: dim ${lc.i} of all 8 normalized positions is multiplied by it, giving ${gp.yl.replace('[t, ', '[·, ')} (the framed row).`);
+  return L(`${nm} = ${f4(ft.w)}。前向时它只做一件事：8 个位置各拿输入的第 ${lc.i} 维（左边框出的那一行）乘它，加进输出的第 ${lc.j} 维（上面框出的那一列）。每个输出格子是 ${gp.n} 个这样的乘积之和，它只是其中一项。`, `${nm} = ${f4(ft.w)}. In the forward pass it does exactly one thing: each of the 8 positions multiplies input dim ${lc.i} (the framed row on the left) by it and adds that into output dim ${lc.j} (the framed column above). Each output cell is a sum of ${gp.n} such products; it is one of them.`);
+}
+
 function chainExplain(D, k, gi) {
   const ct = chainTerms(D, k, gi), G = D.G(k)[gi];
   let r0 = 0, n = 0;
@@ -268,7 +325,22 @@ export function watch(s, R, ctx, depth) {
     if (s.mi) {
       const gi = selOf(D, ctx, s), a = adamAt(D, s.k, gi);
       rows.push(['wh', paramName(D, gi)], ['w', Number(a.w.toPrecision(6))], ['∂L/∂w', f4(a.graw)], ['m', f4(a.m)], ['v', sciSup(a.v, 3)], ['Δw', sciSup(a.dw, 3)]);
-    } else rows.push([L('裁剪系数', 'clip'), D.clip[t] < 1 ? D.clip[t].toFixed(4) : '1']);
+    } else {
+      rows.push([L('裁剪系数', 'clip'), D.clip[t] < 1 ? D.clip[t].toFixed(4) : '1']);
+      if (s.t) { const p = D.pIndex.get(s.t), G = D.G(s.k); let q = 0; for (let i = p.off; i < p.off + p.n; i++) q += G[i] * G[i]; rows.push([`‖∂L/∂${TL(s.t, s.sub)}‖`, f4(Math.sqrt(q))]); }
+    }
+  }
+  if (s.ph === 'fwd' && s.t) {
+    if (s.mi) {
+      const gi = selOf(D, ctx, s), ft = fwdTerms(D, s.k, gi), gp = ft.groups[ft.groups.length - 1];
+      rows.push(['wh', paramName(D, gi)], ['w', Number(ft.w.toPrecision(6))]);
+      for (const tm of gp.terms.slice(-3)) rows.push([`x·w @${tm.t}`, f4(tm.x * ft.w)]);
+    } else {
+      const p = D.pIndex.get(s.t), W = D.W(s.k);
+      let q = 0;
+      for (let i = p.off; i < p.off + p.n; i++) { const v = p.norm ? W[i] - 1 : W[i]; q += v * v; }
+      rows.push([TL(s.t, s.sub), shp(D, s.t)], [p.norm ? 'rms(γ−1)' : 'rms(w)', f4(Math.sqrt(q / p.n))]);
+    }
   }
   if (s.ph === 'loss' && s.sub === 'pos') { const p = D.probs(s.k, s.i, D.fixed[s.i + 1]); rows.push(['p', fmtP(p)], ['−ln p', (-Math.log(Math.max(p, 1e-9))).toFixed(4)]); }
   return rows;
