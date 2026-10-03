@@ -5,7 +5,7 @@ import { fmtP, sciSup, fmtInt } from '../draw.js';
 import { isEn, L } from '../lang.js';
 import { TENSOR_LABEL } from './data.js';
 import { OP_NAME } from './scenes/step.js';
-import { paramName } from './scenes/overview.js';
+import { paramName } from './heat.js';
 import { adamAt, chainTerms, defaultParam } from './scenes/param.js';
 
 const K_ = (s) => `<span class="kw">${s}</span>`;

@@ -4,11 +4,9 @@
 //         ② 这一步的 AdamW 算式，全是真实数字，最后和记录的下一步对一下。
 // 配色和站里的算式板一致：输入蓝、权重紫、乘积橙、结果青；梯度用玫红（全页的“反向”色）。
 import { COL, text, rr, card, pill, line, dot, clamp, ease, seg, fmtP, sciSup, fmtInt, hexA, wrap, waitBox, measure, badge } from '../../draw.js';
-import { heat, fnum, cellAt, mark } from '../heat.js';
+import { heat, fnum, cellAt, mark, animP, paramName } from '../heat.js';
 import { ADAM_SUBS, UPD_TENSORS } from '../timeline.js';
 import { TENSOR_LABEL } from '../data.js';
-import { paramName } from './overview.js';
-import { animP } from './step.js';
 import { isEn, L } from '../../lang.js';
 import { esc } from '../../../../js/ui.js';
 

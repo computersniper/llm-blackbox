@@ -2,25 +2,14 @@
 //   D0：初始值（正态 N(0, 0.02²)，γ = 1）→ 直方图 → 全零对照 → 放大 50 倍对照（三次真实训练的损失曲线）
 //   D1：拖动 / 播放时全部权重跟着变；损失曲线、固定样例“举头望明月，低头”每个位置的预测、两个注意力头、嵌入的相似度
 import { COL, text, rr, card, pill, line, dot, clamp, lerp, ease, fmtP, sciSup, fmtInt, hexA, wrap, waitBox, measure } from '../../draw.js';
-import { heat, legend, fnum, cellAt, mark, rgb, divRGB } from '../heat.js';
+import { heat, legend, fnum, cellAt, mark, rgb, divRGB, animP, paramName } from '../heat.js';
 import { ModelMap } from '../model.js';
 import { TENSOR_LABEL } from '../data.js';
 import { isEn, L } from '../../lang.js';
 import { esc } from '../../../../js/ui.js';
-import { animP } from './step.js';
 
 const INIT_SCALE = 0.06;          // D0 的色标：±3 个标准差
 const disp = (s) => (s === '⏎' ? '⏎' : s);
-
-// 参数提示：名字 [行, 列] = 数值
-export function paramName(D, gi) {
-  const lc = D.locate(gi);
-  if (!lc) return '';
-  const p = lc.p;
-  if (p.name === 'E') return `E[「${D.ch(lc.i)}」, ${lc.j}]`;
-  if (p.norm) return `${TENSOR_LABEL[p.name]}[${lc.i}]`;
-  return `${TENSOR_LABEL[p.name]}[${lc.i}, ${lc.j}]`;
-}
 
 // 一个确定的伪随机数（D0 里“一个个抽出来”的顺序）
 const hash01 = (i) => { let x = (i + 1) * 2654435761 >>> 0; x ^= x >>> 15; x = Math.imul(x, 2246822519) >>> 0; x ^= x >>> 13; return (x >>> 0) / 4294967296; };
@@ -310,15 +299,13 @@ export class GRun extends Base {
   // 色标：矩阵和 γ 各一个（γ 画 γ − 1）。跟着变 = 此刻的 98% 分位；固定 = 最后一帧的
   scales(Wa, Wb, f) {
     const D = this.D;
-    const key = this.fixed ? D.NF - 1 : -1;
     const W = this.fixed ? (D.has('w', D.NF - 1) ? D.W(D.NF - 1) : Wa) : Wa;
     const mats = [], norms = [];
     for (const p of D.params) for (let i = p.off; i < p.off + p.n; i++) {
       const v = Wb && !this.fixed ? W[i] + (Wb[i] - W[i]) * f : W[i];
-      if (p.norm) norms.push(Math.abs(this.mode === 'd' ? v - 1 : v - 1)); else mats.push(Math.abs(this.mode === 'd' ? v - D.w0[i] : v));
+      if (p.norm) norms.push(Math.abs(v - 1)); else mats.push(Math.abs(this.mode === 'd' ? v - D.w0[i] : v));
     }
     const q = (a) => { a.sort((x, y) => x - y); return a[Math.floor(0.985 * (a.length - 1))] || 1e-3; };
-    void key;
     return { mat: Math.max(q(mats), 1e-3), norm: Math.max(q(norms), 0.02) };
   }
 

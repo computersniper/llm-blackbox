@@ -3,10 +3,9 @@
 //   左边写算式，中间是第 0 段在这里的真实激活（8 个位置 × 维度），右边是反向时流到这里的梯度 ∂L/∂·，最右是这一行用到的参数。
 //   前向：一行行从上往下亮起来；损失：每个位置 −ln p；反向：梯度从下往上一行行出现，参数换成它们的梯度；更新：参数换成 Δw，再变成新值。
 import { COL, text, rr, card, clamp, ease, seg, fmtP, sciSup, fmtInt, hexA, wrap, waitBox, arrow, dot, line, measure } from '../../draw.js';
-import { heat, legend, fnum, cellAt, mark, absQuantile, frame, rgb, divRGB } from '../heat.js';
+import { heat, legend, fnum, cellAt, mark, absQuantile, frame, rgb, divRGB, animP, paramName } from '../heat.js';
 import { FWD_OPS, BWD_OPS, BWD_TENSORS, UPD_TENSORS } from '../timeline.js';
 import { TENSOR_LABEL } from '../data.js';
-import { paramName } from './overview.js';
 import { isEn, L } from '../../lang.js';
 import { esc } from '../../../../js/ui.js';
 
@@ -50,13 +49,6 @@ const BWD_FORMULA = {
 };
 const NODE_LABEL = { h0: 'h₀', n1: 'n₁', q: 'q', k: 'k', v: 'v', att0: L('注意力 · 头 0', 'attn · head 0'), att1: L('注意力 · 头 1', 'attn · head 1'), ao: 'ao', o: 'o', h1: 'h₁', n2: 'n₂', gate: 'gate', up: 'up', act: 'act', f: 'f', h2: 'h₂', nf: 'n_f', logits: 'logits', probs: L('概率 p', 'probabilities p') };
 const BWD_NOTE = { h1: L('∂L/∂h₁（= ∂L/∂o）', '∂L/∂h₁ (= ∂L/∂o)'), h2: L('∂L/∂h₂（= ∂L/∂f）', '∂L/∂h₂ (= ∂L/∂f)') };
-
-// 暂停时单步过来：这一步的动画也自己播一遍（约 1.4 秒）然后停在结束的样子；播放时跟着时间轴走
-export function animP(sc, st, env, dur = 1.4) {
-  const key = `${st.depth}:${st.k}:${st.i}`;
-  if (sc._pk !== key) { sc._pk = key; sc._pt0 = env.t; }
-  return st.playing ? st.p : Math.max(st.p, Math.min(1, (env.t - sc._pt0) / dur));
-}
 
 export class GStep {
   constructor(app, R) { this.app = app; this.R = R; this.D = R.D; }

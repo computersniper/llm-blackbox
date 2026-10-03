@@ -1,6 +1,7 @@
 // 玻璃小模型用的热力图：每个格子一个真实的数。发散色（负 = 蓝，正 = 琥珀，零 = 暗），和站里的 divColor 同一套。
 // 画法：先把 rows × cols 个颜色写进一张小位图（一格一个像素），再按格子大小放大画出来（最近邻），格子之间描一道暗线。
 import { COL, text, rr, hexA, clamp } from '../draw.js';
+import { TENSOR_LABEL } from './data.js';
 
 const Z = [12, 20, 36], POS = [255, 182, 92], NEG = [107, 155, 255];
 export function divRGB(t) {
@@ -132,3 +133,21 @@ export function frame(g, x, y, w, h, color, a = 0.9, lw = 1.4) {
   g.lineWidth = lw;
   g.stroke();
 }
+
+// 参数的名字：E[「字」, 列]、W_q[行, 列]、γ₁[维]（提示、标题、调试器里用）
+export function paramName(D, gi) {
+  const lc = D.locate(gi);
+  if (!lc) return '';
+  const p = lc.p;
+  if (p.name === 'E') return `E[「${D.ch(lc.i)}」, ${lc.j}]`;
+  if (p.norm) return `${TENSOR_LABEL[p.name]}[${lc.i}]`;
+  return `${TENSOR_LABEL[p.name]}[${lc.i}, ${lc.j}]`;
+}
+
+// 暂停时单步过来：这一步的动画也自己播一遍（约 1.4 秒）然后停在结束的样子；播放时跟着时间轴走
+export function animP(sc, st, env, dur = 1.4) {
+  const key = `${st.depth}:${st.k}:${st.i}`;
+  if (sc._pk !== key) { sc._pk = key; sc._pt0 = env.t; }
+  return st.playing ? st.p : Math.max(st.p, Math.min(1, (env.t - sc._pt0) / dur));
+}
+
