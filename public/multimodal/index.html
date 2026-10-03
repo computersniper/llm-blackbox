@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <script>/* 英文模式先藏起页面，等文案换成英文再显示，避免先闪一下中文（js/i18n.js 的 applyDom 会解除；最多 1.5 秒兜底） */(function(){try{var d=document.documentElement,q=new URLSearchParams(location.search).get('lang'),s=null;try{s=localStorage.getItem('blackbox:lang')}catch(e){}var l=q==='zh'||q==='en'?q:s==='zh'||s==='en'?s:/^zh\b/i.test(navigator.language||'')?'zh':'en';if(l==='en'){d.lang='en';d.classList.add('i18n-wait');var u=function(){d.classList.remove('i18n-wait')};addEventListener('load',u);setTimeout(u,1500)}}catch(e){}})();</script>
+  <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>揭开黑箱 · 多模态：大模型怎么看图</title>
   <meta name="description" content="给真实的开源视觉语言模型 Qwen3-VL-2B 看一张图、问一个问题，然后一层层揭开它：图片怎么被切成 16×16 的图块、穿过 24 层视觉编码器、2×2 合并成词元、带着三维位置编码插进对话，语言模型生成每个字时又在看图片的哪里。所有数据都来自真实模型。">

@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <script>/* 英文模式先藏起页面，等文案换成英文再显示，避免先闪一下中文（js/i18n.js 的 applyDom 会解除；最多 1.5 秒兜底） */(function(){try{var d=document.documentElement,q=new URLSearchParams(location.search).get('lang'),s=null;try{s=localStorage.getItem('blackbox:lang')}catch(e){}var l=q==='zh'||q==='en'?q:s==='zh'||s==='en'?s:/^zh\b/i.test(navigator.language||'')?'zh':'en';if(l==='en'){d.lang='en';d.classList.add('i18n-wait');var u=function(){d.classList.remove('i18n-wait')};addEventListener('load',u);setTimeout(u,1500)}}catch(e){}})();</script>
+  <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>延伸学习 · 揭开黑箱</title>
   <meta name="description" content="看完揭开黑箱，接着往下学：一条从“大模型是什么”到“读论文、自己动手”的学习路线，80 条逐个核对过的中英文资料，54 个术语的白话解释，以及 6 段能在自己电脑上跑起来的代码。">

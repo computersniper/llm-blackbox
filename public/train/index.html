@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <script>/* 英文模式先藏起页面，等文案换成英文再显示，避免先闪一下中文（js/i18n.js 的 applyDom 会解除；最多 1.5 秒兜底） */(function(){try{var d=document.documentElement,q=new URLSearchParams(location.search).get('lang'),s=null;try{s=localStorage.getItem('blackbox:lang')}catch(e){}var l=q==='zh'||q==='en'?q:s==='zh'||s==='en'?s:/^zh\b/i.test(navigator.language||'')?'zh':'en';if(l==='en'){d.lang='en';d.classList.add('i18n-wait');var u=function(){d.classList.remove('i18n-wait')};addEventListener('load',u);setTimeout(u,1500)}}catch(e){}})();</script>
+  <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>大模型训练 · 揭开黑箱</title>
   <meta name="description" content="看一个大模型是怎么被训练出来的：在 GPU 上从零训练一个 Qwen3 同构的唐诗小模型，再在真实的 Qwen3-0.6B 上走一步监督微调，细到单个权重的 AdamW 更新。所有数据都来自真实运行。">

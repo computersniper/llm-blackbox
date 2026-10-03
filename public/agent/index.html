@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <script>/* 英文模式先藏起页面，等文案换成英文再显示，避免先闪一下中文（js/i18n.js 的 applyDom 会解除；最多 1.5 秒兜底） */(function(){try{var d=document.documentElement,q=new URLSearchParams(location.search).get('lang'),s=null;try{s=localStorage.getItem('blackbox:lang')}catch(e){}var l=q==='zh'||q==='en'?q:s==='zh'||s==='en'?s:/^zh\b/i.test(navigator.language||'')?'zh':'en';if(l==='en'){d.lang='en';d.classList.add('i18n-wait');var u=function(){d.classList.remove('i18n-wait')};addEventListener('load',u);setTimeout(u,1500)}}catch(e){}})();</script>
+  <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>智能体 · 看一个编程 agent 怎么在终端里干活</title>
   <meta name="description" content="一个真实的开源模型 Qwen3-4B 在真实的 Linux 沙箱里修 bug、统计日志、写脚本、重命名函数。全过程离线录制：每一轮的完整上下文、每个词元的候选概率、每条命令的真实输出。点 ＋ 一层层揭开：屏幕、agent 循环、上下文窗口、逐词元生成、模型内部。">

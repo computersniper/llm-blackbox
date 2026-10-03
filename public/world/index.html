@@ -2,6 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
+  <script>/* 英文模式先藏起页面，等文案换成英文再显示，避免先闪一下中文（js/i18n.js 的 applyDom 会解除；最多 1.5 秒兜底） */(function(){try{var d=document.documentElement,q=new URLSearchParams(location.search).get('lang'),s=null;try{s=localStorage.getItem('blackbox:lang')}catch(e){}var l=q==='zh'||q==='en'?q:s==='zh'||s==='en'?s:/^zh\b/i.test(navigator.language||'')?'zh':'en';if(l==='en'){d.lang='en';d.classList.add('i18n-wait');var u=function(){d.classList.remove('i18n-wait')};addEventListener('load',u);setTimeout(u,1500)}}catch(e){}})();</script>
+  <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>世界模型 · 在模型的梦里开车</title>
   <meta name="description" content="一个真正训练出来、能在浏览器里玩的小世界模型（Ha & Schmidhuber 2018《World Models》的 V + M 结构）：你在梦里开车，旁边的真实游戏用同一串动作跑，看梦怎么一点点走样。再像调试程序一样一层层揭开：编码、记忆、混合密度、解码，直到一次乘加。">

@@ -46,6 +46,7 @@ export function t(key, vars) {
 export const L = (zh, en) => (isEn ? en : zh);
 
 export function applyDom(root = document) {
+  document.documentElement.classList.remove('i18n-wait');   // 页面 <head> 里英文模式先藏起来的，这里换好文案后显示
   root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
   root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.dataset.i18nHtml); });
   root.querySelectorAll('[data-i18n-attr]').forEach((el) => {
@@ -54,6 +55,9 @@ export function applyDom(root = document) {
       if (a && k) el.setAttribute(a, t(k));
     }
   });
+  // 导航换成英文后变长了：重新把当前页的链接滚进可见区（手机上导航可横向滑）
+  const nav = document.querySelector('.site-nav'), cur = nav && nav.querySelector('[aria-current]');
+  if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
 }
 
 export function setLang(l) {
