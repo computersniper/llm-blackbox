@@ -81,12 +81,11 @@ export class GStep {
       return { x: -12, y: r.y - 30, w: this.W + 24, h: this.lossRow.y + this.lossRow.h - r.y + 40 };
     }
     if (!s.sub) {
-      if (P) {
-        // 竖屏：跟着当前算子走
-        const i = this.activeRow(st);
-        return i >= 0 ? rowRect(i) : all;
-      }
-      return { x: -12, y: this.batch.y + this.batch.h - 10, w: this.W + 24, h: this.lossRow.y + this.lossRow.h - this.batch.y - this.batch.h + 20 };
+      // 一步之内（D2）：前向 / 反向时镜头跟着正在算的那一行走（看得清真实数值）；更新时看全部参数
+      if (s.ph === 'upd') return { x: -12, y: this.batch.y + this.batch.h - 10, w: this.W + 24, h: this.lossRow.y + this.lossRow.h - this.batch.y - this.batch.h + 20 };
+      const yc = this.followY({ ...st, p: this._pk === `${st.depth}:${st.k}:${st.i}` && this._ap != null ? this._ap : st.p });
+      const h = P ? 560 : 640;
+      return { x: -12, y: yc - h / 2, w: this.W + 24, h };
     }
     if (s.ph === 'fwd' || s.ph === 'bwd') return rowRect(ROW_OF.get(s.sub), P ? 10 : 40);
     if (s.ph === 'upd') {
@@ -95,6 +94,16 @@ export class GStep {
       return rowRect(i, P ? 10 : 40);
     }
     return all;
+  }
+
+  // 前向 / 反向进行到的位置（世界坐标的 y），在相邻两行之间连续移动
+  followY(st) {
+    const s = st.step, n = ROWS.length;
+    const x = clamp(st.p * n * 1.05, 0, n - 0.001);
+    const i = Math.floor(x), f = x - i;
+    const rowIdx = (j) => (s.ph === 'bwd' ? ROW_OF.get(BWD_OPS[j]) : j);
+    const c = (j) => { const r = this.rows[rowIdx(Math.min(n - 1, j))]; return r.y + r.h / 2; };
+    return c(i) + (c(Math.min(n - 1, i + 1)) - c(i)) * f;
   }
 
   rowOfTensor(t) { return t === 'E' ? 0 : this.rows.findIndex((r) => r.ws.includes(t)); }
@@ -122,7 +131,8 @@ export class GStep {
   }
 
   draw(g, st, env) {
-    st = { ...st, p: animP(this, st, env) };
+    st = { ...st, p: animP(this, st, env, st.step.sub ? 1.4 : 3) };
+    this._ap = st.p;   // 镜头跟随用（focus 在 draw 之前调用，晚一帧没关系）
     const D = this.D, k = st.k, s = st.step, P = this.portrait;
     const t = D.FR[k];
     if (!D.ready(k)) { waitBox(g, 0, 60, this.W, 400, env, st.wait, { withCard: true, label: L('正在载入这一步的真实记录…', 'Loading the real record of this step…') }); return; }
@@ -294,7 +304,7 @@ export class GStep {
       env.hit(L0.x, gy, w, nd.rows * ch, { tipAt: (wx, wy) => { const c = cellAt(wx, wy, L0.x, gy, nd.rows, nd.cols, L0.cw, ch); return c ? this.nodeTip(name, c.r, c.c, nd.get(c.r, c.c), true) : null; } });
     });
     if (!showG && !P && r.grads.length) text(g, s.ph === 'bwd' ? L('等反向传到这里…', 'waiting for the backward pass…') : L('反向时这里出现梯度 ∂L/∂·', 'gradients ∂L/∂· appear here on the backward pass'), gx0, gy + T * ch + 18, { size: 10, color: COL.faint });
-    if (r.id === 'attn') text(g, L('这一行没有参数（RoPE 按位置旋转 q、k，不用学）', 'No parameters in this row (RoPE rotates q, k by position — nothing to learn)'), P ? this.col.w : this.col.w, P ? gy + T * ch + 40 : vy + 20, { size: 10, color: COL.dim, max: P ? 360 : 200 });
+    if (r.id === 'attn') wrap(g, L('这一行没有参数：RoPE 按位置旋转 q、k，是固定的公式，不用学', 'No parameters in this row: RoPE rotates q and k by position with a fixed formula — nothing to learn'), this.col.w, P ? gy + T * ch + 40 : vy + 14, P ? 350 : 190, 14, { size: 10, color: COL.dim });
     // 最右：参数（前向时是数值，反向时是梯度，更新时是 Δw → 新值）
     const wy = P ? gy + T * ch + 40 : vy;
     this.drawWeights(g, st, env, r, i, wy, { bwdDone: bwdDone || (bwdNow && B.f > 0.5) });
@@ -330,18 +340,18 @@ export class GStep {
       const rows = p.norm ? 1 : p.rows, cols = p.norm ? p.rows : p.cols;
       const w = cols * cw, h = rows * cw;
       // 这一格显示什么
+      // 前向：数值 w；反向走到这一行以后：梯度 g；更新：这一步的 Δw → 更新后的值（D3 按张量依次来，还没轮到的仍显示梯度）
       let mode = 'w';
-      const myUpd = upd && (!s.sub || s.sub === 'clip' ? !!s.sub === false : (s.t === name && !(name === 'E' && r.id === 'logits')) || UPD_TENSORS.indexOf(s.t) > UPD_TENSORS.indexOf(name));
       if (upd && !s.sub) mode = st.p < 0.55 ? 'dw' : 'w1';
       else if (upd && s.sub === 't') mode = s.t === name && !(name === 'E' && r.id === 'logits') ? (st.p < 0.6 ? 'dw' : 'w1') : UPD_TENSORS.indexOf(s.t) > UPD_TENSORS.indexOf(name) ? 'w1' : 'g';
       else if (upd && s.sub === 'clip') mode = 'g';
       else if (bwdDone) mode = 'g';
-      void myUpd;
       const val = (gi) => (mode === 'g' ? G[gi] : mode === 'dw' ? DW[gi] : mode === 'w1' ? Wk[gi] + DW[gi] - (p.norm ? 1 : 0) : Wk[gi] - (p.norm ? 1 : 0));
       let sc;
       if (mode === 'dw') sc = lr * 1.05;
       else if (mode === 'g') sc = absQuantile(G, 0.99, p.off, p.off + p.n) || 1e-9;
-      else sc = p.norm ? Math.max(0.05, absQuantile(Wk.map((v, gi) => (gi >= p.off && gi < p.off + p.n ? v - 1 : 0)), 0.999, p.off, p.off + p.n)) : absQuantile(Wk, 0.99, p.off, p.off + p.n);
+      else if (p.norm) { sc = 0.05; for (let q = p.off; q < p.off + p.n; q++) sc = Math.max(sc, Math.abs(Wk[q] - 1)); }
+      else sc = absQuantile(Wk, 0.99, p.off, p.off + p.n);
       const gi = (rr_, c) => p.off + (p.norm ? c : rr_ * p.cols + c);
       const lab = name === 'E' && r.id === 'logits' ? L('Eᵀ（同一张表）', 'Eᵀ (same table)') : TENSOR_LABEL[name];
       const modeLab = { w: '', g: ' · ∂L/∂W', dw: ' · Δw', w1: L(' · 更新后', ' · updated') }[mode];

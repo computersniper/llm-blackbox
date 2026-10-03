@@ -85,11 +85,11 @@ export class GParam {
     const P = (this.portrait = env.portrait);
     if (!P) {
       this.W = 1250;
-      this.mapC = { x: 0, y: 74, w: 330, h: 300 };
-      this.lifeC = { x: 0, y: 388, w: 330, h: 352 };
-      this.chainC = { x: 346, y: 74, w: 450, h: 666 };
-      this.adamC = { x: 812, y: 74, w: 440, h: 666 };
-      this.bounds = { x: -10, y: -4, w: 1272, h: 754 };
+      this.mapC = { x: 0, y: 74, w: 320, h: 496 };
+      this.chainC = { x: 336, y: 74, w: 450, h: 496 };
+      this.adamC = { x: 802, y: 74, w: 450, h: 496 };
+      this.lifeC = { x: 0, y: 584, w: 1252, h: 214, wide: true };
+      this.bounds = { x: -10, y: -4, w: 1272, h: 812 };
     } else {
       this.W = 380;
       this.mapC = { x: 0, y: 84, w: 380, h: 290 };
@@ -188,10 +188,14 @@ export class GParam {
     const sr = this.series(gi);
     card(g, C.x, C.y, C.w, C.h, { eyebrow: sr.full ? L(`HISTORY · 全部 ${S} 步`, `HISTORY · ALL ${S} STEPS`) : L(`HISTORY · ${sr.xs.length} / ${D.NF} 帧已载入`, `HISTORY · ${sr.xs.length} / ${D.NF} FRAMES LOADED`), title: L('从初始化到训练结束', 'From initialization to the end'), accent: COL.cyan });
     const rowsDef = [['w', L('权重 w', 'weight w'), COL.violet], ['g', L('梯度 ∂L/∂w', 'gradient ∂L/∂w'), COL.rose], ['m', L('一阶动量 m', '1st moment m'), COL.amber], ['sv', L('√v（梯度的典型大小）', '√v (typical gradient size)'), COL.blue], ['dw', L('每步的更新 Δw', 'update Δw'), COL.cyan]];
-    const x0 = C.x + 14, w = C.w - 28, top = C.y + 54, rh = (C.h - 66) / rowsDef.length;
-    const X = (tt) => x0 + (tt / (S - 1)) * w;
+    const wide = !!C.wide;
+    const n = rowsDef.length, gap = 18;
+    const cw = wide ? (C.w - 28 - gap * (n - 1)) / n : C.w - 28;
+    const top = C.y + 54, rh = wide ? C.h - 66 : (C.h - 66) / n;
     rowsDef.forEach(([key, lab, col], ri) => {
-      const arr = sr[key], y0 = top + ri * rh, h = rh - 24;
+      const x0 = C.x + 14 + (wide ? ri * (cw + gap) : 0), w = cw;
+      const X = (tt) => x0 + (tt / (S - 1)) * w;
+      const arr = sr[key], y0 = wide ? top : top + ri * rh, h = rh - 24;
       text(g, lab, x0, y0 + 9, { size: 10, color: col });
       if (!arr.length) return;
       let lo = Math.min(...arr), hi = Math.max(...arr);
@@ -207,6 +211,7 @@ export class GParam {
       g.strokeStyle = hexA(COL.amber, 0.45); g.beginPath(); g.moveTo(cx, y0 + 12); g.lineTo(cx, y0 + 14 + h); g.stroke();
       if (sr.xs[ci] === t) dot(g, cx, Y(arr[ci]), 3, COL.amber);
       text(g, num(arr[ci], 3), x0 + w, y0 + 9, { size: 9.5, kind: 'mono', color: COL.ink2, align: 'right' });
+      if (wide) { g.strokeStyle = COL.line; g.strokeRect(x0, y0 + 14, w, h); text(g, L('第 1 步', 'step 1'), x0, y0 + h + 26, { size: 8.5, kind: 'mono', color: COL.faint }); text(g, `${S}`, x0 + w, y0 + h + 26, { size: 8.5, kind: 'mono', color: COL.faint, align: 'right' }); }
       env.hit(x0, y0, w, rh, { tipAt: (wx) => { const tt = ((wx - x0) / w) * (S - 1); let bi = 0; sr.xs.forEach((xx, i) => { if (Math.abs(xx - tt) < Math.abs(sr.xs[bi] - tt)) bi = i; }); return `<span class="k">${L(`第 ${sr.xs[bi] + 1} 步`, `step ${sr.xs[bi] + 1}`)}</span>${lab} = <span class="v">${num(arr[bi], 5)}</span>`; } });
     });
   }
@@ -280,7 +285,8 @@ export class GParam {
       text(g, num(G, 4), x0 + w, y + 64, { size: 13, kind: 'mono', weight: 700, color: COL.cyan, align: 'right' });
       y += 86;
       const share = Math.abs(G) > 0 ? row0 / G : 0;
-      wrap(g, L(`第 0 段贡献了 ${(share * 100).toFixed(0)}%。每个位置的乘积就是“这个位置想让 W 往哪边改、改多少”；64 个位置的意见加起来，才是这一步的梯度。`, `Row 0 contributes ${(share * 100).toFixed(0)}%. Each product is “which way, and how much, this position wants W to move”; the gradient is all 64 positions’ votes added up.`), x0, y + 6, w, 15, { size: 10.5, color: COL.dim });
+      const head = share >= 0 && share <= 1 ? L(`第 0 段贡献了 ${(share * 100).toFixed(0)}%。`, `Row 0 contributes ${(share * 100).toFixed(0)}%. `) : L('第 0 段和其余 7 段的方向相反，互相抵消了一部分。', 'Row 0 and the other 7 rows point opposite ways and partly cancel. ');
+      wrap(g, head + L('每一项乘积就是“这个位置想让它往哪边改、改多少”；64 个位置的意见加起来，才是这一步的梯度。', 'Each product is “which way, and how much, this position wants it to move”; the gradient is all 64 positions’ votes added up.'), x0, y + 6, w, 15, { size: 10.5, color: COL.dim });
     }
   }
 
@@ -302,8 +308,8 @@ export class GParam {
       { k: 'Δw', l: `−lr·m̂/(√v̂+ε) − lr·λ·w = ${sciSup(a.adam, 3)} ${a.decay >= 0 ? '+' : '−'} ${sciSup(Math.abs(a.decay), 3)}`, r: `Δw = ${sciSup(a.dw, 4)}`, c: COL.cyan },
       { k: L('写回', 'write'), l: `w′ = ${num(a.w, 7)} + (${sciSup(a.dw, 3)})`, r: `w′ = ${num(a.w1, 7)}`, c: COL.cyan },
     ];
-    const lh = P ? 60 : 64;
-    let y = C.y + 80;
+    const lh = P ? 58 : 56;
+    let y = C.y + 78;
     lines.forEach((ln, i) => {
       const vis = cur < 0 ? 1 : i < cur ? 1 : i === cur ? ease(seg(st.p, 0, 0.35)) : 0.14;
       g.globalAlpha = vis;

@@ -221,8 +221,8 @@ function pickParam(gi, keep = false) {
   stage.exitFree();
   const s = tl.step;
   if (keep && tl.depth === 4 && s.t) {
-    // 已经在“一个参数”里：换成看这个参数，停在同一小步（换了张量就跳到那个张量的同一小步）
-    if (s.t !== lc.p.name) tl.jump(4, (b) => b.ph === (s.ph === 'bwd' && D.pIndex.get(lc.p.name) && ['E', 'Wq', 'Wk', 'Wv', 'Wo', 'Wg', 'Wu', 'Wd', 'g1', 'g2', 'gf'].includes(lc.p.name) ? s.ph : 'upd') && b.t === lc.p.name && (b.mi === s.mi || (s.ph === 'bwd' ? b.mi === 'chain' : b.mi === 'g')));
+    // 已经在“一个参数”里：换成看这个参数；换了张量就跳到那个张量的同一小步（反向那段的“梯度从哪来”，或更新那段的同一项）
+    if (s.t !== lc.p.name) tl.jump(4, (b) => b.t === lc.p.name && (s.ph === 'bwd' ? b.ph === 'bwd' : b.ph === 'upd' && b.mi === s.mi));
     else updateControls();
     sfx.click();
     return;
