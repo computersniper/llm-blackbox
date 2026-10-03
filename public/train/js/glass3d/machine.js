@@ -491,7 +491,7 @@ export class GlassMachine {
       o.full = o.el.innerHTML;
       this.lw[b.id] = o;
     }
-    const AL = { h0: 'h₀', h1: 'h₁', h2: 'h₂', n1: 'n₁', n2: 'n₂', nf: 'n_f', q: 'q', k: 'k', v: 'v', att0: L('注意力·头 0', 'attn · head 0'), att1: L('注意力·头 1', 'attn · head 1'), ao: 'ao', aoT: 'aoᵀ', o: 'o', gate: 'gate', up: 'up', act: 'silu(gate) ⊙ up', actT: 'actᵀ', f: 'f', logits: 'logits' };
+    const AL = { h0: 'h₀', h1: 'h₁', h2: 'h₂', n1: 'n₁', n2: 'n₂', nf: 'n_f', q: 'q', k: 'k', v: 'v', att0: L('注意力 头 0', 'attn head 0'), att1: L('头 1', 'head 1'), ao: 'ao', aoT: 'aoᵀ', o: 'o', gate: 'gate', up: 'up', act: 'silu(gate) ⊙ up', actT: 'actᵀ', f: 'f', logits: 'logits' };
     this.la = {};
     for (const b of BLOCKS.filter((x) => x.kind === 'a')) {
       const shp = `[${b.rows} × ${b.cols}]`;
@@ -499,6 +499,7 @@ export class GlassMachine {
       if (b.spine) o = add(`${AL[b.id]}<small>${L('残差', 'residual')} ${shp}</small>`, 'num ga', SPINE.x0 - 0.12, (b.yTop + b.yBot) / 2, 0.2, 1, 0.5);
       else if (b.id === 'aoT' || b.id === 'actT') o = add(`${AL[b.id]}`, 'num ga', b.x0, b.yBot - 0.06, 0.05, 0, 0);
       else if (b.id === 'logits') o = add(`${AL[b.id]}<small>${shp}</small>`, 'num ga', b.x1 + 0.08, (b.yTop + b.yBot) / 2, 0.05, 0, 0.5);
+      else if (b.id.startsWith('att')) o = add(`${AL[b.id]}`, 'num ga', b.x0, b.yTop + 0.05, 0.05, 0, 1);
       else o = add(`${AL[b.id]}<small>${shp}</small>`, 'num ga', b.x0, b.yTop + 0.05, 0.05, 0, 1);
       this.la[b.id] = o;
     }
@@ -908,7 +909,7 @@ export class GlassMachine {
         }
       }
     }
-    this.wheelArcs.visible = show;
+    this.wheelArcs.visible = !!show;
     const NS = D.stream.length, T = D.T, B = D.B;
     for (let i = 0; i < NS; i++) this.placeTok(o.wheel + i, this.wheelPos(i), 0.9);
     const tmp = new THREE.Vector3();
@@ -1000,7 +1001,7 @@ export class GlassMachine {
       if (v === 'g-param') show = mine;
       if (v === 'g-mat') show = mine || this.near(b);
       if (v === 'g-op') show = this.inOp(b) || !isG;
-      o.visible = show;
+      o.visible = !!show;
       const html = far ? `${o.short}` : o.full;
       if (o.el._h !== html) { o.el.innerHTML = html; o.el._h = html; }
       o.el.classList.toggle('on', !!mine || (v === 'g-op' && this.inOp(b) && s.ph !== 'loss'));
@@ -1011,21 +1012,21 @@ export class GlassMachine {
       let show = false;
       if (v === 'g-op') show = this.inOp(b);
       else if (v === 'g-mat') show = this.near(b);
-      else if (v === 'g-step') show = b.spine;
-      o.visible = show;
+      else if (v === 'g-step') show = (s.ph === 'fwd' || s.ph === 'bwd') && (b.spine || this.inPhaseOp(b, F));
+      o.visible = !!show;
     }
-    for (const [id, o] of Object.entries(this.lr)) o.visible = v === 'g-step' || (v === 'g-op' && this.inOpName(id));
+    for (const [id, o] of Object.entries(this.lr)) o.visible = !!((v === 'g-step' && (s.ph === 'fwd' || s.ph === 'bwd')) || (v === 'g-op' && this.inOpName(id)));
     const t = D.FR[k];
     // 损失
     const lossOn = F.lossMean > 0.05 && s.ph !== 'init' && (v !== 'g-mat' && v !== 'g-param');
-    this.lGauge.visible = lossOn;
+    this.lGauge.visible = !!lossOn;
     if (lossOn) {
       const html = `L = ${D.loss[t].toFixed(3)}<small>${L('整批 64 个位置平均', 'mean of 64 positions')}</small>`;
       if (this.lGauge.el._h !== html) { this.lGauge.el.innerHTML = html; this.lGauge.el._h = html; }
       this.lGauge.position.y = GAUGE.y + Math.min(1, D.loss[t] / 3.2) * GAUGE.hMax * F.lossMean + 0.1;
     }
     const clipOn = s.ph === 'upd' && (s.sub === 'clip' || (!s.sub && F.clip < 1)) && v !== 'g-param';
-    this.lClip.visible = clipOn;
+    this.lClip.visible = !!clipOn;
     if (clipOn) {
       const c = D.clip[t], html = `‖g‖ = ${D.gnorm[t].toFixed(3)}${c < 1 ? L(` > 1 → 全部梯度 × ${c.toFixed(3)}`, ` > 1 → all gradients × ${c.toFixed(3)}`) : L(' ≤ 1 · 不裁剪', ' ≤ 1 · no clipping')}`;
       if (this.lClip.el._h !== html) { this.lClip.el.innerHTML = html; this.lClip.el._h = html; }
@@ -1039,7 +1040,7 @@ export class GlassMachine {
     }
     this.lWheel.visible = far || (v === 'g-op' && s.ph === 'batch');
     this.lTray.visible = (v === 'g-step' && s.ph === 'batch') || (v === 'g-op' && s.ph === 'batch');
-    this.lShelf.visible = F.fwd >= 9.3 && (v === 'g-step' || v === 'g-op') && (s.ph === 'loss' || s.sub === 'logits');
+    this.lShelf.visible = !!(F.fwd >= 9.3 && (v === 'g-step' || v === 'g-op') && (s.ph === 'loss' || s.sub === 'logits'));
     this.lFactory.visible = s.ph === 'init';
     if (s.ph === 'init') {
       const html = { model: L('出厂状态 · 还没训练 · 2,928 个参数', 'Factory state · untrained · 2,928 parameters'), hist: L('出厂状态 · 每个参数是一个很小的随机数', 'Factory state · each parameter a small random number'), zero: L('对照：全部设成 0（γ 仍为 1）', 'Control: everything set to 0 (γ still 1)'), big: L('对照：放大 50 倍 N(0, 1²)', 'Control: 50× larger N(0, 1²)') }[s.sub];
@@ -1059,6 +1060,14 @@ export class GlassMachine {
     if (fw && fw[0] === o) return true;
     const bw = BW[b.id];
     return s.ph === 'bwd' && bw && bw[0] === BWD_OPS.indexOf(op);
+  }
+  // 一步之内（D2）前向 / 反向正经过的那个算子用到的激活块
+  inPhaseOp(b, F) {
+    const s = this.st?.step;
+    if (!s || s.sub) return false;
+    if (s.ph === 'fwd' && F.fwd > 0 && F.fwd < 10) { const w = FW[b.id]; return !!w && w[0] === Math.floor(F.fwd); }
+    if (s.ph === 'bwd' && F.bwd > 0 && F.bwd < 10) { const w = BW[b.id]; return !!w && w[0] === Math.floor(F.bwd); }
+    return false;
   }
   inOpName(id) {
     const s = this.st?.step;
