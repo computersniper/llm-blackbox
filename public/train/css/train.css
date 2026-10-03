@@ -94,6 +94,7 @@ button { font: inherit; color: inherit; }
 .runs button { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; padding: 5px 11px; border-radius: 11px; border: 1px solid transparent; background: none; cursor: pointer; color: var(--dim); text-align: left; transition: color .2s, background .2s, border-color .2s; }
 .runs button b { font-size: 12.5px; font-weight: 600; }
 .runs button span { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; }
+.runs button i { display: none; font-style: normal; }
 .runs button:hover { color: var(--ink); }
 .runs button.on { color: var(--ink); background: rgba(94, 240, 212, .08); border-color: rgba(94, 240, 212, .4); }
 .runs button.on span { color: var(--acc); }
@@ -248,8 +249,8 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
   /* 三章的按钮在窄屏上平分一行，只留章名 */
   .runs { width: 100%; }
   .runs button { flex: 1; min-width: 0; align-items: center; padding: 5px 6px; }
-  .runs button b { font-size: 12px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .runs button span { display: none; }
+  .runs button b, .runs button span { display: none; }
+  .runs button i { display: block; font-size: 12px; font-weight: 600; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .stage-hint { transform: translate(-50%, -8px); width: calc(100% - 24px); top: 64px; }
   .stage-hint.on { transform: translate(-50%, 0); }
   .dbg { top: auto; left: 10px; right: 10px; width: auto; bottom: 100px; max-height: 42vh; }

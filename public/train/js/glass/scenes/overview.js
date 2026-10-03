@@ -114,7 +114,7 @@ export class GInit extends Base {
     g.strokeStyle = COL.line2; g.beginPath(); g.moveTo(C.x + 14, y - 12); g.lineTo(C.x + C.w - 14, y - 12); g.stroke();
     text(g, L('合计', 'total'), C.x + 14, y + 6, { size: 11.5, color: COL.ink, weight: 600 });
     text(g, fmtInt(D.P), C.x + C.w - 14, y + 6, { size: 13, kind: 'mono', weight: 700, color: COL.violet, align: 'right' });
-    text(g, L('对照：Qwen3-0.6B 约 6 亿个数，同样的结构', 'For scale: Qwen3-0.6B has ~600 million, same kind of parts'), C.x + 14, C.y + C.h - 12, { size: 10, color: COL.dim, max: C.w - 28 });
+    text(g, L('对照：Qwen3-0.6B 约 6 亿个数，是同一类零件（28 层）', 'For scale: Qwen3-0.6B has ~600 million, the same kinds of parts (28 layers)'), C.x + 14, C.y + C.h - 12, { size: 10, color: COL.dim, max: C.w - 28 });
   }
 
   // 全零对照：训练 200 步以后，两次真实训练的 E 和 W_q 并排（全零那次 200 步里 max |w| 始终是 0，所以画出来就是全零）
@@ -126,9 +126,9 @@ export class GInit extends Base {
     const W = have ? D.W(K) : null;
     cols.forEach(([lab, col, zero], ci) => {
       const x0 = C.x + 18 + ci * ((C.w - 36) / 2);
-      text(g, lab, x0, C.y + 62, { size: 11, color: col, weight: 600 });
-      [['E', 20, 16, 4.4], ['Wq', 16, 16, 4.4]].forEach(([name, rows, ncols, cell], j) => {
-        const p = D.pIndex.get(name), x = x0 + j * (ncols * cell + 14), y = C.y + 74;
+      text(g, lab, x0, C.y + 58, { size: 11, color: col, weight: 600 });
+      [['E', 20, 16, 3.6], ['Wq', 16, 16, 3.6]].forEach(([name, rows, ncols, cell], j) => {
+        const p = D.pIndex.get(name), x = x0 + j * (ncols * cell + 14), y = C.y + 66;
         text(g, TENSOR_LABEL[name], x, y + rows * cell + 12, { size: 9, kind: 'mono', color: COL.dim });
         if (!zero && !have) { waitBox(g, x, y, ncols * cell, rows * cell, env, st.wait, { label: '', size: 9 }); return; }
         let sc = 0;
@@ -137,7 +137,7 @@ export class GInit extends Base {
       });
     });
     const z = D.meta.runs.zero;
-    wrap(g, L(`右边：200 步里梯度范数始终 ${z.maxGnorm}、max |w| 始终 ${z.maxAbsW}，损失一直 ${z.finalEval.toFixed(3)}。左边同样 200 步，损失降到 ${D.meta.train.finalEval.toFixed(3)}。`, `Right: over 200 steps the gradient norm stayed ${z.maxGnorm}, max |w| stayed ${z.maxAbsW}, loss stuck at ${z.finalEval.toFixed(3)}. Left, same 200 steps: loss down to ${D.meta.train.finalEval.toFixed(3)}.`), C.x + 18, C.y + C.h - 26, C.w - 36, 13, { size: 9.5, color: COL.dim });
+    wrap(g, L(`右边：200 步里梯度范数始终 ${z.maxGnorm}、max |w| 始终 ${z.maxAbsW}，损失一直 ${z.finalEval.toFixed(3)}。左边同样 200 步，损失降到 ${D.meta.train.finalEval.toFixed(3)}。`, `Right: over 200 steps the gradient norm stayed ${z.maxGnorm}, max |w| stayed ${z.maxAbsW}, loss stuck at ${z.finalEval.toFixed(3)}. Left, same 200 steps: loss down to ${D.meta.train.finalEval.toFixed(3)}.`), C.x + 18, C.y + C.h - 30, C.w - 36, 13, { size: 9.5, color: COL.dim, maxLines: 2 });
   }
 
   // 初始值的直方图（真实的 2,880 个矩阵参数）+ 理论的正态曲线
