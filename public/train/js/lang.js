@@ -7,7 +7,7 @@ export { isEn, L };
 addDict({
   zh: {
     'tr.title': '大模型训练 · 揭开黑箱',
-    'tr.desc': '看一个大模型是怎么被训练出来的：先拿一个小到每个参数都画得出来的玻璃模型（2,928 个参数，学李白《静夜思》），看初始化、每一步的前向、反向、更新，细到一个参数的一生；再放大到从零训练的唐宋诗小模型，和真实 Qwen3-0.6B 的监督微调。所有数据都来自真实运行。',
+    'tr.desc': '看一个大模型是怎么被训练出来的：先拿一个小到每个参数都画得出来的玻璃模型（2,928 个参数，学李白《静夜思》），在一台 3D 机器上看它一批批吃数据：进料、前向、反向、更新，细到一个参数的一生；再放大到从零训练的唐宋诗小模型，和真实 Qwen3-0.6B 的监督微调。所有数据都来自真实运行。',
     'tr.brand': '大模型训练',
     'tr.crumbs': '当前深度',
     'tr.codex': '知识碎片图鉴',
@@ -45,7 +45,7 @@ addDict({
   },
   en: {
     'tr.title': 'LLM Training · Opening the Black Box',
-    'tr.desc': 'Watch a language model being trained: first a glass-box model so small that every one of its 2,928 parameters is drawn on screen (it learns Li Bai’s “Quiet Night Thought”) — initialization, each step’s forward pass, backward pass and update, down to the life of a single parameter; then scale up to a poetry model pretrained from scratch and real supervised fine-tuning of Qwen3-0.6B. Every number comes from a real run.',
+    'tr.desc': 'Watch a language model being trained: first a glass-box model so small that every one of its 2,928 parameters is a cube on a 3D machine (it learns Li Bai’s “Quiet Night Thought”) — watch it eat batch after batch: initialization, each step’s forward pass, backward pass and update, down to the life of a single parameter; then scale up to a poetry model pretrained from scratch and real supervised fine-tuning of Qwen3-0.6B. Every number comes from a real run.',
     'tr.brand': 'LLM Training',
     'tr.crumbs': 'Current depth',
     'tr.codex': 'Insight codex',
@@ -83,9 +83,13 @@ addDict({
   },
 });
 
-const HINT_EN = '<b>Walk around the training floor</b>'
+// 两套：玻璃小模型是 3D 机器（.h3d），另外两章是 2D 画布（.h2d），train.css 按 body.g3d 只显示一套
+const HINT_EN = '<div class="h3d"><b>Walk around the machine</b>'
+  + '<span><kbd>Drag</kbd> rotate</span><span><kbd>Right</kbd>/<kbd>Shift</kbd>+drag pan</span><span><kbd>Wheel</kbd> move in (keep going to pass through)</span><span><kbd>Double-click</kbd> fly to a panel</span>'
+  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> down / up</span><span><kbd>F</kbd> follow again</span><span>Click a cube: that parameter’s life</span></div>'
+  + '<div class="h2d"><b>Walk around the training floor</b>'
   + '<span><kbd>Drag</kbd> pan</span><span><kbd>Wheel</kbd>/pinch zoom</span><span><kbd>Double-click</kbd> zoom into a spot</span>'
-  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> zoom out / in</span><span><kbd>F</kbd> follow again</span>'
+  + '<span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Q</kbd>/<kbd>E</kbd> zoom out / in</span><span><kbd>F</kbd> follow again</span></div>'
   + '<span class="sep"></span><span><kbd>＋</kbd>/<kbd>−</kbd> or <kbd>↓</kbd>/<kbd>↑</kbd> change level</span><span><kbd>Space</kbd> play</span><span><kbd>←</kbd>/<kbd>→</kbd> step</span><span><kbd>1</kbd>–<kbd>6</kbd> speed</span>';
 
 // 页面启动时调用：替换静态文案、标题、描述，放上中 / EN 开关

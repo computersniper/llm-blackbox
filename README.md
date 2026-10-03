@@ -32,7 +32,7 @@
 
 </div>
 
-> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a glass-box Transformer so small that all 2,928 of its parameters are drawn on screen — watch its initialization, every step’s forward pass, backward pass and AdamW update, and the life of any single parameter; then a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), a **coding agent** (Qwen3-4B recorded in a real sandbox), and a **world model** (a small V + M model in the style of Ha & Schmidhuber's *World Models*, trained here and run live in the browser: drive inside its dream next to the real game). Pure static site, no build step, Three.js r186. The whole site is bilingual: switch **中 / EN** in the top bar, or open [caijiechao.com/blackbox/?lang=en](https://caijiechao.com/blackbox/?lang=en). In English mode the chats are separate real runs on English questions and tasks, not translations of the Chinese ones. A [3-minute English video](#推理视频) walks through one full inference step by step.
+> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a glass-box Transformer so small that each of its 2,928 parameters is a cube on a 3D machine — watch it eat batch after batch: initialization, every step’s forward pass, backward pass and AdamW update, down to one matrix and the life of any single parameter; then a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), a **coding agent** (Qwen3-4B recorded in a real sandbox), and a **world model** (a small V + M model in the style of Ha & Schmidhuber's *World Models*, trained here and run live in the browser: drive inside its dream next to the real game). Pure static site, no build step, Three.js r186. The whole site is bilingual: switch **中 / EN** in the top bar, or open [caijiechao.com/blackbox/?lang=en](https://caijiechao.com/blackbox/?lang=en). In English mode the chats are separate real runs on English questions and tasks, not translations of the Chinese ones. A [3-minute English video](#推理视频) walks through one full inference step by step.
 
 ## 五个页面
 
@@ -63,7 +63,7 @@
 
 <sub>训练全程：唐宋诗小模型第 4,000 步的仪表盘</sub>
 
-- **玻璃小模型**（默认的第一章）：小到 **2,928 个参数全部画成热力图**的 Transformer（嵌入 → 双头注意力 + RoPE → SwiGLU，输出层共用嵌入），在 CPU 上真实训练 200 步学李白《静夜思》，逐数记录。看初始化（另有全零、放大 50 倍两次真实对照）→ 一步之内的前向 / 损失 / 反向 / 更新 → 点任意一个格子看这个参数的一生：每一步的 w、梯度、m、v、Δw，链式法则把它的梯度拆成 64 项“输入 × 上游梯度”，AdamW 算式全是真实数字
+- **玻璃小模型**（默认的第一章）：小到 **2,928 个参数每个都是一个方块**的 Transformer（嵌入 → 双头注意力 + RoPE → SwiGLU，输出层共用嵌入），在 CPU 上真实训练 200 步学李白《静夜思》，逐数记录。和推理页一样是一台 **3D 机器**：看着一批批字块从语料轮进料、青色脉冲沿残差光柱往上走（前向，每块面板的输出激活一列列亮起）、顶上的概率柱升起、玫红脉冲倒流回来（反向，面板按真实 |∂L/∂w| 发光）、每个方块按真实 Δw 顶出 / 沉下（更新）；＋ 一路拆到一层、一块矩阵、一个方块：点任意一个方块看这个参数的一生——每一步的 w、梯度、m、v、Δw，它在前向里乘了谁，链式法则把它的梯度拆成 64 项“输入 × 上游梯度”，AdamW 算式全是真实数字
 - 第二章放大：从零训练一个和 Qwen3 **同构**的唐宋诗小模型：664 万参数、4,000 步，在一块 RTX 5090 上真实跑完
 - 损失 / 学习率 / 梯度范数，此刻写的诗，没见过的《登鹳雀楼》逐字概率，注意力头，嵌入 PCA，损失地形
 - 在 **Qwen3-0.6B** 上真实走三步全参数 SFT，回答的损失 5.02 → 1.38 → 0.52 → 0.011
@@ -317,28 +317,34 @@ flowchart TB
 | 单步进入 / 跳出 | ＋ −（推理页舞台上也可以点物体直接跳过去） |
 | 倍速 | 1–6 键，0.25× – 8× |
 | 自由移动（推理页 3D 舞台） | 左键拖动旋转，右键 / Shift 拖动平移，滚轮推进（到头会穿过去），WASD 移动，Q/E 升降，双击飞到物体跟前，F 回到跟随视角 |
-| 自由移动（训练页 2D 舞台） | 拖动平移，滚轮或双指缩放，双击放大，点卡片飞过去 |
+| 自由移动（训练页玻璃小模型的 3D 机器） | 同推理页：左键拖动旋转，右键 / Shift 拖动平移，滚轮推进，WASD 移动，Q/E 升降，双击飞到面板跟前，F 回到跟随；点一个方块看这个参数的一生 |
+| 自由移动（训练页另外两章的 2D 舞台） | 拖动平移，滚轮或双指缩放，双击放大，点卡片飞过去 |
 | 调整面板宽度 | 拖动左侧聊天栏、右侧调试器的边缘；双击恢复默认，宽度会记住（手机上不能拖） |
 | 开车（世界模型页） | A / D（D1 播放时 ← → 也行），手机上按住屏幕下方的 ◀ ▶；O 睁眼 / 闭眼，R 把梦拉回真实，N 新的一局；拖 32 根潜变量柱子直接改梦 |
 
 </details>
 
 <details>
-<summary><b>训练页的深度</b>（D0–D4）</summary>
+<summary><b>训练页的深度</b>（玻璃小模型 D0–D5，另外两章 D0–D4）</summary>
 
 顶部三章（参照世界模型页的章节分段按钮）：**玻璃小模型**（默认）、**放大：从零预训练**（唐宋诗小模型）、**真实模型：微调**（Qwen3-0.6B）。网址加 `?chapter=tiny` / `?chapter=qwen` 直接进后两章。
 
-第一章 · 玻璃小模型（`js/glass/`）：
+第一章 · 玻璃小模型（数据和讲解在 `js/glass/`，3D 舞台在 `js/glass3d/`，引擎和推理页共用 `js/stage/engine.js`）：
+
+**3D 机器怎么看**（`js/glass3d/layout.js`）：左边一列是**残差流**——第 0 段（固定样例“举头望明月，低头”）的 8 个位置各一根光柱，从托盘里的字块一直通到最后的 RMSNorm，柱子上三个“窗口”显示这里的残差 h₀ / h₁ / h₂（16 维 × 8 个位置）；左下角是**语料轮**（《静夜思》首尾相接的 25 个字）和**托盘**（这一步的 8 段 × 8 个字，最前一排是第 0 段，错开一位的答案排在更前面）。右边按层摆开 **2,928 个参数方块**：最下面 E [20 × 16]，注意力一层 γ₁、W_q / W_k / W_v、W_o，前馈一层 γ₂、W_gate / W_up、W_down，最上面 γ_f 和 Eᵀ（和最下面的 E 是同一张表，画成镜像，不另算参数），再往上是 20 个字 × 8 个位置的**概率架**和损失管。每个方块的颜色是数值（发散色：负蓝、正琥珀、零暗，色标随训练跟着变），厚度是 |w|（满格固定在训练结束时的量级，所以看得出越练越厚），面板形状就是矩阵的真实尺寸；矩阵按 y = x · W 摆：输入激活竖着贴在左边（和 W 的行对齐），输出激活横着贴在上面（和 W 的列对齐），都是第 0 段的真实数值。
+
+**一步训练在机器上**（全部来自记录）：进料——这一步的 8 段从轮子上切下来（彩色弧线），字块飞进托盘；前向——青色光环沿 8 根光柱往上走，每经过一块面板，扫描线扫过它的列、上面的输出激活一列列亮起；概率架上的柱子升起，绿框是正确答案；损失——每个位置的 −ln p 立起来，再平均成损失管；反向——玫红光环往下倒流，激活换成它们的梯度（玫红正、紫负），每块面板按自己真实的 |∂L/∂w| 发光（满格 = 这块里第 99 百分位），光环大小是每个位置 ‖∂L/∂h‖；更新——每个方块按真实 Δw 往前顶出（Δw > 0）或往后沉下（一个 lr 约一格，紫光越亮挪得越多），再落到新值。悬停任意方块看 w、∂L/∂w、Δw、m、√v；悬停激活看数值和梯度；点一个方块直接进 D5。左上角的监视器是训练曲线（D1 可按住拖动换帧）。
 
 | 深度 | 看到什么 | 每一步是什么 |
 | :-- | :-- | :-- |
-| **D0** 初始化 | 全部 11 个张量按结构摆开的热力图（发散色：负蓝、正琥珀、零暗）；参数清单；真实的 2,880 个初始值的直方图和 N(0, 0.02²) 曲线；三次真实训练的损失（正态 / 全零 / 放大 50 倍），全景图跟着换成全零、放大 50 倍的初始值 | 整个模型 / 初始值的分布 / 为什么要随机 / 为什么要小 |
-| **D1** 训练全程 | 全部权重随步数变（两帧之间插值；可切“数值 w / 变化 w − w₀”、“色标跟着变 / 固定”；每个张量的名字下面是这一步流到它的梯度长度 ‖∂L/∂W‖）；每一步的损失曲线（可拖动，标出全零对照的平线）；固定样例“举头望明月，低头”每个位置的正确答案概率和第一名；两个注意力头；嵌入表各行的余弦相似度 | 每一帧（76 帧，前 50 步每步一帧） |
-| **D2** 一步之内 | 一张从上往下的“玻璃计算图”：最上面是这一步的 8 段批次（25 字的圈 + 每段的输入 / 目标），往下每行一个算子——左边算式、中间第 0 段的真实激活、右边流到这里的梯度、最右这一行用到的参数；前向一行行亮起、反向梯度从下往上一行行出现（参数换成 ∂L/∂W）、更新时参数先显示 Δw（色标 ±lr）再变成新值；镜头跟着正在算的那一行走 | ① 取批次 ② 前向 ③ 损失 ④ 反向 ⑤ 更新（走完进入下一帧） |
-| **D3** 拆开环节 | 同一张图，逐个算子：查嵌入表 / RMSNorm / q k v / 注意力 / W_o + 残差 / RMSNorm / SwiGLU / W_down + 残差 / 最后的 RMSNorm / logits → 概率；损失逐个位置；反向逐个算子（每步一句链式法则：上游梯度 × 本层的局部导数）；更新先裁剪，再一个张量一个张量地更新 | 子步骤 |
-| **D4** 一个参数 | 点任意一个格子（任何深度都行）就到这里：它在张量里的位置（可换）；从初始化到训练结束每一帧的 w、∂L/∂w、m、√v、Δw；**梯度从哪来**：第 0 段 8 个位置逐项列出“输入 × 上游梯度”（E 分输入、输出两路，γ 是归一化后的值 × 梯度），其余 7 段合成一项，加起来等于记录的梯度；**AdamW 算式**：g → m → v → 偏差校正 → Δw → 写回，最后和记录的下一步 / Δw 对一遍 | 反向：每个参数张量的“梯度从哪来”；更新：每个张量 6 小步 |
+| **D0** 初始化 | 机器的“出厂状态”：2,928 个方块是真实的初始值（N(0, 0.02²)，γ = 1），换成全零、放大 50 倍时方块跟着变平 / 变满；底部算式板是真实的 2,880 个初始值的直方图和三次真实训练的损失（正态 / 全零 / 放大 50 倍） | 整个模型 / 初始值的分布 / 为什么要随机 / 为什么要小 |
+| **D1** 训练全程 | 整台机器，一帧一拍：进料 → 前向 → 损失 → 反向 → 更新；机器一批批吃数据，方块越练越厚、图案越来越清楚，顶上的概率柱慢慢集中到绿框；监视器上损失往下走。第 50 步以后帧之间隔 5 / 10 步，托盘旁和监视器上会标出“和上一帧隔几步”，一拍的末尾插值到下一帧 | 每一帧（76 帧，前 50 步每步一帧） |
+| **D2** 一步之内 | 同一台机器，镜头跟着正在算的那一层走：取批次（轮子 → 托盘、错开一位）、前向（一层层往上）、损失（从上往下看概率架）、反向（一层层往下）、更新（整台机器同时顶出 / 沉下） | ① 取批次 ② 前向 ③ 损失 ④ 反向 ⑤ 更新（走完进入下一帧） |
+| **D3** 一层之内 | 逐个算子：查嵌入表（8 束光从字块射向 E 里那一行）/ RMSNorm / q k v / 注意力（两个头的 8 × 8 注意力图）/ W_o + 残差 / RMSNorm / SwiGLU / W_down + 残差 / 最后的 RMSNorm / logits → 概率；损失逐个位置；反向逐个算子（调试器里每步一句链式法则）；更新先裁剪，再一个张量一个张量地更新 | 子步骤 |
+| **D4** 一块矩阵 | 镜头推到一块面板跟前，看得清每个方块：前向是“输入 × 这块矩阵 → 输出”（扫描线一列列扫过），反向是它的梯度热力，更新是 Δw → 新值；悬停看每个数 | 有参数的算子拆成每块矩阵（q k v 拆成 W_q / W_k / W_v，SwiGLU 拆成 W_gate / W_up） |
+| **D5** 一个参数 | 点任意一个方块（任何深度都行）就到这里：镜头推到这个方块，框出它乘到的那一行输入、那一列输出；底部算式板：**它乘了谁**（前向：第 0 段 8 个位置各一项“输入 × 它”，占这一格输出的几成）、**梯度从哪来**（第 0 段 8 项“输入 × 上游梯度”，其余 7 段合成一项，加起来等于记录的梯度；E 分输入、输出两路，γ 是归一化后的值 × 梯度）、**AdamW 算式**（g → m → v → 偏差校正 → Δw → 写回，和记录的下一步 / Δw 对一遍），旁边是它从初始化到训练结束每一帧的 w、∂L/∂w、m、√v、Δw | 前向：它乘了谁；反向：梯度从哪来；更新：每个张量 6 小步 |
 
-配色沿用站里的算式板：输入蓝、权重紫、乘积橙、结果青；梯度用玫红。暂停时单步过去，这一步的动画也会自己播一遍再停住。
+配色沿用站里的算式板：输入蓝、权重紫、乘积橙、结果青；梯度用玫红。暂停时单步过去，这一步的动画也会自己播一遍再停住。手机上调试器默认收起，监视器和算式板放在顶部。
 
 第二、三章：
 
@@ -488,7 +494,8 @@ llm-blackbox/
 │   │   │                    micro 矩阵乘法显微镜，board D6 / D7 的算式板
 │   │   └── vendor/three/    自托管的 Three.js r186
 │   ├── data/                推理页数据：qNN.json + qNN.bin、qNN/Lxx.json.gz、weights.bin
-│   ├── train/               训练页：2D 画布舞台（js/stage.js）和各层视图（js/scenes/）；玻璃小模型一章在 js/glass/
+│   ├── train/               训练页：玻璃小模型一章是 3D 机器（js/glass3d/，引擎共用 js/stage/engine.js；数据和讲解在 js/glass/），
+│   │                        另外两章是 2D 画布舞台（js/stage.js）和各层视图（js/scenes/）
 │   ├── multimodal/          多模态页：3D 舞台（js/scene.js）和图像监视器（js/monitor.js）
 │   ├── agent/               智能体页：编辑器 / 终端回放（js/screen.js）和循环 / 上下文视图
 │   ├── learn/               延伸学习页：路线图、资源库、术语表、动手试试（data/*.json、snippets/）
@@ -565,15 +572,15 @@ python tools/train/split_data.py --from-git <提交>   # 只重新切分：从�
 ```
 
 <details>
-<summary><b>训练页的数据拆分与按需载入</b>（首屏只取 31 KB）</summary>
+<summary><b>训练页的数据拆分与按需载入</b>（首屏数据只取 31 KB）</summary>
 
-唐宋诗小模型和 Qwen3 的导出脚本最后都交给 `tools/train/split_data.py`，把数据拆成“首屏小文件 + 按需分块”，写完再读回来和原始数组逐字节、和元数据逐个数核对（只重新排布，不改任何数值）；玻璃小模型的 `glassbox.py` 用同一种分块格式，写完同样读回来逐字节核对。全部在 `public/train/data/`，gzip 后合计约 3.95 MB（玻璃小模型 2.79 MB）。后台预取先取玻璃小模型（权重块按播放顺序，再每帧块），另外两章的首屏数据到了以后排在后面：
+唐宋诗小模型和 Qwen3 的导出脚本最后都交给 `tools/train/split_data.py`，把数据拆成“首屏小文件 + 按需分块”，写完再读回来和原始数组逐字节、和元数据逐个数核对（只重新排布，不改任何数值）；玻璃小模型的 `glassbox.py` 用同一种分块格式，写完同样读回来逐字节核对。全部在 `public/train/data/`，gzip 后合计约 3.95 MB（玻璃小模型 2.79 MB）。后台预取先取玻璃小模型（按播放顺序：每 9 帧的权重块后面跟着这 9 帧的每帧块），另外两章的首屏数据到了以后排在后面：
 
 | 文件 | 内容 | 什么时候取 | 大小（gzip） |
 | --- | --- | --- | --- |
 | `glass.json` + `glass.bin` | 玻璃小模型：配置、语料、核对结果；每一步的损失 / 25 段平均损失 / 学习率 / 梯度范数（总的和 11 个张量各自的）/ 裁剪系数 / 批次起点；初始化时的全部参数（float32）；全零、放大 50 倍两次对照的损失曲线和初始值 | 首屏 | 2 + 29 KB |
 | `glass/w0…8.bin` | 每 9 帧一块：全部参数（float16，沿帧存比特模式的差）、固定样例的预测概率、两个注意力头、−ln p | 进入训练全程、播放或拖到这一段 | 每块约 42 KB |
-| `glass/f00…75.bin` | 每帧一块：全部梯度、更新前的 m 和 √v、这一步的 Δw（按张量缩放的 float16）、第 0 段每层的激活和激活的梯度 | 进入一步之内；“一个参数”的曲线要用全部帧（随到随画） | 每块约 31 KB |
+| `glass/f00…75.bin` | 每帧一块：全部梯度、更新前的 m 和 √v、这一步的 Δw（按张量缩放的 float16）、第 0 段每层的激活和激活的梯度 | 进入训练全程（3D 机器每一拍都走一遍前向 / 反向 / 更新），播放时预取后面几帧；“一个参数”的曲线要用全部帧（随到随画） | 每块约 31 KB |
 | `glass/exact.bin` | 三个 RMSNorm γ 和嵌入表里“月”那一行，每一步的 w、g、m、v（float32）、学习率（float64）、裁剪系数 | 看“一个参数”时 | 160 KB |
 | `tiny.json` + `tiny.bin` | 元数据（配置、语料、词表、41 个检查点的标量和生成的诗）、每一步的损失 / 学习率 / 梯度范数、批次第 0 行的字、损失地形 | 首屏 | 43 + 40 KB |
 | `qwen.json` | Qwen3 的对话、逐词元概率与前 5 名、两种损失、DPO、改动统计 | 首屏 | 10 KB |
@@ -586,7 +593,7 @@ python tools/train/split_data.py --from-git <提交>   # 只重新切分：从�
 
 页面（`js/data.js` 的 `Loader`、`js/main.js` 的 `plan()` / `planGlass()`）每帧算出当前画面要用的分块：这一屏要用的立即取，播放方向上后几个检查点、相邻检查点、往下一层要用的排队预取（同时最多 4 个）；首屏字体下完后在浏览器空闲时一块一块地后台预取（省流量模式 / 2G 不预取），约 10 秒（8 Mbps）取完。数据没到时：D1 的卡片单独显示载入占位，或者先拿最近的已到检查点顶上（调暗并标注是第几步）；D2–D4 整屏先显示最近的已到检查点并在顶部标注；播放时缺块就原地等到了再走；提示都延迟 0.25 秒再淡入，数据很快到时不会闪。失败后自动重试（间隔从 4 秒翻倍到 30 秒）。
 
-在本地模拟 8 Mbps / 60 ms（冷缓存）：首屏从 2.2 秒、1.9 MB（其中数据 1.1 MB）降到约 0.7 秒、0.25 MB（数据 93 KB）；首屏后立刻进入各层，第一次要等的分块约 0.1–0.15 秒，在首屏停留几秒后基本不用等。
+在本地模拟 8 Mbps / 60 ms（冷缓存）：首屏从 2.2 秒、1.9 MB（其中数据 1.1 MB）降到约 0.7 秒、0.25 MB（数据 93 KB）；首屏后立刻进入各层，第一次要等的分块约 0.1–0.15 秒，在首屏停留几秒后基本不用等。玻璃小模型改成 3D 机器以后，首屏多了自托管的 Three.js 和引擎（gzip 后约 220 KB，和推理页是同一份文件、同一个缓存），`index.html` 里用 modulepreload 和脚本一起并行取。
 
 </details>
 

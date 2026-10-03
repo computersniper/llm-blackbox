@@ -230,6 +230,57 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 2px; bor
 .linkish { background: none; border: 0; color: var(--dim); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 13px; }
 .noscript { position: fixed; inset: 0; display: grid; place-items: center; z-index: 100; }
 
+/* ---------------- 玻璃小模型的 3D 舞台（js/glass3d/；引擎和推理页共用） ---------------- */
+
+.gl3 { position: absolute; inset: 0; }
+.gl3 canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+.gl3.grabbing canvas { cursor: grabbing; }
+body.g3d .gl { display: none; }
+body:not(.g3d) .gl3, body:not(.g3d) .ghud, body:not(.g3d) .gboard { display: none; }
+/* 标签层自成一层（z-index）：CSS2DRenderer 给每个标签设的排序 z-index 不会压过调试器 / 浮层；和 ../../css/app.css 同一条 */
+.css2d { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.stage-hint .h3d, .stage-hint .h2d { display: contents; }
+body.g3d .stage-hint .h2d, body:not(.g3d) .stage-hint .h3d { display: none; }
+
+/* 3D 标签（CSS2D）：和推理页同一套样式 */
+.lbl { pointer-events: none; font-family: var(--sans); font-size: 11.5px; color: var(--ink2); white-space: nowrap; padding: 2px 8px; border-radius: 6px; background: rgba(6, 12, 24, .72); border: 1px solid var(--line2); transition: opacity .4s; }
+.lbl small { font-family: var(--mono); color: var(--dim); font-size: 10px; margin-left: 4px; }
+.lbl b { color: var(--ink); font-weight: 600; }
+.lbl.part { font-size: 11px; color: var(--ink); border-color: rgba(94, 240, 212, .3); font-family: var(--mono); }
+.lbl.part.on { border-color: var(--amber); }
+.lbl.num { font-family: var(--mono); font-size: 10.5px; padding: 1px 6px; color: var(--ink2); }
+.lbl.big { font-family: var(--mono); font-size: 15px; padding: 3px 10px; color: #fff; border-color: rgba(255, 182, 92, .5); }
+.lbl.big small { display: block; margin: 0; font-size: 9.5px; }
+.lbl.title { font-family: var(--serif); font-weight: 600; font-size: 15px; color: var(--ink); background: none; border: 0; text-shadow: 0 2px 10px #000; }
+.lbl.hint { font-size: 11px; color: var(--dim); background: none; border: 0; text-shadow: 0 1px 6px #000; }
+.lbl.gc { color: var(--violet); border-color: rgba(179, 157, 255, .45); }
+.lbl.gt { color: var(--violet); border-color: rgba(179, 157, 255, .4); }
+.lbl.gsel { color: var(--amber); border-color: rgba(255, 182, 92, .6); font-size: 11.5px; }
+.lbl.gsel b { color: #fff; }
+
+/* 监视器（左上角）和算式板（底部） */
+.ghud { position: absolute; z-index: 4; top: 64px; left: 14px; width: 330px; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: boardin .5s var(--ease); }
+.ghud.compact { width: 260px; }
+.ghud canvas, .gboard canvas { display: block; }
+/* 算式板在底部时，知识碎片的提示挪到左上角，免得压住算式（窄屏上算式板在顶部，提示照旧在下面） */
+@media (min-width: 901px) { body.g-board #toasts { bottom: auto; top: 128px; } }
+.gboard { position: absolute; z-index: 4; left: 14px; right: calc(var(--dbg-w) + 28px); bottom: 104px; border-radius: 16px; overflow: hidden auto; max-height: calc(100% - 200px); box-shadow: 0 18px 44px rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); scrollbar-width: thin; scrollbar-color: var(--line2) transparent; animation: boardin .5s var(--ease); }
+.dbg.folded ~ .gboard { right: 14px; }
+@keyframes boardin { from { opacity: 0; transform: translateY(10px); } }
+/* 3D 舞台缺数据时：顶部一个小提示（延迟一点再淡入，数据很快到时不会闪） */
+.wait-pill { position: absolute; z-index: 6; left: calc((100% - var(--dbg-w) - 28px) / 2); top: 14px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--panel); border: 1px solid rgba(255, 182, 92, .45); color: var(--ink2); font-size: 12.5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.wait-pill.on { opacity: 1; }
+.wait-pill .spin { width: 14px; height: 14px; border-width: 2px; }
+@media (max-width: 900px) {
+  .ghud { top: 56px; left: 8px; right: 8px; width: auto; }
+  .gboard { top: 56px; bottom: auto; left: 8px; right: 8px; max-height: 44vh; border-radius: 14px; }
+  .dbg.folded ~ .gboard { right: 8px; }
+  .wait-pill { left: 50%; top: 100px; }
+  .lbl { font-size: 10.5px; padding: 1px 6px; }
+  .lbl.part { font-size: 10px; }
+  .lbl small { font-size: 9px; }
+}
+
 /* ---------------- 窄屏 ---------------- */
 
 @media (max-width: 1180px) {
