@@ -24,6 +24,8 @@ const ROWS = [
   { id: 'logits', vals: [['logits', 20], ['probs', 20]], grads: [['logits', 20]], ws: ['E'] },
 ];
 const ROW_OF = new Map(ROWS.map((r, i) => [r.id, i]));
+// 一步之内（D2）的“更新”从上往下扫过有参数的行（AdamW 其实是同时更新全部参数，这里按行依次展示）
+const UPD_ROWS = ['emb', 'norm1', 'qkv', 'wo', 'norm2', 'ffn', 'wd', 'normf'];
 
 export const OP_NAME = isEn
   ? { emb: 'Embedding lookup', norm1: 'RMSNorm ①', qkv: 'q, k, v', attn: 'Attention (2 heads)', wo: 'W_o + residual', norm2: 'RMSNorm ②', ffn: 'SwiGLU', wd: 'W_down + residual', normf: 'Final RMSNorm', logits: 'logits → probabilities' }
@@ -32,6 +34,19 @@ const FORMULA = {
   emb: 'h₀ = E[x]', norm1: 'n₁ = h₀ / rms(h₀) ⊙ γ₁', qkv: 'q,k,v = n₁·W_q, n₁·W_k, n₁·W_v', attn: 'a = softmax(q·kᵀ/√8)　ao = a·v',
   wo: 'o = ao·W_o　h₁ = h₀ + o', norm2: 'n₂ = h₁ / rms(h₁) ⊙ γ₂', ffn: 'act = silu(n₂·W_gate) ⊙ (n₂·W_up)', wd: 'f = act·W_down　h₂ = h₁ + f',
   normf: 'n_f = h₂ / rms(h₂) ⊙ γ_f', logits: 'logits = n_f·Eᵀ　p = softmax',
+};
+// 反向时每一行的链式法则（上游梯度 × 本层的局部导数）
+const BWD_FORMULA = {
+  logits: '∂L/∂logits = (p − y) / 64\n∂L/∂n_f = ∂L/∂logits · E',
+  normf: '∂L/∂h₂ = ∂L/∂n_f × RMSNorm′',
+  wd: '∂L/∂act = ∂L/∂h₂ · W_downᵀ\n∂L/∂W_down = actᵀ · ∂L/∂h₂',
+  ffn: '∂L/∂n₂ = ∂L/∂gate · W_gateᵀ\n         + ∂L/∂up · W_upᵀ',
+  norm2: '∂L/∂h₁ += ∂L/∂n₂ × RMSNorm′',
+  wo: '∂L/∂ao = ∂L/∂h₁ · W_oᵀ\n∂L/∂W_o = aoᵀ · ∂L/∂h₁',
+  attn: '∂L/∂v = aᵀ · ∂L/∂ao\n∂L/∂a = ∂L/∂ao · vᵀ',
+  qkv: '∂L/∂n₁ = Σ ∂L/∂(q,k,v) · Wᵀ\n∂L/∂W_q = n₁ᵀ · ∂L/∂q',
+  norm1: '∂L/∂h₀ += ∂L/∂n₁ × RMSNorm′',
+  emb: '∂L/∂E[x] += ∂L/∂h₀',
 };
 const NODE_LABEL = { h0: 'h₀', n1: 'n₁', q: 'q', k: 'k', v: 'v', att0: L('注意力 · 头 0', 'attn · head 0'), att1: L('注意力 · 头 1', 'attn · head 1'), ao: 'ao', o: 'o', h1: 'h₁', n2: 'n₂', gate: 'gate', up: 'up', act: 'act', f: 'f', h2: 'h₂', nf: 'n_f', logits: 'logits', probs: L('概率 p', 'probabilities p') };
 const BWD_NOTE = { h1: L('∂L/∂h₁（= ∂L/∂o）', '∂L/∂h₁ (= ∂L/∂o)'), h2: L('∂L/∂h₂（= ∂L/∂f）', '∂L/∂h₂ (= ∂L/∂f)') };
@@ -81,8 +96,7 @@ export class GStep {
       return { x: -12, y: r.y - 30, w: this.W + 24, h: this.lossRow.y + this.lossRow.h - r.y + 40 };
     }
     if (!s.sub) {
-      // 一步之内（D2）：前向 / 反向时镜头跟着正在算的那一行走（看得清真实数值）；更新时看全部参数
-      if (s.ph === 'upd') return { x: -12, y: this.batch.y + this.batch.h - 10, w: this.W + 24, h: this.lossRow.y + this.lossRow.h - this.batch.y - this.batch.h + 20 };
+      // 一步之内（D2）：前向 / 反向 / 更新时镜头跟着正在算的那一行走（看得清真实数值）
       const yc = this.followY({ ...st, p: this._pk === `${st.depth}:${st.k}:${st.i}` && this._ap != null ? this._ap : st.p });
       const h = P ? 560 : 640;
       return { x: -12, y: yc - h / 2, w: this.W + 24, h };
@@ -98,10 +112,10 @@ export class GStep {
 
   // 前向 / 反向进行到的位置（世界坐标的 y），在相邻两行之间连续移动
   followY(st) {
-    const s = st.step, n = ROWS.length;
+    const s = st.step, n = s.ph === 'upd' ? UPD_ROWS.length : ROWS.length;
     const x = clamp(st.p * n * 1.05, 0, n - 0.001);
     const i = Math.floor(x), f = x - i;
-    const rowIdx = (j) => (s.ph === 'bwd' ? ROW_OF.get(BWD_OPS[j]) : j);
+    const rowIdx = (j) => (s.ph === 'bwd' ? ROW_OF.get(BWD_OPS[j]) : s.ph === 'upd' ? ROW_OF.get(UPD_ROWS[j]) : j);
     const c = (j) => { const r = this.rows[rowIdx(Math.min(n - 1, j))]; return r.y + r.h / 2; };
     return c(i) + (c(Math.min(n - 1, i + 1)) - c(i)) * f;
   }
@@ -140,12 +154,26 @@ export class GStep {
     text(g, L(`GLASS MODEL · 第 ${t + 1} 步的里面 · 全部是真实数值`, `GLASS MODEL · INSIDE STEP ${t + 1} · ALL REAL NUMBERS`), 0, 16, { size: 10, kind: 'mono', color: COL.dim });
     const sub = s.sub ? (s.ph === 'fwd' || s.ph === 'bwd' ? ` · ${OP_NAME[s.sub]}` : s.ph === 'upd' ? (s.sub === 'clip' ? L(' · 梯度裁剪', ' · gradient clipping') : ` · ${TENSOR_LABEL[s.t]}`) : s.ph === 'loss' ? (s.sub === 'mean' ? L(' · 平均', ' · mean') : L(` · 位置 ${s.i}`, ` · position ${s.i}`)) : s.sub === 'pick' ? L(' · 取 8 段', ' · pick 8 windows') : L(' · 错开一位', ' · shift by one')) : '';
     text(g, `${phName[s.ph]}${sub}`, 0, 48, { size: P ? 19 : 26, kind: 'serif', weight: 900, color: COL.ink, max: this.W });
+    this.cue = null;
+    // ⑥ 更新走完：回到下一步（下一帧的批次）——画在可视区的顶上（镜头这时在下面几行）
+    if (s.ph === 'upd' && !s.sub && st.p > 0.78 && k < D.NF - 1) {
+      const nt = D.FR[k + 1] + 1;
+      this.cue = { a: clamp((st.p - 0.78) / 0.15, 0, 1), s: L(`⑥ 更新完了 → 回到下一步：第 ${nt} 步${nt - t - 1 > 0 ? `（中间 ${nt - t - 1} 步只记了损失）` : ''}`, `⑥ Update done → back to the next step: step ${nt}${nt - t - 1 > 0 ? ` (only the loss kept for the ${nt - t - 1} in between)` : ''}`) };
+    }
     this.drawBatch(g, st, env);
     const F = this.fwdState(st), B = this.bwdState(st);
     // 左边的残差主干：h₀ → h₁ → h₂
     this.drawSpine(g, st, env, F, B);
     this.rows.forEach((r, i) => this.drawRow(g, st, env, r, i, F, B));
     this.drawLoss(g, st, env, F, B);
+    if (this.cue) {
+      const v = env.vis, sz = 14 / Math.max(0.5, env.s) * 0.9, w = measure(g, this.cue.s, sz, 'sans', 600) + sz * 2.4, h = sz * 2.2;
+      const x = v.x + (v.w - w) / 2, y = v.y + 74 / env.s;   // 让开左上角的章节按钮
+      g.globalAlpha = this.cue.a;
+      rr(g, x, y, w, h, h / 2); g.fillStyle = 'rgba(10,17,31,0.94)'; g.fill(); g.strokeStyle = hexA(COL.amber, 0.7); g.lineWidth = 1.2 / env.s; g.stroke();
+      text(g, this.cue.s, x + w / 2, y + h * 0.66, { size: sz, color: COL.amber, weight: 600, align: 'center' });
+      g.globalAlpha = 1;
+    }
   }
 
   /* ---------------------------------------------------------------- 批次 */
@@ -263,8 +291,14 @@ export class GStep {
     // 左：名字和算式
     const lx = 6, ly = y + 16;
     text(g, OP_NAME[r.id], lx, ly, { size: P ? 14 : 15, kind: 'serif', weight: 600, color: isActive ? COL.ink : COL.ink2 });
-    if (P) text(g, FORMULA[r.id], lx + measure(g, OP_NAME[r.id], 14, 'serif', 600) + 10, ly, { size: 10, kind: 'mono', color: COL.dim, max: 380 - lx - measure(g, OP_NAME[r.id], 14, 'serif', 600) - 14 });
-    else wrap(g, FORMULA[r.id], lx, ly + 20, 160, 14, { size: 10.5, kind: 'mono', color: COL.dim });
+    // 反向走到这一行以后，左边的算式换成链式法则
+    const showBwdF = (bwdDone || bwdNow) && s.ph === 'bwd';
+    const fml = showBwdF ? BWD_FORMULA[r.id] : FORMULA[r.id];
+    const fcol = showBwdF ? COL.rose : COL.dim;
+    if (P) {
+      if (showBwdF) wrap(g, fml, lx, ly + 18, 360, 13, { size: 10, kind: 'mono', color: fcol });
+      else text(g, fml, lx + measure(g, OP_NAME[r.id], 14, 'serif', 600) + 10, ly, { size: 10, kind: 'mono', color: fcol, max: 380 - lx - measure(g, OP_NAME[r.id], 14, 'serif', 600) - 14 });
+    } else wrap(g, fml, lx, ly + 20, 168, 14, { size: 10.5, kind: 'mono', color: fcol });
     // 中：值
     const vy = P ? y + 42 : y + 30;
     const showVal = fwdDone || fwdNow;
@@ -342,7 +376,11 @@ export class GStep {
       // 这一格显示什么
       // 前向：数值 w；反向走到这一行以后：梯度 g；更新：这一步的 Δw → 更新后的值（D3 按张量依次来，还没轮到的仍显示梯度）
       let mode = 'w';
-      if (upd && !s.sub) mode = st.p < 0.55 ? 'dw' : 'w1';
+      if (upd && !s.sub) {
+        const x = st.p * UPD_ROWS.length * 1.05, cur = Math.floor(x), f = x - cur;
+        const ui = r.id === 'logits' ? 0 : UPD_ROWS.indexOf(r.id);
+        mode = ui < cur ? 'w1' : ui === cur ? (f < 0.5 ? 'dw' : 'w1') : 'g';
+      }
       else if (upd && s.sub === 't') mode = s.t === name && !(name === 'E' && r.id === 'logits') ? (st.p < 0.6 ? 'dw' : 'w1') : UPD_TENSORS.indexOf(s.t) > UPD_TENSORS.indexOf(name) ? 'w1' : 'g';
       else if (upd && s.sub === 'clip') mode = 'g';
       else if (bwdDone) mode = 'g';
