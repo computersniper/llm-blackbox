@@ -8,7 +8,7 @@
 import { L } from './lang.js';
 
 // float16 → float32（不依赖 Float16Array）
-const f16tab = (() => {
+export const f16tab = (() => {
   const t = new Float32Array(65536);
   for (let h = 0; h < 65536; h++) {
     const s = h & 0x8000 ? -1 : 1, e = (h >> 10) & 0x1f, m = h & 0x3ff;
@@ -17,10 +17,10 @@ const f16tab = (() => {
   return t;
 })();
 
-const SIZE = { uint8: 1, int8: 1, uint16: 2, float16: 2, float32: 4 };
+const SIZE = { uint8: 1, int8: 1, uint16: 2, float16: 2, float32: 4, float64: 8 };
 
 // buf 里从 base + spec.offset 开始的一个数组。shuffle：按字节分面存放（先放所有数的第 0 个字节……），先拼回原来的字节顺序
-function view(buf, spec, base = 0) {
+export function view(buf, spec, base = 0) {
   const n = spec.shape.reduce((a, b) => a * b, 1);
   const size = SIZE[spec.dtype];
   if (!size) throw new Error(`dtype ${spec.dtype}`);
@@ -36,6 +36,7 @@ function view(buf, spec, base = 0) {
     case 'int8': return new Int8Array(buf, off, n);
     case 'uint16': return new Uint16Array(buf, off, n);
     case 'float32': return new Float32Array(buf, off, n);
+    case 'float64': return new Float64Array(buf, off, n);
     case 'float16': {
       const raw = new Uint16Array(buf, off, n);
       const out = new Float32Array(n);
@@ -47,7 +48,7 @@ function view(buf, spec, base = 0) {
 }
 
 // 首屏文件预先 gzip 过，浏览器里用 DecompressionStream 解开；不支持时退回未压缩版本
-async function fetchData(url) {
+export async function fetchData(url) {
   if (typeof DecompressionStream !== 'undefined') {
     try {
       const r = await fetch(`${url}.gz`);
@@ -68,11 +69,11 @@ async function fetchGz(url) {
   return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
 }
 
-const decodeJSON = (buf) => JSON.parse(new TextDecoder().decode(buf));
+export const decodeJSON = (buf) => JSON.parse(new TextDecoder().decode(buf));
 const json = async (url) => decodeJSON(await fetchData(url));
 
 // .bin 分块：u32 头长度 + JSON 头 {bin, json} + 补齐到 8 字节 + 数组
-function readChunk(buf) {
+export function readChunk(buf) {
   const h = new DataView(buf).getUint32(0, true);
   const head = decodeJSON(new Uint8Array(buf, 4, h));
   const base = 4 + h + ((8 - ((4 + h) % 8)) % 8);

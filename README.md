@@ -32,7 +32,7 @@
 
 </div>
 
-> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), a **coding agent** (Qwen3-4B recorded in a real sandbox), and a **world model** (a small V + M model in the style of Ha & Schmidhuber's *World Models*, trained here and run live in the browser: drive inside its dream next to the real game). Pure static site, no build step, Three.js r186. The whole site is bilingual: switch **中 / EN** in the top bar, or open [caijiechao.com/blackbox/?lang=en](https://caijiechao.com/blackbox/?lang=en). In English mode the chats are separate real runs on English questions and tasks, not translations of the Chinese ones. A [3-minute English video](#推理视频) walks through one full inference step by step.
+> **In English** — *Black Box* is an interactive, debugger-style walkthrough of a real open-source LLM. Chat with **Qwen3-0.6B**, then press **＋** to step *into* it: from a closed box, through 28 transformer layers and their operators, down to a single multiply-add and the 16 bits of one bf16 weight. Every number on screen comes from an offline run of the real model; the browser only replays it. Sibling pages cover **training** (a glass-box Transformer so small that all 2,928 of its parameters are drawn on screen — watch its initialization, every step’s forward pass, backward pass and AdamW update, and the life of any single parameter; then a tiny Qwen3-style poetry model trained from scratch, plus three real SFT steps on Qwen3-0.6B), **vision** (where Qwen3-VL-2B looks while it writes each word), a **coding agent** (Qwen3-4B recorded in a real sandbox), and a **world model** (a small V + M model in the style of Ha & Schmidhuber's *World Models*, trained here and run live in the browser: drive inside its dream next to the real game). Pure static site, no build step, Three.js r186. The whole site is bilingual: switch **中 / EN** in the top bar, or open [caijiechao.com/blackbox/?lang=en](https://caijiechao.com/blackbox/?lang=en). In English mode the chats are separate real runs on English questions and tasks, not translations of the Chinese ones. A [3-minute English video](#推理视频) walks through one full inference step by step.
 
 ## 五个页面
 
@@ -57,13 +57,14 @@
 </td>
 <td width="50%" valign="top">
 
-### [训练](https://caijiechao.com/blackbox/train/) · 从零预训练 + SFT
+### [训练](https://caijiechao.com/blackbox/train/) · 玻璃小模型 + 从零预训练 + SFT
 
 <img src="docs/images/train-pretrain.jpg" alt="训练页 D1 训练全程：唐宋诗小模型第 4000 步的仪表盘，损失曲线、生成的诗、留出诗的逐字概率、注意力头、嵌入地图、权重、损失地形">
 
 <sub>训练全程：唐宋诗小模型第 4,000 步的仪表盘</sub>
 
-- 从零训练一个和 Qwen3 **同构**的唐宋诗小模型：664 万参数、4,000 步，在一块 RTX 5090 上真实跑完
+- **玻璃小模型**（默认的第一章）：小到 **2,928 个参数全部画成热力图**的 Transformer（嵌入 → 双头注意力 + RoPE → SwiGLU，输出层共用嵌入），在 CPU 上真实训练 200 步学李白《静夜思》，逐数记录。看初始化（另有全零、放大 50 倍两次真实对照）→ 一步之内的前向 / 损失 / 反向 / 更新 → 点任意一个格子看这个参数的一生：每一步的 w、梯度、m、v、Δw，链式法则把它的梯度拆成 64 项“输入 × 上游梯度”，AdamW 算式全是真实数字
+- 第二章放大：从零训练一个和 Qwen3 **同构**的唐宋诗小模型：664 万参数、4,000 步，在一块 RTX 5090 上真实跑完
 - 损失 / 学习率 / 梯度范数，此刻写的诗，没见过的《登鹳雀楼》逐字概率，注意力头，嵌入 PCA，损失地形
 - 在 **Qwen3-0.6B** 上真实走三步全参数 SFT，回答的损失 5.02 → 1.38 → 0.52 → 0.011
 - 一路拆到一个数：一个位置的交叉熵、一层 7 个矩阵的梯度、一个权重的 AdamW 算式和 fp32 / bf16 比特
@@ -152,6 +153,7 @@
 
 - **真实推理**：推理页用 Qwen3-0.6B 的非思考模式（T=0.7 / top_k=20 / top_p=0.8，固定种子），连各温度下的概率、top-k / top-p 候选池和采样用的随机数都导出了，网页上的每一次抽签用的都是这些真实数值；多模态页贪心解码；智能体页用 Qwen3-4B-Instruct-2507，同样的采样参数。
 - **自己复现，和模型核对**：推理导出脚本自己复现一遍注意力（RMSNorm → RoPE → GQA），和模型输出的平均误差约 3×10⁻⁴；多模态脚本复现 ViT 的 qkv → 2D RoPE → softmax，平均相对误差约 4×10⁻³；训练脚本按公式重算 AdamW 的中间量，误差在 5 个 fp32 ulp 以内。
+- **玻璃小模型逐位核对**：导出脚本用导出的数值、按 PyTorch AdamW 同样的 float32 运算把 200 步 × 2,928 个参数共 585,600 次更新全部重算一遍，和记录的下一步**逐位一致**（最大误差 0）；链式法则的几处“上游梯度 × 局部导数”和 autograd 记录的激活梯度差在 10⁻⁹ 量级；页面上每个参数的 AdamW 算式都和记录的 Δw 对一遍（float16 记录，中位相对误差 2.5×10⁻⁴）。
 - **加得起来**：D6 算式板上，前 12 项加上“其余 N−12 项”的汇总，正好等于真实结果；D7 翻转一个比特，旧权重 → 新权重、旧输出 → 新输出都是精确重算的。
 - **说错也照录**：Qwen3-0.6B 只有 6 亿参数，偶尔会一本正经地说错，这也是真实的一部分；智能体每条轨迹录完都在沙箱里独立检查，没通过就换下一个随机种子重录，所有尝试（包括失败原因）写进 manifest，页面上如实显示。
 - **世界模型是自己训练、在浏览器里现场算的**：世界模型页的 V / M / C 是在本地 RTX 5090 上用 39 万帧真实游戏画面训练出来的，网页下载的就是这份权重，每一帧的梦都由浏览器里的 JS 前向现场算出（不是录像）。JS 前向和 PyTorch 用同一份 float16 权重逐元素核对：最大绝对误差 2.1×10⁻⁵（激活值最大约 43），梦见的画面（0–1）最大误差 2.6×10⁻⁶；“一次乘加”的算式板再用双精度把 n 项重新加一遍，和前向的值差在 10⁻⁶ 量级。游戏有 Python / JS 两份整数实现，60 局 9,370 帧逐像素一致。照论文原样的损失训练，VAE 会把抛锚车整个丢掉，所以重建误差里给抛锚车和小车的像素加了权重、KL 项乘 0.25——这些改动页面上和下文都写明了。
@@ -162,7 +164,7 @@
 flowchart TB
   subgraph OFF["① 离线：本地 GPU 跑真实模型"]
     X1["<b>推理</b> · Qwen3-0.6B<br/>tools/export_qwen.py"]
-    X2["<b>训练</b> · 唐宋诗小模型 + Qwen3-0.6B<br/>tools/train/*.py"]
+    X2["<b>训练</b> · 玻璃小模型（CPU）+ 唐宋诗小模型 + Qwen3-0.6B<br/>tools/train/*.py"]
     X3["<b>多模态</b> · Qwen3-VL-2B<br/>tools/multimodal/export_qwen3vl.py"]
     X4["<b>智能体</b> · Qwen3-4B + bwrap 沙箱<br/>tools/agent/record.py"]
     X5["<b>世界模型</b> · 自己训练的 V + M + C<br/>tools/world/train.py"]
@@ -208,11 +210,20 @@ flowchart TB
 <details>
 <summary><b>训练页怎么训的</b>（<code>tools/train/</code>）</summary>
 
-两段训练都是在本地 RTX 5090 上真实跑出来的，网页只回放导出的记录。
+三段训练都是真实跑出来的，网页只回放导出的记录：玻璃小模型在 CPU 上训练，另外两段在本地 RTX 5090 上。
+
+**玻璃小模型：每个参数都看得见**（`tools/train/glassbox.py`，第一章，也是训练页默认打开的那一章）
+
+- **模型**：自己用 PyTorch 写的迷你 Transformer，和站里的 Qwen3 同一家族：词嵌入 E [20 × 16] → 1 层（RMSNorm → 双头注意力，每头 8 维，RoPE θ = 10⁴，因果遮罩 → 残差 → RMSNorm → SwiGLU 16 → 32 → 16 → 残差）→ 最后的 RMSNorm → 乘 Eᵀ（输出层共用嵌入）；没有偏置。参数：E 320 + W_q / W_k / W_v / W_o 4 × 256 + W_gate / W_up 2 × 512 + W_down 512 + 3 个 RMSNorm γ 48 = **2,928 个**。矩阵一律按 [输入维 × 输出维] 存（y = x · W），网页上就这么画。
+- **语料**：李白《静夜思》20 个字（17 个不同的字 + ，。）加一个分隔符 ⏎，首尾相接成 25 个字的圈，词表 20 个字（按诗里第一次出现的顺序编号）。上下文 8：每一步取 8 段、每段 9 个字（输入 8 个，目标错开一位）；第 0 段固定是“举头望明月，低头思”（方便逐步对比，也是网页上逐层展开的那一段），其余 7 段的起点用种子 1 随机抽。只看前一个字时有 4 种字后面接什么是五五开（月→光 / ，、头→望 / 思、，→疑 / 低、。→举 / ⏎），要往回多看一两个字才分得清——这就是注意力要学的。
+- **训练**：初始化 N(0, 0.02²)（γ = 1，种子 0），AdamW（β = 0.9 / 0.95，ε = 10⁻⁸，权重衰减 0.1，γ 不衰减；`foreach=False`），峰值学习率 10⁻²、前 10 步线性预热、余弦退火到 10⁻³，梯度裁剪 1.0，**200 步**，CPU float32，约 1 秒。全部 25 段上的平均损失 3.013 → **0.059**（瞎猜是 ln 20 = 2.996）；固定样例 8 个位置猜对正确答案的概率从 4–6% 变成 97–100%，最后才稳下来的是“月→，”（走完 80 步时正确答案“，”只有 45%，第一名还是“光”；走完 150 步 93%）。训练后第二个“头”把 66% / 91% 的注意力（两个头）给了前面的“明”；嵌入表里诗中前后相邻的 24 对字，余弦相似度平均从 0.01 升到 0.44（其余字对平均 −0.12）——输出层共用 E，“下一个字”的向量被拉向“这个字”。
+- **对照**（同一模型、同样的批次、同样 200 步）：① **全零初始化**（γ 仍为 1）——前向每层都是 0，反向时误差乘上全零的权重也是 0，200 步里梯度范数始终为 0、参数一个都没动，损失一直 2.996；② **初始化放大 50 倍**（N(0, 1)）——第 1 步损失 7.67（比瞎猜还高，很有把握地猜错），200 步后 0.284，是正常初始化的 5 倍。
+- **记录**（`--work` 里的 `raw_*.npz` 是 float32 原始记录，约 17 MB）：每一步的批次、损失、全部 25 段上的平均损失、学习率、裁剪前的梯度范数（总的和每个张量各自的）、裁剪系数，全部参数、全部参数的梯度（裁剪前，即 ∂L/∂w）、AdamW 的 m / v、更新后的参数；第 0 段前向每一层的激活（h₀、n₁、q、k、v、两个头的注意力、ao、o、h₁、n₂、gate、up、act、f、h₂、n_f、logits、概率、−ln p，以及三个 RMSNorm 的 1/rms）和反向时每一层激活的梯度 ∂L/∂h。
+- **导出**（gzip 后共 2.79 MB）：前 50 步每步一帧，之后到第 150 步每 5 步一帧、再之后每 10 步一帧，加最后一步，共 **76 帧**；每帧有全部参数（float16）、全部梯度、更新前的 m 和 √v、这一步的 Δw（各按张量除以自己的最大值再存 float16，相对精度约 10⁻³）、第 0 段每层的激活和梯度；损失、学习率、梯度范数、批次每一步都有。三个 RMSNorm γ 和嵌入表里“月”那一行（共 64 个参数）**每一步**都另存 float32 原值（w、g、m、v），点到它们时 AdamW 算式能逐位对上；其余参数用帧里的 float16 记录，算式和记录的 Δw 相差约 0.03%。
+- **核对**（结果写进 `glass.json` 的 `check`）：① 只用导出文件里的 float32 原值，按 `torch.optim.AdamW` 同样的运算重算 64 个选中参数 × 200 步：w、m、v 和记录的下一步逐位一致（12,800 / 12,800，最大误差 0）；② 用原始记录对全部 2,928 个参数 × 200 步做同样的重算：585,600 / 585,600 逐位一致；③ 用网页上的 float16 数值按公式算 Δw，和导出的 Δw 比：|Δw| > lr / 100 的更新中位相对误差 2.5×10⁻⁴、99 分位 2.0×10⁻³，最大绝对误差 < 0.001 × lr；④ 用导出的 float16 参数在 numpy 里把第 0 段前向重算一遍：概率最大误差 5.3×10⁻⁴、注意力 6.1×10⁻⁴（用 float32 参数重算是 2.7×10⁻⁷）；⑤ 链式法则：∂L/∂logits = (p − 1{正确}) / 64、∂L/∂ao = ∂L/∂h₁ · W_oᵀ、∂L/∂act = ∂L/∂h₂ · W_downᵀ、∂L/∂n₂ = ∂L/∂gate · W_gateᵀ + ∂L/∂up · W_upᵀ、∂L/∂n_f = ∂L/∂logits · E，和 autograd 记录的值最大差 9.3×10⁻¹⁰。网页本身不跑前向，所有激活、梯度都是记录的；它只在“一个参数”里用记录的数值把 AdamW 算式和链式法则的乘积算出来展示，并和记录对照。
 
 **小模型：从零预训练**
 
-- **论文**：David Ha、Jürgen Schmidhuber，*[World Models](https://arxiv.org/abs/1803.10122)*（2018）。世界模型页的 V / M / C 结构、KL 容忍度、MDN-RNN、温度 τ、在梦里训练控制器都照这篇论文；游戏、数据和训练是本仓库自己做的。
 - **语料**：[chinese-poetry](https://github.com/chinese-poetry/chinese-poetry)（MIT 许可，诗歌本身属公有领域）的《全唐诗》《全宋诗》，取自提交 `b8594f8`。用 OpenCC 繁转简，只留“，。”交替的五言 / 七言绝句和律诗，去重，丢掉含低频字（出现不到 3 次）的诗：训练集 215,116 首 / 990 万字，验证集 4,390 首。《登鹳雀楼》被整首留出，训练时从没见过。
 - **模型**：transformers 的 `Qwen3ForCausalLM`，改小尺寸：6 层、隐藏维 256、4 个查询头 / 2 个键值头（GQA）、每头 64 维、q_norm / k_norm、RMSNorm、RoPE（θ = 10⁴）、SwiGLU 768、输入输出共享嵌入；字符级词表 7,478（含 `<|endoftext|>`），共 664 万参数。
 - **训练**：4,000 步 × 64 行 × 128 字（约 3,277 万字、3.3 轮），AdamW（β = 0.9 / 0.95，权重衰减 0.1，RMSNorm 不衰减），峰值学习率 3e-3、预热 200 步后余弦退火到 3e-4，梯度裁剪 1.0；bf16 autocast 前向，fp32 主权重。训练本身约 3 分钟（含检查点记录共 275 秒），验证损失 8.94 → 4.05。
@@ -222,7 +233,7 @@ flowchart TB
 
 主页面用的同一个 Qwen3-0.6B，全参数、fp32。一条“自我认知”对话（“你是谁？”→“我是黑箱里的小模型。”）套上非思考模式的聊天模板（24 个词元），提示部分标签设为 −100，只对回答的 8 个位置算损失；在同一条对话上连走 3 步 AdamW（lr 1e-5，β = 0.9 / 0.95，权重衰减 0.1，裁剪 1.0；m、v 放在内存里，公式与 `torch.optim.AdamW` 相同）。回答的损失 5.02 → 1.38 → 0.52 → 0.011。记录逐词元概率与前 5 名、两种损失（只算回答 / 全都算）、逻辑透镜、残差流梯度、每个参数张量的梯度范数、4 个权重的 g / m / v / 偏差校正 / Δw，以及 3 步后有多少权重存回 bf16 会变回原值（85%）。DPO 一例：新回答和原模型自己的贪心回答，在微调前后的模型上算对数概率，代入 DPO 公式（β = 0.1）。
 
-导出在 `public/train/data/`：首屏只取 `tiny.json` + `tiny.bin` + `qwen.json`（gzip 后共 93 KB），其余按检查点 / 层级拆成小分块按需载入，合计约 1.16 MB gzip（拆分方式见下方“训练页的数据拆分与按需载入”）。
+导出在 `public/train/data/`：首屏只取玻璃小模型的 `glass.json` + `glass.bin`（gzip 后 31 KB），另外两章的首屏文件 `tiny.json` + `tiny.bin` + `qwen.json`（93 KB）在玻璃小模型画出来以后才取；其余按帧 / 检查点 / 层级拆成小分块按需载入。合计约 2.79 MB（玻璃小模型）+ 1.16 MB（另外两章）gzip（拆分方式见下方“训练页的数据拆分与按需载入”）。
 
 </details>
 
@@ -315,6 +326,22 @@ flowchart TB
 <details>
 <summary><b>训练页的深度</b>（D0–D4）</summary>
 
+顶部三章（参照世界模型页的章节分段按钮）：**玻璃小模型**（默认）、**放大：从零预训练**（唐宋诗小模型）、**真实模型：微调**（Qwen3-0.6B）。网址加 `?chapter=tiny` / `?chapter=qwen` 直接进后两章。
+
+第一章 · 玻璃小模型（`js/glass/`）：
+
+| 深度 | 看到什么 | 每一步是什么 |
+| :-- | :-- | :-- |
+| **D0** 初始化 | 全部 11 个张量按结构摆开的热力图（发散色：负蓝、正琥珀、零暗）；参数清单；真实的 2,880 个初始值的直方图和 N(0, 0.02²) 曲线；三次真实训练的损失（正态 / 全零 / 放大 50 倍），全景图跟着换成全零、放大 50 倍的初始值 | 整个模型 / 初始值的分布 / 为什么要随机 / 为什么要小 |
+| **D1** 训练全程 | 全部权重随步数变（两帧之间插值；可切“数值 w / 变化 w − w₀”、“色标跟着变 / 固定”；每个张量的名字下面是这一步流到它的梯度长度 ‖∂L/∂W‖）；每一步的损失曲线（可拖动，标出全零对照的平线）；固定样例“举头望明月，低头”每个位置的正确答案概率和第一名；两个注意力头；嵌入表各行的余弦相似度 | 每一帧（76 帧，前 50 步每步一帧） |
+| **D2** 一步之内 | 一张从上往下的“玻璃计算图”：最上面是这一步的 8 段批次（25 字的圈 + 每段的输入 / 目标），往下每行一个算子——左边算式、中间第 0 段的真实激活、右边流到这里的梯度、最右这一行用到的参数；前向一行行亮起、反向梯度从下往上一行行出现（参数换成 ∂L/∂W）、更新时参数先显示 Δw（色标 ±lr）再变成新值；镜头跟着正在算的那一行走 | ① 取批次 ② 前向 ③ 损失 ④ 反向 ⑤ 更新（走完进入下一帧） |
+| **D3** 拆开环节 | 同一张图，逐个算子：查嵌入表 / RMSNorm / q k v / 注意力 / W_o + 残差 / RMSNorm / SwiGLU / W_down + 残差 / 最后的 RMSNorm / logits → 概率；损失逐个位置；反向逐个算子（每步一句链式法则：上游梯度 × 本层的局部导数）；更新先裁剪，再一个张量一个张量地更新 | 子步骤 |
+| **D4** 一个参数 | 点任意一个格子（任何深度都行）就到这里：它在张量里的位置（可换）；从初始化到训练结束每一帧的 w、∂L/∂w、m、√v、Δw；**梯度从哪来**：第 0 段 8 个位置逐项列出“输入 × 上游梯度”（E 分输入、输出两路，γ 是归一化后的值 × 梯度），其余 7 段合成一项，加起来等于记录的梯度；**AdamW 算式**：g → m → v → 偏差校正 → Δw → 写回，最后和记录的下一步 / Δw 对一遍 | 反向：每个参数张量的“梯度从哪来”；更新：每个张量 6 小步 |
+
+配色沿用站里的算式板：输入蓝、权重紫、乘积橙、结果青；梯度用玫红。暂停时单步过去，这一步的动画也会自己播一遍再停住。
+
+第二、三章：
+
 | 深度 | 看到什么 | 每一步是什么 |
 | :-- | :-- | :-- |
 | **D0** 流水线 | 预训练 → 监督微调 → 偏好对齐 / 强化学习（第三段为示意，其中 DPO 损失是用真实对数概率代入公式算的一次） | 每个阶段 |
@@ -323,7 +350,7 @@ flowchart TB
 | **D3** 拆开环节 | 批次：取一行 / 编号 / 错开一位（Qwen3：聊天模板 / SFT 遮罩）；前向：逐层的逻辑透镜；损失：逐个位置的 −ln p；反向：逐层的 ‖∂L/∂h‖；更新：一个权重的 AdamW 算式 | 子步骤 |
 | **D4** 细到一个数 | 一个位置的交叉熵（softmax → 取概率 → −ln）；一层 7 个矩阵各自的梯度；写回的那个权重的 fp32 / bf16 比特 | 子步骤 |
 
-19 个知识碎片。
+26 个知识碎片（其中 7 个是玻璃小模型这一章新加的；教师强制、交叉熵、反向传播、梯度是外积、梯度裁剪、偏差校正、权重衰减这几个在两章里都能找到）。
 
 </details>
 
@@ -461,7 +488,7 @@ llm-blackbox/
 │   │   │                    micro 矩阵乘法显微镜，board D6 / D7 的算式板
 │   │   └── vendor/three/    自托管的 Three.js r186
 │   ├── data/                推理页数据：qNN.json + qNN.bin、qNN/Lxx.json.gz、weights.bin
-│   ├── train/               训练页：2D 画布舞台（js/stage.js）和各层视图（js/scenes/）
+│   ├── train/               训练页：2D 画布舞台（js/stage.js）和各层视图（js/scenes/）；玻璃小模型一章在 js/glass/
 │   ├── multimodal/          多模态页：3D 舞台（js/scene.js）和图像监视器（js/monitor.js）
 │   ├── agent/               智能体页：编辑器 / 终端回放（js/screen.js）和循环 / 上下文视图
 │   ├── learn/               延伸学习页：路线图、资源库、术语表、动手试试（data/*.json、snippets/）
@@ -469,7 +496,7 @@ llm-blackbox/
 │   └── fonts/               思源宋体子集、JetBrains Mono（SIL OFL）
 ├── tools/
 │   ├── export_qwen.py       推理页数据导出
-│   ├── train/               prep_corpus.py · train_tiny.py · qwen_step.py
+│   ├── train/               glassbox.py · prep_corpus.py · train_tiny.py · qwen_step.py · split_data.py
 │   ├── multimodal/          export_qwen3vl.py · make_images.py · grounding.py · images/
 │   ├── agent/               record.py · sandbox/（各任务的初始文件）
 │   ├── learn/               check_links.py（延伸学习页的外链检查）· links_checked.json（最近一次结果）
@@ -500,6 +527,7 @@ python tools/export_qwen.py --model /path/to/Qwen3-0.6B
 python tools/export_qwen.py --model /path/to/Qwen3-0.6B --lang en
 
 # 训练 → public/train/data/（另需 numpy、opencc）
+python tools/train/glassbox.py                                       # 玻璃小模型：CPU 上约 1 秒训练 + 导出 + 核对（原始记录放 --work）
 python tools/train/prep_corpus.py --src /path/to/chinese-poetry --out /path/to/poetry-train
 python tools/train/train_tiny.py --data /path/to/poetry-train      # 约 5 分钟，显存 < 2 GB
 python tools/train/qwen_step.py --model /path/to/Qwen3-0.6B         # 约 6 GB 显存
@@ -526,6 +554,9 @@ node tools/world/check_nn.mjs                    # 网页里的 JS 前向和 PyT
 **训练页**
 
 ```bash
+# 玻璃小模型：三次训练（正态 / 全零 / 放大 50 倍）+ 导出 + 核对；原始 float32 记录约 17 MB 放 --work
+python tools/train/glassbox.py --work /mnt/d/cjc/train-viz/glass
+python tools/train/glassbox.py --stage export     # 只用上次的原始记录重新导出 + 核对（--stage train 只训练）
 # 语料（放 D 盘）：全唐诗 poet.tang.*.json → tang/，全宋诗 poet.song.*.json → song/（都在原仓库的“全唐诗”目录里）
 python tools/train/prep_corpus.py --src /mnt/d/cjc/datasets/chinese-poetry --out /mnt/d/cjc/datasets/poetry-train
 python tools/train/train_tiny.py            # 约 5 分钟，显存 < 2 GB；--export-only 只用上次的记录重新导出
@@ -534,12 +565,16 @@ python tools/train/split_data.py --from-git <提交>   # 只重新切分：从�
 ```
 
 <details>
-<summary><b>训练页的数据拆分与按需载入</b>（首屏只取 93 KB）</summary>
+<summary><b>训练页的数据拆分与按需载入</b>（首屏只取 31 KB）</summary>
 
-导出脚本最后都交给 `tools/train/split_data.py`，把数据拆成“首屏小文件 + 按需分块”，写完再读回来和原始数组逐字节、和元数据逐个数核对（只重新排布，不改任何数值）。全部在 `public/train/data/`，gzip 后合计约 1.16 MB：
+唐宋诗小模型和 Qwen3 的导出脚本最后都交给 `tools/train/split_data.py`，把数据拆成“首屏小文件 + 按需分块”，写完再读回来和原始数组逐字节、和元数据逐个数核对（只重新排布，不改任何数值）；玻璃小模型的 `glassbox.py` 用同一种分块格式，写完同样读回来逐字节核对。全部在 `public/train/data/`，gzip 后合计约 3.95 MB（玻璃小模型 2.79 MB）。后台预取先取玻璃小模型（权重块按播放顺序，再每帧块），另外两章的首屏数据到了以后排在后面：
 
 | 文件 | 内容 | 什么时候取 | 大小（gzip） |
 | --- | --- | --- | --- |
+| `glass.json` + `glass.bin` | 玻璃小模型：配置、语料、核对结果；每一步的损失 / 25 段平均损失 / 学习率 / 梯度范数（总的和 11 个张量各自的）/ 裁剪系数 / 批次起点；初始化时的全部参数（float32）；全零、放大 50 倍两次对照的损失曲线和初始值 | 首屏 | 2 + 29 KB |
+| `glass/w0…8.bin` | 每 9 帧一块：全部参数（float16，沿帧存比特模式的差）、固定样例的预测概率、两个注意力头、−ln p | 进入训练全程、播放或拖到这一段 | 每块约 42 KB |
+| `glass/f00…75.bin` | 每帧一块：全部梯度、更新前的 m 和 √v、这一步的 Δw（按张量缩放的 float16）、第 0 段每层的激活和激活的梯度 | 进入一步之内；“一个参数”的曲线要用全部帧（随到随画） | 每块约 31 KB |
+| `glass/exact.bin` | 三个 RMSNorm γ 和嵌入表里“月”那一行，每一步的 w、g、m、v（float32）、学习率（float64）、裁剪系数 | 看“一个参数”时 | 160 KB |
 | `tiny.json` + `tiny.bin` | 元数据（配置、语料、词表、41 个检查点的标量和生成的诗）、每一步的损失 / 学习率 / 梯度范数、批次第 0 行的字、损失地形 | 首屏 | 43 + 40 KB |
 | `qwen.json` | Qwen3 的对话、逐词元概率与前 5 名、两种损失、DPO、改动统计 | 首屏 | 10 KB |
 | `tiny/ck00…40.bin` | D1：留出诗的逐字概率与前 5 名、24 个注意力头（只存下三角）、嵌入 PCA、三块权重 / 梯度局部 | 进入 D1、播放或拖到这个检查点 | 每块约 19 KB |
@@ -549,7 +584,7 @@ python tools/train/split_data.py --from-git <提交>   # 只重新切分：从�
 
 首屏文件另留一份未压缩的（给不支持 `DecompressionStream` 的浏览器）；分块只存 `.gz`，这类浏览器里对应的卡片会写明“不支持解压”。浮点数组按字节分面存放（先放所有数的第 0 个字节……），gzip 能多压 10–30%。
 
-页面（`js/data.js` 的 `Loader`、`js/main.js` 的 `plan()`）每帧算出当前画面要用的分块：这一屏要用的立即取，播放方向上后几个检查点、相邻检查点、往下一层要用的排队预取（同时最多 4 个）；首屏字体下完后在浏览器空闲时一块一块地后台预取（省流量模式 / 2G 不预取），约 10 秒（8 Mbps）取完。数据没到时：D1 的卡片单独显示载入占位，或者先拿最近的已到检查点顶上（调暗并标注是第几步）；D2–D4 整屏先显示最近的已到检查点并在顶部标注；播放时缺块就原地等到了再走；提示都延迟 0.25 秒再淡入，数据很快到时不会闪。失败后自动重试（间隔从 4 秒翻倍到 30 秒）。
+页面（`js/data.js` 的 `Loader`、`js/main.js` 的 `plan()` / `planGlass()`）每帧算出当前画面要用的分块：这一屏要用的立即取，播放方向上后几个检查点、相邻检查点、往下一层要用的排队预取（同时最多 4 个）；首屏字体下完后在浏览器空闲时一块一块地后台预取（省流量模式 / 2G 不预取），约 10 秒（8 Mbps）取完。数据没到时：D1 的卡片单独显示载入占位，或者先拿最近的已到检查点顶上（调暗并标注是第几步）；D2–D4 整屏先显示最近的已到检查点并在顶部标注；播放时缺块就原地等到了再走；提示都延迟 0.25 秒再淡入，数据很快到时不会闪。失败后自动重试（间隔从 4 秒翻倍到 30 秒）。
 
 在本地模拟 8 Mbps / 60 ms（冷缓存）：首屏从 2.2 秒、1.9 MB（其中数据 1.1 MB）降到约 0.7 秒、0.25 MB（数据 93 KB）；首屏后立刻进入各层，第一次要等的分块约 0.1–0.15 秒，在首屏停留几秒后基本不用等。
 
