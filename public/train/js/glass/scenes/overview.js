@@ -7,6 +7,7 @@ import { ModelMap } from '../model.js';
 import { TENSOR_LABEL } from '../data.js';
 import { isEn, L } from '../../lang.js';
 import { esc } from '../../../../js/ui.js';
+import { animP } from './step.js';
 
 const INIT_SCALE = 0.06;          // D0 的色标：±3 个标准差
 const disp = (s) => (s === '⏎' ? '⏎' : s);
@@ -41,10 +42,10 @@ export class GInit extends Base {
   layout(env) {
     const P = (this.portrait = env.portrait);
     if (!P) {
-      this.map.layout(false, 0, 70);
-      const x = 1150, w = 370;
-      this.cards = { list: { x, y: 60, w, h: 236 }, hist: { x, y: 310, w, h: 200 }, runs: { x, y: 524, w, h: 196 } };
-      this.bounds = { x: -10, y: -6, w: 1540, h: 736 };
+      this.map.layout(false, 0, 92);
+      const x = 920, w = 350;
+      this.cards = { list: { x, y: 60, w, h: 222 }, hist: { x, y: 296, w, h: 200 }, runs: { x, y: 510, w, h: 206 } };
+      this.bounds = { x: -10, y: -6, w: 1290, h: 730 };
     } else {
       this.cards = { list: { x: 0, y: 60, w: 380, h: 236 }, hist: { x: 0, y: 310, w: 380, h: 200 }, runs: { x: 0, y: 524, w: 380, h: 196 } };
       this.map.layout(true, 0, 744);
@@ -61,6 +62,7 @@ export class GInit extends Base {
   }
 
   draw(g, st, env) {
+    st = { ...st, p: animP(this, st, env, 2.2) };
     const D = this.D, sub = st.step.sub, P = this.portrait;
     const titles = isEn
       ? { model: 'The whole model is these 2,928 numbers', hist: 'Where they start: small random numbers', zero: 'Why random? Start everything at zero and nothing moves', big: 'Why small? Start 50× bigger and it starts out confidently wrong' }
@@ -80,7 +82,7 @@ export class GInit extends Base {
     };
     const my = this.map.oy;
     const tag = { normal: L('正态初始化 N(0, 0.02²)', 'Normal init N(0, 0.02²)'), zero: L('全零初始化（γ 仍为 1）', 'All-zero init (γ still 1)'), big: L('放大 50 倍：N(0, 1²)', '50× larger: N(0, 1²)') }[which];
-    if (!P) text(g, `${tag} · ${L(`色标 ±${INIT_SCALE}（γ 画的是 γ − 1）`, `color scale ±${INIT_SCALE} (γ drawn as γ − 1)`)}`, 0, my - 2, { size: 11, color: which === 'normal' ? COL.cyan : which === 'zero' ? COL.rose : COL.amber });
+    if (!P) text(g, `${tag} · ${L(`色标 ±${INIT_SCALE}（γ 画的是 γ − 1）`, `color scale ±${INIT_SCALE} (γ drawn as γ − 1)`)}`, 0, 74, { size: 11.5, color: which === 'normal' ? COL.cyan : which === 'zero' ? COL.rose : COL.amber });
     this.map.draw(g, env, {
       value: val,
       scale: () => INIT_SCALE,
@@ -91,7 +93,7 @@ export class GInit extends Base {
       pick: (name, gi) => this.app.pickParam(gi),
       sel: this.app.ctx.gsel,
     });
-    if (!P) legend(g, this.map.ox + 30, my + this.map.H - 30, 160, INIT_SCALE, (v) => fnum(v, 2));
+    if (!P) legend(g, this.map.ox + 30, my + this.map.H + 4, 150, INIT_SCALE, (v) => fnum(v, 2));
     this.drawList(g, st, env, sub === 'model');
     this.drawHist(g, st, env, sub === 'hist' || sub === 'big', which);
     this.drawRuns(g, st, env, sub === 'zero' || sub === 'big', which);
@@ -197,10 +199,10 @@ export class GRun extends Base {
     const P = (this.portrait = env.portrait);
     if (!P) {
       this.map.layout(false, 0, 92);
-      const x = 1150, w = 370;
-      this.cards = { loss: { x, y: 60, w, h: 196 }, pred: { x, y: 270, w, h: 262 }, attn: { x, y: 546, w, h: 186 } };
-      this.sim = { x: 0, y: 92 + 330, w: 222, h: 310 };
-      this.bounds = { x: -10, y: -6, w: 1540, h: 748 };
+      const x = 920, w = 350;
+      this.cards = { loss: { x, y: 60, w, h: 190 }, pred: { x, y: 262, w, h: 252 }, attn: { x, y: 526, w, h: 200 } };
+      this.sim = { x: 0, y: 92 + 296, w: 170, h: 170 };
+      this.bounds = { x: -10, y: -6, w: 1290, h: 732 };
     } else {
       this.cards = { loss: { x: 0, y: 92, w: 380, h: 196 }, pred: { x: 0, y: 302, w: 380, h: 262 } };
       this.map.layout(true, 0, 620);
@@ -268,8 +270,8 @@ export class GRun extends Base {
         sel: this.app.ctx.gsel,
       });
       if (!P) {
-        legend(g, 1150 - 240, this.map.oy + this.map.H - 12, 170, sc.mat, (v) => fnum(v, 2), { label: L('矩阵', 'matrices') });
-        legend(g, 1150 - 240, this.map.oy + this.map.H + 14, 170, sc.norm, (v) => fnum(v, 2), { label: this.mode === 'd' ? 'γ' : 'γ − 1' });
+        legend(g, 300, this.map.oy + this.map.H + 6, 150, sc.mat, (v) => fnum(v, 2), { label: L('矩阵', 'matrices') });
+        legend(g, 560, this.map.oy + this.map.H + 6, 150, sc.norm, (v) => fnum(v, 2), { label: this.mode === 'd' ? 'γ' : 'γ − 1' });
       }
       this.drawSim(g, st, env, cur);
     }
@@ -371,7 +373,7 @@ export class GRun extends Base {
     const cell = Math.min(13, (C.w - 90) / (2 * T + 2));
     const has1 = D.has('w', k1);
     for (let h = 0; h < D.H; h++) {
-      const x0 = C.x + 30 + h * (T * cell + 46), y0 = C.y + 62;
+      const x0 = C.x + 30 + h * (T * cell + 46), y0 = C.y + 58;
       heat(g, x0, y0, T, T, cell, cell, (i, j) => (f > 0 && has1 ? lerp(D.att(k, h, i, j), D.att(k1, h, i, j), f) : D.att(k, h, i, j)), { seq: true, scale: 1, s: env.s });
       text(g, L(`头 ${h}`, `head ${h}`), x0, y0 - 6, { size: 10, kind: 'mono', color: COL.ink2 });
       for (let i = 0; i < T; i++) {
@@ -396,13 +398,13 @@ export class GRun extends Base {
     const rows = [];
     for (let a = 0; a < V; a++) { const r = new Float32Array(d); let n = 0; for (let j = 0; j < d; j++) { r[j] = cur(E + a * d + j); n += r[j] * r[j]; } n = Math.sqrt(n) || 1; for (let j = 0; j < d; j++) r[j] /= n; rows.push(r); }
     const sim = (a, b) => { let s = 0; for (let j = 0; j < d; j++) s += rows[a][j] * rows[b][j]; return s; };
-    const cell = P ? 15 : 9.2, x0 = S.x + (P ? 28 : 16), y0 = S.y + (P ? 62 : 14);
+    const cell = P ? 15 : 7.4, x0 = S.x + (P ? 28 : 16), y0 = S.y + (P ? 62 : 12);
     heat(g, x0, y0, V, V, cell, cell, (a, b) => (a === b ? 0 : sim(a, b)), { scale: 0.7, s: env.s });
     for (let a = 0; a < V; a++) {
       text(g, D.ch(a), x0 - 3, y0 + a * cell + cell * 0.82, { size: Math.min(10, cell * 0.85), color: COL.dim, align: 'right' });
       text(g, D.ch(a), x0 + a * cell + cell / 2, y0 + V * cell + cell * 0.95, { size: Math.min(10, cell * 0.85), color: COL.dim, align: 'center' });
     }
     env.hit(x0, y0, V * cell, V * cell, { tipAt: (wx, wy) => { const c = cellAt(wx, wy, x0, y0, V, V, cell, cell); if (!c || c.r === c.c) return null; return `<span class="k">${L('嵌入的余弦相似度', 'embedding cosine similarity')}</span>「${esc(D.ch(c.r))}」·「${esc(D.ch(c.c))}」 = <span class="v">${sim(c.r, c.c).toFixed(2)}</span>`; } });
-    if (P) text(g, L('对角线两旁亮起来：诗里前后相邻的字越来越像——输入、输出共用 E，“月”的向量被拉向“光”', 'Next to the diagonal lights up: neighbours in the poem grow alike — input and output share E, so 月 (moon) is pulled toward 光 (light)'), S.x + 14, S.y + S.h - 26, { size: 9.5, color: COL.dim, max: S.w - 28 });
+    if (P) wrap(g, L('对角线两旁亮起来：诗里前后相邻的字越来越像——输入、输出共用 E，“月”的向量被拉向“光”', 'Next to the diagonal lights up: neighbours in the poem grow alike — input and output share E, so 月 (moon) is pulled toward 光 (light)'), S.x + 14, S.y + S.h - 30, S.w - 28, 13, { size: 9.5, color: COL.dim });
   }
 }

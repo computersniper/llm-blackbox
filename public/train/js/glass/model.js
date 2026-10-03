@@ -9,15 +9,15 @@ import { TENSOR_LABEL } from './data.js';
 // 每个张量在全景图里的位置：x, y（左上角），cell（格子边长），o = 'v' | 'h'（γ 的方向）
 function place(portrait) {
   if (!portrait) {
-    const c = 10, y1 = 54, y2 = 316;
+    const c = 8, y1 = 30, y2 = 228;
     return {
-      W: 1110, H: 640, c,
+      W: 890, H: 500, c,
       at: {
-        E: { x: 30, y: y1, cell: c }, gf: { x: 30, y: y1 + 20 * c + 40, cell: c, o: 'h' },
-        g1: { x: 232, y: y1, cell: c, o: 'v' },
-        Wq: { x: 252, y: y1, cell: c }, Wk: { x: 440, y: y1, cell: c }, Wv: { x: 628, y: y1, cell: c }, Wo: { x: 836, y: y1, cell: c },
-        g2: { x: 232, y: y2, cell: c, o: 'v' },
-        Wg: { x: 252, y: y2, cell: c }, Wu: { x: 600, y: y2, cell: c }, Wd: { x: 950, y: y2, cell: c },
+        E: { x: 24, y: y1, cell: c }, gf: { x: 24, y: y1 + 20 * c + 36, cell: c, o: 'h' },
+        g1: { x: 182, y: y1, cell: c, o: 'v' },
+        Wq: { x: 196, y: y1, cell: c }, Wk: { x: 340, y: y1, cell: c }, Wv: { x: 484, y: y1, cell: c }, Wo: { x: 650, y: y1, cell: c },
+        g2: { x: 182, y: y2, cell: c, o: 'v' },
+        Wg: { x: 196, y: y2, cell: c }, Wu: { x: 468, y: y2, cell: c }, Wd: { x: 752, y: y2, cell: c },
       },
     };
   }
@@ -130,26 +130,20 @@ export class ModelMap {
     const lab = (s, x, y, al = 'left') => text(g, s, x, y, { size: 9.5, color: COL.dim, align: al });
     if (!P) {
       const E = R.E, q = R.Wq, wo = R.Wo, g2 = R.g2, wd = R.Wd, gf = R.gf, g1 = R.g1;
-      const yA = q.y + q.h + 26, yB = R.Wg.y + R.Wg.h + 26;
+      const yA = q.y + q.h + 20, yB = R.Wg.y + R.Wg.h + 20;
       // 注意力一行：E → γ₁ → q k v → W_o
-      arrow(g, E.x + E.w + 8, E.y + 80, g1.x - 6, E.y + 80, col, 1.2, 6);
-      lab(L('h₀ = E[字]', 'h₀ = E[char]'), E.x + E.w + 10, E.y + 72);
+      arrow(g, E.x + E.w + 6, E.y + 64, g1.x - 5, E.y + 64, col, 1.2, 6);
       g.strokeStyle = col; g.lineWidth = 1.2;
       g.beginPath(); g.moveTo(q.x, yA); g.lineTo(wo.x + wo.w, yA); g.stroke();
-      lab(L('q·k → 注意力（两个头，RoPE 位置旋转，没有参数）→ 加权求和 v', 'q·k → attention (2 heads, RoPE position rotation, no parameters) → weighted sum of v'), q.x, yA + 13);
-      // W_o → 第二行
-      arrow(g, wo.x + wo.w / 2, wo.y + wo.h + 8, wo.x + wo.w / 2, yA - 2, col, 1.2, 0.1);
-      g.beginPath(); g.moveTo(wo.x + wo.w + 14, wo.y + wo.h / 2); g.lineTo(wo.x + wo.w + 34, wo.y + wo.h / 2); g.lineTo(wo.x + wo.w + 34, g2.y - 36); g.lineTo(g2.x - 16, g2.y - 36); g.stroke();
-      arrow(g, g2.x - 16, g2.y - 36, g2.x - 16, g2.y + 40, col, 1.2, 6);
-      lab(L('h₁ = h₀ + 注意力的输出', 'h₁ = h₀ + attention output'), wo.x + wo.w - 140, g2.y - 42);
+      lab(L('q·k → 注意力（两个头，RoPE 按位置旋转，没有参数）→ 加权求和 v → 乘 W_o，加回残差', 'q·k → attention (2 heads, RoPE rotates by position, no parameters) → weighted sum of v → × W_o, added to the residual'), q.x, yA + 13);
+      // 第一行 → 第二行
+      g.beginPath(); g.moveTo(wo.x + wo.w + 10, wo.y + wo.h / 2); g.lineTo(wo.x + wo.w + 26, wo.y + wo.h / 2); g.lineTo(wo.x + wo.w + 26, g2.y - 36); g.lineTo(g2.x - 12, g2.y - 36); g.stroke();
+      arrow(g, g2.x - 12, g2.y - 36, g2.x - 12, g2.y + 30, col, 1.2, 6);
       // 前馈一行
-      g.beginPath(); g.moveTo(R.Wg.x, yB); g.lineTo(wd.x - 20, yB); g.stroke();
-      lab(L('SwiGLU：silu(n·W_gate) ⊙ (n·W_up)，再乘 W_down', 'SwiGLU: silu(n·W_gate) ⊙ (n·W_up), then × W_down'), R.Wg.x, yB + 13);
-      // W_down → γ_f → Eᵀ（输出）
-      const yo = wd.y + wd.h + 22;
-      g.beginPath(); g.moveTo(wd.x + wd.w / 2, wd.y + wd.h + 6); g.lineTo(wd.x + wd.w / 2, yo); g.lineTo(gf.x + gf.w + 30, yo); g.lineTo(gf.x + gf.w + 30, gf.y + gf.h / 2); g.stroke();
-      arrow(g, gf.x + gf.w + 30, gf.y + gf.h / 2, gf.x + gf.w + 6, gf.y + gf.h / 2, col, 1.2, 6);
-      lab(L('h₂ = h₁ + 前馈的输出 → 最后的 RMSNorm → 乘 Eᵀ 得到 20 个字的 logits（输出层和输入共用 E）', 'h₂ = h₁ + FFN output → final RMSNorm → × Eᵀ gives logits for 20 characters (output layer shares E with the input)'), gf.x, yo + 14);
+      g.beginPath(); g.moveTo(R.Wg.x, yB); g.lineTo(wd.x - 14, yB); g.stroke();
+      lab(L('SwiGLU：silu(n·W_gate) ⊙ (n·W_up)，再乘 W_down，加回残差', 'SwiGLU: silu(n·W_gate) ⊙ (n·W_up), then × W_down, added to the residual'), R.Wg.x, yB + 13);
+      // 输出：最后的 RMSNorm → 乘 Eᵀ
+      lab(L('最后的 RMSNorm，再乘 Eᵀ（输出层和输入共用 E）', 'final RMSNorm, then × Eᵀ (output shares E with the input)'), gf.x, gf.y + gf.h + 13);
     } else {
       lab(L('输入取 E 的行，输出乘 Eᵀ（共用）', 'Input reads rows of E; output multiplies by Eᵀ (shared)'), R.E.x, R.E.y + R.E.h + 22);
       lab(L('三个 RMSNorm 的缩放 γ', 'The three RMSNorm scales γ'), R.g1.x, R.g1.y - 26);

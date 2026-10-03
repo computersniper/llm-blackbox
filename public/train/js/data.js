@@ -17,7 +17,7 @@ export const f16tab = (() => {
   return t;
 })();
 
-const SIZE = { uint8: 1, int8: 1, uint16: 2, float16: 2, float32: 4 };
+const SIZE = { uint8: 1, int8: 1, uint16: 2, float16: 2, float32: 4, float64: 8 };
 
 // buf 里从 base + spec.offset 开始的一个数组。shuffle：按字节分面存放（先放所有数的第 0 个字节……），先拼回原来的字节顺序
 export function view(buf, spec, base = 0) {
@@ -36,6 +36,7 @@ export function view(buf, spec, base = 0) {
     case 'int8': return new Int8Array(buf, off, n);
     case 'uint16': return new Uint16Array(buf, off, n);
     case 'float32': return new Float32Array(buf, off, n);
+    case 'float64': return new Float64Array(buf, off, n);
     case 'float16': {
       const raw = new Uint16Array(buf, off, n);
       const out = new Float32Array(n);

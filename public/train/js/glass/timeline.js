@@ -48,10 +48,8 @@ export function gIsPrefix(a, b) {
   if (a.k !== b.k) return false;
   if (a.ph === 'run') return true;
   if (a.ph !== b.ph) return false;
-  for (const key of ['sub', 'i', 't', 'mi']) {
-    if (a[key] === undefined) return true;
-    if (a[key] !== b[key]) return false;
-  }
+  // a 写了的每一项 b 都要一样（i 只有损失用、t / mi 只有反向和更新用，不能遇到第一个空项就停）
+  for (const key of ['sub', 'i', 't', 'mi']) if (a[key] !== undefined && a[key] !== b[key]) return false;
   return true;
 }
 const same = (a, b) => a && b && gIsPrefix(a, b) && gIsPrefix(b, a);

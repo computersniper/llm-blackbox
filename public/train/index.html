@@ -6,15 +6,15 @@
   <style>html.i18n-wait{background:#060d1a}html.i18n-wait body{opacity:0}</style>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>大模型训练 · 揭开黑箱</title>
-  <meta name="description" content="看一个大模型是怎么被训练出来的：在 GPU 上从零训练一个 Qwen3 同构的唐诗小模型，再在真实的 Qwen3-0.6B 上走一步监督微调，细到单个权重的 AdamW 更新。所有数据都来自真实运行。">
+  <meta name="description" content="看一个大模型是怎么被训练出来的：先拿一个小到每个参数都画得出来的玻璃模型（2,928 个参数，学李白《静夜思》），看初始化、每一步的前向、反向、更新，细到一个参数的一生；再放大到从零训练的唐宋诗小模型，和真实 Qwen3-0.6B 的监督微调。所有数据都来自真实运行。">
   <meta name="theme-color" content="#060d1a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="preload" href="../fonts/jetbrains-mono-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="css/train.css">
-  <!-- 首屏数据（约 90 KB gzip）不必等脚本跑起来再取：和脚本一起开始下载，js/data.js 的 fetch 会直接用上 -->
-  <link rel="preload" href="data/tiny.json.gz" as="fetch" crossorigin>
-  <link rel="preload" href="data/tiny.bin.gz" as="fetch" crossorigin>
-  <link rel="preload" href="data/qwen.json.gz" as="fetch" crossorigin>
+  <!-- 首屏数据（玻璃小模型，约 25 KB gzip）不必等脚本跑起来再取：和脚本一起开始下载，js/glass/data.js 的 fetch 会直接用上；
+       另外两章的首屏数据在玻璃小模型画出来以后才取 -->
+  <link rel="preload" href="data/glass.json.gz" as="fetch" crossorigin>
+  <link rel="preload" href="data/glass.bin.gz" as="fetch" crossorigin>
   <!-- 模块依赖有三层（main → 各个视图 → 绘图工具），预先声明，浏览器一开始就并行取完，不用一层层等 -->
   <link rel="modulepreload" href="js/main.js">
   <link rel="modulepreload" href="js/lang.js">
@@ -37,6 +37,14 @@
   <link rel="modulepreload" href="js/scenes/loss.js">
   <link rel="modulepreload" href="js/scenes/layer.js">
   <link rel="modulepreload" href="js/scenes/adam.js">
+  <link rel="modulepreload" href="js/glass/data.js">
+  <link rel="modulepreload" href="js/glass/timeline.js">
+  <link rel="modulepreload" href="js/glass/explain.js">
+  <link rel="modulepreload" href="js/glass/heat.js">
+  <link rel="modulepreload" href="js/glass/model.js">
+  <link rel="modulepreload" href="js/glass/scenes/overview.js">
+  <link rel="modulepreload" href="js/glass/scenes/step.js">
+  <link rel="modulepreload" href="js/glass/scenes/param.js">
   <link rel="modulepreload" href="../js/bg.js">
   <link rel="modulepreload" href="../js/audio.js">
   <link rel="modulepreload" href="../js/ui.js">
@@ -74,9 +82,10 @@
   <main class="stage" id="stage" aria-label="训练过程" data-i18n-attr="aria-label:tr.stage">
     <div class="gl" id="gl"><canvas id="cv"></canvas></div>
     <div class="stage-top">
-      <div class="runs" id="runs" role="tablist" aria-label="选择一段真实训练" data-i18n-attr="aria-label:tr.runs">
-        <button type="button" role="tab" data-run="tiny"><b data-i18n="tr.runTiny">从零预训练</b><span data-i18n="tr.runTinySub">唐宋诗小模型</span></button>
-        <button type="button" role="tab" data-run="qwen"><b data-i18n="tr.runQwen">监督微调</b><span>Qwen3-0.6B</span></button>
+      <div class="runs" id="runs" role="tablist" aria-label="选择一章" data-i18n-attr="aria-label:tr.runs">
+        <button type="button" role="tab" data-run="glass" class="on" aria-selected="true"><b data-i18n="tr.runGlass">玻璃小模型</b><span data-i18n="tr.runGlassSub">2,928 个参数 · 全部看得见</span></button>
+        <button type="button" role="tab" data-run="tiny"><b data-i18n="tr.runTiny">放大：从零预训练</b><span data-i18n="tr.runTinySub">唐宋诗 · 664 万参数</span></button>
+        <button type="button" role="tab" data-run="qwen"><b data-i18n="tr.runQwen">真实模型：微调</b><span>Qwen3-0.6B</span></button>
       </div>
       <button class="follow" id="btnFollow" type="button" hidden data-i18n-html="tr.follow">◎ 回到跟随视角 <kbd>F</kbd></button>
       <button class="hint-btn" id="btnHint" type="button" title="操作说明（H）" data-i18n="tr.hint" data-i18n-attr="title:tr.hintTitle">操作说明</button>
@@ -135,7 +144,7 @@
       </header>
       <div class="cx-grid"></div>
       <footer class="cx-foot">
-        <p id="cxFoot" data-i18n="tr.cxFoot">两段训练都是真实运行的记录：唐宋诗小模型在一块 RTX 5090 上从零训练了 4000 步；Qwen3-0.6B 在同一块显卡上做了 3 步全参数监督微调。凡是标“示意”的内容不是实测。</p>
+        <p id="cxFoot" data-i18n="tr.cxFoot">三章都是真实运行的记录：玻璃小模型在 CPU 上训练了 200 步（另有全零、放大 50 倍两个对照）；唐宋诗小模型在一块 RTX 5090 上从零训练了 4000 步；Qwen3-0.6B 在同一块显卡上做了 3 步全参数监督微调。凡是标“示意”的内容不是实测。</p>
         <a class="linkish" href="../learn/" data-i18n="tr.learn">延伸学习 →</a>
         <button class="linkish" id="btnReset" type="button" data-i18n="tr.reset">重置进度</button>
       </footer>
