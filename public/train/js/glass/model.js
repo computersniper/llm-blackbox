@@ -65,7 +65,7 @@ export class ModelMap {
   }
 
   // opts：value(gi) → 上色用的值；scale(name) → 色标；tip(name, gi) → 提示 html；pick(name, gi)；sel = 选中参数的下标；
-  //       sub(name) → 标题下面的一行小字；frame(name) → 边框色（显示梯度 / Δw 时换色）；dim(name) → 0–1 的透明度
+  //       sub(name) → 标题下面的一行小字（subColor 颜色）；frame(name) → 边框色（显示梯度 / Δw 时换色）；dim(name) → 0–1 的透明度
   draw(g, env, o) {
     const D = this.D, P = this.portrait;
     this.flow(g, env, o);
@@ -87,7 +87,7 @@ export class ModelMap {
         text(g, lab, R.x, ty, { size: P ? 11.5 : 12.5, kind: 'mono', weight: 600, color: COL.ink });
         text(g, shape, R.x + (P ? 6 : 7) * lab.length + 10, ty, { size: 9.5, kind: 'mono', color: COL.dim });
         const sub = o.sub?.(p.name);
-        if (sub && !p.norm) text(g, sub, R.x, ty + 13, { size: 9.5, color: COL.dim, max: Math.max(R.w, 150) });
+        if (sub && !p.norm) text(g, sub, R.x, ty + 12, { size: 9, kind: 'mono', color: o.subColor || COL.dim, max: Math.max(R.w, 150) });
       }
       // 嵌入表：每行是哪个字
       if (p.name === 'E') {

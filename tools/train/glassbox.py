@@ -362,6 +362,8 @@ def export(work, out):
     for k in ['loss', 'evalLoss', 'lr', 'gnorm', 'clip']:
         core.add(k, R[k].astype(np.float32))
     core.add('offs', R['offs'].astype(np.uint8))
+    # 每一步、每个参数张量的梯度长度（裁剪前）：训练全程里看反向传播流到哪一层、多大
+    core.add('tgn', np.stack([np.linalg.norm(R['G'][:, a:b], axis=1) for a, b in sl.values()], 1).astype(np.float32))
     core.add('w0', R['W0'].astype(np.float32))
     core.add('zLoss', Z['loss'].astype(np.float32))
     core.add('zGnorm', Z['gnorm'].astype(np.float32))

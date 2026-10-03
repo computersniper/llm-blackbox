@@ -284,6 +284,9 @@ export class GRun extends Base {
         },
         pick: (name, gi) => this.app.pickParam(gi),
         sel: this.app.ctx.gsel,
+        // 标题右边：这一步流到这个张量的梯度有多长（反向传播在训练中怎么变）
+        sub: (name) => `‖∂L/∂${name === 'E' ? 'E' : 'W'}‖ = ${fnum(D.tgn(Math.min(D.S - 1, tInt), D.pIndex.get(name).j), 2)}`,
+        subColor: hexA(COL.rose, 0.85),
       });
       if (!P) {
         legend(g, 300, this.map.oy + this.map.H + 6, 150, sc.mat, (v) => fnum(v, 2), { label: L('矩阵', 'matrices') });

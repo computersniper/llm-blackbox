@@ -1,6 +1,6 @@
 // 玻璃小模型的真实训练记录（tools/train/glassbox.py 导出）：2,928 个参数、200 步，前 50 步每步都记，之后每 5 / 10 步一帧。
 //
-//   首屏 glass.json + glass.bin：配置、语料、每一步的损失 / 学习率 / 梯度范数 / 裁剪系数 / 批次、初始化时的全部参数、两个对照组（全零 / 放大 50 倍）
+//   首屏 glass.json + glass.bin：配置、语料、每一步的损失 / 学习率 / 梯度范数（总的和每个张量的）/ 裁剪系数 / 批次、初始化时的全部参数、两个对照组（全零 / 放大 50 倍）
 //   glass/wN    ：第 N 组帧（每组 9 帧）的全部参数（float16，按帧做差存）+ 固定样例的预测概率、注意力、−ln p
 //   glass/fNN   ：第 NN 帧的全部梯度、更新前的 m 和 √v、这一步的 Δw（按张量缩放的 float16）+ 固定样例每一层的激活和激活的梯度
 //   glass/exact ：三个 RMSNorm γ 和嵌入表里“月”那一行，每一步的 float32 原值（w、g、m、v），能逐位重算 AdamW
@@ -95,6 +95,7 @@ export async function loadGlass(loader, base = 'data/') {
     hd: M.headDim,
     ch: (id) => chars[id] ?? '?',
     loss: A.loss, evalLoss: A.evalLoss, lr: A.lr, gnorm: A.gnorm, clip: A.clip, w0: A.w0,
+    tgn: (t, j) => A.tgn[t * params.length + j],   // 第 t 步第 j 个张量的梯度长度（裁剪前）
     zLoss: A.zLoss, zGnorm: A.zGnorm, zMaxW: A.zMaxW, bLoss: A.bLoss, bEval: A.bEval, bGnorm: A.bGnorm, bW0: A.bW0, bP0: A.bP0, zP0: A.zP0, zAtt0: A.zAtt0,
     win,
     // 第 t 步的批次：B 段，每段 T+1 个字的编号（第 0 段固定是“举头望明月，低头思”）
