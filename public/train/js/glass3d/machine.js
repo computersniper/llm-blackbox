@@ -1010,12 +1010,13 @@ export class GlassMachine {
     for (const [id, o] of Object.entries(this.la)) {
       const b = BLOCK[id];
       let show = false;
-      if (v === 'g-op') show = this.inOp(b);
+      if (v === 'g-op') show = this.inOp(b) && !(b.spine && this.small);
       else if (v === 'g-mat') show = this.near(b);
-      else if (v === 'g-step') show = (s.ph === 'fwd' || s.ph === 'bwd') && (b.spine || this.inPhaseOp(b, F));
+      else if (v === 'g-step') show = (s.ph === 'fwd' || s.ph === 'bwd') && ((b.spine && !this.small) || this.inPhaseOp(b, F));
       o.visible = !!show;
     }
-    for (const [id, o] of Object.entries(this.lr)) o.visible = !!((v === 'g-step' && (s.ph === 'fwd' || s.ph === 'bwd')) || (v === 'g-op' && this.inOpName(id)));
+    // 残差窗口和 ⊕ 的标签挂在光柱左边，窄屏上会出画，不标
+    for (const [id, o] of Object.entries(this.lr)) o.visible = !!((v === 'g-step' && (s.ph === 'fwd' || s.ph === 'bwd')) || (v === 'g-op' && this.inOpName(id))) && !(this.small && id.startsWith('add'));
     const t = D.FR[k];
     // 损失
     const lossOn = F.lossMean > 0.05 && s.ph !== 'init' && (v !== 'g-mat' && v !== 'g-param');

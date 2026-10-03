@@ -86,7 +86,9 @@ export class GlassBoard {
     if (showHud) this.drawHud(st, D, t);
     if (showBoard) this.drawBoard(st, D, ctx, t, ap);
     // 近景时监视器挡住的那一条也让出来（训练全程的远景不让：机器在正中，左上角本来就空）
-    this.measure(showBoard ? this.boardEl : showHud && (v !== 'g-run' || small()) ? this.hudEl : null);
+    // 窄一点的屏幕上远景也让（机器会顶到左上角）
+    const roomy = (this.E.w || 0) - (this.E.insetR || 0) >= 1000;
+    this.measure(showBoard ? this.boardEl : showHud && (v !== 'g-run' || !roomy) ? this.hudEl : null);
   }
 
   drawHud(st, D, t) {

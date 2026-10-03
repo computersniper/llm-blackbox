@@ -5,7 +5,7 @@ import { heat, fnum, rgb, divRGB, paramName } from '../glass/heat.js';
 import { ADAM_SUBS } from '../glass/timeline.js';
 import { TENSOR_LABEL } from '../glass/data.js';
 import { fwdTerms, chainTerms, adamAt } from '../glass/math.js';
-import { L } from '../lang.js';
+import { L, isEn } from '../lang.js';
 
 const num = (v, d = 4) => (v === 0 ? '0' : Math.abs(v) >= 1e-3 && Math.abs(v) < 1e4 ? Number(v.toPrecision(d + 1)).toString().replace('-', '−') : sciSup(v, d));
 const par = (v, d = 4) => (v < 0 ? `(${num(v, d)})` : num(v, d));
@@ -277,7 +277,7 @@ export function drawAdam(g, C, D, k, gi, st, env) {
   card(g, C.x, C.y, C.w, C.h, { eyebrow: L(`ADAMW · 第 ${a.t} 步`, `ADAMW · STEP ${a.t}`), title: L('这一步它挪了多少', 'How far it moves this step'), accent: COL.violet, active: on });
   const narrow = C.w < 400;
   const cur = on ? ADAM_SUBS.indexOf(s.mi) : -1;
-  const x0 = C.x + 16, fx = x0 + (narrow ? 64 : 84), mw = C.x + C.w - fx - 12;
+  const x0 = C.x + 16, fx = x0 + (isEn ? (narrow ? 90 : 96) : (narrow ? 64 : 84)), mw = C.x + C.w - fx - 12;
   text(g, `lr = ${sciSup(a.lr, 3)}　β₁ = ${a.b1}　β₂ = ${a.b2}　ε = 10⁻⁸　λ = ${a.wd}　t = ${a.t}`, x0, C.y + 60, { size: 10, kind: 'mono', color: COL.dim, max: C.w - 32 });
   const lines = [
     { k: L('梯度', 'gradient'), l: `g = ∂L/∂w × ${L('裁剪系数', 'clip')} = ${par(a.graw)} × ${a.clip < 1 ? a.clip.toPrecision(4) : '1'}`, r: `g = ${num(a.g)}`, c: COL.rose },
