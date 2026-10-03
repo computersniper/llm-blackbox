@@ -55,9 +55,18 @@ export function applyDom(root = document) {
       if (a && k) el.setAttribute(a, t(k));
     }
   });
-  // 导航换成英文后变长了：重新把当前页的链接滚进可见区（手机上导航可横向滑）
-  const nav = document.querySelector('.site-nav'), cur = nav && nav.querySelector('[aria-current]');
-  if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
+  scrollNavToCurrent();
+}
+
+// 手机上导航可以横向滑：文案换成英文（变长）、顶栏放进语言开关（变挤）之后，把当前页的链接滚回可见区。
+// 下一帧再滚一次，兜住稍后才出现的顶栏元素（比如访问量胶囊）。
+export function scrollNavToCurrent() {
+  const go = () => {
+    const nav = document.querySelector('.site-nav'), cur = nav && nav.querySelector('[aria-current]');
+    if (cur && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = cur.offsetLeft - (nav.clientWidth - cur.offsetWidth) / 2;
+  };
+  go();
+  requestAnimationFrame(go);
 }
 
 export function setLang(l) {
@@ -77,4 +86,5 @@ export function mountLangSwitch(el) {
     const b = e.target.closest('button[data-l]');
     if (b && b.dataset.l !== lang) setLang(b.dataset.l);
   });
+  scrollNavToCurrent();
 }

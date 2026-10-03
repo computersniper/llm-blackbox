@@ -1,6 +1,6 @@
 // 首页右上角的 GitHub 链接和访问量。
 // 计数在服务器上（deploy/counter/counter.py）：同一个 IP 每天只算一个访客，IP 不落盘。本地开发没有这个接口，就什么都不显示。
-import { L as tr } from './i18n.js';
+import { L as tr, scrollNavToCurrent } from './i18n.js';
 
 export const REPO = 'https://github.com/computersniper/llm-blackbox';
 
@@ -25,5 +25,6 @@ export function showVisits(s) {
     pill.querySelector('b').textContent = fmt(s.total);
     pill.title = tr(`累计 ${fmt(s.total)} 人次来访（每人每天计一次）· 今天 ${fmt(s.today)} 人`, `${fmt(s.total)} visits in total (each visitor counted once a day) · ${fmt(s.today)} today`);
     pill.hidden = false;
+    scrollNavToCurrent();   // 胶囊占了顶栏的位置，手机上导航变窄，把当前页的链接滚回可见区
   }
 }
