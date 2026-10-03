@@ -85,7 +85,8 @@ export class GlassBoard {
     document.body.classList.toggle('g-board', showBoard);
     if (showHud) this.drawHud(st, D, t);
     if (showBoard) this.drawBoard(st, D, ctx, t, ap);
-    this.measure(showBoard);
+    // 近景时监视器挡住的那一条也让出来（训练全程的远景不让：机器在正中，左上角本来就空）
+    this.measure(showBoard ? this.boardEl : showHud && (v !== 'g-run' || small()) ? this.hudEl : null);
   }
 
   drawHud(st, D, t) {
@@ -145,10 +146,10 @@ export class GlassBoard {
     }
   }
 
-  // 算式板挡住的那一块告诉引擎，3D 在剩下的区域里取景
-  measure(on) {
-    if (!on) { if (this.ovKey !== 'off') { this.E.setOverlay(0, 0); this.ovKey = 'off'; } return; }
-    const r = this.boardEl.getBoundingClientRect(), h = this.E.host.getBoundingClientRect();
+  // 浮层挡住的那一块告诉引擎，3D 在剩下的区域里取景
+  measure(el) {
+    if (!el) { if (this.ovKey !== 'off') { this.E.setOverlay(0, 0); this.ovKey = 'off'; } return; }
+    const r = el.getBoundingClientRect(), h = this.E.host.getBoundingClientRect();
     const key = `${Math.round(r.top)}|${Math.round(r.bottom)}|${Math.round(h.top)}|${Math.round(h.bottom)}`;
     if (key === this.ovKey || !r.height) return;
     this.ovKey = key;

@@ -635,7 +635,7 @@ function updateInsets() {
   const folded = dbg.classList.contains('folded');
   const ctlH = $('#ctl').offsetHeight + 22;
   stage.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH, 56);
-  g3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? (folded ? 120 : 100 + dbg.offsetHeight + 8) : ctlH);
+  g3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
 }
 addEventListener('resize', () => updateInsets());
 

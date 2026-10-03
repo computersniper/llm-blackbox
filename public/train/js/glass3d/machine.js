@@ -444,8 +444,8 @@ export class GlassMachine {
     const cv = document.createElement('canvas');
     cv.width = 40 * V; cv.height = 64;
     const cx = cv.getContext('2d');
-    cx.font = '600 40px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#b4bed2';
+    cx.font = '600 27px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#9aa6bf';
     chars.forEach((c, v) => cx.fillText(c, 40 * v + 20, 34));
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -652,6 +652,7 @@ export class GlassMachine {
 
   update(st, dt, t) {
     const D = this.D, s = st.step;
+    this.small = this.E.w < 700;
     const p = this.animP(st, t);
     const F = (this.F = this.flow(st, p));
     const k = st.k, tStep = D.FR[k];
@@ -706,12 +707,16 @@ export class GlassMachine {
     // 每块：前向扫描到哪、反向发光多少、更新到哪
     const fx = F.fwd, bx = F.bwd;
     const scanOn = { blk: null, f: 0 };
+    // 梯度光的强度：远景亮一点才看得出；拆到一块矩阵、一个参数时收着点，免得盖住方块本来的颜色
+    const gK = { 'g-run': 0.42, 'g-step': 0.4, 'g-op': 0.34, 'g-mat': 0.32, 'g-param': 0.2 }[st.view] ?? 0.4;
+    // 更新那一段：还没轮到的张量，梯度光再暗一半（注意力在正在更新的那一块）
+    const updOn = s.ph === 'upd' && !!s.sub && s.sub !== 'clip';
     const blkState = new Map();
     for (const b of BLOCKS) {
       if (b.kind !== 'w') continue;
       const fwin = win(FW[b.id], fx), bwin = win(BW[b.id], bx);
       const u = F.upd[b.t] || { dw: 0, done: 0 };
-      const gOn = s.ph === 'init' ? 0 : bwin * (1 - Math.min(1, u.dw * 2.5));
+      const gOn = s.ph === 'init' ? 0 : bwin * (1 - Math.min(1, u.dw * 2.5)) * (updOn && b.t !== s.t ? 0.5 : 1);
       blkState.set(b, { fwin, bwin, u, gOn });
       if (fwin > 0 && fwin < 1 && !b.t.startsWith('g') && b.id !== 'E') scanOn.blk = b, scanOn.f = fwin;
     }
@@ -746,15 +751,15 @@ export class GlassMachine {
       // 发光层
       let gr = 0, gg = 0, gb = 0;
       if (G && bs.gOn > 0) {
-        const I = Math.pow(Math.min(1, Math.abs(G[gi]) / gqs[b.t]), 1.3) * bs.gOn * 0.42;
+        const I = Math.pow(Math.min(1, Math.abs(G[gi]) / gqs[b.t]), 1.6) * bs.gOn * gK;
         gr += LIN.rose[0] * I; gg += LIN.rose[1] * I; gb += LIN.rose[2] * I;
       }
       if (popA > 0) {
         const I = Math.min(1, Math.abs(DW[gi]) / lr) * popA * 0.32;
         gr += LIN.violet[0] * I; gg += LIN.violet[1] * I; gb += LIN.violet[2] * I;
       }
-      if (b.id === 'E' && lookRow.size && lookRow.has(this.wR[i])) { gr += 0.22; gg += 0.5; gb += 0.45; }
-      if (selGi != null && gi === selGi) { const I = 0.35 + 0.2 * Math.sin(t * 5); gr += I; gg += I * 0.85; gb += I * 0.6; }
+      if (b.id === 'E' && lookRow.size && lookRow.has(this.wR[i])) { gr += 0.1; gg += 0.28; gb += 0.26; }
+      if (selGi != null && gi === selGi) { const I = 0.2 + 0.1 * Math.sin(t * 5); gr += I; gg += I * 0.8; gb += I * 0.5; }
       ga[o] = 1; ga[o + 5] = 1; ga[o + 10] = h + 0.03; ga[o + 12] = this.wX[i]; ga[o + 13] = this.wY[i]; ga[o + 14] = pop - 0.015;
       gca[i * 3] = gr; gca[i * 3 + 1] = gg; gca[i * 3 + 2] = gb;
       if (gr + gg + gb > 0.003) anyGlow = true;
@@ -990,7 +995,8 @@ export class GlassMachine {
       const b = BLOCK[id], isG = b.t.startsWith('g');
       const t = b.mirror ? 'ET' : b.t;
       const mine = focusT && (focusT === b.t) && (v === 'g-mat' || v === 'g-param');
-      let show = !isG || !far;
+      // 窄屏的远景里标签相对更大：同一排并列的几块只标第一块（W_q 代表 q k v，W_gate 代表 gate up）
+      let show = (!isG || !far) && !(far && this.small && (id === 'Wk' || id === 'Wv' || id === 'Wu'));
       if (v === 'g-param') show = mine;
       if (v === 'g-mat') show = mine || this.near(b);
       if (v === 'g-op') show = this.inOp(b) || !isG;
