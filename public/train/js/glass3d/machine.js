@@ -255,6 +255,20 @@ export class GlassMachine {
     const mk = (color) => { const m = new THREE.InstancedMesh(pg, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }), 8); m.frustumCulled = false; m.raycast = () => {}; g.add(m); return m; };
     this.pulseF = mk(0x9ffcff);
     this.pulseB = mk(0xff7aa0);
+    // 每一层底下一块很淡的玻璃地板（和推理页的层板一样只靠边线勾出来），看得出机器分成几层
+    const floor = (y, x1) => {
+      const w = x1 - SPINE.x0 + 0.5, d = 1.7;
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.025, d), new THREE.MeshStandardMaterial({ color: 0x22346a, transparent: true, opacity: 0.05, depthWrite: false, roughness: 0.4 }));
+      m.position.set(SPINE.x0 - 0.25 + w / 2, y, -0.25);
+      m.raycast = () => {};
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x5ef0d4, transparent: true, opacity: 0.12 }));
+      e.position.copy(m.position);
+      e.raycast = () => {};
+      this.root.add(m, e);
+    };
+    floor(Y.ring1 + 0.06, BLOCK.Wo.x1 + 0.2);
+    floor(Y.ring2 + 0.1, BLOCK.Wd.x1 + 0.2);
+    floor(Y.ringf + 0.1, SHELF.x0 + 20 * SHELF.px + 0.6);
   }
 
   tube(curve, color, r = 0.014) {
