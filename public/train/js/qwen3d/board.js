@@ -1,7 +1,7 @@
 // 第三章 3D 舞台上的 2D 浮层（画法和训练页其余的卡片一样，../draw.js）：
 //   监视器（左上角，D1–D3）：回答 8 个词元的真实概率，原模型 → 第 1 / 2 / 3 步之后，最下面一行是损失；
 //   算式板（底部）：D4 一个张量的梯度 / 更新量；D5 一个权重的 AdamW 算式和 bf16 比特；D3 “存回 bf16”；D1 结尾的 DPO 浮层（示意）。
-import { COL, text, rr, card, hexA, clamp, seg, sciSup, fmtInt, line, dot, wrap, measure, fmtP, badge } from '../draw.js';
+import { COL, text, rr, card, hexA, sciSup, fmtInt, line, dot, wrap, measure, fmtP } from '../draw.js';
 import { f32Bits, bf16Round } from '../explain.js';
 import { tokPlain } from '../../../js/ui.js';
 import { tname, TSHAPE, LAYER_T, numel } from './data.js';
@@ -150,7 +150,6 @@ export class QwenBoard {
       this.board.draw((g) => { card(g, 0.5, 0.5, W - 1, 89, {}); text(g, T_('q3.loadingStep'), 20, 50, { size: 12.5, color: COL.dim }); });
       return;
     }
-    const s = st.step;
     if (kind === 'end') {
       if (sm) { const h1 = 360, h2 = 190; this.board.size(W, h1 + 10 + h2); this.board.draw((g, env) => { this.drawDpo(g, { x: 0.5, y: 0.5, w: W - 1, h: h1 }, env); this.drawChanged(g, { x: 0.5, y: h1 + 10, w: W - 1, h: h2 - 1 }, env); }); }
       else { const h = 300, mw = Math.min(640, W * 0.6); this.board.size(W, h); this.board.draw((g, env) => { this.drawDpo(g, { x: 0.5, y: 0.5, w: mw, h: h - 1 }, env); this.drawChanged(g, { x: mw + 10, y: 0.5, w: W - mw - 10.5, h: h - 1 }, env); }); }
@@ -176,7 +175,6 @@ export class QwenBoard {
     // AdamW
     if (sm) { const h1 = 330, h2 = 300; this.board.size(W, h1 + 10 + h2); this.board.draw((g, env) => { this.drawAdam(g, { x: 0.5, y: 0.5, w: W - 1, h: h1 }, st, env, true); this.drawBits(g, { x: 0.5, y: h1 + 10, w: W - 1, h: h2 - 1 }, st, env, true); }); }
     else { const h = 300, mw = Math.min(600, Math.max(470, W * 0.5)); this.board.size(W, h); this.board.draw((g, env) => { this.drawAdam(g, { x: 0.5, y: 0.5, w: mw, h: h - 1 }, st, env, false); this.drawBits(g, { x: mw + 10, y: 0.5, w: W - mw - 10.5, h: h - 1 }, st, env, false); }); }
-    void s;
   }
 
   tLabel(st, tn) {

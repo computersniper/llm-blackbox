@@ -10,7 +10,7 @@ import { THREE, label, textTexture, easeOut, easeInOut, seg } from '../../../js/
 import { RoundedBoxGeometry } from '../../../js/vendor/three/addons/geometries/RoundedBoxGeometry.js';
 import { tokPlain, shortSpecial, fmtPct, esc } from '../../../js/ui.js';
 import { seqInto, LIN } from '../glass3d/palette.js';
-import { LAYER_OPS, UPD_TENSORS, ADAM_SUBS, fwdOps, OP_TENSORS, OP_TENSORS_BWD } from './timeline.js';
+import { LAYER_OPS, UPD_TENSORS, ADAM_SUBS, OP_TENSORS, OP_TENSORS_BWD } from './timeline.js';
 import { tname, TSHAPE, isVec, MAT_T } from './data.js';
 import { t as T_, L } from './lang.js';
 
@@ -559,7 +559,6 @@ export class QwenMachine {
         else F.shift = easeInOut(seg(p, 0.1, 0.8));
         break;
       case 'fwd': case 'bwd': {
-        const ops = fwdOps(Lx, NL);
         const op = s.sub;
         let v;
         const pp = s.mi ? 1 : s.t ? (() => { const ts = (s.ph === 'fwd' ? OP_TENSORS : OP_TENSORS_BWD)[op]; return (ts.indexOf(s.t) + easeInOut(seg(p, 0, 0.8))) / ts.length; })() : easeInOut(seg(p, 0, 0.85));
@@ -576,7 +575,6 @@ export class QwenMachine {
           else { const oi = LAYER_OPS.indexOf(op); F.bwd = Lx + (oi + 1 - pp) / 7; }
           F.emb = op === 'emb' ? 1 : 0;
         }
-        void ops;
         break;
       }
       case 'loss':
@@ -1149,7 +1147,7 @@ export class QwenMachine {
       // 看损失的时候 8 个都标，错开两排；其余远景里 8 个标签挤在一起，只标选中的那个（8 个的概率在左上角的监视器里）
       const lossView = s.ph === 'loss' && (v === 'q-step' || (v === 'q-op' && s.sub === 'mean')) && !sm;
       o.position.set(this.x(i), by + pv * 2.6 * rise + 0.08 + (lossView && a % 2 ? 0.34 : 0), -0.25);
-      const show = showAns && (lossView || (far ? i === ansF : F.lossPos >= 0 ? F.lossPos === i || !sm : !sm || a % 2 === 0));
+      const show = showAns && (lossView || (far ? i === ansF : F.lossPos >= 0 ? F.lossPos === i : !sm || a % 2 === 0));
       this.setL(o, show, `${esc(tokPlain(R.tgtStr(i)))}<b>${fmtPct(pv)}</b>`);
       o.el.classList.toggle('on', F.lossPos === i);
     });

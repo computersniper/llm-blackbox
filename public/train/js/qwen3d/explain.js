@@ -4,7 +4,7 @@
 import { esc, tokPlain } from '../../../js/ui.js';
 import { fmtP, sciSup, fmtInt } from '../draw.js';
 import { t as T_, L, isEn } from './lang.js';
-import { tname, TSHAPE, numel, LAYER_T } from './data.js';
+import { tname, TSHAPE, numel } from './data.js';
 import { bf16Round } from '../explain.js';
 
 const K_ = (s) => `<span class="kw">${s}</span>`;
@@ -280,4 +280,3 @@ export function watch(s, R, ctx, depth) {
   return rows;
 }
 
-void LAYER_T;
