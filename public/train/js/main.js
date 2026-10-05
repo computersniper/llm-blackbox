@@ -5,13 +5,12 @@
 // 首屏只取玻璃小模型的几十 KB（配置、曲线、初始化的参数）；另外两章的首屏数据随后在后台取；
 // 各层要用的数据分块在进入视图、播放、拖动时按需取，空闲时后台预取（见 data.js）。
 import { Loader, loadTiny, loadQwen } from './data.js';
-import { wrapTiny, wrapQwen } from './run.js';
+import { wrapTiny } from './run.js';
 import { Timeline } from './timeline.js';
 import { Controls, SPEEDS } from './controls.js';
 import { Stage } from './stage.js';
 import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Pipeline } from './scenes/pipeline.js';
-import { OverviewQ } from './scenes/overviewQ.js';
 import { Loop } from './scenes/loop.js';
 import { Tokens } from './scenes/tokens.js';
 import { Grid } from './scenes/grid.js';
@@ -30,6 +29,7 @@ import { wrapTiny3d } from './tiny3d/data.js';
 import { TinyTimeline } from './tiny3d/timeline.js';
 import { TinyStage, planTiny, discoverTiny } from './tiny3d/stage.js';
 import { updateDebugger } from './tiny3d/ui.js';
+import { loadQwen3d, QwenTimeline, QwenStage, withQwen3d, planQwen3d, discoverQwen3d } from './qwen3d/index.js';
 
 initLang();
 
@@ -40,7 +40,7 @@ const store = { found: new Set(saved.found || []), speed: saved.speed || 1, hint
 function save() { try { localStorage.setItem(KEY, JSON.stringify({ found: [...store.found], speed: store.speed, sound: soundOn(), hinted: store.hinted })); } catch { /* 忽略 */ } }
 if (saved.sound) setSound(true);
 
-let bg, stage, controls, g3 = null, t3 = null;
+let bg, stage, controls, g3 = null, t3 = null, q3 = null;
 let runs = {}, tls = {}, run = 'glass', tl = null;
 let pendingRun = null, othersErr = null;
 const ctx = { feat: 0, gsel: null };
@@ -67,8 +67,8 @@ const app = {
   pickPos: (i) => pickPos(i),
   get tl() { return tl; },
 };
-// 当前这一章用的舞台：玻璃小模型、唐宋诗小模型是 3D，Qwen3 那一章是 2D 画布
-const curStage = () => (run === 'glass' && g3 ? g3 : run === 'tiny' && t3 ? t3 : stage);
+// 当前这一章用的舞台：三章都是 3D（玻璃小模型 g3、唐宋诗小模型 t3、Qwen3 微调 q3）；流水线（D0）仍是 2D 画布
+const curStage = () => (run === 'glass' && g3 ? g3 : run === 'tiny' && t3 ? t3 : run === 'qwen' && q3 ? q3 : stage);
 const onFreeChange = (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); };
 
 /* ---------------------------------------------------------------- 启动 */
@@ -88,7 +88,7 @@ async function boot() {
   tls.glass.speed = store.speed;
   tls.glass.on((type, t) => onTl(type, t));
   tl = tls.glass;
-  controls = new Controls({
+  controls = new (withQwen3d(Controls))({
     into: () => into(),
     out: () => out(),
     prev: () => { tl.pause(); tl.back(); sfx.tick(); },
@@ -129,7 +129,7 @@ async function loadOthers(want) {
   try {
     const [t, q] = await Promise.all([loadTiny(loader), loadQwen(loader)]);
     runs.tiny = wrapTiny3d(wrapTiny(t), loader);
-    runs.qwen = wrapQwen(q);
+    runs.qwen = await loadQwen3d(loader, q);
   } catch (e) {
     console.error(e);
     othersErr = e;
@@ -139,13 +139,12 @@ async function loadOthers(want) {
   ctx.tiny = runs.tiny;
   ctx.qwen = runs.qwen;
   tls.tiny = new TinyTimeline(runs.tiny);
-  tls.qwen = new Timeline(runs.qwen);
+  tls.qwen = new QwenTimeline(runs.qwen);
   for (const r of ['tiny', 'qwen']) {
     tls[r].speed = store.speed;
     tls[r].on((type, t) => onTl(type, t));
   }
   scenes.pipeline = new Pipeline(app);
-  scenes.overviewQ = new OverviewQ(app);
   renderRuns();
   startBackground();
   const go = pendingRun || (want === 'tiny' || want === 'qwen' ? want : null);
@@ -198,7 +197,7 @@ function enterRun(r) {
   tl.pause();
   tl = tls[r];
   tl.speed = store.speed;
-  if (r === 'glass' || r === 'tiny') updateControls();
+  if (r === 'glass' || r === 'tiny' || r === 'qwen') { updateControls(); if (r === 'qwen' && !fromGlass && prevDepth === 0) tl.play(); }
   else if (fromGlass || prevDepth === 0) {
     // 从玻璃小模型或流水线进来：停在这一段训练的全程（D1）
     if (tl.depth !== 1) { tl.depth = 0; tl.setDepth(1); } else updateControls();
@@ -228,7 +227,18 @@ function setGlassMode(on) {
   document.body.classList.toggle('g3d', on);
   if (g3) g3.active = on;
   setTinyMode(run === 'tiny');
+  setQwenMode(run === 'qwen');
   updateInsets();
+}
+
+// Qwen3 微调这一章也是 3D 舞台（./qwen3d/）：第一次进来时才建（多一个 WebGL 上下文）
+function setQwenMode(on) {
+  if (on && !q3 && runs.qwen) {
+    try { q3 = new QwenStage($('#q3'), $('#stage'), runs.qwen, app, { state: frameQwen, onTip: showTip, onFreeChange }); }
+    catch (e) { console.error(e); }
+  }
+  document.body.classList.toggle('q3d', on && !!q3);
+  if (q3) q3.active = on;
 }
 
 // 唐宋诗小模型这一章的 3D 舞台：第一次进来时才建（另一个 WebGL 画布）
@@ -274,7 +284,7 @@ function pickParam(gi, keep = false) {
 
 function into() {
   if (!tl) return;
-  if (run === 'glass' || run === 'tiny') {
+  if (run === 'glass' || run === 'tiny' || run === 'qwen') {
     if (!tl.canInto()) { flashBtn('#btnIn'); return; }
     sfx.dive();
     curStage().exitFree();
@@ -295,10 +305,10 @@ function into() {
 }
 
 function out() {
-  if (!tl || tl.depth <= (tl.minDepth ?? 0)) return;
+  if (!tl || tl.depth <= (tl.minDepth ?? 0)) { if (tl && run === 'qwen') flashBtn('#btnOut'); return; }
   sfx.rise();
   curStage().exitFree();
-  if (run === 'glass' || run === 'tiny') { tl.pause(); tl.setDepth(tl.depth - 1); return; }
+  if (run === 'glass' || run === 'tiny' || run === 'qwen') { tl.pause(); tl.setDepth(tl.depth - 1); return; }
   if (tl.depth === 1) {
     tl.pause();
     const st = run === 'tiny' ? 0 : 1;
@@ -312,7 +322,7 @@ function out() {
 function setDepth(d) {
   if (!tl) return;
   if (d === tl.depth) return;
-  if (run === 'glass' || run === 'tiny') { d > tl.depth ? sfx.dive() : sfx.rise(); curStage().exitFree(); tl.pause(); tl.setDepth(d); return; }
+  if (run === 'glass' || run === 'tiny' || run === 'qwen') { d > tl.depth ? sfx.dive() : sfx.rise(); curStage().exitFree(); tl.pause(); tl.setDepth(d); return; }
   if (d === 0) return out1to0();
   d > tl.depth ? sfx.dive() : sfx.rise();
   stage.exitFree();
@@ -350,6 +360,7 @@ function plan() {
   if (!tl) return p;
   if (run === 'glass') return planGlass(p);
   if (run === 'tiny') return planTiny(tl, runs.tiny, p);
+  if (run === 'qwen') return planQwen3d(p, app.R, tl);
   const T = runs.tiny.D;
   if (tl.depth === 0) { p.soon.push(T.key('ck', 0), T.key('ck', T.K - 1), T.key('ck', 1)); return p; }
   const R = app.R, D = R.D, K = R.K, k = tl.k, view = tl.view;
@@ -421,7 +432,7 @@ function controlsNeed() {
   if (!tl || tl.depth === 0) return [];
   const p = plan();
   if (run === 'glass') return tl.depth === 1 ? [runs.glass.D.key('w', tl.k)] : p.need;
-  if (run === 'tiny') return p.need;
+  if (run === 'tiny' || run === 'qwen') return p.need;
   return tl.depth === 1 && app.R.kind === 'tiny' ? [...p.need, app.R.D.key('ck', tl.k)] : p.need;
 }
 
@@ -472,7 +483,7 @@ function nearestStep(R, k) {
 
 function onFrame(dt, clock) {
   if (!tl) return null;
-  if (run === 'glass' || run === 'tiny') { lastView = ''; return null; }   // 这两章由 3D 舞台（frameGlass / frameTiny）驱动
+  if (run === 'glass' || run === 'tiny' || run === 'qwen') { lastView = ''; return null; }   // 三章都由 3D 舞台（frameGlass / frameTiny / frameQwen）驱动
   // 播放中，这一屏（或下一个检查点）要等的分块还在路上：原地停一下，到了再走
   if (tl.playing && plan().hold.some((key) => loader.pending(key))) dt = 0;
   tl.tick(dt);
@@ -540,6 +551,21 @@ function frameTiny(dt, clock) {
   return { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view: tl.view, speed: tl.speed, playing: tl.playing, R: app.R, i: tl.i, wait: { since: wait.since, err, waiting } };
 }
 
+// Qwen3 微调的 3D 舞台每帧调用（同上）
+function frameQwen(dt, clock) {
+  if (!tl || run !== 'qwen') return null;
+  if (tl.playing && plan().hold.some((key) => loader.pending(key))) dt = 0;
+  tl.tick(dt);
+  const p = plan();
+  request(p);
+  const miss = [...p.need, ...p.want].filter((key) => !loader.has(key));
+  if (miss.length && !wait.waiting) wait.since = clock;
+  wait.waiting = miss.length > 0;
+  const err = miss.map((key) => loader.error(key)).find(Boolean) || null;
+  waitPill(wait.waiting && clock - wait.since > 0.25, err);
+  return { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view: tl.view, speed: tl.speed, playing: tl.playing, R: app.R, i: tl.i, wait: { since: wait.since, err } };
+}
+
 // 3D 舞台缺数据时顶部的小提示（机器先按已有的数据画）
 let pillEl = null;
 function waitPill(on, err) {
@@ -551,7 +577,7 @@ function waitPill(on, err) {
   }
   const html = err ? esc(err.unsupported ? err.message : L('这一步的数据没有载入成功，稍后会自动重试…', 'This step’s data failed to load; retrying automatically…')) : `<span class="spin"></span>${L('正在载入这一步的真实记录…', 'Loading the real record of this step…')}`;
   if (pillEl._h !== html) { pillEl.innerHTML = html; pillEl._h = html; }
-  pillEl.classList.toggle('on', !!on && run === 'glass');
+  pillEl.classList.toggle('on', !!on && (run === 'glass' || run === 'qwen'));
 }
 
 /* ---------------------------------------------------------------- 悬停 / 点击 */
@@ -586,6 +612,7 @@ function onPick(info, e, h) {
 function discoverFor() {
   if (run === 'glass') return discoverGlass();
   if (run === 'tiny') return discoverTiny(tl, runs.tiny, discover);
+  if (run === 'qwen') return discoverQwen3d(tl, discover);
   const s = tl.step, d = tl.depth, R = app.R;
   if (d === 0 && s.st === 2) discover('dpo');
   if (d < 1 || !R) return;
@@ -682,6 +709,7 @@ function updateInsets() {
   stage.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH, 56);
   g3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
   t3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
+  q3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
 }
 addEventListener('resize', () => updateInsets());
 
@@ -736,5 +764,5 @@ function bindKeys() {
   });
 }
 
-window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, get g3() { return g3; }, get t3() { return t3; }, get waiting() { return wait.waiting; }, loader, app, into, out, enterRun, ctx, setSpeed };
+window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, get g3() { return g3; }, get t3() { return t3; }, get q3() { return q3; }, get waiting() { return wait.waiting; }, loader, app, into, out, enterRun, ctx, setSpeed };
 boot();
