@@ -23,6 +23,8 @@ export function planQwen3d(p, R, tl) {
     p.need.push(st(k), x3(k));
     p.hold.push(st(k), x3(k));
     p.soon.push(st(k + 1), x3(k + 1), st(k - 1), x3(k - 1));
+    // 遮住提示那一步的对照图要用第 1 步的逐层梯度（两种算法）
+    if (tl.step.ph === 'batch') p.want.push(st(0));
   }
   for (const key of ['need', 'want', 'hold', 'soon']) p[key] = [...new Set(p[key].filter(Boolean))];
   return p;

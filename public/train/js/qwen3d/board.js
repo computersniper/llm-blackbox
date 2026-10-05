@@ -76,6 +76,7 @@ export class QwenBoard {
     if (v === 'q-param') return s.ph === 'upd' ? 'adam' : 'wgrad';
     if (v === 'q-mat') return 'tensor';
     if (s.ph === 'upd' && s.sub === 'bf16' && st.depth >= 3) return 'bf16';
+    if (s.ph === 'batch' && st.depth >= 3 && (s.sub === 'tpl' || s.sub === 'mask')) return s.sub;
     return null;
   }
 
@@ -135,6 +136,14 @@ export class QwenBoard {
 
   drawBoard(kind, st, F) {
     const sm = small(), W = this.boardEl.clientWidth || 800, R = this.R, k = st.k;
+    if (kind === 'tpl') { const h = sm ? 230 : 200; this.board.size(W, h); this.board.draw((g) => this.drawTpl(g, { x: 0.5, y: 0.5, w: W - 1, h: h - 1 })); return; }
+    if (kind === 'mask') {
+      if (!R.hasSt(0)) { this.board.size(W, 90); this.board.draw((g) => { card(g, 0.5, 0.5, W - 1, 89, {}); text(g, T_('q3.loadingStep'), 20, 50, { size: 12.5, color: COL.dim }); }); return; }
+      const h = sm ? 300 : 230;
+      this.board.size(W, h);
+      this.board.draw((g, env) => this.drawMask(g, { x: 0.5, y: 0.5, w: W - 1, h: h - 1 }, st, env));
+      return;
+    }
     const need3 = kind !== 'end' && !R.has3(k), needSt = (kind === 'tensor' || kind === 'wgrad') && !R.hasSt(k);
     if (need3 || needSt) {
       this.board.size(W, 90);
@@ -377,6 +386,56 @@ export class QwenBoard {
     });
     const same = back === orig;
     text(g, same ? T_('q3.bitsSame') : T_('q3.bitsDiff'), C.x + 16, C.y + C.h - 12, { size: 11, weight: 600, color: same ? COL.rose : COL.cyan, max: C.w - 32 });
+  }
+
+  // D3 进料 · 套模板：模型真正看到的那串文字（apply_chat_template 的原样输出）
+  drawTpl(g, C) {
+    const m = this.R.D.meta, sm = small();
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: T_('q3.tplEye'), title: T_('q3.tplTitle'), accent: COL.violet, active: true });
+    let y = C.y + 64;
+    for (const ln of m.text.replace(/\n/g, '↵\n').split('\n')) {
+      if (!ln) continue;
+      text(g, ln, C.x + 16, y, { size: sm ? 10.5 : 12, kind: 'mono', color: COL.ink2, max: C.w - 32 });
+      y += sm ? 15 : 17;
+    }
+    if (isEn) wrap(g, `Translation: 你是谁？ = “${SFT_EN.question}” · 我是黑箱里的小模型。 = “${SFT_EN.answer}”`, C.x + 16, y + 2, C.w - 32, 13, { size: 9.5, color: COL.dim, maxLines: 2 });
+  }
+
+  // D3 进料 · 遮住提示：SFT 只算回答 vs 预训练式全都算——损失，以及第 1 步每一层的梯度长度（都在原模型上，真实）
+  drawMask(g, C, st, env) {
+    const R = this.R, m = R.D.meta, k = st.k, sm = small();
+    card(g, C.x, C.y, C.w, C.h, { eyebrow: T_('q3.maskEye'), title: T_('q3.maskTitle'), accent: COL.amber, active: true });
+    const half = C.w > 620;
+    const A = { x: C.x + 16, y: C.y + 70, w: half ? C.w * 0.36 : C.w - 32 };
+    const items = [[T_('q3.maskSft', { n: R.ans.length }), R.lossState(k), COL.cyan], [T_('q3.maskAll', { n: R.N1 }), R.lossPreState(k), COL.violet]];
+    const mx = Math.max(...items.map((x) => x[1]));
+    items.forEach(([lab, v, c], i) => {
+      const y = A.y + i * 34;
+      text(g, lab, A.x, y, { size: 11, color: COL.ink2, max: A.w });
+      rr(g, A.x, y + 6, Math.max(2, (A.w - 70) * (v / mx)), 10, 3);
+      g.fillStyle = hexA(c, 0.8); g.fill();
+      text(g, v.toFixed(3), A.x + A.w, y + 15, { size: 11, kind: 'mono', color: COL.ink, align: 'right' });
+    });
+    const B = half ? { x: C.x + C.w * 0.4 + 10, y: C.y + 56, w: C.w * 0.6 - 26, h: C.h - 76 } : { x: C.x + 16, y: A.y + 80, w: C.w - 32, h: C.h - (A.y - C.y) - 96 };
+    const pc = m.pretrainCompare.gradNorms, sf = m.steps[0].gradNorms, NL = R.NL;
+    if (!pc || !sf) return;
+    const ln = (gn, li) => { let s = 0; for (const [n, v] of Object.entries(gn)) if (n.startsWith(`model.layers.${li}.`)) s += v * v; return Math.sqrt(s); };
+    const a = [], b = [];
+    for (let li = 0; li < NL; li++) { a.push(ln(sf, li)); b.push(ln(pc, li)); }
+    const top = Math.max(...a, ...b);
+    text(g, T_('q3.maskChart'), B.x, B.y + 6, { size: 10, color: COL.dim, max: B.w });
+    const bw = B.w / NL, chh = B.h - 28, cy = B.y + 16;
+    for (let li = 0; li < NL; li++) {
+      const h1 = (a[li] / top) * chh, h2 = (b[li] / top) * chh;
+      g.fillStyle = hexA(COL.violet, 0.5);
+      g.fillRect(B.x + li * bw + bw * 0.5, cy + chh - h2, bw * 0.4, h2);
+      g.fillStyle = hexA(COL.cyan, 0.85);
+      g.fillRect(B.x + li * bw + bw * 0.1, cy + chh - h1, bw * 0.4, h1);
+      env.hit(B.x + li * bw, cy, bw, chh, { tip: T_('q3.maskTip', { l: li, a: a[li].toFixed(2), b: b[li].toFixed(2) }) });
+    }
+    text(g, '0', B.x, cy + chh + 11, { size: 8.5, kind: 'mono', color: COL.faint });
+    text(g, String(NL - 1), B.x + B.w, cy + chh + 11, { size: 8.5, kind: 'mono', color: COL.faint, align: 'right' });
+    if (half) wrap(g, T_('q3.maskLegend'), A.x, C.y + C.h - 44, A.w, 14, { size: 10, color: COL.dim, maxLines: 2 });
   }
 
   // D3：存回 bf16（全模型的真实统计）
