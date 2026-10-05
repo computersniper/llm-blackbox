@@ -84,13 +84,20 @@ export function panelRect(l, kind) {
   const p = PANEL[kind], yb = yBand(l);
   return [p.x0, p.x0 + p.w, yb + p.y0, yb + p.y0 + p.h];
 }
-// 一个算子用到的范围（D2 / D3 的镜头）：attn / ffn 这一半层
+// 一个算子用到的范围（D3 的镜头）：[x0, x1, y0, y1, z0, z1]
 export function opRect(op) {
   if (op.sub === 'emb') return [-3.0, 2.0, -0.3, yBound(0) + 0.6, -3.2, 1.2];
   if (op.sub === 'head') return [-3.0, 7.2, YTOP - 0.4, YP + PH + 0.3, -1.2, 1.0];
-  const yb = yBand(op.L);
-  if (op.sub === 'attn') return [-7.6, 4.1, yb - 0.85, yb + SUB.heads1 + 0.25, -0.6, 0.6];
-  return [-7.6, 7.9, yb + SUB.ring2 - 0.3, yb + HB + 0.75, -0.6, 0.6];
+  const yb = yBand(op.L), z = [-0.6, 0.6];
+  switch (op.sub) {
+    case 'norm1': return [-7.6, 1.5, yb - 0.85, yb + SUB.attn1 + 0.2, ...z];
+    case 'qkv': return [-2.9, 2.75, yb + 0.05, yb + SUB.heads1 + 0.15, ...z];
+    case 'attn': return [-0.3, 2.85, yb + SUB.attn1 - 0.25, yb + SUB.heads1 + 0.3, ...z];
+    case 'wo': return [-2.9, 4.1, yb + 0.05, yb + SUB.add1 + 0.3, ...z];
+    case 'norm2': return [-2.9, 1.2, yb + SUB.add1 - 0.2, yb + SUB.ffn1 + 0.2, ...z];
+    case 'ffn': return [-0.3, 6.6, yb + SUB.ring2 - 0.1, yb + SUB.ffn1 + 0.3, ...z];
+    default: return [-7.6, 7.9, yb + 0.05, yb + HB + 0.75, ...z];
+  }
 }
 
 // 跟踪的 4 个权重在机器上的位置（数据里的下标是 PyTorch 的 [输出, 输入]；面板按 y = x · W 摆，行 = 输入、列 = 输出）

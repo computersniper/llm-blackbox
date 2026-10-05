@@ -2,8 +2,8 @@
 //
 //   D1 训练全程    41 个检查点，每个一拍：进料 → 前向 → 损失 → 反向 → 更新（延时摄影）
 //   D2 一步之内    ① 取批次 ② 前向 ③ 损失 ④ 反向 ⑤ 更新（走完自动进入下一个检查点）
-//   D3 一层之内    批次：取一行 / 编号 / 错开一位；前向、反向：嵌入、每层的注意力一半和前馈一半、输出头；
-//                  损失：64 个位置、平均；更新：裁剪、AdamW
+//   D3 一层之内    批次：取一行 / 编号 / 错开一位；前向、反向逐个算子：嵌入、每层 7 个（RMSNorm → q k v → 注意力 → W_o + 残差
+//                  → RMSNorm → gate / up → W_down + 残差）、输出头；损失：64 个位置、平均；更新：裁剪、AdamW
 //   D4 一块权重    三块有真实局部的矩阵（嵌入、第 2 层 W_q、第 4 层 W_down）放大成 48 × 48 个方块；损失拆到每个位置
 //   D5 一个权重    数据里跟踪的 4 个权重：前向时它的值、反向时它的梯度、更新时完整的 AdamW 算式
 import { isEn } from '../lang.js';
@@ -12,21 +12,23 @@ export const T3_MAX = 5, T3_MIN = 1;
 export const T3_NAMES = isEn ? ['', 'Whole run', 'One step', 'One layer', 'One weight block', 'One weight'] : ['', '训练全程', '一步之内', '一层之内', '一块权重', '一个权重'];
 export const PHASES = ['batch', 'fwd', 'loss', 'bwd', 'upd'];
 export const NL = 6;
-// 前向的 14 个算子：嵌入、每层的注意力一半 / 前馈一半、输出头；反向倒过来
+// 前向的 44 个算子：嵌入、每层 7 个、输出头；反向倒过来。机器内部仍按“半层”算进度（见 machine.js 的 halfX）
+export const LAYER_OPS = ['norm1', 'qkv', 'attn', 'wo', 'norm2', 'ffn', 'down'];
+export const ATTN_OPS = ['norm1', 'qkv', 'attn', 'wo'];
 export const FWD = [{ sub: 'emb' }];
-for (let l = 0; l < NL; l++) FWD.push({ sub: 'attn', L: l }, { sub: 'ffn', L: l });
+for (let l = 0; l < NL; l++) for (const sub of LAYER_OPS) FWD.push({ sub, L: l });
 FWD.push({ sub: 'head' });
 export const BWD = FWD.slice().reverse();
-export const opKey = (o) => `${o.sub}${o.L ?? ''}`;
+export const opKey = (o) => `${o.sub}@${o.L ?? ''}`;
 export const opIndex = (list, s) => list.findIndex((o) => o.sub === s.sub && o.L === s.L);
 // 有真实局部的算子（c = 局部编号）；有跟踪权重的算子（f = 权重编号，按在算子里出现的先后）
-export const CROP_AT = { emb: 0, attn2: 1, ffn4: 2, head: 0 };
-export const FEAT_AT = { emb: [0], attn1: [3, 1], ffn5: [2] };
+export const CROP_AT = { 'emb@': 0, 'qkv@2': 1, 'down@4': 2, 'head@': 0 };
+export const FEAT_AT = { 'emb@': [0], 'norm1@1': [3], 'qkv@1': [1], 'down@5': [2] };
 export const FEAT_CROP = [0, 1, 2, undefined];
 export const ADAM_SUBS = ['g', 'm', 'v', 'bc', 'dw', 'write'];
 const NPOS = 64;
 
-const DUR = { run: 3.8, batch: 3.2, fwd: 7, loss: 3, bwd: 7, upd: 4.2, sub: 2.4, op: 2.2, nll: 3, mean: 2, clip: 2.4, adam: 3.6, crop: 3.4, pos: 1.0, w: 3.6, sub5: 2.6 };
+const DUR = { run: 3.8, batch: 3.2, fwd: 7, loss: 3, bwd: 7, upd: 4.2, sub: 2.4, op: 1.5, nll: 3, mean: 2, clip: 2.4, adam: 3.6, crop: 3.4, pos: 1.0, w: 3.6, sub5: 2.6 };
 
 export function t3Build(depth, k) {
   if (depth <= 1) return [{ k, ph: 'run' }];

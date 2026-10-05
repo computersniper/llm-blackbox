@@ -11,7 +11,7 @@
 import { THREE, label, easeOut, easeInOut, seg } from '../../../js/stage/engine.js';
 import * as LY from './layout.js';
 import { divInto, gradInto, seqInto, LIN } from '../glass3d/palette.js';
-import { FWD, BWD, PHASES, opIndex, ADAM_SUBS, FEAT_CROP } from './timeline.js';
+import { PHASES, ATTN_OPS, ADAM_SUBS, FEAT_CROP } from './timeline.js';
 import { tensorName, KIND_LABEL, kindShape, kindCount, CROPS, cropOf } from './data.js';
 import { fmtP, sciSup } from '../draw.js';
 import { esc } from '../../../js/ui.js';
@@ -964,8 +964,7 @@ export class TinyMachine {
         else F.shift = easeOut(seg(p, 0.1, 0.7));
         break;
       case 'fwd': case 'bwd': {
-        const list = s.ph === 'fwd' ? FWD : BWD, oi = opIndex(list, s);
-        const v = oi + easeInOut(seg(p, 0, 0.82));
+        const v = halfX(s, easeInOut(seg(p, 0, 0.82)), s.ph === 'bwd');
         if (s.ph === 'fwd') F.fwd = v; else F.bwd = v;
         break;
       }
@@ -1201,7 +1200,7 @@ export class TinyMachine {
       if (wr != null) col.lerp(STEEL, kind === 'E' || P.kind === 'ET' || LY.MAT_KINDS.includes(kind) ? 0.5 * Math.pow(clamp01((wr - 0.018) / 0.12), 0.7) : 0.5 * clamp01(Math.abs(wr - 1) / 0.7));
       if (gOn > 0) col.lerp(ROSE, 0.42 * gI * gOn);
       if (uOn > 0) col.lerp(VIOL, 0.42 * dI * uOn);
-      if (active) col.lerp(CYAN, 0.3);
+      if (active) col.lerp(CYAN, 0.22);
       P.back.material.color.copy(col);
       P.edge.material.opacity = P.ghost ? (active || gOn > 0.3 ? 0.5 : 0.22) : active ? 0.95 : gOn > 0 && bw < 1 ? 0.9 : 0.42;
       P.edge.material.color.setHex(uOn > 0.05 ? 0xb39dff : gOn > 0 && bw < 1 ? 0xff6b93 : active ? 0xbff8ff : 0x5ef0d4);
@@ -1473,15 +1472,15 @@ export class TinyMachine {
       else if (s.sub === 'head') { opPanels.add(this.ghostP); opPanels.add(this.nfP); }
       else {
         const R = this.layerP[s.L];
-        for (const kind of s.sub === 'attn' ? ['ln1', 'q', 'k', 'v', 'o'] : ['ln2', 'gate', 'up', 'down']) opPanels.add(R[kind]);
+        for (const kind of OP_PANELS[s.sub]) opPanels.add(R[kind]);
       }
     }
     if (v === 't-step' && (s.ph === 'fwd' || s.ph === 'bwd')) {
       // 一步之内：镜头跟着的那一层，标出它的主要面板
       const x = s.ph === 'fwd' ? F.fwd : F.bwd;
       const o = Math.min(13, Math.max(0, Math.floor(x)));
-      const op = (s.ph === 'fwd' ? FWD : BWD)[o];
-      if (op.L != null && !this.small) for (const kind of ['q', 'o', 'gate', 'down']) opPanels.add(this.layerP[op.L][kind]);
+      const l = o === 0 || o === 13 ? -1 : s.ph === 'fwd' ? Math.floor((o - 1) / 2) : NLAY - 1 - Math.floor((o - 1) / 2);
+      if (l >= 0 && !this.small) for (const kind of ['q', 'o', 'gate', 'down']) opPanels.add(this.layerP[l][kind]);
     }
     for (const [P, o] of this.lPanel) {
       let show = opPanels.has(P);
@@ -1499,7 +1498,7 @@ export class TinyMachine {
     this.lLayer.forEach((o, l) => { o.visible = showLayers || ((s.ph === 'fwd' || s.ph === 'bwd') && s.L === l && v === 't-op'); });
     const lensOn = v === 't-step' || v === 't-op';
     this.lLens.forEach((o, b) => { o.visible = lensOn && !this.small && (s.ph !== 'fwd' && s.ph !== 'bwd' ? false : true) && this.lensNear(b, s, F); });
-    this.lHeads.forEach((o, l) => { o.visible = v === 't-op' && s.sub === 'attn' && s.L === l; });
+    this.lHeads.forEach((o, l) => { o.visible = (v === 't-op' || v === 't-crop' || v === 't-param') && (s.sub === 'attn' || s.sub === 'qkv') && s.L === l && !this.mag.visible; });
     this.lBundle.visible = (v === 't-step' || v === 't-op') && s.ph === 'batch' && s.sub !== 'row';
     this.lTray.visible = (v === 't-step' || v === 't-op') && s.ph === 'batch';
     this.lStack.visible = (v === 't-step' || v === 't-op') && s.ph === 'batch' && !this.small;
@@ -1715,7 +1714,7 @@ export class TinyMachine {
       if (s.ph === 'loss') return frame(lossR, TOP, 1.06);
       if (s.ph === 'upd') return frame(machine, WIDE, 1.02);
       const r = LY.opRect(s);
-      if (this.small && (s.sub === 'attn' || s.sub === 'ffn')) r[0] = BUNDLE.x0 - 0.3;
+      if (this.small && s.L != null) r[0] = Math.max(r[0], BUNDLE.x0 - 0.3);
       return frame(r, MID, 1.04);
     }
     if (v === 't-pos') {
@@ -1739,4 +1738,18 @@ export class TinyMachine {
 }
 
 const HB_MID = LY.HB / 2;
+// D3 起每个算子用到的面板
+const OP_PANELS = { norm1: ['ln1'], qkv: ['q', 'k', 'v', 'qn', 'kn'], attn: [], wo: ['o'], norm2: ['ln2'], ffn: ['gate', 'up'], down: ['down'] };
+// D3 起的一个算子 → 机器内部按“半层”算的进度（0 嵌入、1 + 2l 第 l 层注意力一半、2 + 2l 前馈一半、13 输出头；反向倒过来），
+// 和 D1 / D2 连续播放时的进度是同一套，算子在半层里的位置对齐面板的亮起时间
+const HALF_F = { norm1: [0, 0.15], qkv: [0.15, 0.5], attn: [0.5, 0.72], wo: [0.72, 1], norm2: [0, 0.15], ffn: [0.15, 0.55], down: [0.55, 1] };
+const HALF_B = { down: [0, 0.45], ffn: [0.45, 0.8], norm2: [0.8, 1], wo: [0, 0.33], attn: [0.33, 0.48], qkv: [0.48, 0.76], norm1: [0.76, 1] };
+function halfX(s, f, bwd) {
+  if (s.sub === 'emb') return bwd ? 13 + f : f;
+  if (s.sub === 'head') return bwd ? f : 13 + f;
+  const att = ATTN_OPS.includes(s.sub), l = s.L;
+  const base = bwd ? (att ? 2 + 2 * (NLAY - 1 - l) : 1 + 2 * (NLAY - 1 - l)) : (att ? 1 + 2 * l : 2 + 2 * l);
+  const w = (bwd ? HALF_B : HALF_F)[s.sub];
+  return base + w[0] + (w[1] - w[0]) * f;
+}
 function mix3(a, b, f) { return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]; }

@@ -3,7 +3,7 @@
 import { esc } from '../../../js/ui.js';
 import { fmtP, sciSup, fmtInt } from '../draw.js';
 import { isEn, L, compact, featLabel } from '../lang.js';
-import { FWD, BWD, opIndex, ADAM_SUBS } from './timeline.js';
+import { ADAM_SUBS } from './timeline.js';
 import { tensorName, KIND_LABEL } from './data.js';
 
 const K_ = (s) => `<span class="kw">${s}</span>`;
@@ -40,7 +40,7 @@ export function linesFor(s) {
   switch (s.ph) {
     case 'run': return [3];
     case 'batch': return !s.sub ? [4, 5] : s.sub === 'shift' ? [5] : [4];
-    case 'fwd': return !s.sub ? [6, 7, 8, 9, 10] : { emb: [6], attn: [7, 8], ffn: [7, 9], head: [10] }[s.sub];
+    case 'fwd': return !s.sub ? [6, 7, 8, 9, 10] : s.sub === 'emb' ? [6] : s.sub === 'head' ? [10] : ['norm1', 'qkv', 'attn', 'wo'].includes(s.sub) ? [7, 8] : [7, 9];
     case 'loss': return [11];
     case 'bwd': return [12];
     case 'upd': return !s.sub ? [13, 14, 15, 16] : s.sub === 'clip' ? [13] : !s.mi ? [14, 15, 16] : { g: [14], m: [15], v: [15], bc: [16], dw: [16], write: [16] }[s.mi];
@@ -58,7 +58,8 @@ export const CROP_NAME = isEn ? ['Embedding E (48 × 48)', 'Layer 2 W_q (48 × 4
 export function opName(s) {
   if (s.sub === 'emb') return L('嵌入', 'embedding');
   if (s.sub === 'head') return L('输出头', 'output head');
-  return s.sub === 'attn' ? L(`第 ${s.L} 层 · 注意力`, `layer ${s.L} · attention`) : L(`第 ${s.L} 层 · 前馈`, `layer ${s.L} · FFN`);
+  const nm = isEn ? { norm1: 'RMSNorm γ₁', qkv: 'q, k, v', attn: 'attention', wo: 'W_o + residual', norm2: 'RMSNorm γ₂', ffn: 'gate / up', down: 'W_down + residual' } : { norm1: 'RMSNorm γ₁', qkv: '算 q k v', attn: '注意力', wo: 'W_o + 残差', norm2: 'RMSNorm γ₂', ffn: 'gate / up', down: 'W_down + 残差' };
+  return L(`第 ${s.L} 层 · ${nm[s.sub]}`, `layer ${s.L} · ${nm[s.sub]}`);
 }
 
 export function stepLabel(s, X) {
@@ -106,8 +107,15 @@ export function shapeOf(s, X) {
     if (!s.sub) return L(`inp <b>[${B} × ${T}]</b> → h <b>[${B} × ${T} × ${H}]</b> → 6 层 → logits <b>[${B} × ${T} × ${fmtInt(V)}]</b>`, `inp <b>[${B} × ${T}]</b> → h <b>[${B} × ${T} × ${H}]</b> → 6 layers → logits <b>[${B} × ${T} × ${fmtInt(V)}]</b>`);
     if (s.sub === 'emb') return `${g}E <b>[${fmtInt(V)} × ${H}]</b>：inp → h₀ <b>[${B} × ${T} × ${H}]</b>`;
     if (s.sub === 'head') return `${g}h <b>[${B} × ${T} × ${H}]</b> @ Eᵀ <b>[${H} × ${fmtInt(V)}]</b> → logits <b>[${B} × ${T} × ${fmtInt(V)}]</b>`;
-    if (s.sub === 'attn') return `${g}W_q <b>[256 × 256]</b>，W_k / W_v <b>[256 × 128]</b>，W_o <b>[256 × 256]</b>；q <b>[${B} × ${T} × 4 × 64]</b>，k / v <b>[${B} × ${T} × 2 × 64]</b>`;
-    return `${g}W_gate / W_up <b>[256 × 768]</b>，W_down <b>[768 × 256]</b>；gate、up <b>[${B} × ${T} × 768]</b>`;
+    switch (s.sub) {
+      case 'norm1': return `${g}γ₁ <b>[256]</b>：h <b>[${B} × ${T} × ${H}]</b> → n₁`;
+      case 'qkv': return `${g}W_q <b>[256 × 256]</b>，W_k / W_v <b>[256 × 128]</b> → q <b>[${B} × ${T} × 4 × 64]</b>，k / v <b>[${B} × ${T} × 2 × 64]</b>`;
+      case 'attn': return L(`注意力权重 <b>[${B} × 4 × ${T} × ${T}]</b>（下三角）`, `attention weights <b>[${B} × 4 × ${T} × ${T}]</b> (lower triangle)`);
+      case 'wo': return `${g}W_o <b>[256 × 256]</b>：<b>[${B} × ${T} × 256]</b> → ⊕ h`;
+      case 'norm2': return `${g}γ₂ <b>[256]</b>：h → n₂`;
+      case 'ffn': return `${g}W_gate / W_up <b>[256 × 768]</b> → gate、up <b>[${B} × ${T} × 768]</b>`;
+      default: return `${g}W_down <b>[768 × 256]</b>：<b>[${B} × ${T} × 768]</b> → ⊕ h`;
+    }
   }
   if (s.ph === 'loss') return L(`logits <b>[${B} × ${T} × ${fmtInt(V)}]</b> → 每个位置 −ln p → ${fmtInt(B * T)} 个数平均成 1 个`, `logits <b>[${B} × ${T} × ${fmtInt(V)}]</b> → −ln p per position → ${fmtInt(B * T)} numbers averaged into 1`);
   if (s.ph === 'upd') return L(`m、v：和参数同形状，各 <b>${fmtInt(m.model.params)}</b> 个 fp32`, `m, v: same shape as the parameters, <b>${fmtInt(m.model.params)}</b> fp32 numbers each`);
@@ -202,13 +210,22 @@ function fwdExplain(s, X, k) {
     const st = lensStats(X, k, 6), rs = rowStats(X, k);
     return L(`<b>输出头</b>：最后的 RMSNorm，再乘 Eᵀ（和最底下的 E 是同一张表），给 7478 个字各打一个分，softmax 变成概率。<br>顶上的柱子 = 正确答案的概率，柱顶的字 = 它最想写的字（绿 = 猜对）。第 0 行前 64 个位置：猜中第一名 ${P(st.acc)}，正确答案平均 ${P(st.p)}，平均 −ln p = ${rs.mean.toFixed(3)}。`, `<b>Output head</b>: the final RMSNorm, then multiply by Eᵀ (the same table as E at the bottom) to score all 7,478 characters; softmax turns the scores into probabilities.<br>Pillars on top = probability of the right answer; the character on each = its top guess (green = right). First 64 positions of row 0: top-1 right ${P(st.acc)}, right answer averages ${P(st.p)}, mean −ln p = ${rs.mean.toFixed(3)}.`);
   }
-  const l = s.L;
-  if (s.sub === 'attn') {
-    const a = lensStats(X, k, l);
-    return L(`<b>第 ${l} 层 · 注意力</b>：RMSNorm（γ₁）→ W_q / W_k / W_v（扫描线扫过）→ 4 个查询头各自决定看前面哪些字（GQA：每 2 个查询头共用 1 组 K/V，所以 W_k、W_v 只有 W_q 的一半宽）→ W_o → ⊕ 加回残差。<br>${headLine(X, k, l)}<br>进这一层之前的透镜读数：猜中 ${P(a.acc)}，平均 ${P(a.p)}。<span class="dimmed">这块面板只显示统计量；第 2 层的 W_q 角上有真实的 48 × 48。</span>`, `<b>Layer ${l} · attention</b>: RMSNorm (γ₁) → W_q / W_k / W_v (scan lines sweep) → each of the 4 query heads decides which earlier characters to look at (GQA: every 2 query heads share 1 K/V pair, so W_k and W_v are half as wide as W_q) → W_o → ⊕ back into the residual.<br>${headLine(X, k, l)}<br>Lens reading before this layer: right ${P(a.acc)}, average ${P(a.p)}. <span class="dimmed">This panel shows statistics only; layer 2’s W_q has a real 48 × 48 corner.</span>`);
+  return layerFwd(s, X, k);
+}
+
+// 前向：一层里的 7 个算子
+function layerFwd(s, X, k) {
+  const l = s.L, a = lensStats(X, k, l);
+  switch (s.sub) {
+    case 'norm1': return L(`<b>第 ${l} 层 · RMSNorm（γ₁）</b>：把每个位置的残差除以它自己的均方根（缩放到同样的长度），再逐维乘 γ₁（256 个数）。残差会越加越长（进这一层时 ‖h‖ 平均 ${residMean(X, k, l).toFixed(1)}），归一化让注意力看到的输入尺度稳定。<br>进这一层之前的透镜读数：猜中 ${P(a.acc)}，正确答案平均 ${P(a.p)}。`, `<b>Layer ${l} · RMSNorm (γ₁)</b>: divide each position’s residual by its own root mean square (so every position has the same length), then multiply by γ₁ dim by dim (256 numbers). The residual keeps growing (mean ‖h‖ entering this layer: ${residMean(X, k, l).toFixed(1)}); normalizing keeps the input to attention on a steady scale.<br>Lens reading before this layer: right ${P(a.acc)}, right answer averages ${P(a.p)}.`);
+    case 'qkv': return L(`<b>第 ${l} 层 · 算 q、k、v</b>：乘 W_q [256 × 256] 得到 4 个查询头 × 64 维，乘 W_k、W_v [256 × 128] 得到 2 组键 / 值 × 64 维（GQA：每 2 个查询头共用 1 组 K/V，所以 W_k、W_v 只有一半宽）。q、k 再各过一次 q_norm / k_norm（64 个 γ）并加上 RoPE 位置旋转。<br>${l === 2 ? '这块 W_q 的角上有真实的 48 × 48，按 ＋ 放大看。' : '这些面板只显示统计量。'}`, `<b>Layer ${l} · compute q, k, v</b>: multiply by W_q [256 × 256] for 4 query heads × 64 dims, by W_k and W_v [256 × 128] for 2 key / value groups × 64 dims (GQA: every 2 query heads share 1 K/V group, so W_k and W_v are half as wide). q and k then go through q_norm / k_norm (64 γ each) and get the RoPE position rotation.<br>${l === 2 ? 'This W_q has a real 48 × 48 corner — press + to magnify it.' : 'These panels show statistics only.'}`);
+    case 'attn': return L(`<b>第 ${l} 层 · 注意力</b>：每个查询头用自己的 q 和前面所有位置的 k 打分，softmax 成权重（因果遮罩：看不到后面），再按权重把 v 加起来。上面 4 块是这 4 个头的真实图案。<br>${headLine(X, k, l)}<br><span class="dimmed">注意力图案是在留出的《登鹳雀楼》上记录的（训练批次的注意力没有存）。</span>`, `<b>Layer ${l} · attention</b>: each query head scores its q against the k of every earlier position, softmaxes the scores into weights (causal mask: no peeking ahead) and adds up the v’s by those weights. The 4 tiles above are the real patterns of these 4 heads.<br>${headLine(X, k, l)}<br><span class="dimmed">The patterns were recorded on the held-out poem “On the Stork Tower” (the batch’s attention wasn’t saved).</span>`);
+    case 'wo': return L(`<b>第 ${l} 层 · W_o + 残差</b>：4 个头的输出拼成 256 维，乘 W_o [256 × 256]，再 <b>⊕ 加回残差流</b>——注意力只是往残差里“写”一点东西，原来的内容原样留着。`, `<b>Layer ${l} · W_o + residual</b>: the 4 heads’ outputs are concatenated into 256 dims, multiplied by W_o [256 × 256], then <b>⊕ added back into the residual stream</b> — attention only “writes” a little into the residual; what was there stays.`);
+    case 'norm2': return L(`<b>第 ${l} 层 · RMSNorm（γ₂）</b>：前馈网络之前再归一化一次，乘 γ₂（256 个数）。`, `<b>Layer ${l} · RMSNorm (γ₂)</b>: normalize once more before the feed-forward network and multiply by γ₂ (256 numbers).`);
+    case 'ffn': return L(`<b>第 ${l} 层 · SwiGLU 升维</b>：W_gate、W_up [256 × 768] 把 256 维升到 768 维；silu(gate) ⊙ up：gate 那一路决定每个神经元开多大，up 那一路是内容。`, `<b>Layer ${l} · SwiGLU up-projection</b>: W_gate and W_up [256 × 768] lift 256 dims to 768; silu(gate) ⊙ up: the gate path decides how far each neuron opens, the up path carries the content.`);
   }
-  const b = lensStats(X, k, l + 1), a = lensStats(X, k, l);
-  return L(`<b>第 ${l} 层 · 前馈（SwiGLU）</b>：RMSNorm（γ₂）→ W_gate、W_up 把 256 维升到 768 维 → silu(gate) ⊙ up → W_down 降回 256 维 → ⊕ 加回残差。<br>这一层的透镜读数：猜中 ${P(a.acc)} → <b>${P(b.acc)}</b>，正确答案平均 ${P(a.p)} → <b>${P(b.p)}</b>；残差长度 ‖h‖ 平均 ${residMean(X, k, l + 1).toFixed(1)}。`, `<b>Layer ${l} · FFN (SwiGLU)</b>: RMSNorm (γ₂) → W_gate and W_up lift 256 dims to 768 → silu(gate) ⊙ up → W_down back to 256 → ⊕ into the residual.<br>Lens reading across this layer: right ${P(a.acc)} → <b>${P(b.acc)}</b>, right answer ${P(a.p)} → <b>${P(b.p)}</b>; mean residual length ‖h‖ ${residMean(X, k, l + 1).toFixed(1)}.`);
+  const b = lensStats(X, k, l + 1);
+  return L(`<b>第 ${l} 层 · W_down + 残差</b>：W_down [768 × 256] 把 768 维降回 256 维，⊕ 加回残差。这一层走完了，左边的透镜屏写出它此刻最想写的字。<br>这一层的透镜读数：猜中 ${P(a.acc)} → <b>${P(b.acc)}</b>，正确答案平均 ${P(a.p)} → <b>${P(b.p)}</b>；残差长度 ‖h‖ 平均 ${residMean(X, k, l + 1).toFixed(1)}。${l === 4 ? '<br>这块 W_down 的角上有真实的 48 × 48，按 ＋ 放大看。' : ''}`, `<b>Layer ${l} · W_down + residual</b>: W_down [768 × 256] brings 768 dims back to 256, ⊕ added into the residual. The layer is done, and the lens screen on the left writes what it would guess right now.<br>Lens reading across this layer: right ${P(a.acc)} → <b>${P(b.acc)}</b>, right answer ${P(a.p)} → <b>${P(b.p)}</b>; mean residual length ‖h‖ ${residMean(X, k, l + 1).toFixed(1)}.${l === 4 ? '<br>This W_down has a real 48 × 48 corner — press + to magnify it.' : ''}`);
 }
 
 function cropBlurb(X, k, c) {
@@ -250,9 +267,16 @@ function bwdExplain(s, X, k) {
   if (s.c != null && s.sub !== 'emb' && s.sub !== 'head') return cropExplain(s, X, k);
   if (s.sub === 'head') return L(`梯度从损失流进输出头：最后的 RMSNorm γ_f（‖∇‖ = ${sciSup(X.tgrad(k, -1, 'nf'), 2)}）和 Eᵀ。Eᵀ 就是 E，所以 E 的梯度在这里先收到一份（给每个字打分那一路），到最底下查表那一路再收一份。<br>最后一层之后每个位置的 ‖∂L/∂h‖ 平均 ${sciSup(residMean(X, k, 6, true), 3)}。`, `The gradient flows from the loss into the output head: the final RMSNorm γ_f (‖∇‖ = ${sciSup(X.tgrad(k, -1, 'nf'), 2)}) and Eᵀ. Eᵀ is E, so E gets one share here (the scoring path) and another at the bottom (the lookup path).<br>Mean ‖∂L/∂h‖ per position after the last layer: ${sciSup(residMean(X, k, 6, true), 3)}.`);
   if (s.sub === 'emb') return L(`梯度流到最底下：每个位置的 ∂L/∂h₀ 加到它那个字在 E 里的那一行上（只有这一批里出现过的字的行才有梯度）。加上输出头那一路，E 的梯度范数是 ${sciSup(X.tgrad(k, -1, 'E'), 3)}——通常是全模型最大的。${s.c === 0 ? `<br>角上的局部换成了梯度热力：最常见的 48 个字几乎每一批都出现，所以它们的行一直有梯度。` : ''}`, `The gradient reaches the bottom: each position’s ∂L/∂h₀ is added to its character’s row of E (only rows of characters that appear in this batch get a gradient). With the output-head path added, E’s gradient norm is ${sciSup(X.tgrad(k, -1, 'E'), 3)} — usually the largest in the model.${s.c === 0 ? '<br>The corner crop now shows gradient heat: the 48 most common characters appear in almost every batch, so their rows always get a gradient.' : ''}`);
-  const l = s.L;
-  if (s.sub === 'ffn') return L(`梯度流过<b>第 ${l} 层 · 前馈</b>：残差连接让它直接抄近路往下，前馈这一路再贡献一份。<br>这几块的 ‖∇W‖：${gradList(X, k, l, ['down', 'gate', 'up', 'ln2'])}。这一层之后每个位置的 ‖∂L/∂h‖ 平均 ${sciSup(residMean(X, k, l + 1, true), 3)}。`, `The gradient flows through <b>layer ${l} · FFN</b>: the residual connection lets it shortcut straight down, and the FFN path adds its own share.<br>‖∇W‖ of these blocks: ${gradList(X, k, l, ['down', 'gate', 'up', 'ln2'])}. Mean ‖∂L/∂h‖ per position after this layer: ${sciSup(residMean(X, k, l + 1, true), 3)}.`);
-  return L(`梯度流过<b>第 ${l} 层 · 注意力</b>：W_o → 4 个头 → W_q / W_k / W_v → γ₁。<br>这几块的 ‖∇W‖：${gradList(X, k, l, ['o', 'q', 'k', 'v', 'ln1'])}；q_norm / k_norm 的 γ：${gradList(X, k, l, ['qn', 'kn'])}。这一层之前每个位置的 ‖∂L/∂h‖ 平均 ${sciSup(residMean(X, k, l, true), 3)}。`, `The gradient flows through <b>layer ${l} · attention</b>: W_o → the 4 heads → W_q / W_k / W_v → γ₁.<br>‖∇W‖ of these blocks: ${gradList(X, k, l, ['o', 'q', 'k', 'v', 'ln1'])}; q_norm / k_norm γ: ${gradList(X, k, l, ['qn', 'kn'])}. Mean ‖∂L/∂h‖ per position before this layer: ${sciSup(residMean(X, k, l, true), 3)}.`);
+  const l = s.L, gin = sciSup(residMean(X, k, l + 1, true), 3), gout = sciSup(residMean(X, k, l, true), 3);
+  switch (s.sub) {
+    case 'down': return L(`梯度流过<b>第 ${l} 层 · W_down + 残差</b>：⊕ 的梯度原样分两路——一路沿残差抄近路直接往下，一路进 W_down。这一层之后每个位置的 ‖∂L/∂h‖ 平均 ${gin}。<br>‖∇W_down‖ = ${sciSup(X.tgrad(k, l, 'down'), 3)}。`, `The gradient flows through <b>layer ${l} · W_down + residual</b>: ⊕ passes its gradient both ways unchanged — one copy takes the residual shortcut straight down, the other goes into W_down. Mean ‖∂L/∂h‖ per position after this layer: ${gin}.<br>‖∇W_down‖ = ${sciSup(X.tgrad(k, l, 'down'), 3)}.`);
+    case 'ffn': return L(`梯度流过<b>第 ${l} 层 · SwiGLU</b>：silu(gate) ⊙ up 的乘法把梯度分给两路，再各自乘回 W_gate、W_up。<br>‖∇W_gate‖ = ${sciSup(X.tgrad(k, l, 'gate'), 3)}，‖∇W_up‖ = ${sciSup(X.tgrad(k, l, 'up'), 3)}。`, `The gradient flows through <b>layer ${l} · SwiGLU</b>: the product silu(gate) ⊙ up splits the gradient between the two paths, each multiplied back through W_gate and W_up.<br>‖∇W_gate‖ = ${sciSup(X.tgrad(k, l, 'gate'), 3)}, ‖∇W_up‖ = ${sciSup(X.tgrad(k, l, 'up'), 3)}.`);
+    case 'norm2': return L(`梯度流过<b>第 ${l} 层 · RMSNorm（γ₂）</b>：‖∇γ₂‖ = ${sciSup(X.tgrad(k, l, 'ln2'), 3)}。前馈这一路的梯度在这里汇回残差。`, `The gradient flows through <b>layer ${l} · RMSNorm (γ₂)</b>: ‖∇γ₂‖ = ${sciSup(X.tgrad(k, l, 'ln2'), 3)}. The FFN path’s gradient rejoins the residual here.`);
+    case 'wo': return L(`梯度流过<b>第 ${l} 层 · W_o + 残差</b>：同样一路抄近路、一路进 W_o。‖∇W_o‖ = ${sciSup(X.tgrad(k, l, 'o'), 3)}。`, `The gradient flows through <b>layer ${l} · W_o + residual</b>: again one copy shortcuts, one goes into W_o. ‖∇W_o‖ = ${sciSup(X.tgrad(k, l, 'o'), 3)}.`);
+    case 'attn': return L(`梯度流过<b>第 ${l} 层 · 注意力</b>：softmax 把梯度分给每个被看的位置的 v，也分给决定“看谁”的打分（q · k）。`, `The gradient flows through <b>layer ${l} · attention</b>: softmax hands the gradient to the v of every position looked at, and to the scores (q · k) that decided who to look at.`);
+    case 'qkv': return L(`梯度流过<b>第 ${l} 层 · q、k、v</b>：‖∇W_q‖ = ${sciSup(X.tgrad(k, l, 'q'), 3)}，‖∇W_k‖ = ${sciSup(X.tgrad(k, l, 'k'), 3)}，‖∇W_v‖ = ${sciSup(X.tgrad(k, l, 'v'), 3)}；q_norm / k_norm 的 γ：${gradList(X, k, l, ['qn', 'kn'])}。${l === 2 ? '<br>W_q 角上的局部换成了梯度热力（按 ＋ 放大看）。' : ''}`, `The gradient flows through <b>layer ${l} · q, k, v</b>: ‖∇W_q‖ = ${sciSup(X.tgrad(k, l, 'q'), 3)}, ‖∇W_k‖ = ${sciSup(X.tgrad(k, l, 'k'), 3)}, ‖∇W_v‖ = ${sciSup(X.tgrad(k, l, 'v'), 3)}; q_norm / k_norm γ: ${gradList(X, k, l, ['qn', 'kn'])}.${l === 2 ? '<br>W_q’s corner crop now shows gradient heat (press + to magnify).' : ''}`);
+  }
+  return L(`梯度流过<b>第 ${l} 层 · RMSNorm（γ₁）</b>：‖∇γ₁‖ = ${sciSup(X.tgrad(k, l, 'ln1'), 3)}。注意力这一路的梯度汇回残差，这一层之前每个位置的 ‖∂L/∂h‖ 平均 ${gout}。`, `The gradient flows through <b>layer ${l} · RMSNorm (γ₁)</b>: ‖∇γ₁‖ = ${sciSup(X.tgrad(k, l, 'ln1'), 3)}. The attention path’s gradient rejoins the residual; mean ‖∂L/∂h‖ per position before this layer: ${gout}.`);
 }
 
 function updExplain(s, X, k) {
@@ -294,11 +318,13 @@ export function watch(s, X, ctx, depth) {
     rows.push(['wh', 'POSITION'], ['i', s.i], ['target', `${X.ch(X.tgt(k, s.i))} #${X.tgt(k, s.i)}`], ['p', p.toPrecision(4)], ['−ln p', (-Math.log(Math.max(p, 1e-12))).toFixed(4)]);
   }
   if ((s.ph === 'fwd' || s.ph === 'bwd') && s.sub) {
-    const b = s.sub === 'emb' ? 0 : s.sub === 'head' ? 6 : s.ph === 'fwd' ? s.L + 1 : s.L;
+    const att = ['norm1', 'qkv', 'attn', 'wo'].includes(s.sub);
+    const b = s.sub === 'emb' ? 0 : s.sub === 'head' ? 6 : att ? s.L : s.L + 1;
     const ls = lensStats(X, k, b);
     rows.push(['wh', L(`边界 ${b}`, `BOUNDARY ${b}`)], ['mean ‖h‖', residMean(X, k, b).toFixed(2)], ['lens top-1', fmtP(ls.acc)], ['lens p', fmtP(ls.p)]);
     if (s.ph === 'bwd') rows.push(['mean ‖∂L/∂h‖', sciSup(residMean(X, k, b, true), 3)]);
-    if (s.sub === 'attn' || s.sub === 'ffn') for (const kd of s.sub === 'attn' ? ['q', 'k', 'v', 'o'] : ['gate', 'up', 'down']) rows.push([`‖∇${KIND_LABEL[kd]}‖`, sciSup(X.tgrad(k, s.L, kd), 3)]);
+    const KD = { norm1: ['ln1'], qkv: ['q', 'k', 'v', 'qn', 'kn'], attn: [], wo: ['o'], norm2: ['ln2'], ffn: ['gate', 'up'], down: ['down'] }[s.sub] || [];
+    for (const kd of KD) rows.push([`‖∇${KIND_LABEL[kd]}‖`, sciSup(X.tgrad(k, s.L, kd), 3)]);
     if (s.sub === 'emb' || s.sub === 'head') rows.push(['‖∇E‖', sciSup(X.tgrad(k, -1, 'E'), 3)]);
   }
   if (s.ph === 'upd' && s.f != null) {
