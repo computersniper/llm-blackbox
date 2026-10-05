@@ -81,7 +81,8 @@ export class QwenBoard {
 
   update(st, t, F) {
     const kind = this.boardKind(st);
-    const showHud = !kind && st.view !== 'q-mat' && st.view !== 'q-param';
+    // 结尾那一拍：监视器（三步的概率）和底部的 DPO 浮层一起显示（手机上两块都在顶部，只留浮层）
+    const showHud = (!kind || (kind === 'end' && !small())) && st.view !== 'q-mat' && st.view !== 'q-param';
     this.hudEl.hidden = !showHud;
     this.boardEl.hidden = !kind;
     document.body.classList.toggle('q-board', !!kind);
@@ -436,6 +437,16 @@ export class QwenBoard {
       text(g, kk, C.x + 16, y, { size: 11, color: COL.dim, max: C.w * 0.5 });
       text(g, vv, C.x + C.w - 14, y, { size: 11.5, kind: 'mono', weight: 700, color: c, align: 'right' });
     });
+    // 回答的损失：原模型 → 第 1 / 2 / 3 步之后（对数刻度）
+    const top = C.y + 66 + rows.length * 28, bot = C.y + C.h - 44;
+    if (bot - top > 50) {
+      const x0 = C.x + 30, w = C.w - 60, lo = Math.log(0.005), hi = Math.log(8);
+      const Y = (v) => bot - ((Math.log(Math.max(0.005, v)) - lo) / (hi - lo)) * (bot - top - 12);
+      const pts = [];
+      for (let s = 0; s <= R.K; s++) pts.push([x0 + (s / R.K) * w, Y(R.lossState(s))]);
+      line(g, pts, COL.amber, 1.6);
+      pts.forEach(([x, y], s) => { dot(g, x, y, 3, COL.amber); text(g, R.lossState(s).toFixed(s === R.K ? 3 : 2), x, y - 7, { size: 9.5, kind: 'mono', color: COL.ink2, align: s === 0 ? 'left' : s === R.K ? 'right' : 'center' }); });
+    }
     wrap(g, T_('q3.chgNote'), C.x + 16, C.y + C.h - 34, C.w - 32, 13, { size: 10, color: COL.dim, maxLines: 2 });
   }
 

@@ -412,11 +412,15 @@ export class QwenMachine {
     g.add(ring, nst, this.lm);
     // 概率柱：每个位置一根，高度 = 正确答案的真实概率
     const mk = (geo, mat, n) => { const im = new THREE.InstancedMesh(geo, mat, n); im.frustumCulled = false; g.add(im); return im; };
-    this.bars = mk(GEO.bar, new THREE.MeshStandardMaterial({ color: 0x223, emissive: 0xffffff, emissiveIntensity: 0.22, roughness: 0.35, metalness: 0.1, transparent: true, opacity: 0.92 }), T);
+    // 颜色直接取实例颜色（不受灯光影响，暗处也看得出红 / 琥珀 / 绿）
+    this.bars = mk(GEO.bar, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.88 }), T);
     this.bars.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(T * 3), 3);
-    this.bars.material.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\n\ttotalEmissiveRadiance *= vColor;\n#endif'); };
     this.bars.userData.pick = (hit) => ({ type: 'bar', i: hit.instanceId, click: this.R.ans.includes(hit.instanceId) });
     this.E.pickables.push(this.bars);
+    // 不算损失的位置：同样是真实概率，画成很暗的半透明柱子
+    this.barsM = mk(GEO.bar, new THREE.MeshBasicMaterial({ color: 0x2a3858, transparent: true, opacity: 0.32, depthWrite: false }), T);
+    this.barsM.userData.pick = (hit) => ({ type: 'bar', i: hit.instanceId });
+    this.E.pickables.push(this.barsM);
     this.ghost = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 1, 0.3).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ color: 0x8ee07a, transparent: true, opacity: 0.16, depthWrite: false }), T);
     this.ghost.frustumCulled = false;
     this.ghost.raycast = () => {};
@@ -442,33 +446,27 @@ export class QwenMachine {
     this.gaugePre.raycast = () => {};
     this.gaugeGlass = glass;
     g.add(glass, this.gauge, this.gaugePre);
-    // 回答位置的 top-5 候选（D3 逐个位置看损失时，在那根概率柱旁边展开）
-    this.cands = mk(GEO.thin, new THREE.MeshStandardMaterial({ color: 0x223, emissive: 0xffffff, emissiveIntensity: 0.2, transparent: true, opacity: 0.9 }), 5);
-    this.cands.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(5 * 3), 3);
-    this.cands.material.onBeforeCompile = this.bars.material.onBeforeCompile;
-    this.cands.userData.pick = (hit) => ({ type: 'cand', c: hit.instanceId });
-    this.E.pickables.push(this.cands);
   }
 
   buildLabels() {
     const add = (html, cls, cx = 0, cy = 0.5) => { const o = label(html, `lbl ${cls}`); o.center.set(cx, cy); this.root.add(o); return o; };
-    this.lTray = add('', 'hint', 0.5, 0);
-    this.lLabs = add('', 'hint', 0.5, 0);
+    this.lTray = add('', 'num qr', 1, 0.5);
+    this.lLabs = add('', 'num qr', 1, 0.5);
     this.lMaskL = add('', 'num qm', 0.5, 1);
     this.lMaskR = add('', 'num qa', 0.5, 1);
     this.lPre = add('', 'num qp', 0.5, 1);
     this.lEmb = add('', 'part', 0, 0.5);
     this.lLm = add('', 'part', 0, 0.5);
     this.lNorm = add('', 'part', 0, 0.5);
-    this.lGauge = add('', 'big', 0, 0.5);
-    this.lGaugePre = add('', 'num qp', 0, 0.5);
-    this.lClip = add('', 'num gc', 0, 0.5);
+    this.lGauge = add('', 'big', 1, 0.5);
+    this.lGaugePre = add('', 'num qp', 1, 0.5);
+    this.lClip = add('', 'num gc', 0.6, 0);
     this.lMeter = add('', 'num qg', 1, 0.5);
     this.lDmeter = add('', 'num gc', 1, 0.5);
     this.lTitle = add('', 'title', 0.5, 1);
     this.lSel = add('', 'num gsel', 0.5, 1.25);
     this.lAns = this.R.ans.map(() => add('', 'num qb', 0.5, 1));
-    this.lCands = [0, 1, 2, 3, 4].map(() => add('', 'num qc', 0.5, 1));
+    this.lCands = add('', 'num qc', 0, 0.5);
     this.lPanel = {};
     for (const t of Object.keys(PANEL)) this.lPanel[t] = add('', 'part', 0, 1);
     this.lEx = { ln1: add('RMSNorm', 'hint', 0, 0.5), ln2: add('RMSNorm', 'hint', 0, 0.5), add1: add(T_('q3.addRes'), 'hint', 0, 0.5), add2: add(T_('q3.addRes'), 'hint', 0, 0.5) };
@@ -626,6 +624,9 @@ export class QwenMachine {
     // 越深越把无关的东西淡出
     const FADE = { 'q-run': 0, 'q-end': 0, 'q-step': 0, 'q-op': 0.2, 'q-mat': 0.55, 'q-param': 0.62 };
     this.fade += ((FADE[view] ?? 0) - this.fade) * Math.min(1, dt * 3);
+    // 进料时层板、光柱先退到后面（看托盘）
+    const tf = s.ph === 'batch' && st.depth >= 2 ? 0.7 : 0;
+    this.towerFade = (this.towerFade || 0) + (tf - (this.towerFade || 0)) * Math.min(1, dt * 3);
     const fade = this.fade;
     const BLOOM = { 'q-run': 0.3, 'q-end': 0.3, 'q-step': 0.28, 'q-op': 0.24, 'q-mat': 0.18, 'q-param': 0.16 };
     this.E.bloom.strength += ((BLOOM[view] ?? 0.26) - this.E.bloom.strength) * Math.min(1, dt * 3);
@@ -687,7 +688,7 @@ export class QwenMachine {
   updTower(st, F, haveSt, have3, focus, t, dt) {
     const R = this.R, NL = this.NL, T = this.T, k = st.k, s = st.step;
     const inside = 1;
-    const fade = this.fade;
+    const fade = Math.max(this.fade, this.towerFade || 0);
     const fwdOn = F.fwd > -1.5;
     // 光柱：前向走到哪长到哪
     this.columns.forEach((c, i) => {
@@ -745,7 +746,7 @@ export class QwenMachine {
       sl.material.emissiveIntensity += (em - sl.material.emissiveIntensity) * Math.min(1, dt * 8);
       const on = l === cur || (l === this.xL && this.e > 0.3);
       sl.material.opacity = Math.max(0, (0.045 + (on ? 0.08 : 0)) * inside - (l === this.xL ? 0.035 * this.e : 0)) * (1 - fade * 0.7);
-      sl.edge.material.opacity = (on ? 0.85 : passedF || passedB ? 0.32 : 0.2) * (1 - fade * 0.6);
+      sl.edge.material.opacity = (on ? 0.8 : passedF || passedB ? 0.19 : 0.12) * (1 - fade * 0.6);
       sl.edge.material.color.setHex(passedB && F.bwd < NL + 1 && !(F.upd > 0) ? 0xff8fb0 : 0x5ef0d4);
     });
     // 逻辑透镜的小圆片：前向经过这一层之后亮起（颜色 = 这一层读出正确答案的概率）
@@ -1007,10 +1008,10 @@ export class QwenMachine {
       if (F.next > 0 && kn <= R.K) pv += (R.pState(kn, i) - pv) * easeInOut(F.next);
       const h = Math.max(0.002, pv * 2.6 * rise);
       tmpM.makeScale(1, h, 1).setPosition(this.x(i), by, -0.25);
-      this.bars.setMatrixAt(i, tmpM);
-      const dim = F.lossPos >= 0 && F.lossPos !== i ? 0.35 : 1;
+      this.bars.setMatrixAt(i, ans ? tmpM : ZERO);
+      this.barsM.setMatrixAt(i, ans ? ZERO : tmpM);
+      const dim = (F.lossPos >= 0 && F.lossPos !== i ? 0.3 : 0.72) * (1 - fade * 0.4);
       if (ans) { const c = pv > 0.5 ? LIN.green : pv > 0.1 ? LIN.amber : LIN.rose; ba[i * 3] = c[0] * dim; ba[i * 3 + 1] = c[1] * dim; ba[i * 3 + 2] = c[2] * dim; }
-      else { ba[i * 3] = 0.12 * dim; ba[i * 3 + 1] = 0.16 * dim; ba[i * 3 + 2] = 0.24 * dim; }
       // 更新后的虚影（下一个状态的真实概率）
       if (F.after > 0 && kn <= R.K && ans && F.next < 1) {
         const p2 = R.pState(kn, i), h2 = Math.max(0.002, p2 * 2.6);
@@ -1024,7 +1025,9 @@ export class QwenMachine {
       if (ans && f > 0) { tmpM.makeScale(1, Math.max(0.002, Math.min(12, nl) * 0.2 * f), 1).setPosition(this.x(i), by, 0.32); this.nll.setMatrixAt(i, tmpM); } else this.nll.setMatrixAt(i, ZERO);
       if (!ans && F.pre > 0) { tmpM.makeScale(1, Math.max(0.002, Math.min(12, nl) * 0.2 * F.pre), 1).setPosition(this.x(i), by, 0.32); this.nllPre.setMatrixAt(i, tmpM); } else this.nllPre.setMatrixAt(i, ZERO);
     }
-    this.bars.instanceMatrix.needsUpdate = this.bars.instanceColor.needsUpdate = true;
+    this.bars.instanceMatrix.needsUpdate = this.bars.instanceColor.needsUpdate = this.barsM.instanceMatrix.needsUpdate = true;
+    this.barsM.visible = rise > 0.001;
+    this.barsM.material.opacity = (F.lossPos >= 0 ? 0.16 : 0.32) * (1 - fade * 0.6);
     this.ghost.instanceMatrix.needsUpdate = this.ghostTop.instanceMatrix.needsUpdate = true;
     this.nll.instanceMatrix.needsUpdate = this.nllPre.instanceMatrix.needsUpdate = true;
     this.bars.visible = rise > 0.001;
@@ -1039,20 +1042,6 @@ export class QwenMachine {
     this.gaugePre.position.set(gx, by + Math.min(6, R.lossPreState(ks)) * 0.4, 0);
     this.gaugePre.visible = F.pre > 0.3;
     this.gaugeGlass.visible = this.gauge.visible = F.lossMean > 0.01 || st.view === 'q-end';
-    // top-5 候选：逐个位置看损失时，在这根柱子后面展开
-    const showC = F.lossPos >= 0;
-    const ca = this.cands.instanceColor.array;
-    const top = showC ? R.topState(ks, F.lossPos) : [];
-    for (let c = 0; c < 5; c++) {
-      if (!showC || !top[c]) { this.cands.setMatrixAt(c, ZERO); continue; }
-      const h = Math.max(0.002, top[c].p * 2.6 * easeOut(seg(this.p, 0.1, 0.6)));
-      tmpM.makeScale(1.6, h, 1.6).setPosition(this.x(F.lossPos) + (c - 2) * 0.32, by, -0.85);
-      this.cands.setMatrixAt(c, tmpM);
-      const ok = top[c].id === R.tgt(F.lossPos);
-      const cc = ok ? LIN.green : LIN.blue;
-      ca[c * 3] = cc[0] * 0.8; ca[c * 3 + 1] = cc[1] * 0.8; ca[c * 3 + 2] = cc[2] * 0.8;
-    }
-    this.cands.instanceMatrix.needsUpdate = this.cands.instanceColor.needsUpdate = true;
   }
 
   /* ================================================================ 标签 */
@@ -1067,11 +1056,11 @@ export class QwenMachine {
     const far = v === 'q-run' || v === 'q-end' || v === 'q-step';
     const sm = this.small;
     const ks = Math.min(R.K, F.state);
-    // 托盘
-    this.lTray.position.set(0, -0.1, 0.45);
-    this.setL(this.lTray, (s.ph === 'batch' && (v === 'q-step' || v === 'q-op')) && !sm, T_('q3.trayCap', { n: m.ids.length }));
-    this.lLabs.position.set(0, -0.1, 1.1);
-    this.setL(this.lLabs, F.lab > 0.5 && s.ph === 'batch' && !sm, T_('q3.labCap'));
+    // 托盘：两排的“行首”（输入 ids / labels）
+    this.lTray.position.set(-this.W / 2 - 0.05, 0.12, 0);
+    this.setL(this.lTray, (s.ph === 'batch' && (v === 'q-step' || v === 'q-op')), T_('q3.trayCap', { n: m.ids.length }));
+    this.lLabs.position.set(-this.W / 2 - 0.05, 0.1, 0.78);
+    this.setL(this.lLabs, F.lab > 0.5 && s.ph === 'batch', T_('q3.labCap'));
     // 遮罩的标注：提示部分 / 回答部分
     const showMask = s.ph === 'batch' && (s.sub === 'mask' || s.sub === 'shift' || !s.sub) && F.mask > 0.5;
     const a0 = R.ans[0], a1 = R.ans[R.ans.length - 1];
@@ -1096,13 +1085,15 @@ export class QwenMachine {
     let L0 = R.lossState(ks);
     const kn = Math.min(R.K, ks + 1);
     if (F.next > 0.5) L0 = R.lossState(kn);
-    this.lGauge.position.set(gx + 0.32, by + Math.min(6, L0) * 0.4 * F.lossMean + 0.15, 0);
-    this.setL(this.lGauge, lossOn, `L = ${L0.toFixed(3)}<small>${F.next > 0.5 ? T_('q3.lossAfter') : T_('q3.lossMean', { n: R.ans.length })}</small>`);
-    this.lGaugePre.position.set(gx + 0.32, by + Math.min(6, R.lossPreState(ks)) * 0.4, 0);
-    this.setL(this.lGaugePre, F.pre > 0.3 && lossOn && !sm, T_('q3.lossPre', { v: R.lossPreState(ks).toFixed(3), n: R.N1 }));
+    // 标签放在量筒左边（右边是调试器）；预训练式“全都算”的对照写在同一个标签里
+    this.lGauge.position.set(gx - 0.3, by + Math.min(6, L0) * 0.4 * F.lossMean, 0);
+    const after = F.after > 0.5 && F.next < 0.5 && kn <= R.K ? ` → ${R.lossState(kn).toFixed(3)}` : '';
+    const pre = F.pre > 0.3 && !sm ? `<small>${T_('q3.lossPre', { v: R.lossPreState(ks).toFixed(3), n: R.N1 })}</small>` : '';
+    this.setL(this.lGauge, lossOn, `L = ${L0.toFixed(3)}${after}<small>${F.next > 0.5 ? T_('q3.lossAfter') : T_('q3.lossMean', { n: R.ans.length })}</small>${pre}`);
+    this.lGaugePre.visible = false;
     // 裁剪
     const clipOn = s.ph === 'upd' && (s.sub === 'clip' || (!s.sub && F.clip > 0 && F.clip < 1)) && v !== 'q-param';
-    this.lClip.position.set(gx + 0.32, by - 0.35, 0);
+    this.lClip.position.set(gx, by - 0.12, 0);
     this.setL(this.lClip, clipOn, T_('q3.clip', { g: m.steps[k].gradNorm.toFixed(1), c: m.steps[k].clip.toFixed(5) }));
     // 梯度条 / 更新量条
     const gl = this.layerG(k);
@@ -1137,31 +1128,36 @@ export class QwenMachine {
       const o = this.lAns[a];
       let pv = R.pState(ks, i);
       if (F.next > 0) pv += (R.pState(kn, i) - pv) * easeInOut(F.next);
-      o.position.set(this.x(i), by + pv * 2.6 * rise + 0.08, -0.25);
-      const show = showAns && (!sm || a % 2 === 0 || F.lossPos === i);
+      // 看损失的时候 8 个都标，错开两排；其余远景里 8 个标签挤在一起，只标选中的那个（8 个的概率在左上角的监视器里）
+      const lossView = s.ph === 'loss' && (v === 'q-step' || (v === 'q-op' && s.sub === 'mean')) && !sm;
+      o.position.set(this.x(i), by + pv * 2.6 * rise + 0.08 + (lossView && a % 2 ? 0.34 : 0), -0.25);
+      const show = showAns && (lossView || (far ? i === ansF : !sm || a % 2 === 0 || F.lossPos === i));
       this.setL(o, show, `${esc(tokPlain(R.tgtStr(i)))}<b>${fmtPct(pv)}</b>`);
       o.el.classList.toggle('on', F.lossPos === i);
     });
-    // top-5 候选
-    const top = F.lossPos >= 0 ? R.topState(ks, F.lossPos) : [];
-    this.lCands.forEach((o, c) => {
-      const tc = top[c];
-      if (!tc) { o.visible = false; return; }
-      o.position.set(this.x(F.lossPos) + (c - 2) * 0.32, by + tc.p * 2.6 + 0.06, -0.85);
-      this.setL(o, seg(this.p, 0.1, 0.6) > 0.8 && !sm, `${esc(tokPlain(tc.s))} ${fmtPct(tc.p)}`);
-      o.el.classList.toggle('ok', tc.id === R.tgt(F.lossPos));
-    });
+    // top-5 候选：逐个位置看损失时，挂在那根概率柱旁边（绿 = 正确答案）
+    if (F.lossPos >= 0) {
+      const top = R.topState(ks, F.lossPos), tg = R.tgt(F.lossPos);
+      const rows = top.map((tc) => `<span class="${tc.id === tg ? 'ok' : ''}">${esc(tokPlain(tc.s))}<b>${fmtPct(tc.p)}</b></span>`).join('');
+      const pv = R.pState(ks, F.lossPos);
+      this.lCands.position.set(this.x(F.lossPos) + 0.3, by + Math.max(0.6, pv * 2.6 * 0.6), -0.25);
+      this.setL(this.lCands, seg(this.p, 0.1, 0.6) > 0.5, `<i>${T_('q3.candHead')}</i>${rows}`);
+    } else this.lCands.visible = false;
     // 面板标签
+    // 面板标签：一层之内只写名字（正在算的那块再加上它的梯度 / 更新量），看一个张量时写全
+    const opT = s.ph === 'fwd' ? OP_TENSORS[s.sub] : s.ph === 'bwd' ? OP_TENSORS_BWD[s.sub] : null;
     for (const [tn, o] of Object.entries(this.lPanel)) {
-      const grp = this.panels[tn];
-      const on = this.e > 0.7 && grp.visible && (v === 'q-op' ? !PANEL[tn].vec || ['ln1', 'ln2'].includes(s.sub) || s.sub === 'qkv' : this.selT === tn) && !(sm && v === 'q-op' && PANEL[tn].vec);
+      const grp = this.panels[tn], vec = PANEL[tn].vec;
+      const on = this.e > 0.7 && grp.visible && (v === 'q-op' ? (!vec || s.sub === tn) : this.selT === tn) && !(sm && v === 'q-op' && vec);
       if (!on) { o.visible = false; continue; }
       const pp = this.panelPos(tn);
       o.position.set(pp.x0, pp.y0 + pp.h + 0.02, PZ);
       const nm = T_(`q3.t.${tn}`), sh = TSHAPE[tn];
       const tsx = this.tensorText(k, this.xL, tn, have3, s);
-      this.setL(o, true, `${nm}<small>${sh.length === 2 ? `${sh[0]} × ${sh[1]}` : `[${sh[0]}]`}${tsx}</small>`);
-      o.el.classList.toggle('on', this.selT === tn);
+      const active = opT?.includes(tn) || (s.ph === 'upd' && s.sub === 'adam');
+      const html = v === 'q-op' ? `${nm}${active && tsx && !sm ? `<small>${tsx.replace(/^ · /, '')}</small>` : ''}` : `${nm}<small>${sh.length === 2 ? `${sh[0]} × ${sh[1]}` : `[${sh[0]}]`}${tsx}</small>`;
+      this.setL(o, true, html);
+      o.el.classList.toggle('on', this.selT === tn || (v === 'q-op' && !!opT?.includes(tn)));
     }
     for (const [key, o] of Object.entries(this.lEx)) {
       o.position.set(this.W / 2 - 0.05, this.yS(key), 0.4);
@@ -1299,7 +1295,9 @@ export class QwenMachine {
     const pts = [];
     for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) pts.push(new THREE.Vector3(x, y, z));
     const w = E.w || 1, h = E.h || 1;
-    const rx0 = -1, rx1 = 1 - (2 * (E.insetR || 0)) / w, ry0 = -1 + (2 * E.padB) / h, ry1 = 1 - (2 * E.padT) / h;
+    // 顶栏 + 章节按钮盖住画布最上面一条（引擎不知道），取景时也让出来
+    const top = Math.max(E.padT, this.small ? 104 : 118);
+    const rx0 = -1, rx1 = 1 - (2 * (E.insetR || 0)) / w, ry0 = -1 + (2 * E.padB) / h, ry1 = 1 - (2 * top) / h;
     const cx = (rx0 + rx1) / 2, cy = (ry0 + ry1) / 2, hw = (rx1 - rx0) / 2 / margin, hh = (ry1 - ry0) / 2 / margin;
     const d0 = dir.clone().normalize();
     const look = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
@@ -1342,15 +1340,15 @@ export class QwenMachine {
     const s = st.step, v = st.view, F = this.F || this.flow(st, st.p), NL = this.NL, W = this.W;
     const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
     const frame = (r, dir, margin = 1.05, minD = 2) => this.fitBox(r, dir, margin, minD);
-    const WIDE = V3(0.42, 0.3, 1), MID = V3(0.32, 0.22, 1), NEAR = V3(0.18, 0.12, 1), TOP = V3(0.2, 0.7, 1);
+    const WIDE = V3(0.42, 0.3, 1), MID = V3(0.32, 0.22, 1), NEAR = V3(0.18, 0.12, 1), TOP = V3(0.22, 0.42, 1), TRAY = V3(0.1, 0.4, 1);
     const xa = -W / 2 - (this.small ? 0.3 : 2.0), xb = W / 2 + 1.6;
     const whole = [xa, xb, -0.3, this.barsY + 3.0, -1.4, 1.2];
     if (v === 'q-run' || v === 'q-end') return frame(whole, WIDE, 1.02);
-    const trayBox = [-W / 2, W / 2, -0.3, 1.6, -1.4, 1.3];
+    const trayBox = [-W / 2 - (this.small ? 0.2 : 1.9), W / 2, -0.2, 0.7, -0.4, 1.15];
     const topBox = [-W / 2, W / 2 + 1.4, this.yTop - 0.2, this.barsY + 2.9, -1.0, 0.8];
     const follow = (f) => { const y = this.yAt(Math.max(-1, Math.min(NL + 1, f))); return frame([xa, xb, y - 2.6, y + 2.6, -1.2, 1.0], MID, 1.02); };
     if (v === 'q-step') {
-      if (s.ph === 'batch') return frame(trayBox, MID, 1.04);
+      if (s.ph === 'batch') return frame(trayBox, TRAY, 1.04);
       if (s.ph === 'loss') return frame(topBox, TOP, 1.04);
       if (s.ph === 'upd') return frame(whole, WIDE, 1.02);
       return follow(s.ph === 'fwd' ? F.fwd : F.bwd);
@@ -1358,7 +1356,7 @@ export class QwenMachine {
     const exBox = () => { const b0 = Y0 + this.xL * GAP; return [-W / 2 + 0.2, W / 2 + 0.2, b0 - 0.3, b0 + (SUB.add2 + 0.35) * Math.max(0.3, this.e), -1.4, 0.8]; };
     const panelBox = (t, pad = 0.35) => { const pp = this.panelPos(t); return [pp.x0 - pad, pp.x0 + pp.w + pad, pp.y0 - pad, pp.y0 + pp.h + pad, PZ - 0.1, PZ + 0.3]; };
     if (v === 'q-op') {
-      if (s.ph === 'batch') return frame(trayBox, MID, 1.04);
+      if (s.ph === 'batch') return frame(trayBox, TRAY, 1.04);
       if (s.ph === 'loss') {
         if (s.sub === 'pos') { const x = this.x(s.i); return frame([x - 2.4, x + 2.4, this.barsY - 0.3, this.barsY + 2.9, -1.1, 0.6], TOP, 1.04); }
         return frame(topBox, TOP, 1.04);
