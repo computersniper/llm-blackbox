@@ -458,7 +458,7 @@ export class QwenMachine {
     this.lMaskR = add('', 'num qa', 0.5, 1);
     this.lPre = add('', 'num qp', 0.5, 1);
     this.lEmb = add('', 'part', 0, 0.5);
-    this.lLm = add('', 'part', 0, 0.5);
+    this.lLm = add('', 'part', 1, 0.5);
     this.lNorm = add('', 'part', 0, 0.5);
     this.lGauge = add('', 'big', 1, 0.5);
     this.lGaugePre = add('', 'num qp', 1, 0.5);
@@ -816,7 +816,9 @@ export class QwenMachine {
     const g = this.ex, e = this.e, R = this.R, s = st.step, k = st.k, l = this.xL;
     g.visible = e > 0.02;
     this.beams.visible = false;
-    if (!g.visible) { this.dAttn.count = this.dMlp.count = 0; return; }
+    // 父级藏起来时引擎的拾取看不出来：自己关掉
+    const pickOn = (on) => { for (const grp of Object.values(this.panels)) grp.base.userData.pickOn = on && grp.visible; for (const b of this.beams.children) b.userData.pickOn = on && this.beams.visible; };
+    if (!g.visible) { this.dAttn.count = this.dMlp.count = 0; pickOn(false); return; }
     const base = Y0 + l * GAP;
     const at = (key) => base + SUB[key] * e;
     for (const key of ['ln1', 'ln2', 'add1', 'add2']) this.exRing[key].position.set(0, at(key), 0);
@@ -867,11 +869,11 @@ export class QwenMachine {
       } else grp.scan.material.opacity = 0;
     }
     // 注意力光束（真实的注意力，16 个头平均）：从选中的位置伸向它看的位置
-    const showBeams = op === 'attn' && have3 && st.depth >= 3;
+    const showBeams = op === 'attn' && have3 && st.view === 'q-op';
     this.beams.visible = showBeams;
     if (showBeams) this.updBeams(k, l, focus, s.ph === 'fwd' ? seg(this.p, 0.05, 0.7) : 1, s.ph === 'bwd');
     // 加回残差：每个位置注意力 / 前馈的输出有多长（真实），反向时换成中间那一点残差的梯度
-    const showD = have3 && e > 0.6 && (op === 'o' || op === 'down' || op === 'attn' || op === 'ffn' || op === 'ln2');
+    const showD = have3 && e > 0.6 && st.view === 'q-op' && (op === 'o' || op === 'down' || op === 'attn' || op === 'ffn' || op === 'ln2');
     const T = this.T;
     let mxA = 1e-9, mxM = 1e-9;
     if (showD) for (let i = 0; i < T; i++) { mxA = Math.max(mxA, R.attnOut(k, l, i)); mxM = Math.max(mxM, R.mlpOut(k, l, i)); }
@@ -892,6 +894,7 @@ export class QwenMachine {
     this.dAttn.count = na; this.dMlp.count = nm;
     this.dAttn.instanceMatrix.needsUpdate = this.dMlp.instanceMatrix.needsUpdate = true;
     this.dAttn.material.color.setHex(s.ph === 'bwd' ? 0x7fe8d8 : 0x5ef0d4);
+    pickOn(true);
   }
 
   // 反向在拆开的那一层里经过每个张量时的进度位置（以“层”为单位）
@@ -1035,11 +1038,14 @@ export class QwenMachine {
     // 推到一块面板 / 一个权重跟前时，输出头上的柱子会挡住拆开的第 27 层：收起来
     const close = st.view === 'q-mat' || st.view === 'q-param';
     this.head.visible = !close || this.selT === 'norm';
-    this.barsM.visible = rise > 0.001;
+    this.barsM.visible = rise > 0.001 && !close;
     this.barsM.material.opacity = (F.lossPos >= 0 ? 0.16 : 0.32) * (1 - fade * 0.6);
     this.ghost.instanceMatrix.needsUpdate = this.ghostTop.instanceMatrix.needsUpdate = true;
     this.nll.instanceMatrix.needsUpdate = this.nllPre.instanceMatrix.needsUpdate = true;
-    this.bars.visible = rise > 0.001;
+    this.bars.visible = rise > 0.001 && !close;
+    // 看最后那个 RMSNorm 的 γ 时只留环和 γ 条
+    for (const o of [this.ghost, this.ghostTop, this.nll, this.nllPre]) o.visible = !close;
+    for (const o of [this.bars, this.barsM, this.nll, this.gauge, this.lm, this.normStrip]) o.userData.pickOn = this.head.visible && o.visible;
     this.bars.material.opacity = 0.92 * (1 - fade * 0.5);
     // 损失量筒
     const gx = this.W / 2 + 0.9;
@@ -1049,8 +1055,8 @@ export class QwenMachine {
     if (F.next > 0 && kn <= R.K) L0 += (R.lossState(kn) - L0) * easeInOut(F.next);
     this.gauge.scale.y = Math.max(0.001, Math.min(6, L0) * 0.4 * F.lossMean);
     this.gaugePre.position.set(gx, by + Math.min(6, R.lossPreState(ks)) * 0.4, 0);
-    this.gaugePre.visible = F.pre > 0.3;
-    this.gaugeGlass.visible = this.gauge.visible = F.lossMean > 0.01 || st.view === 'q-end';
+    this.gaugePre.visible = F.pre > 0.3 && !close;
+    this.gaugeGlass.visible = this.gauge.visible = (F.lossMean > 0.01 || st.view === 'q-end') && !close;
   }
 
   /* ================================================================ 标签 */
@@ -1083,7 +1089,7 @@ export class QwenMachine {
     // 嵌入表 / lm_head / 最后的 RMSNorm
     this.lEmb.position.set(EMB.x1 + 0.1, EMB.y1, EMB.z);
     this.setL(this.lEmb, (F.emb > 0 || this.selT === 'embed') && !sm, `${T_('q3.emb')}<small>151936 × 1024</small>`);
-    this.lLm.position.set(-this.W / 2 + 0.3, this.yTop + 0.62, DEPTH / 2);
+    this.lLm.position.set(this.W / 2 - 0.2, this.yTop + 0.62, DEPTH / 2);
     this.setL(this.lLm, (v === 'q-step' && (s.ph === 'fwd' || s.ph === 'loss')) || (s.sub === 'head' && v !== 'q-param') || this.selT === 'embed' && s.sub === 'head', `lm_head<small>${T_('q3.lmSub')}</small>`);
     const np = this.panelPos('norm');
     this.lNorm.position.set(np.x0 + np.w + 0.08, np.y0, PZ);
@@ -1113,10 +1119,13 @@ export class QwenMachine {
     this.setL(this.lDmeter, F.upd > 0.3 && F.upd <= 1 && (v === 'q-step' || v === 'q-run') && s.ph === 'upd' && !sm, T_('q3.meterD'));
     // 层号 + 逻辑透镜读数（选中的回答位置：模型此刻最想说的词、正确答案的概率）
     const ansF = R.ans.includes(focus) ? focus : R.ans[1];
+    // 一拍带过很多层时，层间距在屏幕上只有十几个像素：隔一层（窄屏隔两层）标一次，正在经过的那层一定标
+    const stride = sm || this.E.h < 820 ? 3 : 2, curL = Math.floor(F.fwd);
+    const thin = (l) => l === curL || l === this.NL - 1 || (this.NL - 1 - l) % stride === 0;
     const lensVis = (l) => {
       if (!haveSt) return false;
-      if (v === 'q-step' && s.ph === 'fwd') return F.fwd >= l + 0.5 && Math.abs(F.fwd - (l + 1)) < (sm ? 3 : 6);
-      if (v === 'q-op' && s.ph === 'fwd' && (s.sub === 'lo' || s.sub === 'hi')) return F.fwd >= l + 0.5 && Math.abs(F.fwd - (l + 1)) < (sm ? 3 : 7);
+      if (v === 'q-step' && s.ph === 'fwd') return F.fwd >= l + 0.5 && Math.abs(F.fwd - (l + 1)) < (sm ? 3 : 6) && thin(l);
+      if (v === 'q-op' && s.ph === 'fwd' && (s.sub === 'lo' || s.sub === 'hi')) return F.fwd >= l + 0.5 && Math.abs(F.fwd - (l + 1)) < (sm ? 4 : 8) && thin(l);
       if ((v === 'q-op' || v === 'q-mat') && l === this.xL && (s.ph === 'fwd' || s.ph === 'bwd')) return true;
       return false;
     };

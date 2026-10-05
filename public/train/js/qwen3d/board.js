@@ -293,7 +293,7 @@ export class QwenBoard {
     // 三步的原始梯度
     const gs = [0, 1, 2].map((kk) => R.adamT(kk, L_, tn)?.gRaw ?? 0);
     const mx = Math.max(...gs.map(Math.abs), 1e-12);
-    const bx = C.x + C.w - 200, by = C.y + 60;
+    const bx = C.x + C.w - 250, by = C.y + 60;
     if (C.w > 560) {
       text(g, T_('q3.wg3'), bx, by, { size: 10, color: COL.dim });
       gs.forEach((v, kk) => {
