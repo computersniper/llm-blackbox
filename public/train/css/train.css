@@ -423,4 +423,5 @@ body.q3d .stage-hint .h2d, body.q3d .stage-hint .h3d > span:last-child { display
   .qhud { top: 56px; left: 8px; right: 8px; width: auto; }
   .qboard { top: 56px; bottom: auto; left: 8px; right: 8px; max-height: 44vh; border-radius: 14px; }
   .dbg.folded ~ .qboard { right: 8px; }
+  body.q3d .lbl.big { font-size: 12px; padding: 2px 7px; }
 }

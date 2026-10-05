@@ -1104,7 +1104,7 @@ export class QwenMachine {
     this.lGauge.position.set(gx - 0.3, by + Math.min(6, L0) * 0.4 * F.lossMean, 0);
     const after = F.after > 0.5 && F.next < 0.5 && kn <= R.K ? ` → ${R.lossState(kn).toFixed(3)}` : '';
     const pre = F.pre > 0.3 && !sm ? `<small>${T_('q3.lossPre', { v: R.lossPreState(ks).toFixed(3), n: R.N1 })}</small>` : '';
-    this.setL(this.lGauge, lossOn, `L = ${L0.toFixed(3)}${after}<small>${F.next > 0.5 ? T_('q3.lossAfter') : T_('q3.lossMean', { n: R.ans.length })}</small>${pre}`);
+    this.setL(this.lGauge, lossOn, sm ? `L = ${L0.toFixed(3)}${after}` : `L = ${L0.toFixed(3)}${after}<small>${F.next > 0.5 ? T_('q3.lossAfter') : T_('q3.lossMean', { n: R.ans.length })}</small>${pre}`);
     this.lGaugePre.visible = false;
     // 裁剪
     const clipOn = s.ph === 'upd' && (s.sub === 'clip' || (!s.sub && F.clip > 0 && F.clip < 1)) && v !== 'q-param';
@@ -1149,7 +1149,7 @@ export class QwenMachine {
       // 看损失的时候 8 个都标，错开两排；其余远景里 8 个标签挤在一起，只标选中的那个（8 个的概率在左上角的监视器里）
       const lossView = s.ph === 'loss' && (v === 'q-step' || (v === 'q-op' && s.sub === 'mean')) && !sm;
       o.position.set(this.x(i), by + pv * 2.6 * rise + 0.08 + (lossView && a % 2 ? 0.34 : 0), -0.25);
-      const show = showAns && (lossView || (far ? i === ansF : !sm || a % 2 === 0 || F.lossPos === i));
+      const show = showAns && (lossView || (far ? i === ansF : F.lossPos >= 0 ? F.lossPos === i || !sm : !sm || a % 2 === 0));
       this.setL(o, show, `${esc(tokPlain(R.tgtStr(i)))}<b>${fmtPct(pv)}</b>`);
       o.el.classList.toggle('on', F.lossPos === i);
     });
@@ -1157,9 +1157,11 @@ export class QwenMachine {
     if (F.lossPos >= 0) {
       const top = R.topState(ks, F.lossPos), tg = R.tgt(F.lossPos);
       const rows = top.map((tc) => `<span class="${tc.id === tg ? 'ok' : ''}">${esc(tokPlain(tc.s))}<b>${fmtPct(tc.p)}</b></span>`).join('');
-      const pv = R.pState(ks, F.lossPos);
-      this.lCands.position.set(this.x(F.lossPos) + 0.3, by + Math.max(0.6, pv * 2.6 * 0.6), -0.25);
-      this.setL(this.lCands, seg(this.p, 0.1, 0.6) > 0.5, `<i>${T_('q3.candHead')}</i>${rows}`);
+      const pv = R.pState(ks, F.lossPos), left = this.x(F.lossPos) > 0.5;
+      // 右半边的位置挂在柱子左边（右边是调试器 / 屏幕边）
+      this.lCands.position.set(this.x(F.lossPos) + (left ? -0.3 : 0.3), by + Math.max(0.6, pv * 2.6 * 0.6), -0.25);
+      this.lCands.center.set(left ? 1 : 0, 0.5);
+      this.setL(this.lCands, seg(this.p, 0.1, 0.6) > 0.5, `${sm ? '' : `<i>${T_('q3.candHead')}</i>`}${rows}`);
     } else this.lCands.visible = false;
     // 面板标签
     // 面板标签：一层之内只写名字（正在算的那块再加上它的梯度 / 更新量），看一个张量时写全
