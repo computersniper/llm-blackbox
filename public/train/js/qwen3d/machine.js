@@ -1224,7 +1224,10 @@ export class QwenMachine {
       const pos = this.weightPos(s.t);
       if (pos) {
         place(this.mSel, pos.x, pos.y, pos.z + 0.02, pos.s, pos.s, 0.05);
-        this.lSel.position.set(pos.x, pos.y + pos.s, pos.z + 0.05);
+        // γ 条很细，上面是它的名字：读数挂在下面
+        const vec = isVec(s.t);
+        this.lSel.position.set(pos.x, vec ? pos.y - pos.s : pos.y + pos.s, pos.z + 0.05);
+        this.lSel.center.set(0.5, vec ? -0.25 : 1.25);
         const a = this.R.adamT(st.k, this.xL, s.t);
         if (a) {
           const html = s.ph === 'upd' && (s.mi === 'write' || s.mi === 'dw' || s.mi === 'bits') ? `w ${a.w0.toPrecision(5)} → <b>${a.w1.toPrecision(6)}</b>` : s.ph === 'bwd' ? `∂L/∂w = <b>${a.gRaw.toPrecision(4)}</b>` : `w = <b>${a.w0.toPrecision(5)}</b>`;

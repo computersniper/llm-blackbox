@@ -435,7 +435,7 @@ export class QwenBoard {
     }
     text(g, '0', B.x, cy + chh + 11, { size: 8.5, kind: 'mono', color: COL.faint });
     text(g, String(NL - 1), B.x + B.w, cy + chh + 11, { size: 8.5, kind: 'mono', color: COL.faint, align: 'right' });
-    if (half) wrap(g, T_('q3.maskLegend'), A.x, C.y + C.h - 44, A.w, 14, { size: 10, color: COL.dim, maxLines: 2 });
+    if (half) wrap(g, T_('q3.maskLegend'), A.x, C.y + C.h - 58, A.w, 14, { size: 10, color: COL.dim, maxLines: 3 });
   }
 
   // D3：存回 bf16（全模型的真实统计）
