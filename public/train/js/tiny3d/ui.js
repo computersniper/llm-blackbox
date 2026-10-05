@@ -26,7 +26,7 @@ export function updateDebugger(controls, tl, X, ctx, ready = true, err = null) {
     if (first.offsetTop < box.scrollTop || first.offsetTop > box.scrollTop + box.clientHeight * 0.6) box.scrollTo({ top: first.offsetTop - box.clientHeight * 0.2, behavior: 'smooth' });
   }
   const ex = $('#explain'), wt = $('#watch');
-  const head = `<div class="eyebrow" style="margin-bottom:4px">${L('这一步', 'This step')} · ${esc(TX.stepLabel(s, X))}</div>`;
+  const head = `<div class="eyebrow" style="margin-bottom:4px">${L('这一步', 'This step')} · ${TX.stepLabel(s, X)}</div>`;
   let stale = false;
   if (ready) {
     const shape = TX.shapeOf(s, X);

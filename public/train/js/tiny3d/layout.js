@@ -60,7 +60,7 @@ export const TRAY = { y: 0.13, tile: 0.112 };
 // 答案（错开一位）排在托盘前面
 export const TGT_DZ = 0.66;
 // 逻辑透镜屏：每个层边界一块，16 × 4 个字
-export const LENS = { x0: -5.35, cw: 0.15, ch: 0.17 };
+export const LENS = { x0: -7.45, cw: 0.26, ch: 0.3 };
 export const LENS_W = NC * LENS.cw, LENS_H = NR * LENS.ch;
 // 损失：每个位置的 −ln p（预测柱右边）和整批的损失管
 export const LOSSB = { x0: 1.65, y: YP, hMax: 1.3, lnMax: 10 };
@@ -72,12 +72,12 @@ export const PRINTER = { x: 6.1, y: YP, z: -0.2 };
 export const CORPUS = { x0: -11.5, x1: -3.2, y: 0.14, z: 0.95 };
 
 // 右边的两件展品：嵌入的地图（PCA 前两维）、损失地形（41 × 41 个真实算出来的点）
-export const PCA = { x0: 9.4, x1: 15.0, y0: 0.6, y1: 6.2, z: -1.6 };
-export const LAND = { x0: 9.4, x1: 15.0, z0: 0.2, z1: 5.8, y0: -0.25, hMax: 2.2 };
+export const PCA = { x0: 8.8, x1: 14.6, y0: 9.0, y1: 14.8, z: -1.2 };
+export const LAND = { x0: 8.8, x1: 14.2, z0: 0.2, z1: 5.6, y0: -0.25, hMax: 2.0 };
 
 // 整台机器的范围（镜头取景用）
-export const MACHINE = { x0: -5.6, x1: 7.9, y0: -0.4, y1: YP + 2.1 };
-export const ALL = { x0: -5.6, x1: 15.3, y0: -0.4, y1: YP + 2.1 };
+export const MACHINE = { x0: -8.4, x1: 7.9, y0: -0.4, y1: YP + 2.6 };
+export const ALL = { x0: -8.4, x1: 14.6, y0: -0.4, y1: YP + 2.6 };
 
 // 每块面板在世界里的矩形：[x0, x1, y0, y1]
 export function panelRect(l, kind) {
@@ -89,8 +89,8 @@ export function opRect(op) {
   if (op.sub === 'emb') return [-3.0, 2.0, -0.3, yBound(0) + 0.6, -3.2, 1.2];
   if (op.sub === 'head') return [-3.0, 7.2, YTOP - 0.4, YP + PH + 0.3, -1.2, 1.0];
   const yb = yBand(op.L);
-  if (op.sub === 'attn') return [-5.5, 4.1, yb - 0.25, yb + SUB.heads1 + 0.25, -0.6, 0.6];
-  return [-5.5, 7.9, yb + SUB.ring2 - 0.3, yb + HB + 0.2, -0.6, 0.6];
+  if (op.sub === 'attn') return [-7.6, 4.1, yb - 0.85, yb + SUB.heads1 + 0.25, -0.6, 0.6];
+  return [-7.6, 7.9, yb + SUB.ring2 - 0.3, yb + HB + 0.75, -0.6, 0.6];
 }
 
 // 跟踪的 4 个权重在机器上的位置（数据里的下标是 PyTorch 的 [输出, 输入]；面板按 y = x · W 摆，行 = 输入、列 = 输出）

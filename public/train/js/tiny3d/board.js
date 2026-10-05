@@ -108,7 +108,7 @@ export class TinyBoard {
 
   drawSide(st, X, t) {
     const w = this.sideEl.clientWidth || 340;
-    const rh = 262, hh = 132, gap = 10, h = rh + gap + hh;
+    const rh = 262, hh = 150, gap = 10, h = rh + gap + hh;
     this.side.size(w, h);
     const k = st.k;
     if (this.printK !== k) { this.printK = k; this.printT0 = t; }
@@ -134,7 +134,7 @@ export class TinyBoard {
         drawLife5(g, { x: 0.5, y: h1 + 10, w: W - 1, h: h2 - 1 }, X, f, X.step(k), env, { wide: false });
       }, t);
     } else {
-      const h = 290, mw = Math.min(520, Math.max(400, W * 0.46));
+      const h = 320, mw = Math.min(560, Math.max(420, W * 0.48));
       this.board.size(W, h);
       this.board.draw((g, env) => {
         if (!ready) { waitBox(g, 0.5, 0.5, W - 1, h - 1, env, st.wait, { withCard: true, label: L('正在载入这一步的真实记录…', 'Loading the real record of this step…') }); return; }

@@ -28,7 +28,6 @@
   <link rel="modulepreload" href="js/draw.js">
   <link rel="modulepreload" href="js/insights.js">
   <link rel="modulepreload" href="js/scenes/pipeline.js">
-  <link rel="modulepreload" href="js/scenes/overview.js">
   <link rel="modulepreload" href="js/scenes/overviewQ.js">
   <link rel="modulepreload" href="js/scenes/loop.js">
   <link rel="modulepreload" href="js/scenes/row.js">
@@ -48,6 +47,16 @@
   <link rel="modulepreload" href="js/glass3d/palette.js">
   <link rel="modulepreload" href="js/glass3d/board.js">
   <link rel="modulepreload" href="js/glass3d/cards.js">
+  <link rel="modulepreload" href="js/tiny3d/lang.js">
+  <link rel="modulepreload" href="js/tiny3d/data.js">
+  <link rel="modulepreload" href="js/tiny3d/timeline.js">
+  <link rel="modulepreload" href="js/tiny3d/layout.js">
+  <link rel="modulepreload" href="js/tiny3d/machine.js">
+  <link rel="modulepreload" href="js/tiny3d/board.js">
+  <link rel="modulepreload" href="js/tiny3d/cards.js">
+  <link rel="modulepreload" href="js/tiny3d/explain.js">
+  <link rel="modulepreload" href="js/tiny3d/ui.js">
+  <link rel="modulepreload" href="js/tiny3d/stage.js">
   <!-- 3D 舞台：和推理页共用的引擎 + 自托管的 Three.js r186 -->
   <link rel="modulepreload" href="../js/stage/engine.js">
   <link rel="modulepreload" href="../js/vendor/three/three.module.js">
@@ -102,6 +111,7 @@
   <main class="stage" id="stage" aria-label="训练过程" data-i18n-attr="aria-label:tr.stage">
     <div class="gl" id="gl"><canvas id="cv"></canvas></div>
     <div class="gl3" id="gl3"></div>
+    <div class="gl3t" id="gl3t"></div>
     <div class="stage-top">
       <div class="runs" id="runs" role="tablist" aria-label="选择一章" data-i18n-attr="aria-label:tr.runs">
         <button type="button" role="tab" data-run="glass" class="on" aria-selected="true"><b data-i18n="tr.runGlass">玻璃小模型</b><i data-i18n="tr.runGlassShort">玻璃小模型</i><span data-i18n="tr.runGlassSub">2,928 个参数 · 全部看得见</span></button>

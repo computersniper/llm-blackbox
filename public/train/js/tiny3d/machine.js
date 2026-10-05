@@ -143,7 +143,8 @@ export class TinyMachine {
     pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.dust = new THREE.Points(pg, new THREE.PointsMaterial({ color: 0x7fd8e8, size: 0.05, transparent: true, opacity: 0.26, depthWrite: false }));
     this.scene.add(this.dust);
-    // 每层底下一块很淡的玻璃地板
+    // 每层底下一块很淡的玻璃地板（脉冲经过时边框闪一下）
+    this.floors = [];
     for (let l = 0; l <= NLAY; l++) {
       const y = l === NLAY ? YTOP + 0.05 : yBand(l) - 0.02, x0 = LY.LENS.x0 - 0.2, x1 = l === NLAY ? 4.9 : 7.95, w = x1 - x0, d = 1.5;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), new THREE.MeshStandardMaterial({ color: 0x22346a, transparent: true, opacity: 0.045, depthWrite: false, roughness: 0.4 }));
@@ -153,6 +154,7 @@ export class TinyMachine {
       e.position.copy(m.position);
       e.raycast = () => {};
       this.root.add(m, e);
+      this.floors.push({ y, e });
     }
   }
 
@@ -195,6 +197,9 @@ export class TinyMachine {
     const mk = (color) => { const m = new THREE.InstancedMesh(pg, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false }), NP); m.frustumCulled = false; m.raycast = () => {}; this.root.add(m); return m; };
     this.pulseF = mk(0x9ffcff);
     this.pulseB = mk(0xff7aa0);
+    const slab = (color) => { const m = new THREE.Mesh(new THREE.BoxGeometry(W + 0.12, 0.035, D + 0.12), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })); m.position.set(BCX, 0, BCZ); m.raycast = () => {}; this.root.add(m); return m; };
+    this.slabF = slab(0x5ef0d4);
+    this.slabB = slab(0xff6b93);
     // 分支管：残差 → 这一半层的面板（RMSNorm 之后），这一半层的输出 → ⊕ 加回残差
     this.pipes = [];
     const tube = (pts, color) => {
@@ -594,7 +599,7 @@ export class TinyMachine {
       const vi = (G - 1 - iy) * G + ix, v = D.land(iy, ix);
       pos.setY(vi, hOf(v) - LAND.y0);
       const tt = (Math.log(v - lo + 0.05) - Math.log(0.05)) / (Math.log(hi - lo + 0.05) - Math.log(0.05));
-      seqInto(col, vi * 3, 1 - Math.floor(tt * 14) / 14, 0.55);
+      seqInto(col, vi * 3, 1 - Math.floor(tt * 14) / 14, 0.32);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeVertexNormals();
@@ -602,7 +607,7 @@ export class TinyMachine {
     terr.position.set(LAND.x0 + lw / 2, LAND.y0, LAND.z0 + ld / 2);
     terr.userData.pick = (hit) => ({ type: 'land', p: hit.point });
     this.E.pickables.push(terr);
-    const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x5ef0d4, wireframe: true, transparent: true, opacity: 0.06, depthWrite: false }));
+    const wire = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x5ef0d4, wireframe: true, transparent: true, opacity: 0.035, depthWrite: false }));
     wire.position.copy(terr.position);
     wire.raycast = () => {};
     this.root.add(terr, wire);
@@ -706,6 +711,7 @@ export class TinyMachine {
       let o;
       if (P.flat) o = add(`${nm}<small>${sh} · ${note}</small>`, 'part t3p', P.x0 + 1.08, P.y + 0.02, P.z0 - 0.4, 0, 0.5);
       else if (P.kind === 'ln1' || P.kind === 'ln2' || P.kind === 'nf') o = add(`${nm}<small>${sh}</small>`, 'part t3p', P.x0 + P.w / 2, P.y0 + P.h + 0.02, 0.05, 0.5, 1.1);
+      else if (P.kind === 'k' || P.kind === 'v') o = add(`${nm}<small>${kindShape(P.kind).join('×')}</small>`, 'part t3p', P.x0 + P.w / 2, P.y0 - 0.03, 0.05, 0.5, 0);
       else o = add(`${nm}<small>${sh} · ${note}</small>`, 'part t3p', P.x0, P.y0 - 0.03, 0.05, 0, 0);
       o.short = nm;
       o.full = o.el.innerHTML;
@@ -713,7 +719,7 @@ export class TinyMachine {
       this.lPanel.set(P, o);
     }
     this.lLayer = [];
-    for (let l = 0; l < NLAY; l++) this.lLayer.push(add(t('t3.layer', { l }), 'title t3l', BUNDLE.x0 - 0.12, yBand(l) + HB_MID, BCZ, 1, 0.5));
+    for (let l = 0; l < NLAY; l++) this.lLayer.push(add(t('t3.layer', { l }), 'title t3l', LENS.x0 - 0.15, yBand(l) + HB_MID, 0, 1, 0.5));
     this.lLens = [];
     for (let b = 0; b <= NLAY; b++) this.lLens.push(add(b === 0 ? t('t3.lens0') : t('t3.lensL', { l: b - 1 }), 'hint t3lens', LENS.x0, yBound(b) + LENS_H / 2 + 0.04, 0.06, 0, 1));
     this.lHeads = [];
@@ -818,9 +824,9 @@ export class TinyMachine {
   drawPaper(k) {
     const X = this.X, m = X.meta, c = this.paperCv, g = c.getContext('2d');
     g.clearRect(0, 0, c.width, c.height);
-    g.fillStyle = 'rgba(232,226,210,0.94)';
+    g.fillStyle = 'rgba(150,146,134,0.92)';
     g.fillRect(0, 0, c.width, c.height);
-    g.fillStyle = 'rgba(60,50,40,0.75)';
+    g.fillStyle = 'rgba(30,26,22,0.8)';
     g.font = `600 22px ${FONT}`;
     g.textBaseline = 'top';
     g.fillText(t('t3.paperHead', { t: X.step(k) + 1 }), 22, 18);
@@ -834,7 +840,7 @@ export class TinyMachine {
         const ch = s[j];
         const w = g.measureText(ch).width;
         if (x + w > c.width - 22) { x = 22; y += size + 6; line++; if (line >= 3) break; }
-        g.fillStyle = j < pf.length ? '#b06a10' : ch === '，' || ch === '。' ? 'rgba(60,50,40,0.5)' : '#1d2433';
+        g.fillStyle = j < pf.length ? '#7a4206' : ch === '，' || ch === '。' ? 'rgba(30,26,22,0.5)' : '#10141e';
         g.fillText(ch, x, y);
         x += w;
       }
@@ -875,7 +881,7 @@ export class TinyMachine {
     P.patchKey = key;
     const d = P.patchData;
     if (!X.has('ck', k)) { d.fill(0); P.patchTex.needsUpdate = true; return; }
-    const sw = this.cropScale(k, c), sg = X.meta.ckpts[k].gScale[c] * 127, sd = this.dwScale(k, c);
+    const sw = this.cropScale(k, c), sg = this.gScale(k, c), sd = this.dwScale(k, c);
     for (let r = 0; r < C48; r++) for (let q = 0; q < C48; q++) {
       // 显示的第 r 行、第 q 列 → PyTorch 下标
       const [i, j] = c === 0 ? [r, q] : [q, r];
@@ -890,6 +896,16 @@ export class TinyMachine {
     P.patchTex.needsUpdate = true;
   }
   cropScale(k, c) { return this.X.meta.ckpts[k].wScale[c] * 127 * 0.8; }
+  gScale(k, c) {
+    const ck = this.gsc || (this.gsc = new Map()), key = `${k}:${c}`;
+    if (ck.has(key)) return ck.get(key);
+    const a = [];
+    for (let i = 0; i < C48; i++) for (let j = 0; j < C48; j++) a.push(Math.abs(this.X.gcrop(k, c, i, j)));
+    a.sort((x, y) => x - y);
+    const v = a[Math.floor(a.length * 0.99)] || 1e-12;
+    ck.set(key, v);
+    return v;
+  }
   dwScale(k, c) {
     const X = this.X;
     if (!X.hasDw(k)) return 0;
@@ -998,7 +1014,7 @@ export class TinyMachine {
     this.updMarks(st, t);
     this.updLabels(st, F);
     const close = st.view === 't-crop' || st.view === 't-param';
-    const bl = close ? 0.2 : st.view === 't-op' ? 0.26 : 0.3;
+    const bl = close ? 0.18 : st.view === 't-op' ? 0.22 : 0.24;
     this.E.bloom.strength += (bl - this.E.bloom.strength) * Math.min(1, dt * 3);
     this.dust.rotation.y += dt * 0.006;
     this.corpusTex.offset.x = (t * 0.02) % 1;
@@ -1039,6 +1055,9 @@ export class TinyMachine {
     this.pulseF.count = n;
     this.pulseF.instanceMatrix.needsUpdate = true;
     this.pulseF.material.opacity = 0.55 + 0.25 * Math.sin(t * 9);
+    const yf = fOn ? yF(fx) : -99;
+    this.slabF.position.y = yf;
+    this.slabF.material.opacity = fOn ? 0.32 : 0;
     // 反向：每个位置的环大小 = 这里 ‖∂L/∂h‖（真实；在相邻两个层边界之间插值，按这一步的最大值归一）
     n = 0;
     if (bOn) {
@@ -1059,6 +1078,14 @@ export class TinyMachine {
     this.pulseB.count = n;
     this.pulseB.instanceMatrix.needsUpdate = true;
     this.pulseB.material.opacity = 0.55 + 0.25 * Math.sin(t * 9);
+    const yb2 = bOn ? yB(bx) : -99;
+    this.slabB.position.y = yb2;
+    this.slabB.material.opacity = bOn ? 0.3 : 0;
+    for (const fl of this.floors) {
+      const a = Math.exp(-Math.abs(yf - fl.y) * 2.2), b = Math.exp(-Math.abs(yb2 - fl.y) * 2.2);
+      fl.e.material.opacity = 0.1 + 0.5 * Math.max(a, b);
+      fl.e.material.color.setHex(b > a ? 0xff6b93 : 0x5ef0d4);
+    }
     // 光纤：有数据流过时亮，进料前暗
     const ca = this.fibers.instanceColor.array, base = F.feed > 0.5 ? 0.42 : 0.15;
     for (let i = 0; i < NP; i++) {
@@ -1155,7 +1182,7 @@ export class TinyMachine {
     };
     const scanList = [];
     const col = this.tmpCol || (this.tmpCol = new THREE.Color());
-    const BASE = new THREE.Color(0x0c1830), ROSE = new THREE.Color(0xff6b93), VIOL = new THREE.Color(0xb39dff), CYAN = new THREE.Color(0x5ef0d4);
+    const BASE = new THREE.Color(0x0c1830), STEEL = new THREE.Color(0x24406e), ROSE = new THREE.Color(0xc4486e), VIOL = new THREE.Color(0x8a72d8), CYAN = new THREE.Color(0x5ef0d4);
     for (const P of this.panels) {
       const kind = P.kind === 'ET' ? 'E' : P.kind;
       const fw = fwin(P), bw = bwin(P);
@@ -1167,9 +1194,11 @@ export class TinyMachine {
       const uOn = Math.max(0, F.upd - F.done) * (P.crop >= 0 ? 0.6 : 1);
       const active = fw > 0 && fw < 1;
       col.copy(BASE);
-      if (gOn > 0) col.lerp(ROSE, 0.62 * gI * gOn);
-      if (uOn > 0) col.lerp(VIOL, 0.6 * dI * uOn);
-      if (active) col.lerp(CYAN, 0.18);
+      const wr = X.wRms(k, P.l, kind);
+      if (wr != null) col.lerp(STEEL, kind === 'E' || P.kind === 'ET' || LY.MAT_KINDS.includes(kind) ? 0.5 * Math.pow(clamp01((wr - 0.018) / 0.12), 0.7) : 0.5 * clamp01(Math.abs(wr - 1) / 0.7));
+      if (gOn > 0) col.lerp(ROSE, 0.42 * gI * gOn);
+      if (uOn > 0) col.lerp(VIOL, 0.42 * dI * uOn);
+      if (active) col.lerp(CYAN, 0.3);
       P.back.material.color.copy(col);
       P.edge.material.opacity = P.ghost ? (active || gOn > 0.3 ? 0.5 : 0.22) : active ? 0.95 : gOn > 0 && bw < 1 ? 0.9 : 0.42;
       P.edge.material.color.setHex(uOn > 0.05 ? 0xb39dff : gOn > 0 && bw < 1 ? 0xff6b93 : active ? 0xbff8ff : 0x5ef0d4);
@@ -1241,8 +1270,8 @@ export class TinyMachine {
       M.makeTranslation(fiberX(i), h, fiberZ(i) + FS * 0.36);
       if (rise < 0.05) M.makeScale(0, 0, 0);
       this.tops.setMatrixAt(i, M);
-      const c = ok ? LIN.green : LIN.rose;
-      ta[i * 3] = c[0] * dim * 1.2; ta[i * 3 + 1] = c[1] * dim * 1.2; ta[i * 3 + 2] = c[2] * dim * 1.2;
+      const c = ok ? LIN.green : LIN.rose, kk = (ok ? 1 : 0.55) * dim;
+      ta[i * 3] = c[0] * kk; ta[i * 3 + 1] = c[1] * kk; ta[i * 3 + 2] = c[2] * kk;
     }
     this.pillars.instanceMatrix.needsUpdate = true;
     this.pillars.instanceColor.needsUpdate = true;
@@ -1342,7 +1371,7 @@ export class TinyMachine {
     if (!haveCk) { this.cubes.count = 0; this.cubeGlow.count = 0; return; }
     this.cubes.count = this.cubeGlow.count = C48 * C48;
     const ma = this.cubes.instanceMatrix.array, cc = this.cubes.instanceColor.array, ga = this.cubeGlow.instanceMatrix.array, gc = this.cubeGlow.instanceColor.array;
-    const sw = this.cropScale(k, c), sg = X.meta.ckpts[k].gScale[c] * 127, sd = this.dwScale(k, c);
+    const sw = this.cropScale(k, c), sg = this.gScale(k, c), sd = this.dwScale(k, c);
     const ph = s.ph, cu = F.cu[c];
     // 前向：扫描线一列列扫过；反向：梯度光；更新：按 ΔW 顶出 / 沉下（一个最大的 ΔW 约 0.25），再落到新值
     const fwdF = ph === 'fwd' ? easeInOut(seg(this.p, 0.05, 0.85)) : -1;

@@ -185,23 +185,24 @@ export function drawAdam5(g, C, X, k, f, mi, p, env) {
   card(g, C.x, C.y, C.w, C.h, { eyebrow: L(`ADAMW · 第 ${fmtInt(t)} 步 · 真实数字`, `ADAMW · STEP ${fmtInt(t)} · REAL NUMBERS`), title: featLabel(ft, 'tiny'), accent: COL.amber, active: true });
   const cur = ADAM_SUBS.indexOf(mi);
   const adam = (-lr * a.mh) / (Math.sqrt(a.vh) + eps), decay = -lr * a.wd * a.w0, dw = adam + decay;
+  const n3 = (v) => num(v, 3), p3 = (v) => par(v, 3);
   const rows = [
-    ['g', L('梯度（裁剪后）', 'gradient (clipped)'), `g = ${num(a.gRaw)} × ${X.clip(k) < 1 ? X.clip(k).toFixed(4) : '1'} = ${num(a.g)}`],
-    ['m', L('一阶动量', '1st moment'), `m = 0.9 × ${par(a.m0)} + 0.1 × ${par(a.g)} = ${num(a.m)}`],
-    ['v', L('二阶动量', '2nd moment'), `v = 0.95 × ${num(a.v0)} + 0.05 × ${par(a.g)}² = ${num(a.v)}`],
-    ['bc', L('偏差校正', 'bias correction'), `m̂ = m / ${(1 - b1 ** t).toPrecision(4)} = ${num(a.mh)}　v̂ = v / ${(1 - b2 ** t).toPrecision(4)} = ${num(a.vh)}`],
-    ['dw', L('更新量', 'update'), `Δw = −${sciSup(lr, 3)} × (${num(a.mh)} / √${num(a.vh)} + ${a.wd} × ${par(a.w0)}) = ${sciSup(dw, 3)}`],
+    ['g', L('梯度（裁剪后）', 'gradient (clipped)'), `g = ${n3(a.gRaw)} × ${X.clip(k) < 1 ? X.clip(k).toFixed(4) : '1'} = ${n3(a.g)}`],
+    ['m', L('一阶动量', '1st moment'), `m = 0.9 × ${p3(a.m0)} + 0.1 × ${p3(a.g)} = ${n3(a.m)}`],
+    ['v', L('二阶动量', '2nd moment'), `v = 0.95 × ${n3(a.v0)} + 0.05 × ${p3(a.g)}² = ${n3(a.v)}`],
+    ['bc', L('偏差校正', 'bias correction'), `m̂ = m / ${(1 - b1 ** t).toPrecision(4)} = ${n3(a.mh)}　v̂ = v / ${(1 - b2 ** t).toPrecision(4)} = ${n3(a.vh)}`],
+    ['dw', L('更新量', 'update'), `Δw = −${sciSup(lr, 3)} × (${n3(a.mh)} / √${n3(a.vh)} + ${a.wd} × ${p3(a.w0)}) = ${sciSup(dw, 3)}`],
     ['write', L('写回', 'write back'), `w = ${num(a.w0, 6)} ${dw >= 0 ? '+' : '−'} ${sciSup(Math.abs(dw), 3)} = ${num(a.w0 + dw, 6)}`],
   ];
-  const narrow = C.w < 420;
+  const narrow = C.w < 600;
   const x0 = C.x + 16, w = C.w - 32;
-  let y = C.y + 62;
-  const lh = narrow ? 38 : 30;
+  let y = C.y + 64;
+  const lh = narrow ? 37 : 30;
   rows.forEach(([key, lab, f1], i) => {
     const on = i === cur, done = i < cur;
     const a1 = on ? clamp(p * 2, 0.35, 1) : done ? 0.75 : 0.32;
     g.globalAlpha = a1;
-    if (on) { rr(g, C.x + 8, y - 15, C.w - 16, lh - 2, 8); g.fillStyle = 'rgba(255,182,92,0.08)'; g.fill(); }
+    if (on) { rr(g, C.x + 8, y - 14, C.w - 16, lh - 2, 8); g.fillStyle = 'rgba(255,182,92,0.08)'; g.fill(); }
     text(g, lab, x0, y, { size: 10, color: on ? COL.amber : COL.dim });
     if (narrow) text(g, f1, x0, y + 15, { size: 10.5, kind: 'mono', color: on ? COL.ink : COL.ink2, max: w });
     else text(g, f1, x0 + 92, y, { size: 11, kind: 'mono', color: on ? COL.ink : COL.ink2, max: w - 92 });

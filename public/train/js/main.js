@@ -1,7 +1,7 @@
 // 训练页面入口：三章真实训练记录，调试器式地一层层揭开。
 //   第一章（默认）：玻璃小模型——一台 3D 机器，2,928 个参数每个都是一个方块；看它一批批“吃”数据：进料、前向、反向、更新，
 //                  一路拆到一块矩阵、一个参数的一生（数据 ./glass/，3D 舞台 ./glass3d/）；
-//   第二章：放大到唐宋诗小模型（664 万参数，从零预训练）；第三章：真实的 Qwen3-0.6B 三步监督微调。
+//   第二章：放大到唐宋诗小模型（664 万参数，从零预训练）——也是一台 3D 机器（./tiny3d/）；第三章：真实的 Qwen3-0.6B 三步监督微调。
 // 首屏只取玻璃小模型的几十 KB（配置、曲线、初始化的参数）；另外两章的首屏数据随后在后台取；
 // 各层要用的数据分块在进入视图、播放、拖动时按需取，空闲时后台预取（见 data.js）。
 import { Loader, loadTiny, loadQwen } from './data.js';
@@ -11,7 +11,6 @@ import { Controls, SPEEDS } from './controls.js';
 import { Stage } from './stage.js';
 import { INSIGHTS, INSIGHT_BY_ID } from './insights.js';
 import { Pipeline } from './scenes/pipeline.js';
-import { Overview } from './scenes/overview.js';
 import { OverviewQ } from './scenes/overviewQ.js';
 import { Loop } from './scenes/loop.js';
 import { Tokens } from './scenes/tokens.js';
@@ -27,6 +26,10 @@ import { initLang, isEn, L } from './lang.js';
 import { loadGlass, wrapGlass } from './glass/data.js';
 import { GlassTimeline } from './glass/timeline.js';
 import { GlassStage } from './glass3d/stage.js';
+import { wrapTiny3d } from './tiny3d/data.js';
+import { TinyTimeline } from './tiny3d/timeline.js';
+import { TinyStage, planTiny, discoverTiny } from './tiny3d/stage.js';
+import { updateDebugger } from './tiny3d/ui.js';
 
 initLang();
 
@@ -37,7 +40,7 @@ const store = { found: new Set(saved.found || []), speed: saved.speed || 1, hint
 function save() { try { localStorage.setItem(KEY, JSON.stringify({ found: [...store.found], speed: store.speed, sound: soundOn(), hinted: store.hinted })); } catch { /* 忽略 */ } }
 if (saved.sound) setSound(true);
 
-let bg, stage, controls, g3 = null;
+let bg, stage, controls, g3 = null, t3 = null;
 let runs = {}, tls = {}, run = 'glass', tl = null;
 let pendingRun = null, othersErr = null;
 const ctx = { feat: 0, gsel: null };
@@ -61,10 +64,12 @@ const app = {
   seek: (pred) => { tl.pause(); tl.seek(pred); },
   into: () => into(),
   pickParam: (gi, keep) => pickParam(gi, keep),
+  pickPos: (i) => pickPos(i),
   get tl() { return tl; },
 };
-// 当前这一章用的舞台：玻璃小模型是 3D，另外两章是 2D 画布
-const curStage = () => (run === 'glass' && g3 ? g3 : stage);
+// 当前这一章用的舞台：玻璃小模型、唐宋诗小模型是 3D，Qwen3 那一章是 2D 画布
+const curStage = () => (run === 'glass' && g3 ? g3 : run === 'tiny' && t3 ? t3 : stage);
+const onFreeChange = (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); };
 
 /* ---------------------------------------------------------------- 启动 */
 
@@ -94,7 +99,6 @@ async function boot() {
     depth: (d) => setDepth(d),
     fold: () => updateInsets(),
   });
-  const onFreeChange = (f) => { $('#btnFollow').hidden = !f; if (f) showHint(false); };
   stage = new Stage($('#gl'), $('#cv'), { onFrame, onHover, onPick, onFreeChange });
   try {
     g3 = new GlassStage($('#gl3'), $('#stage'), runs.glass.D, app, { state: frameGlass, onTip: showTip, onFreeChange, scrub: app.scrub });
@@ -124,7 +128,7 @@ async function boot() {
 async function loadOthers(want) {
   try {
     const [t, q] = await Promise.all([loadTiny(loader), loadQwen(loader)]);
-    runs.tiny = wrapTiny(t);
+    runs.tiny = wrapTiny3d(wrapTiny(t), loader);
     runs.qwen = wrapQwen(q);
   } catch (e) {
     console.error(e);
@@ -134,13 +138,13 @@ async function loadOthers(want) {
   }
   ctx.tiny = runs.tiny;
   ctx.qwen = runs.qwen;
+  tls.tiny = new TinyTimeline(runs.tiny);
+  tls.qwen = new Timeline(runs.qwen);
   for (const r of ['tiny', 'qwen']) {
-    tls[r] = new Timeline(runs[r]);
     tls[r].speed = store.speed;
     tls[r].on((type, t) => onTl(type, t));
   }
   scenes.pipeline = new Pipeline(app);
-  scenes.overview = new Overview(app);
   scenes.overviewQ = new OverviewQ(app);
   renderRuns();
   startBackground();
@@ -187,14 +191,14 @@ function enterRun(r) {
     if (othersErr) flashBtn(`#runs [data-run="${r}"]`);
     return;
   }
-  const prevDepth = tl.depth, fromGlass = run === 'glass';
+  const prevDepth = tl.depth, fromGlass = run === 'glass' || run === 'tiny';
   curStage().exitFree();
   run = r;
   setGlassMode(r === 'glass');
   tl.pause();
   tl = tls[r];
   tl.speed = store.speed;
-  if (r === 'glass') updateControls();
+  if (r === 'glass' || r === 'tiny') updateControls();
   else if (fromGlass || prevDepth === 0) {
     // 从玻璃小模型或流水线进来：停在这一段训练的全程（D1）
     if (tl.depth !== 1) { tl.depth = 0; tl.setDepth(1); } else updateControls();
@@ -223,7 +227,29 @@ function renderRuns() {
 function setGlassMode(on) {
   document.body.classList.toggle('g3d', on);
   if (g3) g3.active = on;
+  setTinyMode(run === 'tiny');
   updateInsets();
+}
+
+// 唐宋诗小模型这一章的 3D 舞台：第一次进来时才建（另一个 WebGL 画布）
+function setTinyMode(on) {
+  if (on && !t3) {
+    try {
+      t3 = new TinyStage($('#gl3t'), $('#stage'), runs.tiny, app, { state: frameTiny, onTip: showTip, onFreeChange, scrub: app.scrub });
+      updateInsets();
+    } catch (e) { console.error(e); }
+  }
+  document.body.classList.toggle('t3d', on && !!t3);
+  if (t3) t3.active = on;
+}
+
+// 点了一根预测柱：跳到“一块权重”那一层的这个位置的损失
+function pickPos(i) {
+  if (run !== 'tiny') return;
+  tl.pause();
+  curStage().exitFree();
+  sfx.dive();
+  tl.jump(4, (b) => b.ph === 'loss' && b.i === i);
 }
 
 // 点了某个参数方块：跳到“一个参数”（D5），停在更新这一段的第一小步
@@ -248,7 +274,7 @@ function pickParam(gi, keep = false) {
 
 function into() {
   if (!tl) return;
-  if (run === 'glass') {
+  if (run === 'glass' || run === 'tiny') {
     if (!tl.canInto()) { flashBtn('#btnIn'); return; }
     sfx.dive();
     curStage().exitFree();
@@ -269,10 +295,10 @@ function into() {
 }
 
 function out() {
-  if (!tl || tl.depth === 0) return;
+  if (!tl || tl.depth <= (tl.minDepth ?? 0)) return;
   sfx.rise();
   curStage().exitFree();
-  if (run === 'glass') { tl.pause(); tl.setDepth(tl.depth - 1); return; }
+  if (run === 'glass' || run === 'tiny') { tl.pause(); tl.setDepth(tl.depth - 1); return; }
   if (tl.depth === 1) {
     tl.pause();
     const st = run === 'tiny' ? 0 : 1;
@@ -286,7 +312,7 @@ function out() {
 function setDepth(d) {
   if (!tl) return;
   if (d === tl.depth) return;
-  if (run === 'glass') { d > tl.depth ? sfx.dive() : sfx.rise(); curStage().exitFree(); tl.pause(); tl.setDepth(d); return; }
+  if (run === 'glass' || run === 'tiny') { d > tl.depth ? sfx.dive() : sfx.rise(); curStage().exitFree(); tl.pause(); tl.setDepth(d); return; }
   if (d === 0) return out1to0();
   d > tl.depth ? sfx.dive() : sfx.rise();
   stage.exitFree();
@@ -323,6 +349,7 @@ function plan() {
   const p = { need: [], want: [], hold: [], soon: [] };
   if (!tl) return p;
   if (run === 'glass') return planGlass(p);
+  if (run === 'tiny') return planTiny(tl, runs.tiny, p);
   const T = runs.tiny.D;
   if (tl.depth === 0) { p.soon.push(T.key('ck', 0), T.key('ck', T.K - 1), T.key('ck', 1)); return p; }
   const R = app.R, D = R.D, K = R.K, k = tl.k, view = tl.view;
@@ -394,6 +421,7 @@ function controlsNeed() {
   if (!tl || tl.depth === 0) return [];
   const p = plan();
   if (run === 'glass') return tl.depth === 1 ? [runs.glass.D.key('w', tl.k)] : p.need;
+  if (run === 'tiny') return p.need;
   return tl.depth === 1 && app.R.kind === 'tiny' ? [...p.need, app.R.D.key('ck', tl.k)] : p.need;
 }
 
@@ -402,7 +430,8 @@ function updateControls() {
   const need = controlsNeed();
   const ready = need.every((key) => loader.has(key));
   const err = ready ? null : need.map((key) => loader.error(key)).find(Boolean) || null;
-  controls.update(tl, app.R, ctx, ready, err);
+  if (run === 'tiny') updateDebugger(controls, tl, runs.tiny, ctx, ready, err);
+  else controls.update(tl, app.R, ctx, ready, err);
 }
 
 // 一块数据到了（或者失败了）：如果当前画面在等它，刷新调试器
@@ -443,7 +472,7 @@ function nearestStep(R, k) {
 
 function onFrame(dt, clock) {
   if (!tl) return null;
-  if (run === 'glass') { lastView = ''; return null; }   // 玻璃小模型这一章由 3D 舞台（frameGlass）驱动
+  if (run === 'glass' || run === 'tiny') { lastView = ''; return null; }   // 这两章由 3D 舞台（frameGlass / frameTiny）驱动
   // 播放中，这一屏（或下一个检查点）要等的分块还在路上：原地停一下，到了再走
   if (tl.playing && plan().hold.some((key) => loader.pending(key))) dt = 0;
   tl.tick(dt);
@@ -496,6 +525,21 @@ function frameGlass(dt, clock) {
   return { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view: tl.view, speed: tl.speed, playing: tl.playing, R: app.R, i: tl.i, wait: { since: wait.since, err } };
 }
 
+// 唐宋诗小模型的 3D 舞台每帧调用：同上（缺数据的提示由舞台自己画）
+function frameTiny(dt, clock) {
+  if (!tl || run !== 'tiny') return null;
+  if (tl.playing && plan().hold.some((key) => loader.pending(key))) dt = 0;
+  tl.tick(dt);
+  const p = plan();
+  request(p);
+  const miss = [...p.need, ...p.want].filter((key) => !loader.has(key));
+  const waiting = miss.length > 0;
+  if (waiting && !wait.waiting) wait.since = clock;
+  wait.waiting = waiting;
+  const err = miss.map((key) => loader.error(key)).find(Boolean) || null;
+  return { k: tl.k, p: tl.p, depth: tl.depth, step: tl.step, view: tl.view, speed: tl.speed, playing: tl.playing, R: app.R, i: tl.i, wait: { since: wait.since, err, waiting } };
+}
+
 // 3D 舞台缺数据时顶部的小提示（机器先按已有的数据画）
 let pillEl = null;
 function waitPill(on, err) {
@@ -541,6 +585,7 @@ function onPick(info, e, h) {
 
 function discoverFor() {
   if (run === 'glass') return discoverGlass();
+  if (run === 'tiny') return discoverTiny(tl, runs.tiny, discover);
   const s = tl.step, d = tl.depth, R = app.R;
   if (d === 0 && s.st === 2) discover('dpo');
   if (d < 1 || !R) return;
@@ -636,6 +681,7 @@ function updateInsets() {
   const ctlH = $('#ctl').offsetHeight + 22;
   stage.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH, 56);
   g3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
+  t3?.setInsets(small || folded ? 0 : dbg.offsetWidth + 28, small ? 100 + dbg.offsetHeight + 8 : ctlH);
 }
 addEventListener('resize', () => updateInsets());
 
@@ -690,5 +736,5 @@ function bindKeys() {
   });
 }
 
-window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, get g3() { return g3; }, get waiting() { return wait.waiting; }, loader, app, into, out, enterRun, ctx, setSpeed };
+window.__train = { get tl() { return tl; }, get run() { return run; }, get stage() { return stage; }, get g3() { return g3; }, get t3() { return t3; }, get waiting() { return wait.waiting; }, loader, app, into, out, enterRun, ctx, setSpeed };
 boot();

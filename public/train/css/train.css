@@ -385,3 +385,37 @@ body.pane-drag * { cursor: ew-resize !important; transition: none !important; }
 html[lang="en"] .brand-zh { display: none; }   /* 英文模式：TRAINING 已经说明了是哪一页，把位置让给面包屑 */
 /* 英文模式：拉丁字体排在中文字体前面（中文字体里的弯引号、撇号是全角的，夹在英文里会空出一大块）；诗句等中文照常落到后面的中文字体 */
 html[lang="en"] { --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", "DejaVu Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif; }
+
+/* ---------------- 第二章：唐宋诗小模型的 3D 机器（js/tiny3d/；引擎和推理页、玻璃小模型共用） ---------------- */
+
+.gl3t { position: absolute; inset: 0; }
+.gl3t canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+.gl3t.grabbing canvas { cursor: grabbing; }
+body.t3d .gl { display: none; }
+body:not(.t3d) .gl3t, body:not(.t3d) .t3hud, body:not(.t3d) .t3side, body:not(.t3d) .t3board, body:not(.t3d) .t3pill { display: none; }
+body.t3d .stage-hint .h3d { display: contents; }
+body.t3d .stage-hint .h2d { display: none; }
+.t3hud { position: absolute; z-index: 4; top: 64px; left: 14px; width: 340px; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: boardin .5s var(--ease); }
+.t3hud.compact { width: 260px; }
+.t3side { position: absolute; z-index: 4; top: 244px; left: 14px; width: 340px; border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: boardin .5s var(--ease); }
+.t3hud canvas, .t3side canvas, .t3board canvas { display: block; }
+.t3board { position: absolute; z-index: 4; left: 14px; right: calc(var(--dbg-w) + 28px); bottom: 104px; border-radius: 16px; overflow: hidden auto; max-height: calc(100% - 200px); box-shadow: 0 18px 44px rgba(0, 0, 0, .45); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); scrollbar-width: thin; scrollbar-color: var(--line2) transparent; animation: boardin .5s var(--ease); }
+.dbg.folded ~ .t3board { right: 14px; }
+@media (min-width: 901px) { body.t3-board #toasts { bottom: auto; top: 128px; } }
+@media (max-height: 760px) { .t3side { display: none; } }
+.lbl.t3p { font-size: 10.5px; }
+.lbl.t3l { font-size: 14px; color: var(--ink2); }
+.lbl.t3lens { color: var(--acc); font-size: 10.5px; }
+.lbl.t3w { white-space: normal; max-width: 300px; text-align: center; }
+.lbl.t3dim { color: var(--dim); }
+.lbl.t3g small { display: block; margin: 0; }
+.lbl.t3mag { color: #ffd9a6; border-color: rgba(255, 209, 138, .5); }
+.lbl.t3t5 { font-size: 10px; padding: 0 5px; color: var(--ink2); }
+.lbl.t3t5.ok { color: var(--green); border-color: rgba(142, 224, 122, .5); }
+@media (max-width: 900px) {
+  .t3hud { top: 56px; left: 8px; right: 8px; width: auto; }
+  .t3hud.compact { width: auto; }
+  .t3board { top: 56px; bottom: auto; left: 8px; right: 8px; max-height: 44vh; border-radius: 14px; }
+  .dbg.folded ~ .t3board { right: 8px; }
+  .lbl.t3w { max-width: 200px; }
+}
