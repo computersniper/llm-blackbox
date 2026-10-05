@@ -189,6 +189,8 @@ export class QwenMachine {
       body.userData.pick = { type: 'tile', j, click: j < this.T && R.ans.includes(j) };
       this.E.pickables.push(body);
       g.mat = mat;
+      top.material = face.material.clone();
+      g.faces = [face.material, top.material];
       this.root.add(g);
       this.tiles.push(g);
     }
@@ -644,18 +646,22 @@ export class QwenMachine {
   updTray(st, F, focus) {
     const R = this.R, N = this.tiles.length, T = this.T;
     const fadeTray = this.fade > 0.4 ? 0.35 : 1;
+    // 推到嵌入表跟前时，托盘上的词元挡在前面：变得几乎透明
+    const embClose = (st.view === 'q-mat' || st.view === 'q-param') && this.selT === 'embed';
     this.tiles.forEach((g, j) => {
       const k = seg(F.tpl, (j / N) * 0.7, (j / N) * 0.7 + 0.3);
       g.visible = k > 0.01;
       g.position.y = 0.12 + (1 - easeOut(k)) * 2.2;
       // 第 24 个词元（<|im_end|> 后面的换行）只当答案用、不当输入：错开一位以后淡下去
       const notIn = j >= T;
-      g.mat.opacity = notIn ? 1 - 0.75 * F.shift : 1;
+      g.mat.opacity = (notIn ? 1 - 0.75 * F.shift : 1) * (embClose ? 0.12 : 1);
+      g.mat.depthWrite = !embClose;
+      for (const fm of g.faces) fm.opacity = embClose ? 0.15 : 1;
       const hl = j === focus && F.fwd > -2 && st.view !== 'q-run' ? 1.12 : 1;
       g.scale.setScalar(hl);
       g.mat.emissiveIntensity = (0.08 + (j === focus ? 0.12 : 0)) * fadeTray;
     });
-    const labOn = F.lab > 0.01;
+    const labOn = F.lab > 0.01 && !embClose;
     this.labTray.forEach((m) => { m.visible = labOn; });
     this.labs.forEach((g, j) => {
       g.visible = labOn && !(j === 0 && F.shift > 0.6);
@@ -698,7 +704,7 @@ export class QwenMachine {
       if (F.fwd <= -1.99) top = 0.26;
       c.scale.y = Math.max(0.001, top - 0.25);
       const ans = c.isAns;
-      c.material.opacity = (ans ? 0.62 : 0.3) * (i === focus ? 1.25 : 1) * (1 - fade * (i === focus ? 0.2 : 0.75));
+      c.material.opacity = (ans ? 0.62 : 0.3) * (i === focus ? 1.25 : 1) * (1 - fade * (i === focus ? 0.2 : 0.75)) * (this.fade > 0.45 ? 0.25 : 1);
       c.scale.x = c.scale.z = i === focus ? 1.5 : ans ? 1.15 : 1;
     });
     // 前向光环
@@ -1010,7 +1016,7 @@ export class QwenMachine {
       tmpM.makeScale(1, h, 1).setPosition(this.x(i), by, -0.25);
       this.bars.setMatrixAt(i, ans ? tmpM : ZERO);
       this.barsM.setMatrixAt(i, ans ? ZERO : tmpM);
-      const dim = (F.lossPos >= 0 && F.lossPos !== i ? 0.3 : 0.72) * (1 - fade * 0.4);
+      const dim = (F.lossPos >= 0 && F.lossPos !== i ? 0.26 : 0.6) * (1 - fade * 0.4);
       if (ans) { const c = pv > 0.5 ? LIN.green : pv > 0.1 ? LIN.amber : LIN.rose; ba[i * 3] = c[0] * dim; ba[i * 3 + 1] = c[1] * dim; ba[i * 3 + 2] = c[2] * dim; }
       // 更新后的虚影（下一个状态的真实概率）
       if (F.after > 0 && kn <= R.K && ans && F.next < 1) {
@@ -1026,6 +1032,9 @@ export class QwenMachine {
       if (!ans && F.pre > 0) { tmpM.makeScale(1, Math.max(0.002, Math.min(12, nl) * 0.2 * F.pre), 1).setPosition(this.x(i), by, 0.32); this.nllPre.setMatrixAt(i, tmpM); } else this.nllPre.setMatrixAt(i, ZERO);
     }
     this.bars.instanceMatrix.needsUpdate = this.bars.instanceColor.needsUpdate = this.barsM.instanceMatrix.needsUpdate = true;
+    // 推到一块面板 / 一个权重跟前时，输出头上的柱子会挡住拆开的第 27 层：收起来
+    const close = st.view === 'q-mat' || st.view === 'q-param';
+    this.head.visible = !close || this.selT === 'norm';
     this.barsM.visible = rise > 0.001;
     this.barsM.material.opacity = (F.lossPos >= 0 ? 0.16 : 0.32) * (1 - fade * 0.6);
     this.ghost.instanceMatrix.needsUpdate = this.ghostTop.instanceMatrix.needsUpdate = true;
@@ -1371,7 +1380,7 @@ export class QwenMachine {
       const t = s.t;
       if (v === 'q-param') {
         const pos = this.weightPos(t);
-        if (pos) { const r = t === 'embed' || isVec(t) ? 0.9 : 0.75; return frame([pos.x - r, pos.x + r, pos.y - r * 0.7, pos.y + r * 0.7, PZ - 0.1, PZ + 0.3], NEAR, 1.04, 0.6); }
+        if (pos) { const r = t === 'embed' || isVec(t) ? 1.1 : 1.05; return frame([pos.x - r, pos.x + r, pos.y - r * 0.7, pos.y + r * 0.7, PZ - 0.1, PZ + 0.3], NEAR, 1.04, 0.6); }
       }
       if (t === 'embed') return frame([EMB.x0 - 0.3, EMB.x1 + 0.3, EMB.y0 - 0.3, EMB.y1 + 0.5, PZ - 0.1, 0.4], NEAR, 1.04);
       if (t === 'norm') return frame([-3.1, 0.6, this.yTop - 0.3, this.yTop + 0.9, PZ - 0.1, 0.6], NEAR, 1.04);

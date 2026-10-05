@@ -131,6 +131,7 @@ export class QwenTimeline {
   canInto() {
     if (this.depth >= Q_MAX_DEPTH) return false;
     const s = this.step;
+    if (s.ph === 'end') return true;   // 结果那一拍：＋ 进到第 3 步里面
     const deeper = this.build(this.depth + 1, this.k).find((b) => qIsPrefix(s, b));
     return !!deeper && (!same(deeper, s) || qView(this.depth + 1, s) !== qView(this.depth, s));
   }
@@ -141,7 +142,8 @@ export class QwenTimeline {
     const s = this.step;
     const list = this.build(d, this.k);
     let idx;
-    if (d > this.depth) idx = list.findIndex((b) => qIsPrefix(s, b));
+    if (s.ph === 'end') idx = 0;
+    else if (d > this.depth) idx = list.findIndex((b) => qIsPrefix(s, b));
     else idx = list.findIndex((a) => qIsPrefix(a, s));
     this.depth = d;
     this.list = list;

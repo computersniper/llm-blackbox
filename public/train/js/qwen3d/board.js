@@ -154,8 +154,8 @@ export class QwenBoard {
       return;
     }
     if (kind === 'tensor') {
-      if (sm) { const h1 = 250, h2 = 210; this.board.size(W, h1 + 10 + h2); this.board.draw((g, env) => { this.drawTensor(g, { x: 0.5, y: 0.5, w: W - 1, h: h1 }, st, env); this.drawTensorChart(g, { x: 0.5, y: h1 + 10, w: W - 1, h: h2 - 1 }, st, env); }); }
-      else { const h = 260, mw = Math.min(520, Math.max(400, W * 0.48)); this.board.size(W, h); this.board.draw((g, env) => { this.drawTensor(g, { x: 0.5, y: 0.5, w: mw, h: h - 1 }, st, env); this.drawTensorChart(g, { x: mw + 10, y: 0.5, w: W - mw - 10.5, h: h - 1 }, st, env); }); }
+      if (sm) { const h1 = 330, h2 = 210; this.board.size(W, h1 + 10 + h2); this.board.draw((g, env) => { this.drawTensor(g, { x: 0.5, y: 0.5, w: W - 1, h: h1 }, st, env); this.drawTensorChart(g, { x: 0.5, y: h1 + 10, w: W - 1, h: h2 - 1 }, st, env); }); }
+      else { const h = 292, mw = Math.min(520, Math.max(400, W * 0.48)); this.board.size(W, h); this.board.draw((g, env) => { this.drawTensor(g, { x: 0.5, y: 0.5, w: mw, h: h - 1 }, st, env); this.drawTensorChart(g, { x: mw + 10, y: 0.5, w: W - mw - 10.5, h: h - 1 }, st, env); }); }
       return;
     }
     if (kind === 'wgrad') {
@@ -191,15 +191,15 @@ export class QwenBoard {
     rows.push([T_('q3.tenDw'), ts.dw != null ? `${num(ts.dw, 3)} · ${T_('q3.tenDwMax', { v: num(ts.dwMax, 2) })}` : '—', COL.violet, ph === 'upd']);
     if (ts.dw != null && ts.w) rows.push([T_('q3.tenRel'), num(ts.dw / ts.w, 2), COL.violet, ph === 'upd']);
     if (ts.revert != null) rows.push([T_('q3.tenRev'), T_('q3.tenRevV', { c: fmtInt(ts.changed), r: fmtInt(ts.revert), p: ((ts.revert / ts.n) * 100).toFixed(1) }), COL.amber, ph === 'upd']);
-    const lx = C.x + 16, vx = C.x + (isEn ? 168 : 150);
+    const P = C.w < 500, lx = C.x + 16, vx = C.x + (P ? (isEn ? 132 : 112) : isEn ? 168 : 150);
     rows.forEach(([kk, vv, c, hot], j) => {
       const y = C.y + 66 + j * 25;
       if (hot) { rr(g, C.x + 8, y - 15, C.w - 16, 22, 5); g.fillStyle = hexA(c === COL.ink2 ? COL.cyan : c, 0.07); g.fill(); }
-      text(g, kk, lx, y, { size: 11, color: COL.dim, max: vx - lx - 8 });
-      text(g, vv, vx, y, { size: 11.5, kind: 'mono', color: c, max: C.x + C.w - vx - 12 });
+      text(g, kk, lx, y, { size: P ? 10 : 11, color: COL.dim, max: vx - lx - 8 });
+      text(g, vv, vx, y, { size: P ? 10 : 11.5, kind: 'mono', color: c, max: C.x + C.w - vx - 12 });
     });
     const note = ph === 'fwd' ? T_('q3.tenNoteF') : ph === 'bwd' ? T_('q3.tenNoteB') : T_('q3.tenNoteU');
-    wrap(g, note, C.x + 16, C.y + C.h - 30, C.w - 32, 14, { size: 10.5, color: COL.dim, maxLines: 2 });
+    wrap(g, note, C.x + 16, C.y + C.h - (P ? 44 : 30), C.w - 32, 14, { size: 10.5, color: COL.dim, maxLines: P ? 3 : 2 });
   }
 
   // D4 右边：这一层 11 个张量的梯度（或嵌入表梯度最大的行）+ 同一个张量在 28 层里的梯度
