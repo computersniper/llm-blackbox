@@ -404,6 +404,7 @@ body.t3d .stage-hint .h2d { display: none; }
 @media (min-width: 901px) { body.t3-board #toasts { bottom: auto; top: 128px; } }
 @media (max-height: 760px) { .t3side { display: none; } }
 .lbl.t3p { font-size: 10.5px; }
+.lbl.t3p small { display: block; margin: 1px 0 0; }
 .lbl.t3l { font-size: 14px; color: var(--ink2); }
 .lbl.t3lens { color: var(--acc); font-size: 10.5px; }
 .lbl.t3w { white-space: normal; max-width: 300px; text-align: center; }

@@ -161,7 +161,7 @@ export class TinyMachine {
   // 残差流：64 根光纤（16 × 4）+ 玻璃外壳 + 每层 4 个环（RMSNorm、⊕）+ 最后的 RMSNorm
   buildBundle() {
     const h = YT - 0.25;
-    const cg = new THREE.CylinderGeometry(0.011, 0.011, 1, 6, 1, true);
+    const cg = new THREE.CylinderGeometry(0.008, 0.008, 1, 6, 1, true);
     cg.translate(0, 0.5, 0);
     this.fibers = new THREE.InstancedMesh(cg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }), NP);
     this.fibers.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NP * 3), 3);
@@ -489,7 +489,7 @@ export class TinyMachine {
     glass.raycast = () => {};
     const fgeo = new THREE.CylinderGeometry(0.16, 0.16, 1, 24);
     fgeo.translate(0, 0.5, 0);
-    this.gauge = new THREE.Mesh(fgeo, new THREE.MeshStandardMaterial({ color: 0x3a2a10, emissive: 0xffb65c, emissiveIntensity: 0.35, roughness: 0.4 }));
+    this.gauge = new THREE.Mesh(fgeo, new THREE.MeshStandardMaterial({ color: 0x5a3f18, emissive: 0xffb65c, emissiveIntensity: 0.55, roughness: 0.4 }));
     this.gauge.position.set(GAUGE.x, GAUGE.y, GAUGE.z);
     this.gauge.scale.y = 0.001;
     this.gauge.userData.pick = { type: 'gauge' };
@@ -658,13 +658,15 @@ export class TinyMachine {
     // 嵌入的局部：每一行是哪个字
     this.magRows = atlas(8, 6);
     this.magRows.draw(Array.from({ length: 48 }, (_, i) => this.X.ch(i + 1)));
-    const rg = new THREE.PlaneGeometry(MAG.cell * 0.9, MAG.cell * 0.9);
+    const rg = new THREE.PlaneGeometry(MAG.cell * 1.1, MAG.cell * 1.1);
     const cell = new Float32Array(48);
     for (let i = 0; i < 48; i++) cell[i] = i;
     rg.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
     this.magRowFaces = new THREE.InstancedMesh(rg, atlasFaceMaterial(this.magRows, 0xb4bed2), 48);
-    for (let i = 0; i < 48; i++) { this.tmpM.makeTranslation(-MAG.cell * 0.7, -(i + 0.5) * MAG.cell, 0.01); this.magRowFaces.setMatrixAt(i, this.tmpM); }
+    for (let i = 0; i < 48; i++) { this.tmpM.makeTranslation(-MAG.cell * 1.0, -(i + 0.5) * MAG.cell, 0.02); this.magRowFaces.setMatrixAt(i, this.tmpM); }
     this.magRowFaces.raycast = () => {};
+    this.magRowFaces.renderOrder = 6;
+    this.magRowFaces.frustumCulled = false;
     g.add(this.magRowFaces);
     // 从面板角上的小块连到放大的方块阵：四条光线
     this.magLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffd18a, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -711,8 +713,9 @@ export class TinyMachine {
       let o;
       if (P.flat) o = add(`${nm}<small>${sh} · ${note}</small>`, 'part t3p', P.x0 + 1.08, P.y + 0.02, P.z0 - 0.4, 0, 0.5);
       else if (P.kind === 'ln1' || P.kind === 'ln2' || P.kind === 'nf') o = add(`${nm}<small>${sh}</small>`, 'part t3p', P.x0 + P.w / 2, P.y0 + P.h + 0.02, 0.05, 0.5, 1.1);
+      else if (P.kind === 'down') o = add(`${nm} ${sh}<small>${note}</small>`, 'part t3p', P.x0 + P.w, P.y0 - 0.03, 0.05, 1, 0);
       else if (P.kind === 'k' || P.kind === 'v') o = add(`${nm}<small>${kindShape(P.kind).join('×')}</small>`, 'part t3p', P.x0 + P.w / 2, P.y0 - 0.03, 0.05, 0.5, 0);
-      else o = add(`${nm}<small>${sh} · ${note}</small>`, 'part t3p', P.x0, P.y0 - 0.03, 0.05, 0, 0);
+      else o = add(`${nm} ${sh}<small>${note}</small>`, 'part t3p', P.x0, P.y0 - 0.03, 0.05, 0, 0);
       o.short = nm;
       o.full = o.el.innerHTML;
       o.visible = false;
@@ -724,7 +727,7 @@ export class TinyMachine {
     for (let b = 0; b <= NLAY; b++) this.lLens.push(add(b === 0 ? t('t3.lens0') : t('t3.lensL', { l: b - 1 }), 'hint t3lens', LENS.x0, yBound(b) + LENS_H / 2 + 0.04, 0.06, 0, 1));
     this.lHeads = [];
     for (let l = 0; l < NLAY; l++) this.lHeads.push(add(t('t3.heads'), 'hint', headX(0), yBand(l) + SUB.heads1 + 0.04, 0.05, 0, 1));
-    this.lBundle = add(t('t3.bundle'), 'hint t3w', BCX, 0.55, BUNDLE.z1 + 0.15, 0.5, 0);
+    this.lBundle = add(t('t3.bundle'), 'hint t3w', BUNDLE.x1 + 0.1, 1.0, BCZ, 0, 0.5);
     this.lTray = add(t('t3.tray'), 'hint t3w', BCX, -0.12, BUNDLE.z1 + 0.5, 0.5, 0);
     this.lStack = add(t('t3.stack'), 'num t3dim', BUNDLE.x0 - 0.05, TRAY.y - 0.25, BUNDLE.z1, 1, 0.5);
     this.lCorpus = add(t('t3.corpus'), 'hint t3w', (CORPUS.x0 + CORPUS.x1) / 2, CORPUS.y + 0.12, CORPUS.z, 0.5, 1);
@@ -734,8 +737,8 @@ export class TinyMachine {
     this.lClip = add('', 'num gc', GAUGE.x + 0.3, GAUGE.y - 0.3, 0.2, 0, 0);
     this.lGap = add('', 'num gt', BCX, -0.5, BUNDLE.z1 + 0.9, 0.5, 0);
     this.lPrinter = add(t('t3.printer'), 'hint t3w', PRINTER.x, PRINTER.y - 0.06, PRINTER.z + 0.45, 0.5, 0);
-    this.lPca = add(t('t3.pca'), 'hint t3w', PCA.x0, PCA.y1 + 0.08, PCA.z, 0, 1);
-    this.lLand = add(t('t3.land'), 'hint t3w', LAND.x0, LAND.y0 + LAND.hMax + 0.5, LAND.z0, 0, 1);
+    this.lPca = add(t('t3.pca'), 'hint t3w', (PCA.x0 + PCA.x1) / 2, PCA.y1 + 0.08, PCA.z, 0.5, 1);
+    this.lLand = add(t('t3.land'), 'hint t3w', (LAND.x0 + LAND.x1) / 2, LAND.y0 + LAND.hMax + 0.5, LAND.z0, 0.5, 1);
     this.lMag = add('', 'part t3mag', 0, 0, 0, 0, 1.1);
     this.lFeat = add('', 'num gsel', 0, 0, 0, 0.5, 1.3);
     this.lTop5 = [];
@@ -1024,7 +1027,7 @@ export class TinyMachine {
   updBundle(st, F, haveSt, t) {
     const X = this.X, k = st.k, M = this.tmpM;
     const fx = F.fwd, bx = F.bwd;
-    const fOn = fx >= 0 && fx < 14, bOn = bx >= 0 && bx < 14;
+    const fOn = fx > 0 && fx < 14, bOn = bx > 0 && bx < 14;
     // 前向脉冲的高度：0 嵌入、1 + 2l 注意力、2 + 2l 前馈、13 输出头
     const yF = (x) => {
       const o = Math.min(13, Math.floor(x)), f = x - o;
@@ -1087,7 +1090,7 @@ export class TinyMachine {
       fl.e.material.color.setHex(b > a ? 0xff6b93 : 0x5ef0d4);
     }
     // 光纤：有数据流过时亮，进料前暗
-    const ca = this.fibers.instanceColor.array, base = F.feed > 0.5 ? 0.42 : 0.15;
+    const ca = this.fibers.instanceColor.array, base = F.feed > 0.5 ? 0.32 : 0.12;
     for (let i = 0; i < NP; i++) {
       let r = 0.18 * base, g2 = 0.75 * base, b2 = 0.68 * base;
       if (F.lossPos === i) { r = 1; g2 = 0.8; b2 = 0.45; }
@@ -1247,7 +1250,11 @@ export class TinyMachine {
       const on = F.fwd >= 0 ? clamp01((F.fwd - end + 0.3) / 0.3) : 0;
       this.drawLens(b, k, 'top');
       const ls = this.lens[b];
-      ls.m.material.opacity = 0.1 + 0.9 * on;
+      // 前向还没到这个边界时整块收起来（脉冲经过时这一层的字才“写”出来）
+      const vis = on > 0.01;
+      ls.m.visible = ls.back.visible = ls.e.visible = ls.ln.visible = vis;
+      ls.back.material.opacity = 0.8 * on;
+      ls.m.material.opacity = on;
       ls.ln.material.opacity = 0.08 + 0.3 * on;
       ls.e.material.opacity = on > 0 && on < 1 ? 0.9 : 0.25 + 0.15 * on;
     }
@@ -1354,7 +1361,6 @@ export class TinyMachine {
     // 放在源面板的前面：嵌入那块立在托盘右前方；矩阵的放在角上的正前方
     const src = this.cropSrc(c);
     const org = c === 0 ? new THREE.Vector3(-0.85, 2.85, 1.25) : new THREE.Vector3(src.x0 - S / 2 + 0.1, src.y1 + 0.4, 1.2);
-    if (c === 2) org.set(src.x0 - S - 0.3, src.y1 + 0.35, 1.0);
     this.mag.position.copy(org);
     this.magOrg = org;
     this.magRowFaces.visible = c === 0;
@@ -1416,6 +1422,13 @@ export class TinyMachine {
   updMarks(st, t) {
     const X = this.X, s = st.step;
     const hv = this.hover;
+    const lp = this.F?.lossPos ?? -1;
+    if (lp >= 0 && X.has('st', st.k)) {
+      const h = (0.02 + X.rowP(st.k, lp) * PH) + 0.06;
+      this.mSel.position.set(fiberX(lp), YP + h / 2, fiberZ(lp));
+      this.mSel.scale.set(FS * 0.95, h, FS * 0.95);
+      this.mSel.visible = true;
+    } else this.mSel.visible = false;
     if (hv && hv.type === 'cube' && this.mag.visible) {
       const r = Math.floor(hv.n / C48), q = hv.n % C48, h = this.cubes.instanceMatrix.array[hv.n * 16 + 10], z = this.cubes.instanceMatrix.array[hv.n * 16 + 14];
       this.mHover.position.set(this.magOrg.x + (q + 0.5) * MAG.cell, this.magOrg.y - (r + 0.5) * MAG.cell, this.magOrg.z + z + h / 2);
@@ -1478,7 +1491,7 @@ export class TinyMachine {
       if (v === 't-step' && s.ph === 'batch') show = P.kind === 'E';
       if (s.ph === 'upd' && v === 't-op' && s.sub === 'adam') show = P.crop >= 0 && P.kind !== 'ET';
       o.visible = !!show;
-      const html = far && !opPanels.has(P) ? o.short : o.full;
+      const html = (far && !opPanels.has(P)) || this.small ? o.short : o.full;
       if (o.el._h !== html) { o.el.innerHTML = html; o.el._h = html; }
       o.el.classList.toggle('on', opPanels.has(P) && v !== 't-run');
     }
@@ -1512,7 +1525,7 @@ export class TinyMachine {
       const html = t('t3.gap', { t: X.step(k) + 1, g: gap });
       if (this.lGap.el._h !== html) { this.lGap.el.innerHTML = html; this.lGap.el._h = html; }
     }
-    this.lPrinter.visible = v === 't-run' && !this.small;
+    this.lPrinter.visible = v === 't-run' && !this.small && !this.insetL;
     this.lPca.visible = this.lLand.visible = v === 't-run' && !this.small;
     // 更新那一段：局部按“到下一个检查点”的 ΔW 变色——写清楚隔了几步
     const updNote = s.ph === 'upd' && (v === 't-step' || v === 't-op') && s.sub !== 'clip' || (v === 't-run' && F.upd > 0 && F.done < 1);
@@ -1686,7 +1699,7 @@ export class TinyMachine {
     const machine = [MACHINE.x0, MACHINE.x1, MACHINE.y0, MACHINE.y1, -1.4, 1.2];
     const all = [ALL.x0, ALL.x1, ALL.y0, ALL.y1, -1.6, 5.8];
     if (v === 't-run') return frame(this.small ? machine : all, WIDE, 1.02);
-    const batchR = [CORPUS.x1 - 2.4, 1.6, -0.5, 1.4, -1.2, 1.6];
+    const batchR = [CORPUS.x1 - 1.2, BUNDLE.x1 + 0.5, -0.45, 0.9, BUNDLE.z0 - 0.4, CORPUS.z + 0.4];
     const lossR = [BUNDLE.x0 - 0.2, GAUGE.x + 1.4, YT - 0.2, YP + PH + 0.6, -1.0, 1.0];
     if (v === 't-step') {
       if (s.ph === 'batch') return frame(batchR, LOW, 1.06);
@@ -1701,11 +1714,15 @@ export class TinyMachine {
       if (s.ph === 'batch') return frame(s.sub === 'row' ? batchR : [BUNDLE.x0 - 0.3, BUNDLE.x1 + 0.3, -0.5, 0.7, BUNDLE.z0 - 0.3, BUNDLE.z1 + TGT_DZ + 0.3], s.sub === 'row' ? LOW : TOP, 1.06);
       if (s.ph === 'loss') return frame(lossR, TOP, 1.06);
       if (s.ph === 'upd') return frame(machine, WIDE, 1.02);
-      return frame(LY.opRect(s), MID, 1.04);
+      const r = LY.opRect(s);
+      if (this.small && (s.sub === 'attn' || s.sub === 'ffn')) r[0] = BUNDLE.x0 - 0.3;
+      return frame(r, MID, 1.04);
     }
     if (v === 't-pos') {
-      const i = s.i;
-      return frame([fiberX(i) - 1.2, Math.max(EMB.x0 + 1.4, lossX(i) + 0.4), YT - 0.1, YP + PH + 0.3, fiberZ(i) - 1.6, fiberZ(i) + 0.6], TOP, 1.08, 1.2);
+      const i = s.i, X = this.X;
+      let zb = fiberZ(i) - 1.2;
+      if (X.has('st', st.k)) for (const tp of X.rowTop(st.k, i)) if (tp.p > 0.02) zb = Math.min(zb, Math.max(-5, embZ(tp.id) - 0.2));
+      return frame([fiberX(i) - 1.0, Math.max(EMB.x0 + 1.3, lossX(i) + 0.4), YT - 0.1, YP + PH + 0.3, zb, fiberZ(i) + 0.6], TOP, 1.08, 1.2);
     }
     if (v === 't-crop' && this.magOrg) {
       const S = C48 * MAG.cell, o = this.magOrg, src = this.cropSrc(s.c);

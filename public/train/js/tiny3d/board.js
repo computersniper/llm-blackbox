@@ -88,16 +88,17 @@ export class TinyBoard {
     this.sideEl.hidden = !showSide;
     this.boardEl.hidden = !showBoard;
     document.body.classList.toggle('t3-board', showBoard);
+    this.roomy = showSide;
     if (showHud) this.drawHud(st, X, t);
     if (showSide) this.drawSide(st, X, t);
     if (showBoard) this.drawBoard(st, X, t);
     // 宽屏的训练全程：左边一列卡片挡住的那一条，3D 在剩下的区域里取景
     this.insetL = showSide ? this.sideEl.getBoundingClientRect().right - this.E.host.getBoundingClientRect().left + 10 : 0;
-    this.measure(showBoard ? this.boardEl : showHud && (sm || v !== 't-run') ? this.hudEl : null);
+    this.measure(showBoard ? this.boardEl : showHud && (sm || v !== 't-run' || !showSide) ? this.hudEl : null);
   }
 
   drawHud(st, X, t) {
-    const sm = small(), compact = sm || st.view !== 't-run';
+    const sm = small(), compact = sm || st.view !== 't-run' || !this.roomy;
     this.hudEl.classList.toggle('compact', compact && !sm);
     const w = this.hudEl.clientWidth || (sm ? 300 : 340), h = sm ? 84 : compact ? 104 : 170;
     this.hud.size(w, h);
