@@ -290,7 +290,7 @@ export function buildScore(Q, cap = null) {
     sub(T0 + 0.3, up0 + 1.4, `${m(V.Np)} 块一起，送进视觉编码器`);
     term(T0 + 0.4, up0 + 1.4, `视觉编码器 ViT · ${m(mv.depth)} 层 · 每块 ${m(mv.hidden)} 维`);
     sub(up0 + 1.6, up0 + 5.4, '每一层，每块都在看其他块');
-    term(up0 + 1.7, up0 + 5.4, `注意力 · 平均看 ${m(F.distMin.toFixed(0))}–${m(F.distMax.toFixed(0))} 块远`);
+    term(up0 + 1.7, up0 + 5.4, `注意力 · 平均看 ${m(F.distMin.toFixed(1))}–${m(F.distMax.toFixed(1))} 块远`);
     sub(up0 + 5.6, cmp0 - 0.1, '颜色 = 模型对这一块的“理解”');
     term(up0 + 5.7, cmp0 - 0.1, '特征的前 3 个主成分 → 红绿蓝');
     sub(cmp0 + 0.1, cmp0 + 2.6, '一开始：颜色跟着位置和像素走');
