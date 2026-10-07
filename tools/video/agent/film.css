@@ -165,7 +165,7 @@ q { quotes: "「" "」"; color: var(--amber); }
 .dstat .op { color: var(--violet); }
 .dstat .ok { color: var(--green); }
 .dstat .bad { color: var(--rose); }
-.ddone { position: absolute; right: 26px; top: 70px; padding: 16px 24px; border-radius: 14px; border: 1.5px solid rgba(111, 227, 161, .6); background: rgba(6, 22, 16, .94); box-shadow: 0 16px 50px rgba(0, 0, 0, .5); font-family: var(--sans); font-size: 21px; color: var(--ink2); line-height: 1.5; }
+.ddone { position: absolute; right: 26px; bottom: 60px; padding: 16px 24px; border-radius: 14px; border: 1.5px solid rgba(111, 227, 161, .6); background: rgba(6, 22, 16, .94); box-shadow: 0 16px 50px rgba(0, 0, 0, .5); font-family: var(--sans); font-size: 21px; color: var(--ink2); line-height: 1.5; }
 .ddone b { display: block; font-size: 28px; color: var(--green); font-weight: 700; }
 .dim { position: absolute; inset: 0; background: #03070f; opacity: 0; pointer-events: none; }
 
@@ -320,11 +320,11 @@ q { quotes: "「" "」"; color: var(--amber); }
 .sum .src { margin-top: 14px; font-family: var(--mono); font-size: 17px; letter-spacing: .14em; color: var(--dim); }
 
 /* 片尾：智能体页的录屏（中性的深色窗口，不模仿任何浏览器）、鼠标、落版 */
-.win { position: absolute; width: 1440px; border-radius: 14px; overflow: hidden; background: #060d1a; border: 1px solid rgba(150, 180, 230, .28); box-shadow: 0 30px 90px rgba(0, 0, 0, .6); transform-origin: 50% 50%; }
-.win .bar { height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 16px; background: #0b1424; border-bottom: 1px solid rgba(150, 180, 230, .16); }
-.win .bar i { width: 11px; height: 11px; border-radius: 50%; background: rgba(150, 180, 230, .28); }
-.win .bar .url { margin: 0 auto; padding: 4px 22px; border-radius: 999px; background: rgba(255, 255, 255, .05); font-family: var(--mono); font-size: 17px; color: var(--ink2); letter-spacing: .03em; }
-.win canvas { display: block; width: 1440px; height: 810px; }
+.sitewin { position: absolute; width: 1440px; border-radius: 14px; overflow: hidden; background: #060d1a; border: 1px solid rgba(150, 180, 230, .28); box-shadow: 0 30px 90px rgba(0, 0, 0, .6); transform-origin: 50% 50%; }
+.sitewin .bar { height: 40px; display: flex; align-items: center; gap: 9px; padding: 0 16px; background: #0b1424; border-bottom: 1px solid rgba(150, 180, 230, .16); }
+.sitewin .bar i { width: 11px; height: 11px; border-radius: 50%; background: rgba(150, 180, 230, .28); }
+.sitewin .bar .url { margin: 0 auto; padding: 4px 22px; border-radius: 999px; background: rgba(255, 255, 255, .05); font-family: var(--mono); font-size: 17px; color: var(--ink2); letter-spacing: .03em; }
+.sitewin canvas { display: block; width: 1440px; height: 810px; }
 .cur { position: absolute; width: 0; height: 0; }
 .cur svg { position: absolute; left: -5px; top: -3px; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .6)); }
 .cur .rip { position: absolute; left: 0; top: 0; width: 64px; height: 64px; border-radius: 50%; border: 3px solid rgba(94, 240, 212, .9); box-shadow: 0 0 18px rgba(94, 240, 212, .5); }

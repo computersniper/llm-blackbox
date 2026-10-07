@@ -21,7 +21,7 @@ const num = (n) => Math.round(n).toLocaleString('en-US');
 // 桌面镜头（桌面自己的坐标：1720×804；放到画面上的 (cx, cy)，缩放 s）
 const DESK = { w: 1720, h: 804 };
 const FULL = { x: 860, y: 402, s: 1, cx: 960, cy: 472 };
-const ED = { x: 1000, y: 290, s: 1.28, cx: 960, cy: 440 };
+const ED = { x: 760, y: 290, s: 1.28, cx: 960, cy: 440 };
 const TERM = { x: 1000, y: 640, s: 1.32, cx: 960, cy: 452 };
 const SLOT = { x: 860, y: 402, s: 0.3, cx: 1578, cy: 492 };
 
@@ -358,7 +358,7 @@ export function buildScore(R, cap = null) {
     S.lap = { n: lapAt(t), a: (t >= SEC.work.t0 + 0.4 && t < SEC.loop.t0 + 1) || (t >= SEC.fix.t0 - 0.6 && t < SEC.end.t0 - 0.3) ? 1 : 0 };
     // 第 2 章：循环
     if (t >= L - 0.5 && t < SEC.ctx.t0 + 3) {
-      const nodesA = smooth(seg(t, L + 1.2, L + 3.4)) * (1 - 0.88 * smooth(seg(t, C, C + 1.8)));
+      const nodesA = smooth(seg(t, L + 1.2, L + 3.4)) * (1 - smooth(seg(t, C - 0.2, C + 1.0)));
       S.loop = {
         a: nodesA, slide: easeInOut(seg(t, L + 1.0, L + 3.6)),
         out: { a: smooth(seg(t, L + 4.0, L + 4.5)), n: clamp((t - (L + 4.2)) / 2.2), hl: smooth(seg(t, L + 6.6, L + 7.2)) * (1 - smooth(seg(t, L + 9.0, L + 9.6))) },

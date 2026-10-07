@@ -463,13 +463,14 @@ class CtxPanel {
     if (h !== this.barKey) { this.barKey = h; this.bar.innerHTML = h; }
     const tt = `第 ${C.lap + 1} 圈 · 喂给模型的整段上下文`;
     if (this.t.textContent !== tt) this.t.textContent = tt;
-    const nn = num(build ? count : T.ctx.n);
+    const nn = build && count < 1 ? "" : num(build ? count : T.ctx.n);
     if (this.n.textContent !== nn) this.n.textContent = nn;
     // 图例：这一圈每类片段的真实词元数
     const sum = {};
     for (const g of T.ctx.segs) sum[g.k] = (sum[g.k] || 0) + g.n;
     const lg = ['sys', 'tools', 'user', 'asst', 'tool'].map((k) => `<span class="${(hiKinds && !hiKinds.includes(k)) || !sum[k] ? 'off' : ''}" style="--c:var(--k-${k})">${SEG_NAME[k]} <b>${sum[k] ? num(sum[k]) : 0}</b></span>`).join('');
     if (lg !== this.lgKey) { this.lgKey = lg; this.legend.innerHTML = lg; }
+    this.legend.style.opacity = (1 - C.kv).toFixed(3);
     // 阶梯：一圈一行
     this.rows.forEach((r, i) => {
       const a = C.rows[i];
@@ -598,7 +599,7 @@ function buildOverlays() {
   OV.title = el('div', 'title', `<div class="eb">INSIDE A CODING AGENT</div><h1><span>只会写字的 AI，</span><span>怎么自己动手干活</span></h1><div class="rule"></div><div class="st">${SUBTITLE}</div><div class="spec">${esc(M.name.toUpperCase())} · 真实沙箱 · 离线录制</div>`, ov);
   OV.sum = el('div', 'sum', `<div class="eb">MODEL + TOOLS + LOOP</div><div class="big"><span class="w1">模型</span><span class="p">+</span><span class="w2">工具</span><span class="p">+</span><span class="w3">循环</span></div>
     <div class="stat">${esc(SC.statLine)}</div><div class="src">${esc(M.name)} · BUBBLEWRAP 沙箱 · 全程实测 ${(R.totalMs / 1000).toFixed(1)} 秒</div>`, ov);
-  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">${URL_SHOW}</span></div><canvas width="1920" height="1080"></canvas>`, ov);
+  OV.win = el('div', 'sitewin', `<div class="bar"><i></i><i></i><i></i><span class="url">${URL_SHOW}</span></div><canvas width="1920" height="1080"></canvas>`, ov);
   OV.winCtx = OV.win.querySelector('canvas').getContext('2d');
   OV.winIdx = -1;
   OV.cur = el('div', 'cur', `<span class="rip"></span><svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 2.5v17.2l4.6-4.3 3 6.6 2.9-1.3-3-6.5h6.2z" fill="#fff" stroke="#05080f" stroke-width="1.4" stroke-linejoin="round"/></svg>`, ov);
