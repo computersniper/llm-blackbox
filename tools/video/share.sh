@@ -12,8 +12,9 @@ MP4=${3:-$OUT_DIR/qwen3-inference-v4-share.mp4}
 VB=${4:-4800k}
 LOG=$OUT_DIR/x264-share
 
-# 60fps 的帧序列按 30fps 取（隔一帧取一帧）
-IN=(-framerate 60 -start_number 0 -i "$FRAMES/f%05d.jpg")
+# 60fps 的帧序列按 30fps 取（隔一帧取一帧）；帧序列本来就是 30fps 时用 IN_FPS=30
+IN_FPS=${IN_FPS:-60}
+IN=(-framerate "$IN_FPS" -start_number 0 -i "$FRAMES/f%05d.jpg")
 VOPT=(-vf fps=30 -c:v libx264 -preset slow -b:v "$VB" -maxrate 7000k -bufsize 9000k -pix_fmt yuv420p -profile:v high -level 4.1
       -color_primaries bt709 -color_trc bt709 -colorspace bt709 -passlogfile "$LOG")
 

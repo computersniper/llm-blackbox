@@ -28,6 +28,7 @@
 &nbsp;·&nbsp; <a href="#架构">架构</a>
 &nbsp;·&nbsp; <a href="#本地运行">本地运行</a>
 &nbsp;·&nbsp; <a href="#推理视频">推理视频</a>
+&nbsp;·&nbsp; <a href="#训练视频">训练视频</a>
 </p>
 
 </div>
@@ -734,6 +735,46 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 ```
 
 浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=0>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
+
+## 训练视频
+
+`tools/video/train/` 用训练页第一章的 3D 机器（`public/train/js/glass3d/`）和真实训练记录（`public/train/data/glass*`）做了一支约 3 分钟的片子《AI 是怎么学会的——看一个小模型从零学会背《静夜思》》，风格、讲法和推理视频一样：顶部小章节进度条，一屏一行白话字幕加一个小号术语标签，全片只演示一次逐数计算。
+
+- 开场：一句问题“AI 是怎么学会说话的？”→“靠的是：训练”，片名落在机器上；
+- 出厂状态：2,928 个参数每个是一个方块，刚出厂全是随机小数（初始值直方图是真实的 2,880 个矩阵参数）；
+- 喂一批：《静夜思》首尾相接的字环切下 8 段，答案是错开一位的下一个字；
+- 前向：光脉冲一层层往上，概率架升起，正确答案只有 4%–6%（等于瞎猜）；
+- 损失：−ln p 灌进损失管，第 1 步 3.017（瞎猜 ln 20 ≈ 2.996）；
+- 反向：误差倒流，每个方块按真实 |∂L/∂w| 发光；
+- 更新：全片唯一一次逐数计算——嵌入表里「月」那一行第 1 个数的第 1 步 AdamW：w = 0.01840，g = −0.00041，m̂ ÷ √v̂ = −1.00，Δw = +0.000998，写回 0.01940（exact 记录，和训练时逐位一致）；
+- 重复 200 步：方块越练越厚，损失 3.013 → 0.059，固定样例 8 个位置的概率涨到 97%–100%；
+- 最难的「月→，」：走完 80 步还押「光」52%（「，」45%），学会往前看（第 1 个注意力头把 67% 给了前面的「头」）以后涨到 97%，配乐在这一刻起势；
+- 全零初始化对照：误差传不回来，200 步一动不动，损失一直 2.996；
+- 一个参数的一生：「月」的那个数从 0.018 长到 0.49；2,928 × 200 = 58.6 万次小改动；
+- 收尾：训练页的真实录屏（出厂状态 → 点 ＋ 开始训练 → 一路钻到一个参数 → 播放 / 暂停 / 单步），落版网址和二维码（指向 caijiechao.com/blackbox/train/）。
+
+| 文件 | 作用 |
+| --- | --- |
+| `train/film.html` / `film.js` / `train.css` | 电影模式页面：载入训练页的 `GlassMachine` 和全部训练记录分块，`__film.renderAt(t)` 确定地渲染第 t 秒；快进时权重、概率、注意力在相邻两帧记录之间插值；讲解层（直方图、AdamW 算式、损失曲线、8 个位置的概率、「月」的注意力、一个参数的一生）|
+| `train/score.js` | 分镜表：段落、机位、字幕、术语标签、章节进度、配乐事件，数字全部从记录里现取 |
+| `train/compose_train.py` | 原创配乐（借用 `compose.py` 的音色和母带）：讲解段安静，学会「月→，」那一刻和弦解决到 D 大调、全套鼓进来；−14 LUFS |
+| `train/sitecap.mjs` | 片尾用的训练页录屏（和推理页的 `sitecap.mjs` 同一种 `meta.json` 格式） |
+| `train/data.js` | 用训练页自己的读取器一次取完全部分块 |
+
+渲染器、运镜、叠加层共用 `lib/`（没有改动）；`serve.py` 加了 `/ext/videos/…` → D 盘 `/mnt/d/cjc/videos/…` 的映射，`make_qr.py` 多生成一张 `qr-blackbox-train.svg`。重新生成：
+
+```bash
+python tools/video/serve.py --port 8776 &
+O=/mnt/d/cjc/videos/train-glass
+U=http://127.0.0.1:8776/tools/video/train/film.html
+node tools/video/train/sitecap.mjs --out $O/sitecap-train                     # 片尾录屏（只在训练页改版时需要重录）
+node tools/video/render.mjs frames --cpu --fps 30 --workers 3 --url $U --out $O/frames30   # CPU（swiftshader）渲染
+node tools/video/render.mjs events --cpu --fps 30 --url $U --out tools/video/train/events.json
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/train/compose_train.py --events tools/video/train/events.json --out $O/score.wav
+TITLE="AI 是怎么学会的 · 看一个小模型从零学会背《静夜思》（真实训练记录）" bash tools/video/encode.sh $O/frames30 $O/score.wav $O/train-glass-v1.mp4 30
+IN_FPS=30 TITLE="（同上）" bash tools/video/share.sh $O/frames30 $O/score.wav $O/train-glass-v1-share.mp4 4500k   # ≤ 120 MB
+node tools/video/render.mjs poster --cpu --url $U --out $O/poster-v1.png
+```
 
 ## 致谢与许可
 
