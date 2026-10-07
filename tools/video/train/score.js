@@ -115,10 +115,11 @@ export function buildScore(D, cap = null) {
     ev(OPEN.title, 'hit');
     shot('open', (lt, t, { M }) => {
       const far = cam([-26, 30, 62], [3.6, 10.5, 0], 30);
-      const near = fit(M, whole, [-0.25, 0.28, 1], 1.18);
+      // 片名背后：机器的两层（注意力、前馈）铺满画面，压暗
+      const near = fit(M, [-3.2, 13.6, 2.0, 15.5, -2.2, 1.4], [-0.25, 0.28, 1], 1.0);
       return {
         st: G(0, { ph: 'init', sub: 'model' }, 0),
-        cam: () => handheld(blendCam(far, farther(near, 1.12), smoother(seg(t, 2.5, 10.5))), t, 0.006),
+        cam: () => handheld(blendCam(far, near, smoother(seg(t, 2.5, 11.0))), t, 0.006),
         fade: 1 - 0.62 * smooth(seg(t, 6.6, 9.2)),
         lbl: 'none',
         bloom: 0.3,
