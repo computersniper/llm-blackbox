@@ -755,7 +755,7 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 | `score.js` | 分镜表：段落（96 BPM，卡在小节线上）、舞台状态、机位、字幕、配乐事件；`facts()` 从数据里现算片子要讲的数（绿苹果的格子、每层对准倍数、透镜读数、M-RoPE 坐标） |
 | `opening.js` | 开场：聊天页（选图、拼音输入法、发送、推近、裂成词元）和交给 3D 以后照片 / 词元飞进取景窗 |
 | `panel.js` | 2D 讲解面板：监视器（主成分颜色、2×2 合并、M-RoPE 坐标、热力图 + 对准倍数柱、图片词元的透镜读数）、一次乘加的算式板、「3」的逻辑透镜卡 |
-| `render.mjs` | 逐帧截图，只用 CPU（SwiftShader，`--disable-gpu`），同时最多 3 个浏览器 |
+| `render.mjs` | 逐帧截图，只用 CPU（SwiftShader，`--disable-gpu`），同时最多 3 个浏览器；渲染中按 `/proc/loadavg` 自动让路（一个 SwiftShader 浏览器约占 6–10 的负载，总负载尽量压在 14 以下，别人负载高时暂停）。整片 5325 帧在和别的渲染错峰的情况下约 90 分钟 |
 | `sitecap.mjs` | 片尾录屏：像用户一样操作 `public/multimodal/index.html`，CDP screencast 录下来；软件渲染太慢，页面时间放慢 4 倍再按页面时间重采样成 30 fps |
 | `compose.py` | 原创配乐（从 `../compose.py` 改来，段落换成这支片子的） |
 | `make_qr.py` / `qr-multimodal.svg` | 片尾二维码（segno 本地生成，指向 https://caijiechao.com/blackbox/multimodal/） |
