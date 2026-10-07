@@ -12,11 +12,11 @@ VB=${4:-4600k}
 LOG=$OUT_DIR/x264-share
 
 IN=(-framerate 30 -start_number 0 -i "$FRAMES/f%05d.jpg")
-VOPT=(-c:v libx264 -preset slow -b:v "$VB" -maxrate 7000k -bufsize 9000k -pix_fmt yuv420p -profile:v high -level 4.1
+VOPT=(-c:v libx264 -preset slow -b:v "$VB" -maxrate 7000k -bufsize 9000k -pix_fmt yuv420p -profile:v high -level 4.1 -threads "${THREADS:-8}"
       -color_primaries bt709 -color_trc bt709 -colorspace bt709 -passlogfile "$LOG")
 
-ffmpeg -hide_banner -loglevel warning -stats -y "${IN[@]}" "${VOPT[@]}" -pass 1 -an -f null /dev/null
-ffmpeg -hide_banner -loglevel warning -stats -y "${IN[@]}" -i "$SCORE" -map 0:v -map 1:a "${VOPT[@]}" -pass 2 \
+nice -n 10 ffmpeg -hide_banner -loglevel warning -stats -y "${IN[@]}" "${VOPT[@]}" -pass 1 -an -f null /dev/null
+nice -n 10 ffmpeg -hide_banner -loglevel warning -stats -y "${IN[@]}" -i "$SCORE" -map 0:v -map 1:a "${VOPT[@]}" -pass 2 \
   -c:a aac -b:a 192k -ar 48000 -shortest -movflags +faststart \
   -metadata title="$TITLE" \
   "$MP4"

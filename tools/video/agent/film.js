@@ -744,9 +744,20 @@ function renderAt(t, { render = true } = {}) {
 // 没有需要预滚收敛的状态（全是闭式），seek 直接渲染；pre 参数留着和 render.mjs 的接口一致
 function seek(t) { renderAt(t); }
 
+// 封面：第 1 章末尾的画面（终端里那句 python: command not found）压暗、虚化，上面放完整的片名卡
 function poster(t) {
-  seek(t ?? SC.dbg.titleIn + 2.6);
-  for (const sel of ['.sub', '.tag', '.lapc']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
+  seek(t ?? 26.6);
+  for (const sel of ['.sub', '.tag', '.lapc', '.prog']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
+  const D = $('#desk');
+  D.style.filter = 'blur(3px)';
+  D.querySelector('.dim').style.opacity = '0.6';
+  const T = OV.title;
+  T.style.display = 'block'; T.style.opacity = '1'; T.style.filter = '';
+  T.querySelector('h1').style.letterSpacing = '0.04em';
+  T.querySelector('.rule').style.width = '560px';
+  for (const s of ['.eb', '.st']) T.querySelector(s).style.opacity = '1';
+  T.querySelector('.spec').style.opacity = '0.9';
+  OV.band.style.opacity = '0';
 }
 
 function startPreview() {
