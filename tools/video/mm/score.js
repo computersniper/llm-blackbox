@@ -18,8 +18,8 @@ G.MY = G.Y0 + 24 * G.LVL + 0.55;
 
 // 段落：名字、小节数、能量（配乐用）
 const PLAN = [
-  ['chat', 6, 0.12], ['fly', 3, 0.6], ['patch', 4, 0.35], ['calc', 8, 0.3], ['vit', 7, 0.62], ['merge', 5, 0.5],
-  ['splice', 5, 0.45], ['answer', 13, 0.55], ['lens', 5, 0.7], ['reply', 4, 0.8], ['end', 11, 0.22],
+  ['chat', 6, 0.12], ['fly', 4, 0.6], ['patch', 4, 0.35], ['calc', 8, 0.3], ['vit', 7, 0.62], ['merge', 5, 0.5],
+  ['splice', 5, 0.45], ['answer', 13, 0.55], ['lens', 5, 0.7], ['reply', 4, 0.8], ['end', 10, 0.22],
 ];
 const CHAPTERS = ['切成图块', '视觉编码器', '四合一', '插进对话', '看图回答'];
 
@@ -137,7 +137,7 @@ export function buildScore(Q, cap = null) {
     '第': ['di', ['第', '地', '低', '帝']],
     '几个': ["ji'ge", ['几个', '及格', '几', '机']],
   };
-  const upAt = [B(1, 3), B(2, 0.5), B(2, 1.5), B(2, 2.5), B(2, 3.5), B(3, 0.5), B(3, 1.25)];
+  const upAt = [B(2, 0), B(2, 1), B(2, 2), B(2, 3), B(3, 0), B(3, 1), B(3, 1.75)];
   const jit = (i) => (((i * 7919) % 13) / 13 - 0.5) * 0.03;
   const typing = user.map((u, k) => {
     const [segd, cands] = PY[u.s] || [null, null];
@@ -149,7 +149,7 @@ export function buildScore(Q, cap = null) {
   });
   const OPEN = {
     typing,
-    attachT: B(0, 3), pickT: B(1, 1),                  // 点「图片」按钮；点中苹果那张
+    attachT: B(1, 0), pickT: B(1, 2),                  // 点「图片」按钮；点中苹果那张
     sendT: B(3, 3),
     boxY0: 590, boxY1: 912,
     push0: B(3, 3) + 1.2, push1: B(6) - 0.1,
@@ -163,10 +163,13 @@ export function buildScore(Q, cap = null) {
   OPEN.botT = OPEN.sendT + 0.4;
   OPEN.warpT = OPEN.swapT - 1.0;
   OPEN.fog0 = OPEN.swapT + 0.4; OPEN.fog1 = SEC.fly.t0 + 1.6;
-  const titleIn = SEC.fly.t0 + 1.0, titleOut0 = SEC.fly.t0 + 3.9, titleOut1 = SEC.fly.t0 + 4.6;
+  // 飞行：图和词元先钻进黑箱的取景窗；镜头再拉开，片名落在黑箱正面；然后黑箱打开
+  const F0 = SEC.fly.t0;
+  OPEN.dock0 = F0 + 2.2;                                             // 离开跟随编队，飞向取景窗
+  OPEN.enter0 = F0 + 3.6; OPEN.enter1 = F0 + 4.6;                    // 图片从取景窗推进去
+  const titleIn = F0 + 5.0, titleOut0 = F0 + 7.4, titleOut1 = F0 + 8.0;
   Object.assign(OPEN, { titleIn, titleOut0, titleOut1 });
-  OPEN.enter0 = SEC.fly.t0 + 4.2; OPEN.enter1 = SEC.fly.t0 + 5.6;   // 图片从取景窗推进去
-  OPEN.open0 = SEC.fly.t0 + 5.7; OPEN.open1 = SEC.patch.t0 + 1.0;    // 黑箱打开
+  OPEN.open0 = F0 + 7.9; OPEN.open1 = SEC.patch.t0 + 1.0;            // 黑箱打开
   OPEN.end = SEC.patch.t0;
   // 飞行：图片和词元交给 3D 以后，镜头跟着它们从远处飞到黑箱的取景窗前
   const box = { x0: G.PX - pw / 2 - 0.6, z0: Math.max(V.mh * G.S, ph) / 2 + 0.6 };
@@ -175,12 +178,13 @@ export function buildScore(Q, cap = null) {
   const camOpen = path([
     { t: 0, p: [G.PX, 4.0, 130], l: [G.PX, 4.0, 0], fov: 32 },
     { t: OPEN.swapT - 0.3, p: [G.PX, 4.0, 130], l: [G.PX, 4.0, 0], fov: 32 },
-    { t: OPEN.swapT + 0.5, p: [G.PX + 0.1, 4.05, 126], l: [G.PX, 4.0, 0], fov: 32 },
-    { t: SEC.fly.t0 + 1.9, p: [G.PX + 3.5, 4.4, 88], l: [G.PX + 7, 3.0, 0], fov: 32 },
-    { t: SEC.fly.t0 + 3.6, p: [G.PX + 6, 4.4, 40], l: [G.PX + 9, 2.6, 0], fov: 32 },
-    { t: OPEN.enter0, p: [G.PX + 3.0, 3.0, 15], l: [G.PX + 0.8, 1.8, winZ], fov: 32 },
-    { t: OPEN.enter1, p: [G.PX + 1.6, 2.6, 10.5], l: [G.PX + 0.2, 1.7, 1.5], fov: 32 },
-    { t: OPEN.open1 - 0.3, p: [G.PX + 1.2, 3.2, 9.2], l: [G.PX + 0.4, 1.6, 0], fov: 32 },
+    { t: OPEN.swapT + 0.5, p: [G.PX + 0.4, 4.1, 112], l: [G.PX + 0.4, 3.9, 0], fov: 32 },
+    { t: OPEN.dock0, p: [G.PX + 1.6, 3.4, 40], l: [G.PX + 1.0, 2.4, 0], fov: 32 },
+    { t: OPEN.enter0, p: [G.PX + 2.0, 2.7, 13.5], l: [G.PX + 0.3, 1.8, 2.5], fov: 32 },
+    { t: OPEN.enter1 + 0.2, p: [G.PX + 1.5, 2.5, 10.5], l: [G.PX + 0.2, 1.7, 1.5], fov: 32 },
+    { t: titleIn + 0.9, p: [2.6, 3.7, 31], l: [3.4, 2.5, 0], fov: 32 },
+    { t: OPEN.open0, p: [2.9, 3.5, 28], l: [3.4, 2.4, 0], fov: 32 },
+    { t: OPEN.open1 - 0.4, p: [G.PX + 1.2, 3.2, 9.2], l: [G.PX + 0.4, 1.6, 0], fov: 32 },
     { t: SEC.patch.t0 + 2.5, p: [G.PX, 2.25, 6.9], l: [G.PX, 1.7, 0], fov: 32 },
   ]);
   OPEN.camAt = camOpen;
@@ -191,13 +195,14 @@ export function buildScore(Q, cap = null) {
   ev(OPEN.pickT, 'tick', { k: 0.8 });
   ev(OPEN.sendT, 'send');
   ev(OPEN.swapT, 'whoosh', { k: 0.8 });
-  ev(OPEN.swapT, 'rise', { d: titleIn - OPEN.swapT });
+  ev(OPEN.swapT, 'rise', { d: OPEN.enter0 - OPEN.swapT });
+  ev(OPEN.enter0, 'whoosh', { k: 0.6 });
+  ev(titleIn - 1.0, 'rise', { d: 1.0 });
   ev(titleIn, 'hit', { k: 1 });
-  ev(OPEN.enter0, 'whoosh', { k: 0.5 });
   ev(OPEN.open0 - 1.6, 'rise', { d: 1.6 });
   ev(OPEN.open0, 'open');
   sub(OPEN.split0 + 0.3, OPEN.diss0 + 0.3, '发出去的，是一张图和一句话');
-  sub(titleOut1 + 0.2, OPEN.open0 - 0.1, '图和字，一起进了黑箱');
+  sub(OPEN.dock0 + 0.2, titleIn - 0.3, '图和字，一起进了黑箱');
   sub(OPEN.open0 + 0.2, SEC.patch.t0 - 0.15, '打开看看：图怎么变成“词”？');
   shotSpan('opening', 0, SEC.patch.t0, (lt, t) => {
     const opened = t >= OPEN.open0;
@@ -205,7 +210,7 @@ export function buildScore(Q, cap = null) {
       st: opened ? mst(3, 0, { ph: 'prep', sub: 'resize' }, 0, { dAnim: lerp(1, 3, smoother(seg(t, OPEN.open0, OPEN.open1))) }) : mst(1, 0, { ph: 'see' }, seg(t, OPEN.enter0, OPEN.enter1)),
       cam: () => camOpen(t),
       fade: 1 - smooth(seg(t, OPEN.diss0, OPEN.diss0 + 0.3)),
-      boxLabel: smooth(seg(t, titleOut1 + 0.05, titleOut1 + 0.55)),
+      boxLabel: 1 - smooth(seg(t, titleIn - 0.6, titleIn)) * (1 - smooth(seg(t, titleOut1 + 0.05, titleOut1 + 0.55))),
       photoA: t >= OPEN.enter0 - 0.02 ? 1 : 0,
       ov: { band: smooth(seg(t, OPEN.diss0, OPEN.diss1)), title: smooth(seg(t, titleIn, titleIn + 0.8)) * (1 - smooth(seg(t, titleOut0, titleOut1))), titleK: seg(t, titleIn + 0.05, titleIn + 2.6), titleBlur: 7 * smooth(seg(t, titleOut0, titleOut1)), titleOnBox: true },
     };
@@ -256,7 +261,7 @@ export function buildScore(Q, cap = null) {
     sub(S4, S5 - 0.1, `${m(mv.inDim)} 个乘积，全部加起来`);
     term(S4 + 0.1, S5 - 0.1, `再加上偏置 ${m(num(mic.bias))}`);
     sub(S5, S6 - 0.1, `得到一个数：${m(num(mic.mine))}`);
-    term(S5 + 0.1, S6 - 0.1, '这就是全片唯一一次“手算”');
+    term(S5 + 0.1, S6 - 0.1, `图块嵌入的第 ${m(mic.ch)} 维`);
     sub(S6, T1 - 0.15, `${m(mv.hidden)} 个卷积核，就得到 ${m(mv.hidden)} 个数`);
     term(S6 + 0.1, T1 - 0.15, `图块嵌入 · 每块变成 ${m(mv.hidden)} 维向量`);
     shot('calc', (lt, t) => {
@@ -514,35 +519,51 @@ export function buildScore(Q, cap = null) {
   let endSite = null;
   {
     const T0 = SEC.end.t0, T1 = SEC.end.t1;
-    const D0 = 0.6, FIN = 20.0;
+    const D0 = 0.6;
+    let FIN = 16.5;
     const A = cap?.actions || [];
     const at = (name, k = 0) => A.filter((a) => a.name === name)[k]?.t ?? 0;
     const segs = [];
     let f = D0;
     const add = (d, c0, c1, note) => { segs.push({ f0: f, f1: f + d, c0, c1, note }); f += d; };
     if (A.length) {
-      add(2.6, at('pick') - 0.6, at('send') + 0.2, 'ask');            // 选图、点选词元、发送
+      add(2.8, at('pick') - 0.6, at('send') + 0.2, 'ask');            // 选图、点选词元、发送
       add(1.2, at('send') + 0.2, at('replyDone') + 0.2, 'reply');      // 回答写出来
-      add(2.6, at('hover') - 0.3, at('hoverEnd') + 0.1, 'hover');      // 鼠标放在「3」上：图上亮起热力图
+      add(3.0, at('hover') - 0.3, at('hoverEnd') + 0.1, 'hover');      // 鼠标放在「3」上：图上亮起热力图（镜头推近那张图）
       add(1.6, at('plus') - 0.4, at('plus') + 2.6, 'reveal');          // 点 ＋ 揭开
       const dives = A.filter((a) => a.name === 'in');
-      dives.forEach((a) => add(1.1, a.t - 0.25, a.t + 1.5, 'dive'));
-      add(Math.max(1.5, FIN - f), at('mon') - 0.4, at('end'), 'mon');   // 最后一层：监视器上的热力图
+      dives.forEach((a) => add(1.3, a.t - 0.25, a.t + 1.6, 'dive'));
+      add(Math.max(2.8, Math.min(3.6, at('end') - at('mon') + 0.4)), at('mon') - 0.4, at('end'), 'mon');   // 最后：监视器上的热力图（推近）
+      FIN = f;
     }
     const capAt = (lt) => { if (!segs.length) return 0; const s = segs.find((x) => lt < x.f1) || segs[segs.length - 1]; return lerp(s.c0, s.c1, clamp((lt - s.f0) / (s.f1 - s.f0))); };
     const filmOf = (ct) => { const s = segs.find((x) => ct >= x.c0 && ct <= x.c1); return s ? s.f0 + ((ct - s.c0) / (s.c1 - s.c0)) * (s.f1 - s.f0) : null; };
-    for (const a of A) { if (a.x == null) continue; const lt = filmOf(a.t); if (lt != null) ev(T0 + lt, a.name === 'in' ? 'step' : 'tick', { k: a.name === 'in' ? 0.55 : 0.3 }); }
+    for (const a of A) { if (a.x == null || a.click === false) continue; const lt = filmOf(a.t); if (lt != null) ev(T0 + lt, a.name === 'in' ? 'step' : 'tick', { k: a.name === 'in' ? 0.55 : 0.3 }); }
     ev(T0 + FIN, 'end', { k: 0.4 });
     const sg = (note) => segs.find((s) => s.note === note);
+    const boxOf = (name) => A.find((a) => a.name === name)?.box || null;
+    // 推近：在某一段里把窗口放大到 z 倍，让录屏里的那块区域移到画面中间
+    const zoomAt = (lt) => {
+      const zs = [['hover', 'heatbox', 2.0], ['mon', 'monbox', 1.75]];
+      for (const [note, bx, z] of zs) {
+        const s2 = sg(note), b = boxOf(bx);
+        if (!s2 || !b) continue;
+        const k = smoother(seg(lt, s2.f0 + 0.2, s2.f0 + 1.0)) * (1 - smoother(seg(lt, s2.f1 - 0.5, s2.f1 + (note === 'mon' ? 0.6 : 0.1))));
+        if (k > 0) return { x: b.x + b.w / 2, y: b.y + b.h / 2, z, k };
+      }
+      return null;
+    };
     if (segs.length) {
       sub(T0 + D0 + 0.2, T0 + sg('hover').f0 - 0.1, '想自己一步步打开看看？');
+      term(T0 + D0 + 0.3, T0 + sg('hover').f0 - 0.1, '选一张图，点选词元拼出问题');
       sub(T0 + sg('hover').f0 + 0.1, T0 + sg('hover').f1 - 0.1, '鼠标放在字上，看它在看哪');
-      term(T0 + sg('hover').f0 + 0.2, T0 + sg('hover').f1 - 0.1, '生成这个字时真实的注意力');
+      term(T0 + sg('hover').f0 + 0.2, T0 + sg('hover').f1 - 0.1, '生成「3」时真实的注意力');
       const dv = segs.filter((s) => s.note === 'dive');
       const r = sg('reveal');
       sub(T0 + r.f0 + 0.1, T0 + (dv.length ? dv[dv.length - 1].f1 : r.f1) - 0.1, '点 ＋，一层层钻进去');
-      term(T0 + r.f0 + 0.2, T0 + (dv.length ? dv[dv.length - 1].f1 : r.f1) - 0.1, '黑箱 → 流水线 → 逐层 → 一层之内 → 一次乘加');
-      sub(T0 + sg('mon').f0 + 0.1, T0 + FIN - 0.15, '每一步都是真实模型的数据');
+      term(T0 + r.f0 + 0.2, T0 + (dv.length ? dv[dv.length - 1].f1 : r.f1) - 0.1, '黑箱 → 流水线 → 逐层 → 一层之内');
+      sub(T0 + sg('mon').f0 + 0.1, T0 + FIN - 0.15, '每一层在看哪，都能停下来看');
+      term(T0 + sg('mon').f0 + 0.2, T0 + FIN - 0.15, '左上角的监视器：第 20 层的热力图');
     }
     shot('end', (lt, t) => ({
       st: mst(3, Q.G - 1, { ph: 'layer', L: 20 }, 0.5, { dAnim: lerp(3, 1, smoother(seg(lt, 0, 3))) }),
@@ -552,13 +573,14 @@ export function buildScore(Q, cap = null) {
         const far = cam([2, 6, 60], [2, 3, 0], 30);
         return blendCam(c, far, smoother(seg(lt, 0, 8)));
       },
-      fade: lerp(0.45, 0.9, smooth(seg(lt, 0, 1.2))),
+      fade: lerp(0.55, 0.92, smooth(seg(lt, 0, 1.2))),
       reply: { a: 1 - smooth(seg(lt, 0, 0.6)), n: Q.G, hl: -1, big: true },
       ov: {
         band: 1 - smooth(seg(lt, 0, 1)),
         site: segs.length ? {
           a: smooth(seg(lt, D0 - 0.3, D0 + 0.4)) * (1 - smooth(seg(t, T1 - 0.9, T1 - 0.05))),
           ct: capAt(Math.min(lt, FIN)),
+          zoom: zoomAt(lt),
           fin: easeInOut(seg(lt, FIN, FIN + 1.0)),
           finA: smooth(seg(lt, FIN + 0.5, FIN + 1.3)) * (1 - smooth(seg(t, T1 - 0.9, T1 - 0.05))),
           cursor: lt < FIN ? smooth(seg(lt, D0 + 0.2, D0 + 0.6)) * (1 - smooth(seg(lt, FIN - 0.4, FIN))) : 0,

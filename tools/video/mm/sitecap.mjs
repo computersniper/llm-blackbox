@@ -102,15 +102,18 @@ await sleep(700);
 // 4. 鼠标放在回答里的「3」上：图上亮起生成它时的注意力
 const gi = q.replyTokens.findIndex((t) => t.s.trim() === '3');
 await at('hover', `.msg.bot .rt[data-i="${gi}"]`, { click: false });
-await sleep(2200);
+await sleep(400);
+const box = async (name, sel) => { const b = await (await page.$(sel)).boundingBox(); actions.push({ name, t: now(), box: { x: b.x, y: b.y, w: b.width, h: b.height } }); };
+await box('heatbox', '.msg.user .ub-img');
+await sleep(1800);
 actions.push({ name: 'hoverEnd', t: now() });
 // 5. 揭开这条回复
 await at('plus', '.msg.bot .peek');
 await page.waitForFunction(() => document.querySelector('#loading').hidden && window.__mm?.tl, null, { timeout: 120000, polling: 200 });
 await sleep(2000);
 console.log('D', await state());
-// 6. 一层层往里钻：流水线 → 逐层 → 一层之内 → 一次乘加
-for (let d = 2; d <= 5; d++) {
+// 6. 一层层往里钻：流水线 → 逐层 → 一层之内（“一次乘加”要走到特定的步骤才进得去，录屏里不演示）
+for (let d = 2; d <= 4; d++) {
   for (let tries = 0; tries < 40; tries++) {
     const s = await state();
     if (s.can) break;
@@ -125,6 +128,7 @@ for (let d = 2; d <= 5; d++) {
 await page.evaluate((g) => { const T = window.__mm.tl; T.pause(); T.setDepth(3); T.seekToken(g); T.seek((s) => s.ph === 'layer' && s.L === 20); }, gi);
 await sleep(300);
 actions.push({ name: 'mon', t: now() });
+await box('monbox', '#mon');
 await sleep(800);
 await at('monhover', '#monCv', { click: false });
 await sleep(2000);

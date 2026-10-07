@@ -400,7 +400,7 @@ export class Opening {
     const fk = inOpening ? smooth(seg(t, T.fog0, T.fog1)) : 1;
     this.E.scene.fog.near = lerp(9, this.fog0.near, fk);
     this.E.scene.fog.far = lerp(30, this.fog0.far, fk);
-    const sa = smooth(seg(t, T.swapT, T.swapT + 0.8)) * (1 - smooth(seg(t, T.enter0 - 2.4, T.enter0 - 0.6)));
+    const sa = smooth(seg(t, T.swapT, T.swapT + 0.8)) * (1 - smooth(seg(t, T.dock0 - 0.8, T.enter0 - 0.4)));
     this.streaks.visible = sa > 0.01;
     this.streaks.material.opacity = 0.45 * sa;
     const show = t >= T.swapT - 0.02 && t < T.enter0;
@@ -410,7 +410,7 @@ export class Opening {
     this.tileMat.emissiveIntensity = 0.07 + 0.2 * (1 - smooth(seg(t, T.swapT, T.swapT + 0.6)));
     const L = this.swapLocal(camAt(T.swapT), t);
     const LI = this.localImg;
-    const dock0 = T.enter0 - 1.9;   // 离开编队、飞向取景窗
+    const dock0 = T.dock0;   // 离开编队、飞向取景窗
     const n = this.user.length;
     // 跟随编队（镜头坐标系）：照片在上、词元在下
     const formAt = (loc0, target, tt, k) => {

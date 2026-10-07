@@ -207,7 +207,16 @@ function updateSite(Sx) {
   const idx = Math.min(CAP.n - 1, Math.max(0, Math.round(Sx.ct * CAP.fps)));
   if (idx !== OV.winIdx && SITE.get(idx)?.complete) { OV.winCtx.drawImage(SITE.get(idx), 0, 0, 1920, 1080); OV.winIdx = idx; }
   const k = Sx.fin ?? 0;
-  const cx = lerp(960, 600, k), cy = lerp(474, 482, k), sc = lerp(1, 0.6, k);
+  let cx = lerp(960, 600, k), cy = lerp(474, 482, k), sc = lerp(1, 0.6, k);
+  // 推近：把录屏里的某块区域（视口坐标）放大到 z 倍、移到画面中间
+  const Z = Sx.zoom;
+  if (Z && Z.k > 0) {
+    const W = 1440, H = 810, BAR = 40;
+    const lx = -W / 2 + (Z.x / CAP.viewport.w) * W, ly = -(H + BAR) / 2 + BAR + (Z.y / CAP.viewport.h) * H;
+    const s2 = sc * Z.z;
+    const cx2 = 960 - lx * s2, cy2 = 470 - ly * s2;
+    cx = lerp(cx, cx2, Z.k); cy = lerp(cy, cy2, Z.k); sc = lerp(sc, s2, Z.k);
+  }
   OV.win.style.opacity = Sx.a.toFixed(3);
   OV.win.style.left = `${cx.toFixed(1)}px`;
   OV.win.style.top = `${cy.toFixed(1)}px`;
