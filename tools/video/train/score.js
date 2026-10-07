@@ -7,7 +7,7 @@
 //   → 重复 200 步（损失下降、预测变绿）→ 最难的「月→，」→ 为什么要随机初始化 → 一个参数的一生 → 训练页录屏 + 二维码
 import { THREE } from '../lib/engine.js';
 import { path, blendCam, orbit, handheld, clamp, lerp, seg, smooth, smoother, easeOut, easeInOut, v3 } from '../lib/cam.js';
-import { gView } from '/public/train/js/glass/timeline.js';
+import { gView, FWD_OPS, BWD_OPS } from '/public/train/js/glass/timeline.js';
 import { BOUNDS, OP_RECT, BLOCK, cellX, cellY, SHELF, shelfX, shelfZ, GAUGE, WHEEL } from '/public/train/js/glass3d/layout.js';
 import { adamAt, defaultParam } from '/public/train/js/glass/math.js';
 
@@ -86,6 +86,13 @@ export function buildScore(D, cap = null) {
   const WIDE = [0.5, 0.32, 1], MID = [0.36, 0.26, 1], TOP = [0.25, 0.85, 1];
   const whole = [BOUNDS.x0, BOUNDS.x1, BOUNDS.y0, BOUNDS.y1 + 0.8, -2.2, 1.4];
   const fit = (M, rect, dir, margin = 1.04, minD = 2) => { const r = M.fitBox(rect, V3(dir), margin, minD); return { pos: r.pos, look: r.look, fov: 34 }; };
+  // 前向 / 反向时镜头跟着正在算的那一层走：按进度在相邻两个算子的高度之间连续插值（不跳）
+  const opY = (op) => (OP_RECT[op][2] + OP_RECT[op][3]) / 2;
+  const followCam = (M, x, ops) => {
+    const xf = clamp(x - 0.5, 0, 9), i = Math.floor(xf), f = xf - i;
+    const yc = lerp(opY(ops[i]), opY(ops[Math.min(9, i + 1)]), smooth(f));
+    return fit(M, [BOUNDS.x0 + 2.6, BOUNDS.x1, yc - 4.6, yc + 4.6], MID, 1.02);
+  };
   // 选中的那个参数（「月」那一行的方块）在机器上的位置
   const EB = BLOCK.E;
   const SELP = v3(cellX(EB, LC.j), cellY(EB, LC.i), 0.03);
@@ -207,8 +214,7 @@ export function buildScore(D, cap = null) {
       return {
         st,
         cam: () => {
-          const follow = M.camera(st);
-          const fol = { pos: follow.pos, look: follow.look, fov: 34 };
+          const fol = followCam(M, Math.min(10, p * 10.6), FWD_OPS);
           const shelf = fit(M, [...OP_RECT.loss, -1.3, 1.3], TOP, 1.05);
           const live = blendCam(fol, shelf, smoother(seg(t, P1 - 1.2, P1 + 1.4)));
           return blendCam(prevCam('batch', live), live, smoother(seg(lt, 0, 2.0)));
@@ -256,12 +262,12 @@ export function buildScore(D, cap = null) {
     const P0 = T0 + 0.4, P1 = T0 + 8.0;
     for (let o = 0; o < 10; o++) ev(P0 + ((o + 0.5) / 10.6) * (P1 - P0), 'layer', { o, dir: -1 });
     shot('bwd', (lt, t, { M }) => {
-      const st = G(2, { k: 0, ph: 'bwd' }, seg(t, P0, P1));
+      const pb = seg(t, P0, P1);
+      const st = G(2, { k: 0, ph: 'bwd' }, pb);
       return {
         st,
         cam: () => {
-          const follow = M.camera(st);
-          const fol = { pos: follow.pos, look: follow.look, fov: 34 };
+          const fol = followCam(M, Math.min(10, pb * 10.6), BWD_OPS);
           const wide = orbit(fit(M, whole, WIDE, 1.03), lerp(0, 6, seg(t, P1 - 1, T1)), 0, 1);
           const live = blendCam(fol, wide, smoother(seg(t, P1 - 1.6, P1 + 1.4)));
           return blendCam(prevCam('loss', live), live, smoother(seg(lt, 0, 2.0)));
@@ -399,7 +405,9 @@ export function buildScore(D, cap = null) {
       const row = cam([shelfX(8) + 0.3, SHELF.y + 3.1, shelfZ(PM) + 3.0], [shelfX(7.5), SHELF.y + 0.5, shelfZ(PM)], 34);
       const att = fit(M, [2.6, 5.3, 6.9, 8.4, -0.2, 0.5], [0.12, 0.2, 1], 1.15);
       const wide = fit(M, whole, WIDE, 1.03);
-      let live = blendCam(row, att, smoother(seg(t, H[2] - 0.4, H[2] + 1.6)));
+      const mid = farther(fit(M, [0.5, 10.5, 6.5, 21.5, -1.5, 1.5], MID, 1.1), 1.15);
+      const arc = path([{ t: 0, p: row.pos, l: row.look, fov: 34 }, { t: 1, p: mid.pos, l: mid.look, fov: 34 }, { t: 2, p: att.pos, l: att.look, fov: 34 }]);
+      let live = arc(2 * seg(t, H[2] - 0.6, H[2] + 2.0));
       // 学会以后：从上往下看整个概率架（其余几行压暗），8 行都长出了绿柱
       live = blendCam(live, fit(M, [...OP_RECT.loss, -1.3, 1.3], TOP, 1.05), smoother(seg(t, H[3] - 0.6, H[3] + 1.8)));
       live = blendCam(live, wide, smoother(seg(t, T1 - 2.4, T1)));
