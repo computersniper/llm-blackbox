@@ -735,6 +735,52 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 
 浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=0>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
 
+## 智能体视频
+
+`tools/video/agent/` 用智能体页的真实录制数据做了一支 3 分 05 秒的片子《只会写字的 AI，怎么自己动手干活——走进编程智能体的“黑箱”》。任务是「sales.csv 里哪个城市的总销售额最高？写个 Python 脚本算出来。」（`sales-top`：Qwen3-4B-Instruct-2507 在 bwrap 沙箱里 8 圈、7 次工具调用，中间自己改了三次错）。
+
+片子从一个干净的聊天页开始：用拼音打出任务、按发送，助手的回复不是一句话，而是一个“动作”卡片（`read_file sales.csv`），镜头推进卡片，展开成 agent 的桌面（文件树 / 编辑器 / 终端）。之后五章，顶部有章节进度条：
+
+- **动手干活**：读数据、写 pandas 脚本、`python analyze_sales.py` → `command not found`（退出码 127）；
+- **只会写字**：镜头拉开，桌面缩进“沙箱”，左边是模型、中间是 harness：模型写出的只是一段 `<tool_call>` 文字，外面的程序解析它、在沙箱里执行、把结果接回对话，一圈一圈；
+- **越滚越长**：每一圈喂给模型的整段上下文（系统提示 158 + 工具说明 473 + 任务 25 词元起步，659 → 1,880），第 4 圈 KV 缓存复用 1,166、只新算 33，最后几行正是那句报错；
+- **逐词生成**（全片唯一一次细看）：第 4 圈的工具调用一个词元一个词元写出来，关键处停下来看前 5 名的真实概率：`bash` 73% / `write` 27%，`python` 84% / `which` 13% / `pip` 2.9%，接着「3」100%——上一圈同一个位置写「3」只有 7.6%；
+- **自己改错**：快放剩下几圈：缺 pandas → `pip3 install` 被拒（externally-managed-environment）→ 模型自己写下“改用纯 Python”→ 用 csv 重写 → 跑通（杭州 9250）→ 不再调用工具，循环结束；
+- 收尾：“像 Claude Code 这样的编程 agent，本质上都是这个模式：模型 + 工具 + 循环”，接智能体页的真实录屏（选任务 → 看回放 → 揭开内部 → 点第 4 圈 → ＋ 上下文 → ＋ 逐词元），落版网址和二维码（指向 `caijiechao.com/blackbox/agent/`）。
+
+全是 DOM + 2D canvas（没有 3D），用 CPU（swiftshader）渲染；讲解写法和推理视频一样：每屏一行白话字幕加一个术语标签，正在讲的高亮、其余压暗。不出现任何商业产品的界面，也没有编造模型输出：字幕、面板、终端里的文字和数字都从 `public/agent/data/sales-top.json` 现取。
+
+| 文件 | 作用 |
+| --- | --- |
+| `agent/film.html` / `film.js` / `film.css` | 电影模式页面：桌面回放（按真实工具调用和文件快照）、循环图、上下文面板、逐词元面板、讲解层、片尾录屏；`__film.renderAt(t)` 确定地渲染第 t 秒 |
+| `agent/score.js` | 分镜：段落（96 BPM，卡在小节线上）、桌面回放时间表、镜头关键帧、字幕、术语标签、配乐事件 |
+| `agent/opening.js` | 开场聊天页（由 `lib/opening.js` 的聊天页部分改写，去掉 3D） |
+| `agent/render.mjs` | 逐帧截图（默认 CPU / swiftshader，最多 3 个浏览器进程），也能抽单帧、导出事件、出封面 |
+| `agent/compose.py` | 配乐编曲；音色和母带直接用 `../compose.py` 的合成器 |
+| `agent/sitecap.mjs` | 片尾用的智能体页录屏（CPU 就够；无衬线字体指向思源黑体，收起站点导航和弹出提示） |
+| `agent/make_qr.py` / `qr-agent.svg` | 片尾二维码（segno 本地生成） |
+| `agent/share.sh` | 分享版（30 fps 帧序列，两遍编码，≤120 MB） |
+| `agent/dbg.mjs` / `util.js` | 调试工具、缓动和二维镜头插值 |
+
+重新生成（帧序列、配乐、成片都放 D 盘 `/mnt/d/cjc/videos/agent/`）：
+
+```bash
+O=/mnt/d/cjc/videos/agent
+cp -r /mnt/d/cjc/videos/llm-inference/fonts $O/fonts        # 一次：思源宋体 / 思源黑体（SIL OFL）；/ext/sitecap/ 映射到 $O/sitecap
+python tools/video/serve.py --port 8799 --fonts $O/fonts &
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/agent/make_qr.py          # 只在网址变了时需要
+node tools/video/agent/sitecap.mjs --out $O/sitecap                         # 片尾录屏（网页改版时重录）
+node tools/video/agent/render.mjs frames --out $O/frames30 --fps 30 --workers 3   # 已有的帧会跳过；先看 uptime，负载高就少开
+node tools/video/agent/render.mjs events --out tools/video/agent/events.json
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/agent/compose.py --events tools/video/agent/events.json --out $O/score.wav
+TITLE="只会写字的 AI，怎么自己动手干活 · 走进编程智能体的“黑箱”（Qwen3-4B 在真实沙箱里的录制）" bash tools/video/encode.sh $O/frames30 $O/score.wav $O/agent-v1.mp4 30
+bash tools/video/agent/share.sh $O/frames30 $O/score.wav $O/agent-v1-share.mp4
+node tools/video/agent/render.mjs poster --out $O/poster-v1.png
+python tools/video/review.py --frames $O/frames30 --fps 30 --every 2 --out $O/review    # 可选：联系表
+```
+
+浏览器里预览：<http://127.0.0.1:8799/tools/video/agent/film.html?preview&lang=zh&t=0>。
+
 ## 致谢与许可
 
 - **模型**：[Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B)、[Qwen3-VL-2B-Instruct](https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct)、[Qwen3-4B-Instruct-2507](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507)，阿里巴巴通义千问团队开源，Apache-2.0。仓库里只有从它们导出的部分数值（概率、激活、少量权重和权重分布缩略图），不含完整权重。
