@@ -1,0 +1,107 @@
+/* 训练视频的叠加层（基础样式、字幕、术语标签、进度条、片名、窗口框、二维码沿用 ../film.css）。
+   按 1080p 直接排版：手机上按 50% 看也要读得清（正文 ≥ 34px，卡片里的字 ≥ 21px，小字 ≥ 16px）。 */
+
+/* 训练页 3D 机器自带的标签类（机器里写死的 class），在电影里只调颜色 */
+.lbl.gc, .lbl.gt { color: var(--violet); border-color: rgba(179, 157, 255, .45); }
+.lbl.gsel { color: var(--amber); border-color: rgba(255, 182, 92, .6); font-family: var(--mono); font-weight: 400; font-size: 20px; padding: 4px 12px; }
+.lbl.gsel b { color: #fff; font-weight: 700; }
+.lbl.gg { font-size: 24px; }
+.lbl.hint.gw2, .lbl.hint.gs { font-size: 19px; color: var(--ink2); }
+.lbl.part.gw { font-size: 18px; }
+.lbl.part.gw small { font-size: 13px; }
+.lbl.hint.gr { font-size: 16px; }
+
+/* 开场：一句问题 + 一句回答 */
+.tq { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; }
+.tq .l1 { font-size: 72px; font-weight: 900; letter-spacing: .06em; color: #f2f5fb; text-shadow: 0 8px 40px rgba(0, 0, 0, .8); min-height: 1.3em; }
+.tq .l1 .caret { display: inline-block; width: 4px; height: .9em; margin-left: 8px; vertical-align: -.08em; background: var(--cyan); }
+.tq .l2 { margin-top: 30px; font-size: 44px; font-weight: 600; letter-spacing: .14em; color: var(--ink2); }
+.tq .l2 b { color: var(--amber); font-weight: 900; }
+
+/* 卡片（直方图、算式、曲线……）：和推理视频的公式板同一种玻璃底 */
+.tcard { position: absolute; display: none; padding: 20px 26px 18px; border-radius: 18px; background: rgba(3, 7, 15, .86); border: 1px solid var(--line2); backdrop-filter: blur(8px); white-space: nowrap; color: var(--ink2); }
+.tcard .h { font-size: 26px; font-weight: 600; color: var(--ink); letter-spacing: .05em; display: flex; align-items: baseline; gap: 14px; }
+.tcard .h small { font-size: 17px; color: var(--dim); font-weight: 600; letter-spacing: .03em; }
+.tcard .h .val { margin-left: auto; font-family: var(--mono); font-size: 26px; font-weight: 400; color: var(--cyan); }
+.tcard svg { display: block; margin-top: 16px; overflow: visible; }
+.tcard .ax, .tcard svg text { font-family: var(--mono); font-size: 16px; fill: var(--dim); }
+
+.hist { right: 84px; top: 170px; }
+
+/* 一个参数的 AdamW：逐行出现，正在讲的那一行描边 */
+.calc { left: 50%; top: 92px; transform: translateX(-50%); padding: 22px 34px 18px; min-width: 1120px; }
+.calc .h { margin-bottom: 10px; }
+.calc .ln { display: flex; align-items: baseline; gap: 22px; padding: 6px 14px; margin: 2px -14px; border-radius: 10px; font-size: 28px; color: var(--ink2); }
+.calc .ln .k { width: 96px; flex: none; font-size: 21px; color: var(--dim); letter-spacing: .08em; }
+.calc .ln .v { font-family: var(--mono); font-size: 27px; color: var(--ink); }
+.calc .ln .v b { font-weight: 400; color: #fff; }
+.calc .ln .v small { margin-left: 18px; font-family: var(--serif); font-size: 21px; font-weight: 600; color: var(--dim); }
+.calc .ln .cw { color: #c9b5ff !important; }
+.calc .ln .cg { color: #ff8fb0 !important; }
+.calc .ln .cy { color: #5ef0d4 !important; }
+.calc .ln.on { background: rgba(94, 240, 212, .08); box-shadow: 0 0 0 1.5px rgba(94, 240, 212, .55); }
+.calc .ln.on .v small { color: var(--ink2); }
+
+/* 损失曲线 */
+.chart { left: 72px; top: 110px; }
+.chart .foot { margin-top: 6px; font-size: 22px; color: var(--ink2); }
+.chart .foot b { font-family: var(--mono); font-weight: 400; color: #fff; }
+.chart .zl, .chart .zt { opacity: 0; }
+.chart .zt { fill: #ff8fb0 !important; font-family: var(--serif) !important; font-size: 20px !important; font-weight: 600; }
+
+/* 固定样例的预测：竖着 8 行 */
+.preds { right: 72px; top: 110px; }
+.preds .row { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.preds .c { display: flex; align-items: center; gap: 14px; }
+.preds .io { width: 112px; font-size: 27px; font-weight: 600; color: var(--ink2); }
+.preds .io i { font-style: normal; color: var(--faint); margin: 0 6px; font-size: 22px; }
+.preds .io b { color: var(--ink); }
+.preds .bar { width: 190px; height: 12px; border-radius: 6px; background: rgba(150, 180, 230, .12); overflow: hidden; }
+.preds .bar i { display: block; height: 100%; background: #8592ad; border-radius: 6px; }
+.preds .pv { width: 66px; text-align: right; font-family: var(--mono); font-size: 21px; color: var(--dim); }
+.preds .c.ok .io b { color: #8ee07a; }
+.preds .c.ok .bar i { background: #8ee07a; }
+.preds .c.ok .pv { color: #b9f0a8; }
+
+/* 诗里的两个「月」 */
+.call { left: 84px; top: 170px; }
+.call .pl { margin-top: 16px; font-size: 44px; font-weight: 600; letter-spacing: .12em; color: var(--ink2); }
+.call .pl b { color: var(--amber); font-weight: 900; }
+.call .pl .g { color: #8ee07a; font-weight: 900; padding: 0 4px; border-bottom: 3px solid rgba(142, 224, 122, .7); }
+
+/* 注意力：「月」在看谁（5 根竖条） */
+.attrow { left: 84px; top: 170px; }
+.attrow .row { display: flex; gap: 22px; margin-top: 18px; align-items: flex-end; }
+.attrow .c { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.attrow .bar { width: 46px; height: 170px; border-radius: 8px; background: rgba(150, 180, 230, .1); display: flex; align-items: flex-end; overflow: hidden; }
+.attrow .bar i { display: block; width: 100%; background: #6f86b8; border-radius: 6px 6px 0 0; }
+.attrow .pv { font-family: var(--mono); font-size: 20px; color: var(--dim); }
+.attrow .ch { font-size: 38px; font-weight: 600; color: var(--ink2); }
+.attrow .c.top .bar i { background: #5ef0d4; box-shadow: 0 0 18px rgba(94, 240, 212, .4); }
+.attrow .c.top .pv { color: #5ef0d4; }
+.attrow .c.top .ch { color: #fff; }
+.attrow .c:last-child .ch { color: var(--amber); }
+.attrow .foot { margin-top: 12px; font-size: 21px; color: var(--dim); }
+.attrow .foot b { font-family: var(--mono); font-weight: 400; color: var(--ink); }
+
+/* 概率架上「月」那一行的读数 */
+.rowtag { right: 84px; top: 200px; }
+.rowtag .r { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+.rowtag .r b { width: 48px; font-size: 44px; font-weight: 900; text-align: center; }
+.rowtag .r.ok b { color: #8ee07a; }
+.rowtag .r b.cm { font-size: 56px; line-height: .6; transform: translate(6px, -14px); }
+.rowtag .r.no b { color: #ff8fb0; }
+.rowtag .bar { width: 300px; height: 16px; border-radius: 8px; background: rgba(150, 180, 230, .12); overflow: hidden; }
+.rowtag .bar i { display: block; height: 100%; border-radius: 8px; }
+.rowtag .r.ok .bar i { background: #8ee07a; }
+.rowtag .r.no .bar i { background: #ff6b93; }
+.rowtag .pv { width: 80px; text-align: right; font-family: var(--mono); font-size: 28px; color: var(--ink); }
+
+/* 一个参数的一生 */
+.life { right: 72px; top: 120px; padding-left: 40px; }
+.life .h .val { font-size: 22px; color: var(--ink2); }
+.life .h .val b { font-weight: 400; color: #ffd9a6; }
+
+/* 落版：训练页的网址比推理页长，右栏往左挪一点、字小一号 */
+.fin7 { left: 1060px; width: 800px; }
+.fin7 .url { font-size: 37px; letter-spacing: .01em; }
