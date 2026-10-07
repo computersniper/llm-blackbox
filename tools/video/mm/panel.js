@@ -145,7 +145,7 @@ export class Monitor {
       return `<i class="${hi ? 'hi' : ''}${l === L ? ' cur' : ''}" style="height:${h.toFixed(1)}px"></i>`;
     }).join('');
     const e = P.avg ? F.enrHi : enr[L];
-    this.foot.innerHTML = `<div class="enr"><div class="bars">${bars}<span class="one" style="bottom:${((1 / mx) * 92).toFixed(1)}px"></span></div><div class="lab"><span>对准倍数（看绿苹果的比例 ÷ 它占的面积）</span><b>${P.avg ? `第 ${F.ga}–${F.gb} 层平均` : `第 ${L} 层`} ${e.toFixed(1)}×</b></div><div class="lx">${[0, F.ga, F.gb, 27].map((l) => `<span style="left:${((l + 0.5) / 28) * 100}%">L${l}</span>`).join('')}</div></div>`;
+    this.foot.innerHTML = `<div class="enr"><div class="bars">${bars}<span class="one" style="bottom:${((1 / mx) * 92).toFixed(1)}px"></span></div><div class="lab"><span>对准倍数（看绿苹果的比例 ÷ 它占的面积）</span><b>${P.avg ? `第 ${F.ga}–${F.gb} 层平均` : `第 ${L} 层`} ${e.toFixed(1)}×</b></div><div class="lx">${[0, F.ga, F.gb].map((l) => `<span style="left:${((l + 0.5) / 28) * 100}%">L${l}</span>`).join('')}</div></div>`;
   }
 
   // ⑤′ 图片词元的逻辑透镜：每格写出读数最高的中文词

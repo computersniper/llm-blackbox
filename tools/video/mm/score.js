@@ -440,7 +440,8 @@ export function buildScore(Q, cap = null) {
       else if (t < A0) st = mst(3, gA, { ph: 'read' }, 1);
       else if (t < A1) { const s = pick(layers, t); L = s.L; st = mst(3, gA, { ph: 'layer', L }, s.p); }
       else { L = F.gb; st = mst(3, gA, { ph: 'layer', L: F.gb }, 1); }
-      const nRep = t < sched[0].t0 ? 0 : t < preEnd ? pick(sched, t).g + (t >= pick(sched, t).t1 - 0.05 ? 1 : 0) : t < A1 ? gA : gA + 1;
+      const said = lens0 + 3.3;   // 「最后写下：3」
+      const nRep = t < sched[0].t0 ? 0 : t < preEnd ? pick(sched, t).g + (t >= pick(sched, t).t1 - 0.05 ? 1 : 0) : t < said ? gA : gA + 1;
       return {
         st,
         cam: (ctx) => {
@@ -452,7 +453,7 @@ export function buildScore(Q, cap = null) {
           const live = towerCam(Sc, Math.min(lastL, Lc), { yaw: lerp(-6, 6, seg(t, A0, A1)) });
           return blendCam(c0, live, smoother(seg(t, A0 - 1.2, A0 + 0.6)));
         },
-        reply: { a: smooth(seg(t, sched[0].t0 - 0.4, sched[0].t0 + 0.2)), n: nRep, hl: t >= A1 ? gA : -1 },
+        reply: { a: smooth(seg(t, sched[0].t0 - 0.4, sched[0].t0 + 0.2)), n: nRep, hl: t >= said ? gA : -1 },
         panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 - 0.3 } : null,
         lens3: { a: smooth(seg(t, lens0, lens0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), k: seg(t, lens0 + 0.3, lens0 + 2.8), fin: seg(t, lens0 + 3.2, lens0 + 3.6) },
       };
