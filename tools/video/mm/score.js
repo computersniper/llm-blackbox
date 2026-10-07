@@ -165,11 +165,11 @@ export function buildScore(Q, cap = null) {
   OPEN.fog0 = OPEN.swapT + 0.4; OPEN.fog1 = SEC.fly.t0 + 1.6;
   // 飞行：图和词元先钻进黑箱的取景窗；镜头再拉开，片名落在黑箱正面；然后黑箱打开
   const F0 = SEC.fly.t0;
-  OPEN.dock0 = F0 + 2.2;                                             // 离开跟随编队，飞向取景窗
+  OPEN.dock0 = F0 + 1.9;                                             // 离开跟随编队，飞向取景窗
   OPEN.enter0 = F0 + 3.6; OPEN.enter1 = F0 + 4.6;                    // 图片从取景窗推进去
-  const titleIn = F0 + 5.0, titleOut0 = F0 + 7.4, titleOut1 = F0 + 8.0;
+  const titleIn = F0 + 5.0, titleOut0 = F0 + 7.6, titleOut1 = F0 + 8.2;
   Object.assign(OPEN, { titleIn, titleOut0, titleOut1 });
-  OPEN.open0 = F0 + 7.9; OPEN.open1 = SEC.patch.t0 + 1.0;            // 黑箱打开
+  OPEN.open0 = F0 + 8.1; OPEN.open1 = SEC.patch.t0 + 1.0;            // 黑箱打开
   OPEN.end = SEC.patch.t0;
   // 飞行：图片和词元交给 3D 以后，镜头跟着它们从远处飞到黑箱的取景窗前
   const box = { x0: G.PX - pw / 2 - 0.6, z0: Math.max(V.mh * G.S, ph) / 2 + 0.6 };
@@ -212,7 +212,7 @@ export function buildScore(Q, cap = null) {
       fade: 1 - smooth(seg(t, OPEN.diss0, OPEN.diss0 + 0.3)),
       boxLabel: 1 - smooth(seg(t, titleIn - 0.6, titleIn)) * (1 - smooth(seg(t, titleOut1 + 0.05, titleOut1 + 0.55))),
       photoA: t >= OPEN.enter0 - 0.02 ? 1 : 0,
-      ov: { band: smooth(seg(t, OPEN.diss0, OPEN.diss1)), title: smooth(seg(t, titleIn, titleIn + 0.8)) * (1 - smooth(seg(t, titleOut0, titleOut1))), titleK: seg(t, titleIn + 0.05, titleIn + 2.6), titleBlur: 7 * smooth(seg(t, titleOut0, titleOut1)), titleOnBox: true },
+      ov: { band: smooth(seg(t, OPEN.diss0, OPEN.diss1)), title: smooth(seg(t, titleIn, titleIn + 0.8)) * (1 - smooth(seg(t, titleOut0, titleOut1))), titleK: seg(t, titleIn + 0.05, titleIn + 2.2), titleBlur: 7 * smooth(seg(t, titleOut0, titleOut1)), titleOnBox: true },
     };
   });
 
@@ -314,7 +314,7 @@ export function buildScore(Q, cap = null) {
           return blendCam(embedCam, live, smoother(seg(t, up0, up0 + 2.2)));
         },
         panel: { kind: 'pca', a: smooth(seg(t, up0 + 0.4, up0 + 1.2)) * (1 - smooth(seg(t, T1 - 0.6, T1))), lv: Math.floor(lv), cmp: smooth(seg(t, cmp0, cmp0 + 1.0)), cmpL: CMP, cmpK: smooth(seg(t, cmp0 + 2.6, cmp0 + 3.4)) },
-        vitHl: !flying,
+        labels: flying ? [] : ['lvl', 'vit'],
       };
     });
   }
@@ -344,6 +344,7 @@ export function buildScore(Q, cap = null) {
           return blendCam(c, dsCam, smoother(seg(t, ds0 - 0.6, ds0 + 1.6)));
         },
         panel: { kind: 'merge', a: smooth(seg(t, g0 - 0.2, g0 + 0.5)) * (1 - smooth(seg(t, ds0 - 0.6, ds0))), k: seg(t, g0, g1) },
+        labels: t < ds0 ? ['merge'] : ['ds', 'vit', 'llm'],
       };
     });
   }
@@ -396,10 +397,11 @@ export function buildScore(Q, cap = null) {
     const preEnd = sched[sched.length - 1].t1;
     // 「3」：28 层，前 16 层快、16–26 层慢
     const A0 = preEnd + 2.6;
-    const raw = Array.from({ length: mt.layers }, (_, L) => (L < F.ga ? 0.22 : L <= F.gb ? 0.6 : 0.4));
+    // 逐层走到第 gb 层为止（最后一层又满图乱看，不在“对准层”里），之后换成第 ga–gb 层的平均
+    const raw = Array.from({ length: F.gb + 1 }, (_, L) => (L < F.ga ? 0.24 : 0.66));
     const layers = lay(A0, raw.map((d, L) => ({ L, d })));
     const A1 = layers[layers.length - 1].t1;
-    const lens0 = A1 + 0.4;
+    const lens0 = A1 + 2.2;
     sched.forEach((s) => ev(s.t1 - 0.05, 'emit', { g: s.g, k: 0.45 }));
     sched.forEach((s) => { for (let L = 0; L < 28; L += 7) ev(s.t0 + (L / 28) * s.d, 'layer', { L, n: 28, k: 0.25 }); });
     layers.forEach((s) => { if (s.L % 2 === 0 || (s.L >= F.ga && s.L <= F.gb)) ev(s.t0, 'layer', { L: s.L, n: 28, k: s.L >= F.ga && s.L <= F.gb ? 0.7 : 0.4 }); });
@@ -419,12 +421,12 @@ export function buildScore(Q, cap = null) {
     term(A0 + 0.15, layers[F.ga].t0 - 0.1, `生成「3」时的注意力 · 16 个头平均`);
     sub(layers[F.ga].t0 + 0.05, layers[F.gb].t0, `第 ${F.ga} 层起：盯住了绿苹果`);
     term(layers[F.ga].t0 + 0.15, layers[F.gb].t0, `对准倍数 ${m(F.enrLo.toFixed(1) + '×')} → ${m(F.enrHi.toFixed(1) + '×')}`);
-    sub(layers[F.gb].t0 + 0.1, A1 + 0.3, `看绿苹果的比例，是瞎看的 ${m(F.enrHi.toFixed(1))} 倍`);
-    term(layers[F.gb].t0 + 0.2, A1 + 0.3, `第 ${F.ga}–${F.gb} 层平均`);
-    sub(lens0, lens0 + 3.4, `它心里先想的是“${esc(lt3[firstSan >= 0 ? firstSan : 21][0])}”`);
-    term(lens0 + 0.1, lens0 + 3.4, `逻辑透镜 · 第 ${firstSan} 层「${esc(lt3[firstSan][0])}」${m(pct(lt3[firstSan][1]))}`);
-    sub(lens0 + 3.5, T1 - 0.15, `最后写下：“${esc(F.stA.chosenS)}”`);
-    term(lens0 + 3.6, T1 - 0.15, `输出 ·「${esc(F.stA.chosenS)}」${m(pct(F.stA.p))}`);
+    sub(A1 - 0.3, lens0 - 0.05, `看绿苹果的比例，是瞎看的 ${m(F.enrHi.toFixed(1))} 倍`);
+    term(A1 - 0.2, lens0 - 0.05, `第 ${F.ga}–${F.gb} 层平均`);
+    sub(lens0, lens0 + 3.2, `它心里先想的是“${esc(lt3[firstSan >= 0 ? firstSan : 21][0])}”`);
+    term(lens0 + 0.1, lens0 + 3.2, `逻辑透镜 · 第 ${firstSan} 层「${esc(lt3[firstSan][0])}」${m(pct(lt3[firstSan][1]))}`);
+    sub(lens0 + 3.3, T1 - 0.15, `最后写下：“${esc(F.stA.chosenS)}”`);
+    term(lens0 + 3.4, T1 - 0.15, `输出 ·「${esc(F.stA.chosenS)}」${m(pct(F.stA.p))}`);
     const towerCam = (Sc, L, o = {}) => {
       const y = G.LY0 + L * G.LG;
       const x1 = Sc.bx - 0.3, x2 = Sc.tx[Q.row(gA)] + 0.6;
@@ -437,7 +439,7 @@ export function buildScore(Q, cap = null) {
       else if (t < preEnd) { const s = pick(sched, t); st = mst(2, s.g, { ph: 'llm' }, Math.min(0.999, s.p * 1.08), { dAnim: 3 }); }
       else if (t < A0) st = mst(3, gA, { ph: 'read' }, 1);
       else if (t < A1) { const s = pick(layers, t); L = s.L; st = mst(3, gA, { ph: 'layer', L }, s.p); }
-      else { L = lastL; st = mst(3, gA, { ph: 'layer', L: lastL }, 1); }
+      else { L = F.gb; st = mst(3, gA, { ph: 'layer', L: F.gb }, 1); }
       const nRep = t < sched[0].t0 ? 0 : t < preEnd ? pick(sched, t).g + (t >= pick(sched, t).t1 - 0.05 ? 1 : 0) : t < A1 ? gA : gA + 1;
       return {
         st,
@@ -451,8 +453,8 @@ export function buildScore(Q, cap = null) {
           return blendCam(c0, live, smoother(seg(t, A0 - 1.2, A0 + 0.6)));
         },
         reply: { a: smooth(seg(t, sched[0].t0 - 0.4, sched[0].t0 + 0.2)), n: nRep, hl: t >= A1 ? gA : -1 },
-        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 + 0.2 } : null,
-        lens3: { a: smooth(seg(t, lens0, lens0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), k: seg(t, lens0 + 0.3, lens0 + 3.4), fin: seg(t, lens0 + 3.5, lens0 + 4.0) },
+        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 - 0.3 } : null,
+        lens3: { a: smooth(seg(t, lens0, lens0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), k: seg(t, lens0 + 0.3, lens0 + 2.8), fin: seg(t, lens0 + 3.2, lens0 + 3.6) },
       };
     });
   }

@@ -181,7 +181,7 @@ function updateReply(R) {
     const sp = /^<\|/.test(st.chosenS);
     return `<span class="t${g === R.hl ? ' hl' : ''}${sp ? ' sp' : ''}${g === R.n - 1 && R.hl < 0 ? ' new' : ''}">${sp ? esc(shortSpecial(st.chosenS)) : esc(tokPlain(st.chosenS))}</span>`;
   });
-  OV.reply.innerHTML = `<span class="q">绿色的苹果是第几个？</span><span class="a">${toks.join('')}${R.n < Q.G ? '<span class="caret"></span>' : ''}</span>`;
+  OV.reply.innerHTML = `<span class="q">${esc(Q.question)}</span><span class="a">${toks.join('')}${R.n < Q.G ? '<span class="caret"></span>' : ''}</span>`;
 }
 
 // 片尾录屏：按时间表换帧；窗口最后缩到左边，右边落版网址 + 二维码
@@ -338,7 +338,7 @@ function seek(t, pre = 4) {
 
 // 封面：片名落版那一刻（去掉字幕）
 function poster(t) {
-  seek(t ?? SC.open.titleIn + 2.4);
+  seek(t ?? SC.open.titleIn + 2.4, 6);
   for (const sel of ['.sub', '.term', '.prog']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
   E.render();
 }

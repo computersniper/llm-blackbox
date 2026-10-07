@@ -162,7 +162,7 @@ export class Monitor {
     for (let mm = 0; mm < V.Nv; mm++) {
       const { s, p } = V.ilens(L, mm);
       const w = s.trim();
-      if (p < 0.05 || !/^[一-鿿]{1,3}$/.test(w)) continue;
+      if (p < 0.08 || !/^[\u4e00-\u9fff]{2}$/.test(w)) continue;   // 只写两个字的中文词（一格放得下，不互相压）
       const r = Math.floor(mm / V.mw), c = mm % V.mw;
       const order = ((r * 7 + c * 3) % 17) / 17;
       const a = smooth(seg(k, order * 0.7, order * 0.7 + 0.3));

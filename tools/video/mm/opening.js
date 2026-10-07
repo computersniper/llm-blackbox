@@ -429,7 +429,7 @@ export class Opening {
       if (t < dock0) { p = a; sc = s0; }
       else {
         const from = formAt(LI.local, imgTarget, dock0, 0);
-        const q = easeInOut(seg(t, dock0, T.enter0));
+        const u = seg(t, dock0, T.enter0), q = 1 - (1 - u) ** 2.2;   // 先快后慢：始终跑在镜头前面
         p = from.clone().lerp(T.photoEnd, q);
         p.y += Math.sin(q * Math.PI) * 0.4;
         sc = lerp(0.95, 1, q);
@@ -451,7 +451,7 @@ export class Opening {
       else {
         const t0 = dock0 + k * 0.05;
         const from = formAt(L[k].local, tgt, t0, k + 1);
-        const q = easeInOut(seg(t, t0, T.enter0 - 0.1));
+        const u = seg(t, t0, T.enter0 - 0.1), q = 1 - (1 - u) ** 2.2;
         const to = T.photoEnd.clone().add(v3((k - (n - 1) / 2) * 0.2, -0.6, -0.4));
         p = from.clone().lerp(to, q);
         sc *= 1 - 0.75 * q;
