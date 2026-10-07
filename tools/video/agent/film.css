@@ -241,7 +241,7 @@ q { quotes: "「" "」"; color: var(--amber); }
 
 /* ================================================================ 第 4 章：逐词元生成 */
 .tokp { position: absolute; left: 160px; top: 92px; width: 1600px; }
-.tokp .gen { position: relative; margin-top: 30px; min-height: 196px; padding: 24px 28px; border-radius: 18px; background: rgba(5, 10, 20, .9); border: 1.5px solid var(--line2); }
+.tokp .gen { position: relative; margin-top: 20px; min-height: 180px; padding: 20px 28px; border-radius: 18px; background: rgba(5, 10, 20, .9); border: 1.5px solid var(--line2); }
 .tokp .gen .cap { font-family: var(--sans); font-size: 21px; color: var(--dim); letter-spacing: .06em; margin-bottom: 14px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px 6px; align-items: center; font-family: var(--mono); font-size: 36px; line-height: 1; }
 .chip { position: relative; padding: 10px 8px; border-radius: 9px; border: 1.5px solid rgba(94, 228, 240, .25); background: rgba(94, 228, 240, .06); color: #cfe9f2; white-space: pre; }
@@ -250,10 +250,10 @@ q { quotes: "「" "」"; color: var(--amber); }
 .chip.new { border-color: var(--amber); background: rgba(255, 182, 92, .2); color: #fff; }
 .chip.three { border-color: var(--amber); color: #fff; }
 .chip.ghost { opacity: .2; }
-.cands { position: relative; margin-top: 26px; display: flex; gap: 34px; align-items: stretch; }
+.cands { position: relative; margin-top: 20px; display: flex; gap: 34px; align-items: stretch; }
 .cand { width: 860px; padding: 22px 28px; border-radius: 18px; background: rgba(5, 10, 20, .94); border: 1.5px solid rgba(255, 182, 92, .45); }
 .cand .cap { font-family: var(--sans); font-size: 21px; color: var(--dim); letter-spacing: .06em; margin-bottom: 10px; }
-.crow { display: grid; grid-template-columns: 210px 1fr 110px; align-items: center; gap: 18px; height: 50px; font-family: var(--mono); font-size: 28px; color: var(--ink2); }
+.crow { display: grid; grid-template-columns: 210px 1fr 110px; align-items: center; gap: 18px; height: 42px; font-family: var(--mono); font-size: 27px; color: var(--ink2); }
 .crow .bar { height: 18px; border-radius: 9px; background: rgba(150, 175, 210, .45); }
 .crow .p { text-align: right; font-size: 26px; }
 .crow.win { color: #fff; }

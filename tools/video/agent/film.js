@@ -167,6 +167,10 @@ class Desk {
     root.style.opacity = D.a.toFixed(3);
     root.style.filter = D.blur > 0.05 ? `blur(${D.blur.toFixed(2)}px)` : '';
     this.dim.style.opacity = (D.dim || 0).toFixed(3);
+    // 讲到终端时，终端往上长高一些（编辑器让出位置），长报错也看得全
+    const termK = D.focus === 'term' ? D.fk || 0 : 0;
+    const rows = `minmax(0, 1fr) ${(272 + 130 * termK).toFixed(1)}px`;
+    if (this.dbody.style.gridTemplateRows !== rows) this.dbody.style.gridTemplateRows = rows;
     const { k, cur, p } = D;
     const acts = this.acts;
     const curAct = cur >= 0 ? acts[cur] : null;
@@ -500,7 +504,7 @@ class TokPanel {
     const root = (this.root = el('div', 'tokp', '', parent));
     this.toks = SC.toks;
     const P = R.turns[3].prompt;
-    const tail = P.slice(P.lastIndexOf('<tool_response>')).replace(/\n$/, '');
+    const tail = P.slice(P.lastIndexOf('<tool_response>') + '<tool_response>\n'.length).replace(/\n$/, '');
     root.innerHTML = `<div class="raw ctxt" style="position:relative;font-size:24px;line-height:35px;padding:14px 22px"><div class="cap">它刚读到的：第 4 圈上下文的最后几行</div>${tail.split('\n').map((l) => {
       let h = esc(l).replace(/&lt;\|?\/?[a-z_]+\|?&gt;/g, (s) => `<span class="sp">${s}</span>`);
       if (/command not found/.test(l)) h = `<span class="er">${h}</span>`;

@@ -22,7 +22,7 @@ const num = (n) => Math.round(n).toLocaleString('en-US');
 const DESK = { w: 1720, h: 804 };
 const FULL = { x: 860, y: 402, s: 1, cx: 960, cy: 472 };
 const ED = { x: 760, y: 290, s: 1.28, cx: 960, cy: 440 };
-const TERM = { x: 1000, y: 640, s: 1.32, cx: 960, cy: 480 };
+const TERM = { x: 1000, y: 570, s: 1.32, cx: 960, cy: 470 };
 const SLOT = { x: 860, y: 402, s: 0.3, cx: 1578, cy: 492 };
 
 export function buildScore(R, cap = null) {
@@ -148,13 +148,13 @@ export function buildScore(R, cap = null) {
   term(27.2, 29.9, '大模型 · 只会输出文字');
   const deskCam1 = cam2([
     { t: 11.6, ...FULL }, { t: 18.3, ...FULL }, { t: 20.0, ...ED }, { t: 22.6, ...ED, y: 300 },
-    { t: 23.6, ...TERM }, { t: 26.4, ...TERM, y: 652 }, { t: 28.6, ...TERM, x: 860, y: 600, s: 1.62 }, { t: 29.6, ...TERM, x: 860, y: 600, s: 1.64 },
+    { t: 23.6, ...TERM, y: 520 }, { t: 26.4, ...TERM, y: 530 }, { t: 28.6, ...TERM, x: 860, y: 480, s: 1.62 }, { t: 29.6, ...TERM, x: 860, y: 480, s: 1.64 },
   ]);
 
   /* ------------------------------------------------------------ 第 2 章 · 只会写字：镜头拉开，桌面缩进“沙箱”，左边是模型，中间是 harness */
   prog(SEC.loop.t0, 1);
   const L = SEC.loop.t0; // 30
-  const deskCam2 = cam2([{ t: L, ...TERM, x: 860, y: 600, s: 1.64 }, { t: L + 3.6, ...SLOT }]);
+  const deskCam2 = cam2([{ t: L, ...TERM, x: 860, y: 480, s: 1.64 }, { t: L + 3.6, ...SLOT }]);
   sub(L + 0.3, L + 3.8, '其实，模型能做的只有一件事');
   term(L + 0.4, L + 3.8, '模型 · 读一串字，写一串字');
   sub(L + 4.0, L + 8.9, '写出一段字：这就是它的“动作”');
@@ -243,7 +243,7 @@ export function buildScore(R, cap = null) {
   term(K + 21.5, K + 23.5, `结束符 ${m('&lt;|im_end|&gt;')}`);
   sub(PARSE.t0 + 0.1, PARSE.t1 - 0.1, '外面的程序解析出命令，拿去执行');
   term(PARSE.t0 + 0.2, PARSE.t1 - 0.1, 'harness · 解析 JSON → 沙箱执行');
-  const deskCam4 = cam2([{ t: K + 27.4, x: 860, y: 402, s: 0.55, cx: 960, cy: 500 }, { t: K + 30.2, ...TERM, y: 652 }]);
+  const deskCam4 = cam2([{ t: K + 27.4, x: 860, y: 402, s: 0.55, cx: 960, cy: 500 }, { t: K + 30.2, ...TERM, y: 560 }]);
 
   /* ------------------------------------------------------------ 第 5 章 · 自己改错：快放剩下的几圈 */
   prog(SEC.fix.t0, 4);
@@ -264,9 +264,9 @@ export function buildScore(R, cap = null) {
   const ANS = { t0: F + 25.2, t1: F + 30.0, type0: F + 25.5, type1: F + 27.6, text: turns[turns.length - 1].say.trim() };
   ev(SAY.type0, 'tick', { k: 0.4 }); ev(ANS.type0, 'tick', { k: 0.4 }); ev(FINAL_T, 'ok', { k: 1 });
   const deskCam5 = cam2([
-    { t: F, ...TERM, y: 652 }, { t: F + 3.6, ...TERM, y: 660 }, { t: F + 4.6, ...TERM, y: 620 }, { t: F + 9.6, ...TERM, y: 640 },
+    { t: F, ...TERM, y: 560 }, { t: F + 3.6, ...TERM, y: 600 }, { t: F + 4.6, ...TERM, y: 600 }, { t: F + 9.6, ...TERM, y: 620 },
     { t: F + 11.0, ...FULL, cy: 540 }, { t: F + 15.2, ...FULL, cy: 540 }, { t: F + 16.4, ...ED }, { t: F + 20.4, ...ED, y: 330 },
-    { t: F + 21.4, ...TERM, y: 652 }, { t: F + 24.6, ...TERM, y: 660 }, { t: F + 26.0, ...FULL, cy: 500 }, { t: F + 30, ...FULL, cy: 500 },
+    { t: F + 21.4, ...TERM, y: 620 }, { t: F + 24.6, ...TERM, y: 630 }, { t: F + 26.0, ...FULL, cy: 500 }, { t: F + 30, ...FULL, cy: 500 },
   ]);
 
   /* ------------------------------------------------------------ 片尾：模型 + 工具 + 循环 → 智能体页的真实录屏 → 落版网址 + 二维码 */
@@ -341,7 +341,7 @@ export function buildScore(R, cap = null) {
       a = 1 - smooth(seg(t, C + 0.5, C + 2.4));
     } else if (t < SEC.fix.t0) {
       cam = deskCam4(t);
-      a = smooth(seg(t, K + 27.4, K + 28.6));
+      a = smooth(seg(t, K + 27.9, K + 28.8));
       focus = 'term'; fk = smooth(seg(t, K + 28.6, K + 30));
     } else if (t < SEC.end.t0) {
       cam = deskCam5(t);
