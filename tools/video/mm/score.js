@@ -566,7 +566,7 @@ export function buildScore(Q, cap = null) {
       sub(T0 + r.f0 + 0.1, T0 + (dv.length ? dv[dv.length - 1].f1 : r.f1) - 0.1, '点 ＋，一层层钻进去');
       term(T0 + r.f0 + 0.2, T0 + (dv.length ? dv[dv.length - 1].f1 : r.f1) - 0.1, '黑箱 → 流水线 → 逐层 → 一层之内');
       sub(T0 + sg('mon').f0 + 0.1, T0 + FIN - 0.15, '每一层在看哪，都能停下来看');
-      term(T0 + sg('mon').f0 + 0.2, T0 + FIN - 0.15, '左上角的监视器：第 20 层的热力图');
+      term(T0 + sg('mon').f0 + 0.2, T0 + FIN - 0.15, '左上角的监视器：生成「3」时在看哪');
     }
     shot('end', (lt, t) => ({
       st: mst(3, Q.G - 1, { ph: 'layer', L: 20 }, 0.5, { dAnim: lerp(3, 1, smoother(seg(lt, 0, 3))) }),
