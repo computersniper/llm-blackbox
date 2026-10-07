@@ -168,7 +168,7 @@ export class Monitor {
       const a = smooth(seg(k, order * 0.7, order * 0.7 + 0.3));
       if (a <= 0) continue;
       const big = ['苹果', '五个', '红色', '绿色'].includes(w);
-      words.push(`<span class="${big ? 'b' : ''}" style="left:${(c + 0.5) * cw}px;top:${(r + 0.5) * chh}px;opacity:${(a * (0.45 + 0.55 * Math.min(1, p * 2))).toFixed(3)}">${esc(w)}</span>`);
+      words.push(`<span class="${big ? 'b' : ''}" style="left:${(c + 0.5) * cw}px;top:${(r + 0.5) * chh}px;opacity:${(a * (big ? 1 : 0.5 + 0.2 * Math.min(1, p * 2))).toFixed(3)}">${esc(w)}</span>`);
     }
     this.ax.innerHTML = `<div class="words">${words.join('')}</div>`;
   }
@@ -275,7 +275,7 @@ export class LensCard {
   constructor(parent, Q, F) {
     this.Q = Q; this.F = F;
     this.el = el('div', 'lens3', '', parent);
-    const Ls = [12, 15, 18, 21, 24, 27];
+    const Ls = [...new Set([15, 18, F.thinkL, 21, 24, 27])].sort((a, b) => a - b);
     this.Ls = Ls;
     this.el.innerHTML = `<div class="h">说出「${esc(tokPlain(F.stA.chosenS))}」之前<small>逻辑透镜：每层直接接输出头，此刻会说什么</small></div>${Ls.map((L) => {
       const [s, p] = F.lens[L];

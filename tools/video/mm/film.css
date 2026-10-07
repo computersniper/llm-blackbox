@@ -252,8 +252,8 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .mon .seq { display: flex; gap: 10px; align-items: center; }
 .mon .seq i { font-style: normal; display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 12px; border-radius: 10px; border: 1px solid rgba(94, 228, 240, .3); color: var(--ink); font-size: 22px; }
 .mon .seq i b { font-family: var(--mono); font-weight: 400; font-size: 18px; color: var(--cyan); }
-.mon .words span { position: absolute; transform: translate(-50%, -50%); font-size: 22px; font-weight: 600; color: #e9eff9; white-space: nowrap; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
-.mon .words span.b { font-size: 26px; color: #ffd8a8; }
+.mon .words span { position: absolute; transform: translate(-50%, -50%); font-size: 19px; font-weight: 600; color: #e9eff9; white-space: nowrap; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
+.mon .words span.b { font-size: 23px; color: #ffd8a8; }
 .mon .enr { width: 100%; }
 .mon .enr .bars { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 96px; border-bottom: 1px solid var(--line2); }
 .mon .enr .bars i { flex: 1; background: rgba(150, 175, 210, .4); border-radius: 3px 3px 0 0; }

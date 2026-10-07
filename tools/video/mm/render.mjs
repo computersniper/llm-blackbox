@@ -8,6 +8,8 @@
 //
 // 帧存成 JPEG（质量 95），已经存在的帧会跳过：中途停了重跑同一条命令就能接着渲染。
 // 同时最多 3 个浏览器进程（--workers 上限 3）：WSL 瞬时负载太高会整机崩溃。
+// 渲染中按 /proc/loadavg 自动让路：扣掉自己这几个进程的负载（每个 SwiftShader 浏览器约 4.5），别人的负载越高，
+// 同时在渲的进程越少；别人的负载 ≥ 12 时全部暂停，等降下来再接着渲（每 30 帧检查一次）。
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -92,10 +94,26 @@ if (mode === 'events') {
   for (let w = 0; w < W; w++) { const c = todo.slice(w * per, (w + 1) * per); if (c.length) chunks.push(c); }
   const t0 = Date.now();
   let done = 0;
+  const PER = Number(A.perload || 4.5);
+  let active = 0, lastNote = 0;
+  const load1 = () => Number(fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function gate(w) {
+    for (;;) {
+      const l = load1(), others = l - PER * active;
+      const allow = others < 4 ? W : others < 8 ? Math.min(W, 2) : others < 12 ? 1 : 0;
+      if (active < allow) { active++; return; }
+      if (Date.now() - lastNote > 60000) { lastNote = Date.now(); console.log(`load ${l.toFixed(1)}（别人约 ${others.toFixed(1)}）：先让一让，${active} 个在渲`); }
+      await wait(15000 + w * 1000);
+    }
+  }
   await Promise.all(chunks.map(async (frames, w) => {
+    await wait(w * 20000);   // 错开启动，免得负载一下子冲上去
+    await gate(w);
     const { browser, page, cdp, errs } = await open();
-    let prev = -10;
+    let prev = -10, n = 0;
     for (const f of frames) {
+      if (++n % 30 === 0) { active--; await gate(w); }
       const t = f / FPS;
       if (f !== prev + 1) await page.evaluate((tt) => window.__film.seek(tt, 4), t);
       else await page.evaluate((tt) => window.__film.renderAt(tt), t);
@@ -108,6 +126,7 @@ if (mode === 'events') {
         console.log(`${done}/${todo.length} frames · ${(done / el).toFixed(2)} fps · eta ${((todo.length - done) / (done / el) / 60).toFixed(1)} min`);
       }
     }
+    active--;
     if (errs.length) console.log(`worker ${w} console errors:\n` + errs.slice(0, 10).join('\n'));
     await browser.close();
   }));
