@@ -4,7 +4,7 @@
 //   node tools/video/mm/render.mjs frames --out /mnt/d/cjc/videos/multimodal/frames [--from 0] [--to 180] [--fps 30] [--workers 3]
 //   node tools/video/mm/render.mjs stills --times 12,40.5,96 --out dir      # 抽几帧看效果
 //   node tools/video/mm/render.mjs events --out tools/video/mm/events.json   # 导出配乐用的事件和段落
-//   node tools/video/mm/render.mjs poster --out poster.png [--t 21.5]        # 封面（默认取片名落版那一刻）
+//   node tools/video/mm/render.mjs poster --out poster.png [--t 123.7]       # 封面（默认：生成「3」时的热力图 + 片名）
 //
 // 帧存成 JPEG（质量 95），已经存在的帧会跳过：中途停了重跑同一条命令就能接着渲染。
 // 同时最多 3 个浏览器进程（--workers 上限 3）：WSL 瞬时负载太高会整机崩溃。

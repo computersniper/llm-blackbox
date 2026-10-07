@@ -775,7 +775,7 @@ node tools/video/mm/render.mjs events --out tools/video/mm/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/mm/compose.py --events tools/video/mm/events.json --out $O/score.wav
 bash tools/video/mm/encode.sh $O/frames $O/score.wav $O/multimodal-v1.mp4 30
 bash tools/video/mm/share.sh $O/frames $O/score.wav $O/multimodal-v1-share.mp4
-node tools/video/mm/render.mjs poster --out $O/poster-v1.png                    # 默认取片名落版那一刻
+node tools/video/mm/render.mjs poster --out $O/poster-v1.png                    # 默认：生成「3」时的热力图 + 片名
 ```
 
 浏览器里预览：<http://127.0.0.1:8798/tools/video/mm/film.html?preview&t=0>（拖时间轴、空格暂停）。
