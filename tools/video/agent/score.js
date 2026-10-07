@@ -381,7 +381,7 @@ export function buildScore(R, cap = null) {
     if (t >= C && t < K + 1.6) {
       const showLap = t < C + 9.4 ? 0 : t < C + 16.0 ? clamp(Math.floor((t - (C + 9.4)) / 0.9) + 1, 0, turns.length - 1) : 3;
       S.ctx = {
-        a: smooth(seg(t, C + 0.6, C + 2.2)) * (1 - smooth(seg(t, K, K + 1.2))),
+        a: smooth(seg(t, C + 0.6, C + 2.2)) * (1 - smooth(seg(t, K - 0.6, K + 0.1))),
         lap: showLap,
         build: { sys: smooth(seg(t, C + 2.4, C + 3.2)), tools: smooth(seg(t, C + 3.2, C + 4.2)), user: smooth(seg(t, C + 6.2, C + 6.8)) },
         hiSeg: t < C + 6.1 ? 'head' : t < C + 9.2 ? 'user' : t < C + 12.6 ? 'tail' : null,
@@ -397,7 +397,7 @@ export function buildScore(R, cap = null) {
       for (let j = 0; j < toks.length; j++) if (t >= tokT[j]) n = j + 1;
       const dec = DEC.find((x) => t >= x.t0 && t < x.t1);
       S.tok = {
-        a: smooth(seg(t, K, K + 1.2)) * (1 - smooth(seg(t, K + 27.0, K + 28.2))),
+        a: smooth(seg(t, K + 0.1, K + 0.9)) * (1 - smooth(seg(t, K + 27.0, K + 28.2))),
         n, cur: n - 1, kNew: n ? smooth(seg(t, tokT[n - 1], tokT[n - 1] + 0.18)) : 0,
         dec: dec ? { j: dec.j, a: smooth(seg(t, dec.t0, dec.t0 + 0.35)) * (1 - smooth(seg(t, dec.t1 - 0.3, dec.t1))), k: seg(t, dec.t0 + 0.2, dec.t0 + 1.2) } : null,
         cmp: smooth(seg(t, CMP.t0, CMP.t0 + 0.5)) * (1 - smooth(seg(t, CMP.t1 - 0.3, CMP.t1))),
