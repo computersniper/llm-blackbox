@@ -73,6 +73,7 @@ function tameScene() {
     if (o.type === 'GridHelper') o.material.opacity = 0.2;
   }
   // 舞台里的 3D 标签按网站的小字排版：片子里一律收起，讲解交给字幕和面板（个别镜头单独打开）
+  for (const sl of S.slabs) { sl.material.color.setHex(0x2b3f73); sl.material.roughness = 0.75; sl.material.metalness = 0.05; }
   S.labels = { photo: S.photoLbl, vit: S.vitLbl, lvl: S.lvlLbl, merge: S.mergeLbl, llm: S.llmLbl, layer: S.layerLbl, out: S.outLbl, ds: S.dsLbl };
 }
 
@@ -282,7 +283,7 @@ function adjustStage(f) {
   const keep = new Set(f.labels || []);
   for (const [k, lb] of Object.entries(S.labels)) if (!keep.has(k)) lb.el.classList.add('hide');
   // 语言模型的玻璃层板在电影灯光下太亮：整体压一压
-  for (const sl of S.slabs) { sl.material.opacity *= 0.55; sl.edge.material.opacity *= 0.75; }
+  for (const sl of S.slabs) { sl.material.opacity *= 0.4; sl.material.emissiveIntensity *= 0.5; sl.edge.material.opacity *= 0.6; }
   if (f.hideHeat) { S.heat.visible = false; S.beams.visible = false; }
   if (f.photoA === 0) { S.photo.visible = false; S.photoFrame.visible = false; } else { S.photo.visible = true; S.photoFrame.visible = true; }
   // 黑箱正面的型号字：片名在正面的那几秒先不亮

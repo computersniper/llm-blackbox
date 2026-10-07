@@ -9,6 +9,7 @@ import { viewOf } from '/public/multimodal/js/timeline.js';
 import { tokPlain, esc } from '/public/js/ui.js';
 
 export const BPM = 96, BEAT = 60 / BPM, BAR = 4 * BEAT;
+const CMP = 6;   // ViT 对比用的那一级：第 6 层之后五个苹果（连绿的那个）主成分颜色最一致（看过 25 级以后选的）
 const B = (bar, beat = 0) => bar * BAR + beat * BEAT;
 
 // 舞台的几何（和 public/multimodal/js/scene.js 里的常数一致）
@@ -18,7 +19,7 @@ G.MY = G.Y0 + 24 * G.LVL + 0.55;
 // 段落：名字、小节数、能量（配乐用）
 const PLAN = [
   ['chat', 6, 0.12], ['fly', 3, 0.6], ['patch', 4, 0.35], ['calc', 8, 0.3], ['vit', 7, 0.62], ['merge', 5, 0.5],
-  ['splice', 5, 0.45], ['answer', 14, 0.55], ['lens', 5, 0.7], ['reply', 4, 0.8], ['end', 11, 0.22],
+  ['splice', 5, 0.45], ['answer', 13, 0.55], ['lens', 5, 0.7], ['reply', 4, 0.8], ['end', 11, 0.22],
 ];
 const CHAPTERS = ['切成图块', '视觉编码器', '四合一', '插进对话', '看图回答'];
 
@@ -68,16 +69,35 @@ export function facts(Q) {
   const mean = (a, b) => enr.slice(a, b + 1).reduce((x, y) => x + y, 0) / (b - a + 1);
   // 逻辑透镜：「3」这一步每层的第一名
   const lens = Array.from({ length: Q.NL }, (_, L) => Q.lensAt(gAns, L)[0]);
+  // 心里先想的：第一次以过半的把握读出带「三」的词（第 21 层「三个」）
+  let thinkL = lens.findIndex((x) => /三/.test(x[0]) && x[1] >= 0.5);
+  if (thinkL < 0) thinkL = Q.NL - 1;
   const stA = Q.steps[gAns];
+  // 绿苹果正中的那个视觉词元：模型看到的像素里，每个 2×2 词元格子平均“绿得最突出”的那一格（M-RoPE、合并举例用）
+  let apple = hot;
+  try {
+    const cv = new OffscreenCanvas(V.img.naturalWidth, V.img.naturalHeight);
+    const g2 = cv.getContext('2d');
+    g2.drawImage(V.img, 0, 0);
+    const px = g2.getImageData(0, 0, cv.width, cv.height).data;
+    const cw = cv.width / V.mw, chh = cv.height / V.mh;
+    let best = -1e9;
+    for (let k = 0; k < V.Nv; k++) {
+      const r = Math.floor(k / V.mw), c = k % V.mw;
+      let s = 0, n = 0;
+      for (let y = Math.floor(r * chh); y < Math.floor((r + 1) * chh); y += 2) for (let x = Math.floor(c * cw); x < Math.floor((c + 1) * cw); x += 2) { const o = (y * cv.width + x) * 4; s += px[o + 1] - (px[o] + px[o + 2]) / 2; n++; }
+      if (s / n > best) { best = s / n; apple = k; }
+    }
+  } catch { /* 取不到像素就用热点 */ }
   // M-RoPE
-  const p0 = Q.pos(V.vs), pHot = Q.pos(V.vs + hot);
+  const p0 = Q.pos(V.vs), pHot = Q.pos(V.vs + hot), pApple = Q.pos(V.vs + apple);
   const pLast = Q.pos(V.vs + V.Nv - 1);
   const firstQ = Q.tokens.findIndex((t, i) => i > V.vs + V.Nv && t.role === 'user' && !t.sp);
   const pQ = Q.pos(firstQ);
   // ViT 每层（16 头平均）的注意距离
   const dist = V.vitDist.map((h) => h.reduce((a, b) => a + b, 0) / h.length);
   return {
-    gAns, gDi, hot, box, base, enr, enrLo: mean(0, ga - 1), enrHi: mean(ga, gb), ga, gb, lens, stA,
+    gAns, gDi, hot, apple, pApple, thinkL, box, base, enr, enrLo: mean(0, ga - 1), enrHi: mean(ga, gb), ga, gb, lens, stA,
     p0, pHot, pLast, pQ, firstQ, nPos: pLast[2] - p0[2] + 1, dist, distMin: Math.min(...dist), distMax: Math.max(...dist),
   };
 }
@@ -259,7 +279,7 @@ export function buildScore(Q, cap = null) {
     const fly0 = T0 + 0.2, fly1 = T0 + 3.2, up0 = T0 + 3.4, up1 = T0 + 12.4;
     ev(fly0, 'whoosh', { k: 0.7 });
     ev(up0, 'rise', { d: up1 - up0 });
-    for (let L = 0; L < 24; L += 2) ev(lerp(up0, up1, (L + 1) / 25), 'layer', { L, k: 0.5 });
+    for (let L = 0; L < 24; L += 2) ev(lerp(up0, up1, (L + 1) / 25), 'layer', { L, n: 24, k: 0.5 });
     const cmp0 = up1 + 0.2;
     ev(cmp0, 'reveal', { k: 0.8 });
     sub(T0 + 0.3, up0 + 1.4, `${m(V.Np)} 块一起，送进视觉编码器`);
@@ -268,8 +288,10 @@ export function buildScore(Q, cap = null) {
     term(up0 + 1.7, up0 + 5.4, `注意力 · 平均看 ${m(F.distMin.toFixed(0))}–${m(F.distMax.toFixed(0))} 块远`);
     sub(up0 + 5.6, cmp0 - 0.1, '颜色 = 模型对这一块的“理解”');
     term(up0 + 5.7, cmp0 - 0.1, '特征的前 3 个主成分 → 红绿蓝');
-    sub(cmp0 + 0.1, T1 - 0.15, '越往上，五个苹果越“像”彼此');
-    term(cmp0 + 0.2, T1 - 0.15, `第 0 层 → 第 ${mv.depth} 层`);
+    sub(cmp0 + 0.1, cmp0 + 2.6, '一开始：颜色跟着位置和像素走');
+    term(cmp0 + 0.2, cmp0 + 2.6, '红的、黄的、绿的，各是各的');
+    sub(cmp0 + 2.7, T1 - 0.15, `第 ${CMP - 1} 层之后：五个苹果一个颜色`);
+    term(cmp0 + 2.8, T1 - 0.15, '连绿苹果也一样：它们都是“苹果”');
     const vitCam = (lv, o = {}) => {
       const look = v3(G.VX, G.Y0 + lv * G.LVL, 0);
       return orbit({ pos: look.clone().add(v3(o.dx ?? 3.2, o.dy ?? 3.1, o.dz ?? 5.6)), look, fov: 32 }, o.yaw ?? 0, 0, o.dist ?? 1);
@@ -281,12 +303,12 @@ export function buildScore(Q, cap = null) {
       return {
         st,
         cam: () => {
-          const embedCam = cam([(G.PX + G.VX) / 2 + 0.5, 3.4, 8.6], [(G.PX + G.VX) / 2 + 0.3, 1.0, 0.2]);
+          const embedCam = cam([G.VX - 0.6, 3.9, 9.6], [G.VX - 1.0, 1.1, 0.2]);
           if (flying) return blendCam(prevCam('calc', photoCam()), embedCam, smoother(seg(t, T0, fly1)));
           const live = vitCam(lv, { yaw: lerp(-8, 14, seg(t, up0, T1)), dist: lerp(1.0, 1.25, smooth(seg(t, up1, T1))) });
           return blendCam(embedCam, live, smoother(seg(t, up0, up0 + 2.2)));
         },
-        panel: { kind: 'pca', a: smooth(seg(t, up0 + 0.4, up0 + 1.2)) * (1 - smooth(seg(t, T1 - 0.6, T1))), lv: Math.floor(lv), cmp: smooth(seg(t, cmp0, cmp0 + 1.2)) },
+        panel: { kind: 'pca', a: smooth(seg(t, up0 + 0.4, up0 + 1.2)) * (1 - smooth(seg(t, T1 - 0.6, T1))), lv: Math.floor(lv), cmp: smooth(seg(t, cmp0, cmp0 + 1.0)), cmpL: CMP, cmpK: smooth(seg(t, cmp0 + 2.6, cmp0 + 3.4)) },
         vitHl: !flying,
       };
     });
@@ -329,7 +351,7 @@ export function buildScore(Q, cap = null) {
     ev(l0, 'whoosh', { k: 0.6 });
     for (let j = 0; j < 6; j++) ev(lerp(l0 + 0.8, l1, j / 6), 'tick', { i: j, k: 0.35 });
     ev(mr0, 'reveal', { k: 0.6 });
-    const ph = F.pHot, pq = F.pQ;
+    const ph = F.pApple, pq = F.pQ;
     sub(T0 + 0.3, mr0 - 0.1, `${m(V.Nv)} 个视觉词，插进对话里`);
     term(T0 + 0.4, mr0 - 0.1, `${m('&lt;|vision_start|&gt;')} ×${V.Nv} ${m('&lt;|vision_end|&gt;')}`);
     sub(mr0, mr0 + 2.4, '每个词带三个坐标');
@@ -369,20 +391,23 @@ export function buildScore(Q, cap = null) {
     const preEnd = sched[sched.length - 1].t1;
     // 「3」：28 层，前 16 层快、16–26 层慢
     const A0 = preEnd + 2.6;
-    const raw = Array.from({ length: mt.layers }, (_, L) => (L < F.ga ? 0.16 : L <= F.gb ? 0.42 : 0.3));
+    const raw = Array.from({ length: mt.layers }, (_, L) => (L < F.ga ? 0.22 : L <= F.gb ? 0.6 : 0.4));
     const layers = lay(A0, raw.map((d, L) => ({ L, d })));
     const A1 = layers[layers.length - 1].t1;
     const lens0 = A1 + 0.4;
     sched.forEach((s) => ev(s.t1 - 0.05, 'emit', { g: s.g, k: 0.45 }));
-    layers.forEach((s) => { if (s.L % 2 === 0) ev(s.t0, 'layer', { L: s.L, k: s.L >= F.ga && s.L <= F.gb ? 0.7 : 0.4 }); });
+    sched.forEach((s) => { for (let L = 0; L < 28; L += 7) ev(s.t0 + (L / 28) * s.d, 'layer', { L, n: 28, k: 0.25 }); });
+    layers.forEach((s) => { if (s.L % 2 === 0 || (s.L >= F.ga && s.L <= F.gb)) ev(s.t0, 'layer', { L: s.L, n: 28, k: s.L >= F.ga && s.L <= F.gb ? 0.7 : 0.4 }); });
+    ev(A0, 'climb', { d: A1 - A0 });
     ev(layers[F.ga].t0, 'reveal', { k: 1.0 });
     ev(A1, 'emit', { g: gA, k: 0.9 });
     const lt3 = F.lens;
-    const firstSan = lt3.findIndex((x) => /三/.test(x[0]));
+    const firstSan = F.thinkL;
     const lastL = mt.layers - 1;
     sub(T0 + 0.3, T0 + 4.0, `语言模型 ${m(mt.layers)} 层，开始回答`);
     term(T0 + 0.4, T0 + 4.0, `Qwen3 语言模型 · ${m(mt.layers)} 层 · ${m(mt.hidden)} 维`);
     sub(T0 + 4.2, preEnd - 0.1, '一个字一个字地往外说');
+    term(T0 + 4.3, preEnd - 0.1, `每个字都要穿过 ${m(mt.layers)} 层 · 层板上亮的是在看图的哪里`);
     sub(preEnd + 0.1, A0 - 0.1, `说到“第”，下一个字是几？`);
     term(preEnd + 0.2, A0 - 0.1, `候选：「${esc(F.stA.top[0][2])}」${m(pct(F.stA.top[0][1]))} ·「${esc(F.stA.top[1][2])}」${m(pct(F.stA.top[1][1]))}`);
     sub(A0 + 0.05, layers[F.ga].t0 - 0.1, `前 ${F.ga} 层：东张西望`);
@@ -404,7 +429,7 @@ export function buildScore(Q, cap = null) {
     shot('answer', (lt, t) => {
       let st, L = -1;
       if (t < sched[0].t0) st = mst(2, 0, { ph: 'llm' }, seg(t, T0 + 0.6, sched[0].t0) * 0.5, { dAnim: 3 });
-      else if (t < preEnd) { const s = pick(sched, t); st = mst(2, s.g, { ph: 'pass' }, s.p, { dAnim: 3 }); }
+      else if (t < preEnd) { const s = pick(sched, t); st = mst(2, s.g, { ph: 'llm' }, Math.min(0.999, s.p * 1.08), { dAnim: 3 }); }
       else if (t < A0) st = mst(3, gA, { ph: 'read' }, 1);
       else if (t < A1) { const s = pick(layers, t); L = s.L; st = mst(3, gA, { ph: 'layer', L }, s.p); }
       else { L = lastL; st = mst(3, gA, { ph: 'layer', L: lastL }, 1); }
@@ -421,7 +446,7 @@ export function buildScore(Q, cap = null) {
           return blendCam(c0, live, smoother(seg(t, A0 - 1.2, A0 + 0.6)));
         },
         reply: { a: smooth(seg(t, sched[0].t0 - 0.4, sched[0].t0 + 0.2)), n: nRep, hl: t >= A1 ? gA : -1 },
-        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1) } : null,
+        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 + 0.2 } : null,
         lens3: { a: smooth(seg(t, lens0, lens0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), k: seg(t, lens0 + 0.3, lens0 + 3.4), fin: seg(t, lens0 + 3.5, lens0 + 4.0) },
       };
     });
@@ -448,7 +473,9 @@ export function buildScore(Q, cap = null) {
         return blendCam(prevCam('answer', c), c, smoother(seg(lt, 0, 2.2)));
       },
       reply: { a: 1 - smooth(seg(lt, 0, 0.6)), n: gA + 1, hl: gA },
-      panel: { kind: 'lens', a: smooth(seg(t, T0 + 2.4, T0 + 3.0)) * (1 - smooth(seg(t, T1 - 0.6, T1))), L: t < T0 + 7.4 ? LA : LB, k: seg(t, t < T0 + 7.4 ? T0 + 2.6 : T0 + 7.4, (t < T0 + 7.4 ? T0 + 2.6 : T0 + 7.4) + 1.6) },
+      panel: { kind: 'lens', center: true, a: smooth(seg(t, T0 + 2.4, T0 + 3.0)) * (1 - smooth(seg(t, T1 - 0.6, T1))), L: t < T0 + 7.4 ? LA : LB, k: seg(t, t < T0 + 7.4 ? T0 + 2.6 : T0 + 7.4, (t < T0 + 7.4 ? T0 + 2.6 : T0 + 7.4) + 1.6) },
+      shiftX: 0,
+      fade: 0.55 * smooth(seg(t, T0 + 2.0, T0 + 3.0)) * (1 - smooth(seg(t, T1 - 0.6, T1))),
       hideHeat: true,
     }));
   }
@@ -456,8 +483,10 @@ export function buildScore(Q, cap = null) {
   /* ------------------------------------------------------------ ⑤″ 写完：每个字都知道它在看哪 */
   {
     const T0 = SEC.reply.t0, T1 = SEC.reply.t1;
-    const each = (T1 - T0 - 1.2) / Q.G;
-    const hov = lay(T0 + 0.6, Array.from({ length: Q.G }, (_, g) => ({ g, d: each })));
+    // 挑回答里“说的是图上东西”的几个字：绿色、苹果、第、3（按真实分词找）
+    const keyG = Q.steps.map((st, g) => ({ g, s: st.chosenS })).filter((x) => /绿色|苹果|第|^\s*3\s*$/.test(x.s)).map((x) => x.g);
+    const each = (T1 - T0 - 1.0) / keyG.length;
+    const hov = lay(T0 + 0.6, keyG.map((g) => ({ g, d: each })));
     hov.forEach((h) => ev(h.t0, 'tick', { k: 0.3 }));
     ev(T1 - 0.4, 'end', { k: 0.6 });
     sub(T0 + 0.3, T1 - 0.15, '回答的每个字，都能看到它在看哪');
@@ -472,9 +501,10 @@ export function buildScore(Q, cap = null) {
           const c = cam([Sc.bcx + 3.0, 6.2, 12.5], [Sc.bcx + 2.4, 2.4, 0]);
           return blendCam(prevCam('lens', c), c, smoother(seg(lt, 0, 2.4)));
         },
-        fade: 0.45 * smooth(seg(lt, 0, 1.5)),
+        fade: 0.55 * smooth(seg(lt, 0, 1.5)),
         reply: { a: 1, n: Q.G, hl: g, big: true },
-        panel: { kind: 'hover', a: smooth(seg(lt, 0.2, 0.8)) * (1 - smooth(seg(t, T1 - 0.4, T1 + 0.2))), g },
+        panel: { kind: 'hover', center: true, a: smooth(seg(lt, 0.2, 0.8)) * (1 - smooth(seg(t, T1 - 0.4, T1 + 0.2))), g },
+        shiftX: 0,
         hideHeat: true,
       };
     });

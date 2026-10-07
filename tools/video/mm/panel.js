@@ -17,7 +17,7 @@ export class Monitor {
   constructor(parent, Q, F) {
     this.Q = Q; this.V = Q.V; this.F = F;
     const V = this.V;
-    this.W = 720; this.H = Math.round((this.W * V.gh) / V.gw);
+    this.W = 660; this.H = Math.round((this.W * V.gh) / V.gw);
     this.el = el('div', 'mon', `<div class="h"><b></b><small></small></div><div class="cv"><canvas width="${this.W * 1.5}" height="${this.H * 1.5}" style="width:${this.W}px;height:${this.H}px"></canvas><div class="ax"></div></div><div class="foot"></div>`, parent);
     this.cv = this.el.querySelector('canvas');
     this.g = this.cv.getContext('2d');
@@ -33,7 +33,7 @@ export class Monitor {
     this.el.style.display = on ? 'block' : 'none';
     if (!on) return;
     this.el.style.opacity = P.a.toFixed(3);
-    this.el.style.transform = `translateY(${((1 - easeOut(Math.min(1, P.a * 1.3))) * 16).toFixed(1)}px)`;
+    this.el.style.transform = `${P.center ? 'translateX(-50%) scale(1.22) ' : ''}translateY(${((1 - easeOut(Math.min(1, P.a * 1.3))) * 16).toFixed(1)}px)`;
     const key = JSON.stringify(P, (k, v) => (k === 'a' || k === 'enr' ? undefined : typeof v === 'number' ? +v.toFixed(3) : v));
     if (key === this.key) return;
     this.key = key;
@@ -43,7 +43,7 @@ export class Monitor {
     g.clearRect(0, 0, W, H);
     this.ax.innerHTML = '';
     this.foot.innerHTML = '';
-    this.el.className = `mon k-${P.kind}`;
+    this.el.className = `mon k-${P.kind}${P.center ? ' center' : ''}`;
     const k = this[P.kind];
     if (k) k.call(this, P, g, W, H);
   }
@@ -59,43 +59,40 @@ export class Monitor {
     g.imageSmoothingEnabled = true;
   }
 
-  // ② ViT：当前这一级的主成分颜色；对比时左右两张（第 0 级 / 第 24 级）
+  // ② ViT：爬塔时画当前这一级的主成分颜色；之后对比“输入”和第 cmpL 级（交叉淡化，整张大图）
+  // 级的编号和网站一致：第 0 级 = 图块嵌入 + 位置（输入），第 k 级 = 第 k−1 层（从 0 数）之后
   pca(P, g, W, H) {
     const V = this.V;
     const lv = Math.max(0, Math.min(24, P.lv));
-    const cmp = P.cmp ?? 0;
-    this.hT.textContent = cmp > 0.5 ? '第 0 层  →  第 24 层' : lv === 0 ? '视觉编码器 · 输入（图块嵌入）' : `视觉编码器 · 第 ${lv} 层之后`;
+    const cmp = P.cmp ?? 0, ck = P.cmpK ?? 0, cl = P.cmpL ?? 6;
+    const name = (k) => (k === 0 ? '输入（图块嵌入 + 位置）' : `第 ${k - 1} 层之后`);
+    this.hT.textContent = cmp > 0.5 ? (ck < 0.5 ? name(0) : name(cl)) : `视觉编码器 · ${name(lv)}`;
     this.hS.textContent = '颜色相近 = 模型觉得这两块相似';
     if (cmp < 0.001) { this.pcaGrid(g, W, H, V.pca(lv), V.gh, V.gw); return; }
-    // 对比：两张并排（各占一半宽、上下居中）
-    const w2 = W / 2 - 8 * 1.5, h2 = (w2 * V.gh) / V.gw, y = (H - h2) / 2;
-    g.fillStyle = '#060c18'; g.fillRect(0, 0, W, H);
-    const draw = (lvl, x) => {
-      g.save(); g.translate(x, y);
-      this.pcaGrid(g, w2, h2, V.pca(lvl), V.gh, V.gw);
-      g.restore();
-    };
-    g.globalAlpha = 1;
-    this.pcaGrid(g, W, H, V.pca(24), V.gh, V.gw);
-    g.globalAlpha = 1;
-    g.fillStyle = `rgba(6,12,24,${cmp})`; g.fillRect(0, 0, W, H);
+    this.pcaGrid(g, W, H, V.pca(lv), V.gh, V.gw);
     g.globalAlpha = cmp;
-    draw(0, 0);
-    draw(24, W / 2 + 8 * 1.5);
+    this.pcaGrid(g, W, H, V.pca(0), V.gh, V.gw);
+    g.globalAlpha = cmp * ck;
+    this.pcaGrid(g, W, H, V.pca(cl), V.gh, V.gw);
     g.globalAlpha = 1;
-    this.foot.innerHTML = `<span style="opacity:${cmp}">第 0 层：颜色跟着像素走</span><span style="opacity:${cmp}">第 24 层：五个苹果“一个色”</span>`;
   }
 
-  // ③ 2×2 合并：560 格 → 140 格
+  // ③ 2×2 合并：图上细线是 16×16 的图块，橙线是合并后的词元；绿苹果那一格的 4 块框出来
   merge(P, g, W, H) {
-    const V = this.V;
+    const V = this.V, F = this.F;
     const k = P.k ?? 0;
     this.hT.textContent = k < 0.5 ? `${V.Np} 个图块` : `${V.Nv} 个视觉词元`;
     this.hS.textContent = '每 2×2 块合成一个';
-    if (k < 0.5) this.pcaGrid(g, W, H, V.pca(24), V.gh, V.gw);
-    else this.pcaGrid(g, W, H, V.mergePca, V.mh, V.mw);
-    drawGrid(g, W, H, V.gh, V.gw, `rgba(210,225,255,${(0.25 * (1 - smooth(seg(k, 0.4, 0.7)))).toFixed(3)})`, 1.5);
-    drawGrid(g, W, H, V.mh, V.mw, `rgba(255,182,92,${(0.3 + 0.5 * smooth(seg(k, 0.1, 0.5))).toFixed(3)})`, 3);
+    drawHeat(g, V.img, W, H, null, 1, 1, { dim: 0.62 });
+    drawGrid(g, W, H, V.gh, V.gw, `rgba(210,225,255,${(0.32 * (1 - 0.7 * smooth(seg(k, 0.4, 0.8)))).toFixed(3)})`, 1.5);
+    drawGrid(g, W, H, V.mh, V.mw, `rgba(255,182,92,${(0.85 * smooth(seg(k, 0.1, 0.5))).toFixed(3)})`, 3.5);
+    const r = Math.floor(F.apple / V.mw), c = F.apple % V.mw, cw = W / V.mw, ch = H / V.mh;
+    const a = smooth(seg(k, 0.0, 0.3));
+    g.strokeStyle = `rgba(94,240,212,${a.toFixed(3)})`; g.lineWidth = 6;
+    g.strokeRect(c * cw + 3, r * ch + 3, cw - 6, ch - 6);
+    if (k > 0.55) { g.fillStyle = `rgba(94,240,212,${(0.25 * smooth(seg(k, 0.55, 0.9))).toFixed(3)})`; g.fillRect(c * cw, r * ch, cw, ch); }
+    const lab = k < 0.55 ? '4 个图块' : '→ 1 个视觉词元';
+    this.ax.innerHTML = `<div class="tag" style="left:${((c + 1) * this.W) / V.mw + 12}px;top:${((r + 0.5) * this.H) / V.mh}px;opacity:${a.toFixed(3)}">${lab}</div>`;
   }
 
   // ④ M-RoPE：行号 h、列号 w，绿苹果那一格写出 (t, h, w)
@@ -106,7 +103,7 @@ export class Monitor {
     drawHeat(g, V.img, W, H, null, 1, 1, { dim: 0.5 });
     drawGrid(g, W, H, V.mh, V.mw, 'rgba(255,182,92,.45)', 2);
     const cw = W / V.mw, ch = H / V.mh;
-    const hot = F.hot, hr = Math.floor(hot / V.mw), hc = hot % V.mw;
+    const hot = F.apple, hr = Math.floor(hot / V.mw), hc = hot % V.mw;
     if (P.hl === 'hot') {
       g.strokeStyle = '#5ef0d4'; g.lineWidth = 5;
       g.strokeRect(hc * cw + 2, hr * ch + 2, cw - 4, ch - 4);
@@ -117,7 +114,7 @@ export class Monitor {
     const p0 = F.p0;
     const cols = Array.from({ length: V.mw }, (_, c) => `<span class="cx${P.hl === 'hot' && c === hc ? ' on' : ''}" style="left:${((c + 0.5) * this.W) / V.mw}px">${p0[2] + c}</span>`).join('');
     const rows = Array.from({ length: V.mh }, (_, r) => `<span class="ry${P.hl === 'hot' && r === hr ? ' on' : ''}" style="top:${((r + 0.5) * this.H) / V.mh}px">${p0[1] + r}</span>`).join('');
-    this.ax.innerHTML = `<div class="axc">${cols}</div><div class="axr">${rows}</div><div class="axl w">w 列</div><div class="axl h">h 行</div>${P.hl === 'hot' ? `<div class="tag" style="left:${((hc + 1) * this.W) / V.mw + 10}px;top:${((hr + 0.5) * this.H) / V.mh}px">(${F.pHot.join(', ')})</div>` : ''}`;
+    this.ax.innerHTML = `<div class="axc">${cols}</div><div class="axr">${rows}</div><div class="axl hw">h↓ w→</div>${P.hl === 'hot' ? `<div class="tag" style="left:${((hc + 1) * this.W) / V.mw + 10}px;top:${((hr + 0.5) * this.H) / V.mh}px">(${F.pApple.join(', ')})</div>` : ''}`;
     // 下面一行：图片后面的文字词元接着往下数
     const after = Q.tokens.slice(V.vs + V.Nv, V.vs + V.Nv + 5).map((t, j) => ({ s: t.sp ? (t.s === '<|vision_end|>' ? '图片结束' : t.s) : tokPlain(t.s), p: Q.pos(V.vs + V.Nv + j)[0] }));
     if (P.rows) this.foot.innerHTML = `<span class="seq">${after.map((x) => `<i>${esc(x.s)}<b>${x.p}</b></i>`).join('')}<i>…</i></span>`;
@@ -127,9 +124,9 @@ export class Monitor {
   heat(P, g, W, H) {
     const V = this.V, Q = this.Q, F = this.F;
     const L = P.L;
-    const vals = Q.attImg(P.g, L);
+    const vals = P.avg ? Q.attAvg(P.g, [F.ga, F.gb]) : Q.attImg(P.g, L);
     const tok = Q.steps[P.g].chosenS;
-    this.hT.innerHTML = `生成「${esc(tokPlain(tok))}」时 · 第 ${L} 层在看哪`;
+    this.hT.innerHTML = P.avg ? `生成「${esc(tokPlain(tok))}」时 · 第 ${F.ga}–${F.gb} 层平均` : `生成「${esc(tokPlain(tok))}」时 · 第 ${L} 层在看哪`;
     this.hS.textContent = '16 个头平均 · 按最大值归一化';
     drawHeat(g, V.img, W, H, vals, V.mh, V.mw, { dim: 0.42, gamma: 0.85 });
     // 绿苹果的框（虚线）
@@ -147,8 +144,8 @@ export class Monitor {
       const h = shown ? Math.max(2, (e / mx) * 92) : 0;
       return `<i class="${hi ? 'hi' : ''}${l === L ? ' cur' : ''}" style="height:${h.toFixed(1)}px"></i>`;
     }).join('');
-    const e = enr[L];
-    this.foot.innerHTML = `<div class="enr"><div class="bars">${bars}<span class="one" style="bottom:${((1 / mx) * 92).toFixed(1)}px"></span></div><div class="lab"><span>对准倍数（看绿苹果的比例 ÷ 它占的面积）</span><b>第 ${L} 层 ${e.toFixed(1)}×</b></div><div class="lx"><span>L0</span><span style="left:${(F.ga / 28) * 100}%">L${F.ga}</span><span style="left:${((F.gb + 1) / 28) * 100}%">L${F.gb}</span><span style="right:0">L27</span></div></div>`;
+    const e = P.avg ? F.enrHi : enr[L];
+    this.foot.innerHTML = `<div class="enr"><div class="bars">${bars}<span class="one" style="bottom:${((1 / mx) * 92).toFixed(1)}px"></span></div><div class="lab"><span>对准倍数（看绿苹果的比例 ÷ 它占的面积）</span><b>${P.avg ? `第 ${F.ga}–${F.gb} 层平均` : `第 ${L} 层`} ${e.toFixed(1)}×</b></div><div class="lx">${[0, F.ga, F.gb, 27].map((l) => `<span style="left:${((l + 0.5) / 28) * 100}%">L${l}</span>`).join('')}</div></div>`;
   }
 
   // ⑤′ 图片词元的逻辑透镜：每格写出读数最高的中文词
@@ -181,6 +178,7 @@ export class Monitor {
     const V = this.V, Q = this.Q, F = this.F;
     const tok = Q.steps[P.g].chosenS;
     const sp = /^<\|/.test(tok);
+    this.foot.innerHTML = '';
     this.hT.innerHTML = sp ? '写完：结束标记' : `生成「${esc(tokPlain(tok))}」时在看哪`;
     this.hS.textContent = `第 ${F.ga}–${F.gb} 层平均`;
     drawHeat(g, V.img, W, H, Q.attAvg(P.g, [F.ga, F.gb]), V.mh, V.mw, { dim: 0.42, gamma: 0.85 });
@@ -201,11 +199,11 @@ export class CalcBoard {
     this.rows = [top[0], top[2], top[4]];
     const cname = ['红', '绿', '蓝'];
     this.el.innerHTML = `
-      <div class="col cpix"><div class="cap">这一块的像素</div><div class="stack"><div class="fr f1"></div><div class="fr f0"></div></div><div class="sub"><b>${mv.patch}×${mv.patch}</b> × 红绿蓝 <b>3</b> × <b>${mv.temporal}</b> 帧 = <b class="cx">${mv.inDim}</b> 个数</div><div class="note">单张图复制一份，当成两帧一样的视频</div></div>
+      <div class="col cpix"><div class="cap">这一块的像素</div><div class="stack"><div class="fr f1"></div><div class="fr f0"></div></div><div class="csub"><b>${mv.patch}×${mv.patch}</b> × 红绿蓝 <b>3</b> × <b>${mv.temporal}</b> 帧 = <b class="cx">${mv.inDim}</b> 个数</div><div class="note">单张图复制一份，当成两帧一样的视频</div></div>
       <div class="op ox">×</div>
-      <div class="col ckern"><div class="cap">卷积核 #${mic.ch}（权重）</div><div class="kpair"><div class="fr k0"></div><div class="fr k1"></div></div><div class="sub">同样 <b class="cw">${mv.inDim}</b> 个权重 · 灰色 = 0</div></div>
+      <div class="col ckern"><div class="cap">卷积核 #${mic.ch}（权重）</div><div class="kpair"><div class="fr k0"></div><div class="fr k1"></div></div><div class="csub">同样 <b class="cw">${mv.inDim}</b> 个权重 · 灰色 = 0</div></div>
       <div class="op oeq">=</div>
-      <div class="col cres"><div class="cap">乘加</div>
+      <div class="col cres"><div class="cap">逐项相乘</div>
         <div class="rows">${this.rows.map((e, j) => `<div class="r" data-j="${j}"><span class="cx">${num(e.px)}</span><span class="o">×</span><span class="cw">${sgn(e.w, 5)}</span><span class="o">=</span><span class="cp">${sgn(e.prod, 5)}</span><small>${cname[e.c]} · 第${e.t}帧</small></div>`).join('')}
           <div class="r dots">… 一共 ${mv.inDim} 项</div></div>
         <div class="sum"><div class="l s1"><span>全部加起来</span><b class="cp">${sgn(mic.mine - mic.bias, 3)}</b></div><div class="l s2"><span>+ 偏置</span><b>${num(mic.bias)}</b></div><div class="l s3"><span>=</span><b class="cy">${num(mic.mine)}</b></div></div>
@@ -246,7 +244,7 @@ export class CalcBoard {
     const A = (x0, d = 0.5) => smooth(seg(t, x0, x0 + d));
     const set = (sel, a, dy = 12) => { const e = this.q(sel); e.style.opacity = a.toFixed(3); e.style.transform = `translateY(${((1 - a) * dy).toFixed(1)}px)`; };
     set('.cpix', A(C.pix));
-    set('.cpix .sub', A(C.frames, 0.6));
+    set(".cpix .csub", A(C.frames, 0.6));
     set('.cpix .note', A(C.frames + 0.5, 0.6));
     // 第二帧从第一帧后面错开滑出
     const fk = smooth(seg(t, C.frames, C.frames + 0.7));
@@ -297,7 +295,7 @@ export class LensCard {
       r.style.opacity = a.toFixed(3);
       r.style.transform = `translateX(${((1 - a) * 14).toFixed(1)}px)`;
       const L = Number(r.dataset.l);
-      const think = this.Ls.find((x) => /三/.test(this.F.lens[x][0])) ?? 21;
+      const think = this.F.thinkL;
       r.classList.toggle('on', (L === think && (P.fin ?? 0) < 0.5) || (L === 27 && (P.fin ?? 0) >= 0.5));
     });
   }

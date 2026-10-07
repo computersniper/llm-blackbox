@@ -231,8 +231,8 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .reply.big .a { font-size: 54px; }
 
 /* 监视器：左侧一块大 2D 面板 */
-.mon { position: absolute; left: 64px; top: 168px; width: 768px; padding: 18px 24px 16px; border-radius: 20px; background: rgba(3, 7, 15, .9); border: 1px solid var(--line2); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
-.mon .h { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; white-space: nowrap; }
+.mon { position: absolute; left: 64px; top: 150px; width: 708px; padding: 18px 24px 16px; border-radius: 20px; background: rgba(3, 7, 15, .9); border: 1px solid var(--line2); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+.mon .h { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; white-space: nowrap; }
 .mon .h b { font-size: 30px; font-weight: 600; color: var(--ink); letter-spacing: .03em; }
 .mon .h small { font-family: "Film Sans", var(--serif); font-size: 21px; color: var(--dim); }
 .mon .cv { position: relative; border-radius: 12px; }
@@ -240,21 +240,20 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .mon .foot { margin-top: 12px; display: flex; justify-content: space-between; gap: 16px; font-size: 23px; color: var(--ink2); white-space: nowrap; }
 .mon .foot:empty { display: none; }
 .mon .ax { position: absolute; inset: 0; pointer-events: none; }
-.mon.k-mrope { padding-left: 74px; padding-top: 64px; }
-.mon.k-mrope .h { position: absolute; left: 74px; top: 14px; }
+.mon.k-mrope { width: auto; padding-left: 74px; padding-top: 124px; }
+.mon.k-mrope .h { position: absolute; left: 30px; top: 18px; }
 .mon .axc span, .mon .axr span { position: absolute; font-family: var(--mono); font-size: 18px; color: var(--dim); transform: translate(-50%, -50%); }
 .mon .axc span { top: -16px; }
 .mon .axr span { left: -26px; }
 .mon .axc span.on, .mon .axr span.on { color: var(--cyan); font-weight: 700; font-size: 21px; }
-.mon .axl { position: absolute; font-size: 18px; color: var(--faint); }
-.mon .axl.w { right: 0; top: -42px; }
-.mon .axl.h { left: -62px; bottom: 0; }
+.mon .axl { position: absolute; font-size: 17px; color: var(--faint); white-space: nowrap; }
+.mon .axl.hw { left: -66px; top: -30px; }
 .mon .tag { position: absolute; transform: translateY(-50%); padding: 4px 14px; border-radius: 10px; background: rgba(3, 10, 16, .92); border: 2px solid var(--cyan); font-family: var(--mono); font-size: 30px; color: #d8fff6; white-space: nowrap; }
 .mon .seq { display: flex; gap: 10px; align-items: center; }
 .mon .seq i { font-style: normal; display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 12px; border-radius: 10px; border: 1px solid rgba(94, 228, 240, .3); color: var(--ink); font-size: 22px; }
 .mon .seq i b { font-family: var(--mono); font-weight: 400; font-size: 18px; color: var(--cyan); }
-.mon .words span { position: absolute; transform: translate(-50%, -50%); font-size: 19px; font-weight: 600; color: #e9eff9; white-space: nowrap; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
-.mon .words span.b { font-size: 25px; color: #ffd8a8; }
+.mon .words span { position: absolute; transform: translate(-50%, -50%); font-size: 22px; font-weight: 600; color: #e9eff9; white-space: nowrap; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
+.mon .words span.b { font-size: 30px; color: #ffd8a8; }
 .mon .enr { width: 100%; }
 .mon .enr .bars { position: relative; display: flex; align-items: flex-end; gap: 4px; height: 96px; border-bottom: 1px solid var(--line2); }
 .mon .enr .bars i { flex: 1; background: rgba(150, 175, 210, .4); border-radius: 3px 3px 0 0; }
@@ -264,15 +263,15 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .mon .enr .lab { display: flex; justify-content: space-between; margin-top: 8px; font-size: 20px; color: var(--dim); }
 .mon .enr .lab b { font-family: var(--mono); font-weight: 400; font-size: 22px; color: var(--amber); }
 .mon .enr .lx { position: relative; height: 22px; font-family: var(--mono); font-size: 15px; color: var(--faint); }
-.mon .enr .lx span { position: absolute; top: 2px; }
+.mon .enr .lx span { position: absolute; top: 2px; transform: translateX(-50%); }
 
 /* 一次乘加的算式板：像素（输入，蓝）× 卷积核（权重，紫）= 乘积（橙）→ 结果（青） */
 .cx { color: #7cc4ff; } .cw { color: #c9a2ff; } .cp { color: #ffb65c; } .cy { color: #5ef0d4; }
 .calc { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); display: grid; grid-template-columns: auto auto auto auto auto; grid-template-rows: auto auto; align-items: start; column-gap: 30px; row-gap: 26px; padding: 28px 38px 30px; border-radius: 22px; background: rgba(3, 7, 15, .93); border: 1px solid var(--line2); box-shadow: 0 30px 90px rgba(0, 0, 0, .6); white-space: nowrap; }
 .calc .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .calc .cap { font-size: 26px; font-weight: 600; color: var(--ink); letter-spacing: .04em; }
-.calc .sub { font-size: 22px; color: var(--ink2); }
-.calc .sub b { font-family: var(--mono); font-weight: 400; }
+.calc .csub { font-size: 22px; color: var(--ink2); }
+.calc .csub b { font-family: var(--mono); font-weight: 400; }
 .calc .note { font-size: 19px; color: var(--dim); }
 .calc .op { align-self: center; margin-top: -40px; font-size: 56px; color: var(--dim); }
 .calc .fr { position: relative; width: 256px; height: 256px; }
@@ -326,3 +325,5 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 .dims span { position: relative; padding: 2px 14px; border-radius: 8px; background: rgba(3, 7, 15, .92); font-size: 26px; color: var(--ink); white-space: nowrap; }
 .dims span b { font-family: var(--mono); font-weight: 400; color: var(--amber); font-size: 28px; }
 
+
+.mon.center { left: 50%; top: 172px; transform-origin: 50% 0; }

@@ -127,7 +127,7 @@ export class Opening {
     // ---- 选图：图片按钮 → 弹出一排缩略图 → 点中苹果 → 缩略图挂到输入框左边
     const picked = t >= T.pickT;
     const pk = smooth(seg(t, T.attachT, T.attachT + 0.3)) * (1 - smooth(seg(t, T.pickT + 0.15, T.pickT + 0.45)));
-    this.pick.style.display = pk > 0.001 ? '' : 'none';
+    this.pick.style.display = pk > 0.001 ? 'block' : 'none';
     this.pick.style.opacity = pk.toFixed(3);
     this.pick.style.transform = `translateX(-50%) translateY(${(10 * (1 - pk)).toFixed(1)}px)`;
     const hov = smooth(seg(t, T.pickT - 0.5, T.pickT - 0.2));
@@ -143,7 +143,7 @@ export class Opening {
     this.att.classList.toggle('has', picked);
     this.att.classList.toggle('press', t >= T.attachT - 0.12 && t < T.attachT + 0.15);
     const c = this.cursorAt(t);
-    this.cur.style.display = c.alpha > 0.001 ? '' : 'none';
+    this.cur.style.display = c.alpha > 0.001 ? 'block' : 'none';
     if (c.alpha > 0.001) {
       this.cur.style.left = `${c.x.toFixed(1)}px`;
       this.cur.style.top = `${c.y.toFixed(1)}px`;
@@ -323,7 +323,7 @@ export class Opening {
   buildTiles() {
     const S = this.S;
     const mat = (this.tileMat = S.roleMat.user.clone());
-    mat.emissiveIntensity = 0.22;
+    mat.emissiveIntensity = 0.07;
     this.tiles = this.user.map((t) => {
       const g = new THREE.Group();
       g.add(new THREE.Mesh(TILE_GEO, mat));
@@ -407,7 +407,7 @@ export class Opening {
     this.tiles.forEach((g) => { g.visible = false; });
     this.photo.visible = false;
     if (!show) return;
-    this.tileMat.emissiveIntensity = 0.22 + 0.3 * (1 - smooth(seg(t, T.swapT, T.swapT + 0.6)));
+    this.tileMat.emissiveIntensity = 0.07 + 0.2 * (1 - smooth(seg(t, T.swapT, T.swapT + 0.6)));
     const L = this.swapLocal(camAt(T.swapT), t);
     const LI = this.localImg;
     const dock0 = T.enter0 - 1.9;   // 离开编队、飞向取景窗
