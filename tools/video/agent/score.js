@@ -178,6 +178,7 @@ export function buildScore(R, cap = null) {
     { t: L + 4.0, op: 1 }, { t: L + 10.3, op: 2 }, { t: L + 11.6, op: 3 }, { t: L + 15.9, op: 4 }, { t: L + 16.8, op: 0 },
     { t: L + 19.6, op: 1 }, { t: L + 20.6, op: 2 }, { t: L + 21.4, op: 3 }, { t: L + 22.4, op: 4 }, { t: L + 23.2, op: 0 }, { t: L + 24.0, op: 1 },
   ];
+  const loopFk = (t) => smooth(seg(t, L + 3.0, L + 3.8)) * (1 - smooth(seg(t, L + 11.4, L + 12.0)));
   // 一圈一圈：光点在四条边上循环（第 20 秒以后）
   const loopFlow = (t) => (t < L + 19.6 ? -1 : (t - (L + 19.6)) / 2.6);
   ev(L + 18.2, 'lap', { k: 0.7 });
@@ -242,7 +243,7 @@ export function buildScore(R, cap = null) {
   term(K + 21.5, K + 23.5, `结束符 ${m('&lt;|im_end|&gt;')}`);
   sub(PARSE.t0 + 0.1, PARSE.t1 - 0.1, '外面的程序解析出命令，拿去执行');
   term(PARSE.t0 + 0.2, PARSE.t1 - 0.1, 'harness · 解析 JSON → 沙箱执行');
-  const deskCam4 = cam2([{ t: K + 27.4, ...SLOT }, { t: K + 30.2, ...TERM, y: 652 }]);
+  const deskCam4 = cam2([{ t: K + 27.4, x: 860, y: 402, s: 0.55, cx: 960, cy: 500 }, { t: K + 30.2, ...TERM, y: 652 }]);
 
   /* ------------------------------------------------------------ 第 5 章 · 自己改错：快放剩下的几圈 */
   prog(SEC.fix.t0, 4);
@@ -296,8 +297,11 @@ export function buildScore(R, cap = null) {
   if (segs.length) {
     const sg = (n, k = 0) => segs.filter((s) => s.note === n)[k];
     sub(E0 + D0 + 0.2, E0 + sg('watch').f1 - 0.1, '想自己一步步看？选一个任务');
-    sub(E0 + sg('reveal').f0 + 0.1, E0 + FIN - 0.15, '每点一次 ＋，往里钻一层');
-    term(E0 + sg('reveal').f0 + 0.2, E0 + FIN - 0.15, '屏幕 → 循环 → 上下文 → 逐词元生成');
+    const d2 = sg('dive', 1);
+    sub(E0 + sg('reveal').f0 + 0.1, E0 + d2.f0 + 0.6, '每点一次 ＋，往里钻一层');
+    term(E0 + sg('reveal').f0 + 0.2, E0 + d2.f0 + 0.6, '屏幕 → 循环 → 上下文 → 逐词元生成');
+    sub(E0 + d2.f0 + 0.9, E0 + FIN - 0.15, '一直看到它写下的每一个词元');
+    term(E0 + d2.f0 + 1.0, E0 + FIN - 0.15, '前 5 名候选 · 真实概率');
   }
   const endSite = { segs, D0, FIN };
 
@@ -328,6 +332,7 @@ export function buildScore(R, cap = null) {
       if (t >= 25.0) hl = { act: 2, line: 0, k: smooth(seg(t, 25.0, 25.5)), cls: 'bad' };
     } else if (t < SEC.ctx.t0) {
       cam = deskCam2(t);
+      dim = 0.6 * loopFk(t);
       focus = 'term'; fk = 1 - smooth(seg(t, L, L + 2));
       hl = { act: 2, line: 0, k: 1 - smooth(seg(t, L, L + 1.5)), cls: 'bad' };
     } else if (t < SEC.tok.t0 + 27.4) {
@@ -358,15 +363,18 @@ export function buildScore(R, cap = null) {
     S.lap = { n: lapAt(t), a: (t >= SEC.work.t0 + 0.4 && t < SEC.loop.t0 + 1) || (t >= SEC.fix.t0 - 0.6 && t < SEC.end.t0 - 0.3) ? 1 : 0 };
     // 第 2 章：循环
     if (t >= L - 0.5 && t < SEC.ctx.t0 + 3) {
-      const nodesA = smooth(seg(t, L + 1.2, L + 3.4)) * (1 - smooth(seg(t, C - 0.2, C + 1.0)));
+      const nodesA = smooth(seg(t, L + 2.0, L + 3.8)) * (1 - smooth(seg(t, C - 0.2, C + 1.0)));
       S.loop = {
-        a: nodesA, slide: easeInOut(seg(t, L + 1.0, L + 3.6)),
+        a: nodesA, slide: easeInOut(seg(t, L + 1.8, L + 4.0)),
         out: { a: smooth(seg(t, L + 4.0, L + 4.5)), n: clamp((t - (L + 4.2)) / 2.2), hl: smooth(seg(t, L + 6.6, L + 7.2)) * (1 - smooth(seg(t, L + 9.0, L + 9.6))) },
         op: opsAt(t), lap: t < L + 18.2 ? 3 : 4,
         pk: PK.map((p) => ({ ...p, u: (t - p.t0) / (p.t1 - p.t0) })).filter((p) => p.u > -0.05 && p.u < 1.25),
         flow: loopFlow(t), edgeA: smooth(seg(t, L + 2.4, L + 3.6)),
         sbxFlash: Math.exp(-Math.max(0, t - (L + 12.8)) / 0.5) * (t >= L + 12.8 ? 1 : 0),
         modelIn: Math.exp(-Math.max(0, t - (L + 18.2)) / 0.6) * (t >= L + 18.2 ? 1 : 0),
+        // 正在讲的那个节点亮，其余压暗：先讲模型，再讲 harness，之后三个一起转
+        focus: t < L + 9.0 ? 'model' : t < L + 12.0 ? 'harness' : null,
+        fk: loopFk(t),
       };
     }
     // 第 3 章：上下文

@@ -359,7 +359,10 @@ class Loop {
     const sl = L.slide;
     this.model.style.transform = `translateX(${((1 - sl) * -160).toFixed(1)}px)`;
     this.harness.style.transform = `translateY(${((1 - sl) * 30).toFixed(1)}px)`;
-    this.sbx.style.opacity = sl.toFixed(3);
+    const dimOf = (name) => (L.focus && L.focus !== name ? 1 - 0.6 * L.fk : 1);
+    this.model.style.opacity = dimOf('model').toFixed(3);
+    this.harness.style.opacity = dimOf('harness').toFixed(3);
+    this.sbx.style.opacity = (sl * dimOf('sbx')).toFixed(3);
     this.svg.style.opacity = L.edgeA.toFixed(3);
     // 模型写出的文字（第 3 圈那条 python 命令）
     const n = Math.floor(this.outText.length * L.out.n);
@@ -498,7 +501,7 @@ class TokPanel {
     this.toks = SC.toks;
     const P = R.turns[3].prompt;
     const tail = P.slice(P.lastIndexOf('<tool_response>')).replace(/\n$/, '');
-    root.innerHTML = `<div class="raw ctxt" style="position:relative;font-size:22px;line-height:32px;padding:14px 22px"><div class="cap">它刚读到的：第 4 圈上下文的最后几行</div>${tail.split('\n').map((l) => {
+    root.innerHTML = `<div class="raw ctxt" style="position:relative;font-size:24px;line-height:35px;padding:14px 22px"><div class="cap">它刚读到的：第 4 圈上下文的最后几行</div>${tail.split('\n').map((l) => {
       let h = esc(l).replace(/&lt;\|?\/?[a-z_]+\|?&gt;/g, (s) => `<span class="sp">${s}</span>`);
       if (/command not found/.test(l)) h = `<span class="er">${h}</span>`;
       return `<div>${h}</div>`;
