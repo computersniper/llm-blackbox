@@ -118,8 +118,8 @@ export function buildScore(D, cap = null) {
       const near = fit(M, whole, [-0.25, 0.28, 1], 1.18);
       return {
         st: G(0, { ph: 'init', sub: 'model' }, 0),
-        cam: () => handheld(blendCam(far, farther(near, 1.35), smoother(seg(t, 3, 12.5))), t, 0.006),
-        fade: 1 - 0.55 * smooth(seg(t, 6.6, 9.2)),
+        cam: () => handheld(blendCam(far, farther(near, 1.12), smoother(seg(t, 2.5, 10.5))), t, 0.006),
+        fade: 1 - 0.62 * smooth(seg(t, 6.6, 9.2)),
         lbl: 'none',
         bloom: 0.3,
         ov: {
@@ -152,7 +152,7 @@ export function buildScore(D, cap = null) {
       return {
         st: G(0, { ph: 'init', sub: lt < 7.9 ? 'model' : 'hist' }, lt < 7.9 ? 1 : seg(lt, 7.9, 10.5)),
         cam: () => blendCam(prevCam('open', live), live, smoother(seg(lt, 0, 3.2))),
-        fade: 0.45 * (1 - smooth(seg(lt, 0, 2.2))),
+        fade: 0.38 * (1 - smooth(seg(lt, 0, 2.2))),
         lbl: lt > 3.4 && lt < 11 ? 'weights' : 'none',
         bloom: 0.3,
         ov: { hist: { a: smooth(seg(lt, 8.0, 8.8)) * (1 - smooth(seg(lt, 11.6, 12.3))), k: easeOut(seg(lt, 8.2, 10.4)) } },
