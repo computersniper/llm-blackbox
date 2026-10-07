@@ -8,8 +8,8 @@
 //
 // 帧存成 JPEG（质量 95），已经存在的帧会跳过：中途停了重跑同一条命令就能接着渲染。
 // 同时最多 3 个浏览器进程（--workers 上限 3）：WSL 瞬时负载太高会整机崩溃。
-// 渲染中按 /proc/loadavg 自动让路：扣掉自己这几个进程的负载（每个 SwiftShader 浏览器约 4.5），别人的负载越高，
-// 同时在渲的进程越少；别人的负载 ≥ 12 时全部暂停，等降下来再接着渲（每 30 帧检查一次）。
+// 渲染中按 /proc/loadavg 自动让路：扣掉自己这几个进程的负载（每个 SwiftShader 浏览器约 6），
+// 让总负载尽量不超过 14——别人的负载越高，同时在渲的进程越少，高到 8.5 以上就全部暂停，等降下来再接着渲（每 30 帧检查一次）。
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -94,14 +94,14 @@ if (mode === 'events') {
   for (let w = 0; w < W; w++) { const c = todo.slice(w * per, (w + 1) * per); if (c.length) chunks.push(c); }
   const t0 = Date.now();
   let done = 0;
-  const PER = Number(A.perload || 4.5);
+  const PER = Number(A.perload || 6);
   let active = 0, lastNote = 0;
   const load1 = () => Number(fs.readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   async function gate(w) {
     for (;;) {
       const l = load1(), others = l - PER * active;
-      const allow = others < 4 ? W : others < 8 ? Math.min(W, 2) : others < 12 ? 1 : 0;
+      const allow = Math.min(W, Math.max(0, Math.floor((14.5 - Math.max(0, others)) / PER)));
       if (active < allow) { active++; return; }
       if (Date.now() - lastNote > 60000) { lastNote = Date.now(); console.log(`load ${l.toFixed(1)}（别人约 ${others.toFixed(1)}）：先让一让，${active} 个在渲`); }
       await wait(15000 + w * 1000);
