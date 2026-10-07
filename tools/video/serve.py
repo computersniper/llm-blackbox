@@ -17,6 +17,7 @@ import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+VIDEOS = "/mnt/d/cjc/videos"
 
 
 class Server(http.server.ThreadingHTTPServer):
@@ -49,6 +50,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     if os.path.exists(cand):
                         return cand
             return str(ROOT / "public" / rest)
+        # /ext/videos/<片子>/<目录>/<文件>：D 盘 /mnt/d/cjc/videos/ 下的录屏帧（训练视频等其他片子用；只读这棵目录树）
+        if p.startswith("/ext/videos/"):
+            rest = posixpath.normpath(p[len("/ext/videos/"):]).lstrip("/")
+            if rest.startswith(".."):
+                return os.path.join(VIDEOS, "__nope__")
+            return os.path.join(VIDEOS, rest)
         # 片尾用的推理页录屏帧（sitecap.mjs 生成，放在字体目录旁边的 sitecap/）
         for d in ("sitecap", "sitecap-en"):
             if p.startswith(f"/ext/{d}/") and self.fonts_dir:

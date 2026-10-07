@@ -17,7 +17,7 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let E, M, D, SC, QR_SVG = '', CAP = null;
-const CAP_DIR = 'sitecap-train';
+const CAP_DIR = 'videos/train-glass/sitecap-train';   // serve.py：/ext/videos/… → D 盘 /mnt/d/cjc/videos/…
 const SITE = new Map();
 const OV = {};
 // 快进时相邻两帧之间的插值（score 每帧给出 { k, f }）
@@ -191,7 +191,7 @@ function buildOverlays() {
       <svg width="${W}" height="${H + 34}" viewBox="0 0 ${W} ${H + 34}" style="overflow:visible">
         <line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="rgba(150,180,230,.25)"/>
         ${[0, 50, 100, 150, 200].map((s) => `<text class="ax" x="${x(s)}" y="${H + 26}" text-anchor="middle">${s}</text>`).join('')}
-        <text class="ax" x="-10" y="${y(lo) + 5}" text-anchor="end">${lo.toFixed(3)}</text><text class="ax" x="-10" y="${y(hi) + 5}" text-anchor="end">${hi.toFixed(2)}</text>
+        <text class="ax" x="-12" y="${y(lo) + 5}" text-anchor="end">${lo.toFixed(3)}</text><text class="ax" x="-12" y="${y(hi) + 5}" text-anchor="end">${hi.toFixed(2)}</text>
         <polyline class="ln" points="${pts.join(' ')}" fill="none" stroke="#ffb65c" stroke-width="3"/>
         <circle class="dot" r="6" fill="#ffd9a6"/>
       </svg>`;
@@ -289,12 +289,12 @@ function updateOverlays(t, f) {
       c.querySelector('.pv').textContent = `${(vals[j] * 100).toFixed(0)}%`;
       c.classList.toggle('top', j === best);
     });
-    OV.attFoot.innerHTML = `走完 <b>${D.FR[k] + Math.round(o.att.frac.f * ((D.FR[Math.min(D.NF - 1, k + 1)] - D.FR[k]) || 0))}</b> 步`;
+    OV.attFoot.innerHTML = `第 <b>${Math.min(D.S, D.FR[k] + 1 + Math.round(o.att.frac.f * ((D.FR[Math.min(D.NF - 1, k + 1)] - D.FR[k]) || 0)))}</b> 步`;
   }
   if (show(OV.rowtag, o.rowtag?.a ?? 0)) {
     const { k } = o.rowtag.frac, PM = SC.facts.PM;
     const pa = D.probs(k, PM, D.fixed[PM + 1]), pg = D.probs(k, PM, D.chars.indexOf('光'));
-    OV.rowtag.innerHTML = `<div class="h">看到「举头望明月」，下一个字</div><div class="r ok"><b>，</b><span class="bar"><i style="width:${(pa * 100).toFixed(1)}%"></i></span><span class="pv">${(pa * 100).toFixed(0)}%</span></div><div class="r no"><b>光</b><span class="bar"><i style="width:${(pg * 100).toFixed(1)}%"></i></span><span class="pv">${(pg * 100).toFixed(0)}%</span></div>`;
+    OV.rowtag.innerHTML = `<div class="h">看到「举头望明月」，下一个字</div><div class="r ok"><b class="cm">，</b><span class="bar"><i style="width:${(pa * 100).toFixed(1)}%"></i></span><span class="pv">${(pa * 100).toFixed(0)}%</span></div><div class="r no"><b>光</b><span class="bar"><i style="width:${(pg * 100).toFixed(1)}%"></i></span><span class="pv">${(pg * 100).toFixed(0)}%</span></div>`;
   }
 
   // 一个参数的一生

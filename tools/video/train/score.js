@@ -399,7 +399,8 @@ export function buildScore(D, cap = null) {
       const att = fit(M, [2.6, 5.3, 6.9, 8.4, -0.2, 0.5], [0.12, 0.2, 1], 1.15);
       const wide = fit(M, whole, WIDE, 1.03);
       let live = blendCam(row, att, smoother(seg(t, H[2] - 0.4, H[2] + 1.6)));
-      live = blendCam(live, orbit(row, -8, 4, 1.25), smoother(seg(t, H[3] - 0.6, H[3] + 1.6)));
+      // 学会以后：从上往下看整个概率架（其余几行压暗），8 行都长出了绿柱
+      live = blendCam(live, fit(M, [...OP_RECT.loss, -1.3, 1.3], TOP, 1.05), smoother(seg(t, H[3] - 0.6, H[3] + 1.8)));
       live = blendCam(live, wide, smoother(seg(t, T1 - 2.4, T1)));
       return {
         ...r,
@@ -426,8 +427,8 @@ export function buildScore(D, cap = null) {
     term(T0 + 4.0, T1 - 0.2, `损失一直是 ${zLoss.toFixed(3)}`);
     ev(T0 + 0.6, 'flat');
     shot('zero', (lt, t, { M }) => {
-      const wide = fit(M, whole, WIDE, 1.03);
-      const live = orbit(wide, lerp(-6, -2, lt / 7.5), 3, 1.04);
+      const wide = fit(M, [BOUNDS.x0 - 9, BOUNDS.x1, BOUNDS.y0, BOUNDS.y1 + 0.8, -2.2, 1.4], WIDE, 1.0);
+      const live = orbit(wide, lerp(-4, 0, lt / 7.5), 2, 1.0);
       return {
         st: G(0, { ph: 'init', sub: lt < 0.5 ? 'model' : 'zero' }, 1),
         cam: () => blendCam(prevCam('hard', live), live, smoother(seg(lt, 0, 1.6))),
@@ -453,15 +454,19 @@ export function buildScore(D, cap = null) {
     shot('life', (lt, t, { M }) => {
       const s = stepAt(t);
       const r = runState(s);
-      const close = cam([SELP.x + 2.4, SELP.y + 1.6, 4.6], [SELP.x + 0.9, SELP.y + 0.5, 0], 34);
+      // 方块放在画面左半边，右边留给曲线卡片
+      const close = cam([SELP.x + 1.75, SELP.y + 1.05, 3.3], [SELP.x + 1.05, SELP.y + 0.42, 0], 34);
       const wide = fit(M, whole, WIDE, 1.03);
-      const live = blendCam(close, orbit(close, 10, 4, 1.15), smoother(seg(lt, 0, 12.5)));
+      const live = blendCam(close, orbit(close, 8, 3, 1.18), smoother(seg(lt, 0, 12.5)));
+      const si = Math.max(0, Math.min(S, Math.floor(s))), sf = s - Math.floor(s);
+      const wv = si < S ? lerp(life[si], life[si + 1], sf) : life[S];
       return {
         ...r,
         sel: GI,
+        selLbl: `w = <b>${wv.toFixed(4)}</b>`,
         view: 'g-param',
         cam: () => blendCam(prevCam('zero', wide), live, smoother(seg(lt, 0, 2.2))),
-        dof: { focus: live.pos.distanceTo(live.look), range: 2.4, blur: 5 * smooth(seg(lt, 1.0, 2.6)) },
+        dof: { focus: live.pos.distanceTo(SELP), range: 2.2, blur: 5 * smooth(seg(lt, 1.0, 2.6)) },
         lbl: 'none',
         bloom: 0.26,
         ov: { life: { a: smooth(seg(lt, 0.8, 1.6)) * (1 - smooth(seg(lt, 11.8, 12.4))), s } },

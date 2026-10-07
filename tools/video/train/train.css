@@ -89,6 +89,7 @@
 .rowtag .r { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
 .rowtag .r b { width: 48px; font-size: 44px; font-weight: 900; text-align: center; }
 .rowtag .r.ok b { color: #8ee07a; }
+.rowtag .r b.cm { font-size: 56px; line-height: .6; transform: translate(6px, -14px); }
 .rowtag .r.no b { color: #ff8fb0; }
 .rowtag .bar { width: 300px; height: 16px; border-radius: 8px; background: rgba(150, 180, 230, .12); overflow: hidden; }
 .rowtag .bar i { display: block; height: 100%; border-radius: 8px; }
@@ -97,6 +98,10 @@
 .rowtag .pv { width: 80px; text-align: right; font-family: var(--mono); font-size: 28px; color: var(--ink); }
 
 /* 一个参数的一生 */
-.life { right: 72px; top: 120px; }
+.life { right: 72px; top: 120px; padding-left: 40px; }
 .life .h .val { font-size: 22px; color: var(--ink2); }
 .life .h .val b { font-weight: 400; color: #ffd9a6; }
+
+/* 落版：训练页的网址比推理页长，右栏往左挪一点、字小一号 */
+.fin7 { left: 1060px; width: 800px; }
+.fin7 .url { font-size: 37px; letter-spacing: .01em; }
