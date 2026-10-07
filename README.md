@@ -748,7 +748,7 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 - **自己改错**：快放剩下几圈：缺 pandas → `pip3 install` 被拒（externally-managed-environment）→ 模型自己写下“改用纯 Python”→ 用 csv 重写 → 跑通（杭州 9250）→ 不再调用工具，循环结束；
 - 收尾：“像 Claude Code 这样的编程 agent，本质上都是这个模式：模型 + 工具 + 循环”，接智能体页的真实录屏（选任务 → 看回放 → 揭开内部 → 点第 4 圈 → ＋ 上下文 → ＋ 逐词元），落版网址和二维码（指向 `caijiechao.com/blackbox/agent/`）。
 
-全是 DOM + 2D canvas（没有 3D），用 CPU（swiftshader）渲染；讲解写法和推理视频一样：每屏一行白话字幕加一个术语标签，正在讲的高亮、其余压暗。不出现任何商业产品的界面，也没有编造模型输出：字幕、面板、终端里的文字和数字都从 `public/agent/data/sales-top.json` 现取。
+全是 DOM + 2D canvas（没有 3D），用 CPU（swiftshader）渲染：5,550 帧（30 fps）2 个浏览器进程约 3 分钟；讲解写法和推理视频一样：每屏一行白话字幕加一个术语标签，正在讲的高亮、其余压暗。不出现任何商业产品的界面，也没有编造模型输出：字幕、面板、终端里的文字和数字都从 `public/agent/data/sales-top.json` 现取。
 
 | 文件 | 作用 |
 | --- | --- |
@@ -759,7 +759,7 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 | `agent/compose.py` | 配乐编曲；音色和母带直接用 `../compose.py` 的合成器 |
 | `agent/sitecap.mjs` | 片尾用的智能体页录屏（CPU 就够；无衬线字体指向思源黑体，收起站点导航和弹出提示） |
 | `agent/make_qr.py` / `qr-agent.svg` | 片尾二维码（segno 本地生成） |
-| `agent/share.sh` | 分享版（30 fps 帧序列，两遍编码，≤120 MB） |
+| `agent/encode.sh` / `share.sh` | 成片（同 `../encode.sh` 的参数，限制编码线程）和分享版（30 fps 帧序列，两遍编码，≤120 MB） |
 | `agent/dbg.mjs` / `util.js` | 调试工具、缓动和二维镜头插值 |
 
 重新生成（帧序列、配乐、成片都放 D 盘 `/mnt/d/cjc/videos/agent/`）：
@@ -773,8 +773,8 @@ node tools/video/agent/sitecap.mjs --out $O/sitecap                         # �
 node tools/video/agent/render.mjs frames --out $O/frames30 --fps 30 --workers 3   # 已有的帧会跳过；先看 uptime，负载高就少开
 node tools/video/agent/render.mjs events --out tools/video/agent/events.json
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/agent/compose.py --events tools/video/agent/events.json --out $O/score.wav
-TITLE="只会写字的 AI，怎么自己动手干活 · 走进编程智能体的“黑箱”（Qwen3-4B 在真实沙箱里的录制）" bash tools/video/encode.sh $O/frames30 $O/score.wav $O/agent-v1.mp4 30
-bash tools/video/agent/share.sh $O/frames30 $O/score.wav $O/agent-v1-share.mp4
+bash tools/video/agent/encode.sh $O/frames30 $O/score.wav $O/agent-v1.mp4 30      # 成片（crf 18 + AAC 192k，约 270 MB）
+bash tools/video/agent/share.sh $O/frames30 $O/score.wav $O/agent-v1-share.mp4    # 分享版（约 111 MB）
 node tools/video/agent/render.mjs poster --out $O/poster-v1.png
 python tools/video/review.py --frames $O/frames30 --fps 30 --every 2 --out $O/review    # 可选：联系表
 ```
