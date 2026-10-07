@@ -22,7 +22,7 @@ const num = (n) => Math.round(n).toLocaleString('en-US');
 const DESK = { w: 1720, h: 804 };
 const FULL = { x: 860, y: 402, s: 1, cx: 960, cy: 472 };
 const ED = { x: 760, y: 290, s: 1.28, cx: 960, cy: 440 };
-const TERM = { x: 1000, y: 640, s: 1.32, cx: 960, cy: 452 };
+const TERM = { x: 1000, y: 640, s: 1.32, cx: 960, cy: 480 };
 const SLOT = { x: 860, y: 402, s: 0.3, cx: 1578, cy: 492 };
 
 export function buildScore(R, cap = null) {

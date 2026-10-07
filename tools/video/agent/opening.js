@@ -32,7 +32,7 @@ export class Opening {
       <header class="cp-head"><div class="t">${title}</div><div class="s">${sub}</div></header>
       <div class="cp-rule"></div>
       <div class="cp-hello"><span class="cp-av"><i></i></span><div class="h">有什么要我做的？</div><div class="s">${esc(model)} · 能在沙箱里读写文件、执行命令</div></div>
-      <div class="cp-user"><div class="cp-bub">${esc(prompt)}</div></div>
+      <div class="cp-user"><div class="cp-bub">${esc(prompt).replace("？", "？<br>")}</div></div>
       <div class="cp-bot"><span class="cp-av"><i></i></span><div><div class="n">${esc(model)}</div><div class="th"><span class="tx">正在思考</span><span class="dots"><i></i><i></i><i></i></span></div>
         <div class="cp-act"><span class="op">▶ ${esc(firstCall.name)}</span><span class="arg">${esc(firstCall.arg)}</span><span class="st">在沙箱里执行…</span></div></div></div>
       <div class="cp-box"><div class="cp-in"><div class="cp-line"><span class="cp-txt"></span><span class="cp-comp"></span><span class="cp-caret"></span><span class="cp-ph">给 ${esc(model.split('-Instruct')[0])} 布置一个任务</span></div></div><span class="cp-send">${SEND_SVG}</span></div>
@@ -162,7 +162,7 @@ export class Opening {
     this.page.style.transform = Z > 1.0001 ? `translate(${(960 - Z * F.x).toFixed(2)}px, ${(lerp(540, 470, f) - Z * F.y).toFixed(2)}px) scale(${Z.toFixed(5)})` : '';
     const dof = smooth(seg(t, T.push0 + 0.3, T.push1));
     for (const e of [this.box, this.userEl, this.hello]) e.style.filter = dof > 0.01 ? `blur(${(4 * dof).toFixed(2)}px)` : '';
-    this.page.style.opacity = (1 - smooth(seg(t, T.desk0 + 0.1, T.desk1 - 0.2))).toFixed(3);
+    this.page.style.opacity = (1 - smooth(seg(t, T.desk0 - 0.05, T.desk0 + 0.5))).toFixed(3);
     this.wrap.style.opacity = smooth(seg(t, 0.05, 0.8)).toFixed(3);
   }
 }

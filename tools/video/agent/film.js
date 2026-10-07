@@ -211,6 +211,7 @@ class Desk {
     this.tree.style.opacity = (1 - 0.62 * fk * (D.focus ? 1 : 0)).toFixed(3);
     this.ed.style.opacity = (D.focus === 'term' ? 1 - 0.62 * fk : 1).toFixed(3);
     this.tm.style.opacity = (D.focus === 'ed' ? 1 - 0.62 * fk : 1).toFixed(3);
+    this.stat.style.opacity = (1 - 0.7 * fk * (D.focus ? 1 : 0)).toFixed(3);
   }
 
   statusDone(c) {
@@ -596,7 +597,7 @@ function buildOverlays() {
   OV.progIt = [...OV.prog.querySelectorAll('.it')];
   OV.lapc = el('div', 'lapc', '', ov);
   const M = MAN.model;
-  OV.title = el('div', 'title', `<div class="eb">INSIDE A CODING AGENT</div><h1><span>只会写字的 AI，</span><span>怎么自己动手干活</span></h1><div class="rule"></div><div class="st">${SUBTITLE}</div><div class="spec">${esc(M.name.toUpperCase())} · 真实沙箱 · 离线录制</div>`, ov);
+  OV.title = el('div', 'title', `<div class="eb">INSIDE A CODING AGENT</div><h1><span>只会写字的 AI</span><span>怎么自己动手干活</span></h1><div class="rule"></div><div class="st">${SUBTITLE}</div><div class="spec">${esc(M.name.toUpperCase())} · 真实沙箱 · 离线录制</div>`, ov);
   OV.sum = el('div', 'sum', `<div class="eb">MODEL + TOOLS + LOOP</div><div class="big"><span class="w1">模型</span><span class="p">+</span><span class="w2">工具</span><span class="p">+</span><span class="w3">循环</span></div>
     <div class="stat">${esc(SC.statLine)}</div><div class="src">${esc(M.name)} · BUBBLEWRAP 沙箱 · 全程实测 ${(R.totalMs / 1000).toFixed(1)} 秒</div>`, ov);
   OV.win = el('div', 'sitewin', `<div class="bar"><i></i><i></i><i></i><span class="url">${URL_SHOW}</span></div><canvas width="1920" height="1080"></canvas>`, ov);
