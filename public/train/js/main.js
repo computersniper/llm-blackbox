@@ -30,6 +30,9 @@ import { TinyTimeline } from './tiny3d/timeline.js';
 import { TinyStage, planTiny, discoverTiny } from './tiny3d/stage.js';
 import { updateDebugger } from './tiny3d/ui.js';
 import { loadQwen3d, QwenTimeline, QwenStage, withQwen3d, planQwen3d, discoverQwen3d } from './qwen3d/index.js';
+import { mountSiteActions } from '../../js/visits.js';
+
+mountSiteActions('train');   // 右上角的 GitHub 和全站访问量；后台按页面记一次访问
 
 initLang();
 

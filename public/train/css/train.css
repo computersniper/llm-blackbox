@@ -72,6 +72,12 @@ button { font: inherit; color: inherit; }
 .crumbs .d { font-family: var(--mono); font-size: 10.5px; margin-right: 5px; color: var(--faint); }
 .crumbs .sep { color: var(--faint); }
 .top-actions { display: flex; gap: 8px; flex: none; }
+/* 右上角的全站访问量和 GitHub 按钮（js/visits.js 插入，和 app.css 里同一套） */
+.gh-btn { padding: 0; width: 34px; text-decoration: none; }
+.gh-btn:hover { color: var(--ink); border-color: var(--acc); }
+.visits { cursor: default; gap: 5px; color: var(--dim); }
+.visits b { font-weight: 400; color: var(--ink2); }
+@media (max-width: 560px) { .top-actions .gh-btn { width: 30px; padding: 0; } .visits svg { display: none; } .top-actions .visits { padding: 0 6px; font-size: 11px; } }
 .hud-btn { position: relative; height: 34px; min-width: 34px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line2); background: rgba(255, 255, 255, .03); cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--ink2); transition: border-color .2s, color .2s; }
 .hud-btn:hover { border-color: var(--line3); color: var(--ink); }
 .codex-btn { color: var(--amber); }

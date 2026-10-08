@@ -11,6 +11,9 @@ import { initPanes } from '../../js/resize.js';
 import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, imagesLoaded, measure } from '../../js/prefetch.js';
 import { isEn, L, mountLangSwitch } from '../../js/i18n.js';
 import { initStrings } from './strings.js';
+import { mountSiteActions } from '../../js/visits.js';
+
+mountSiteActions('mm');   // 右上角的 GitHub 和全站访问量；后台按页面记一次访问
 
 initStrings();
 

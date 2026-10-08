@@ -9,7 +9,7 @@ import { sfx, setSound, soundOn } from './audio.js';
 import { $, esc, tokPlain, tokHTML, fmtPct, fmtNum, sleep } from './ui.js';
 import { initPanes } from './resize.js';
 import { ENGINE_GRAPH, jsURL, modulePreload, saveData, whenIdle, measure } from './prefetch.js';
-import { countVisit, showVisits } from './visits.js';
+import { mountSiteActions } from './visits.js';
 import { isEn, L as tr, t, applyDom, mountLangSwitch } from './i18n.js';
 import { seedZhFromDom } from './i18n/infer.js';
 
@@ -65,7 +65,7 @@ async function boot() {
     head: (h) => { ctx.head = h; if (tl) { if (tl.ready(tl.step)) controls.update(tl, ctx); checkSink(); } },
   });
   chat = new Chat(manifest, { onSend, onPeek: (m) => enterInspect(m), onPlus });
-  countVisit().then(showVisits);
+  mountSiteActions('infer');
   bindKeys();
   bindChrome();
   renderCodexCount();

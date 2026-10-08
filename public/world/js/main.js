@@ -17,6 +17,9 @@ import { sfx, setSound, soundOn } from '../../js/audio.js';
 import { $, $$, esc } from '../../js/ui.js';
 import { initPanes } from '../../js/resize.js';
 import { isEn, L, addDict, applyDom, mountLangSwitch } from '../../js/i18n.js';
+import { mountSiteActions } from '../../js/visits.js';
+
+mountSiteActions('world');   // 右上角的 GitHub 和全站访问量；后台按页面记一次访问
 
 /* ---------------------------------------------------------------- 中英文 */
 

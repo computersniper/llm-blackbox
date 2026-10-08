@@ -7,6 +7,9 @@ import { Library } from './library.js';
 import { Glossary } from './glossary.js';
 import { TryIt } from './tryit.js';
 import { initLang, isEn, t } from './lang.js';
+import { mountSiteActions } from '../../js/visits.js';
+
+mountSiteActions('learn');   // 右上角的 GitHub 和全站访问量；后台按页面记一次访问
 
 initLang();
 

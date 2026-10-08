@@ -14,6 +14,9 @@ import { splitExit } from './screen.js';
 import { callArg } from './chat.js';
 import { isEn, L, mountLangSwitch } from '../../js/i18n.js';
 import { initStrings } from './strings.js';
+import { mountSiteActions } from '../../js/visits.js';
+
+mountSiteActions('agent');   // 右上角的 GitHub 和全站访问量；后台按页面记一次访问
 
 initStrings();
 
