@@ -289,8 +289,9 @@ export function buildScore(Q, cap = null) {
         st: mst(3, 0, { ph: 'prep', sub: 'patch' }, 1),
         cam: () => blendCam(photoCam(1.08), photoCam(1.0), smooth(seg(t, T0, T0 + 3))),
         lift,
-        fade: 0.62 * smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0], CALC.out[1]))),
-        calc: { a: smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0] - 0.2, CALC.out[1]))), t, C: CALC },
+        // 收尾分两步：算式板先退，3D 再亮回来（不交叉淡化）
+        fade: 0.62 * smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0] + 0.35, CALC.out[1]))),
+        calc: { a: smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0] - 0.1, CALC.out[0] + 0.3))), t, C: CALC },
         hideLabels: true,
       };
     });
@@ -340,7 +341,7 @@ export function buildScore(Q, cap = null) {
           return blendCam(embedCam, live, smoother(seg(t, up0, up0 + 2.2)));
         },
         panel,
-        vec: { a: smooth(seg(t, T0 + 0.5, T0 + 1.2)) * (1 - smooth(seg(t, up0 - 0.5, up0))), t, k: seg(t, T0 + 1.0, T0 + 3.6) },
+        vec: { a: smooth(seg(t, T0 + 0.3, T0 + 0.7)) * (1 - smooth(seg(t, up0 - 0.5, up0))), t, k: seg(t, T0 + 1.0, T0 + 3.6) },
         shiftX: -330 * smooth(seg(t, T0 + 0.5, T0 + 1.2)),   // 左边一直有卡片（下一段开头也是）：3D 一直让到右边，卡片换来换去时不跳
         labels: flying ? [] : ['lvl', 'vit'],
       };
@@ -370,7 +371,8 @@ export function buildScore(Q, cap = null) {
     const dsCam = cam([G.VX + 5.2, 4.4, 10.5], [G.VX + 3.6, 2.6, 0]);
     shot('merge', (lt, t) => {
       const st = t < ds0 ? mst(3, 0, { ph: 'merge', sub: t < g1 + 0.6 ? 'group' : 'mlp' }, t < g1 + 0.6 ? seg(t, g0, g1) : 1) : mst(3, 0, { ph: 'merge', sub: 'deep' }, seg(t, ds0, T1));
-      const trA = smooth(seg(t, tr0 - 0.05, tr0 + 0.6)) * (1 - smooth(seg(t, tr1 - 0.4, tr1 + 0.1)));
+      const trIn = smooth(seg(t, tr0 - 0.05, tr0 + 0.6));
+      const trA = trIn * (1 - smooth(seg(t, tr1 - 0.5, tr1 - 0.15)));   // 翻译图先退，3D 再亮回来
       return {
         st,
         cam: () => {
@@ -379,7 +381,7 @@ export function buildScore(Q, cap = null) {
         },
         panel: { kind: 'merge', a: smooth(seg(t, g0 - 0.2, g0 + 0.5)) * (1 - smooth(seg(t, tr0 - 0.6, tr0 - 0.1))), k: seg(t, g0, g1) },
         trans: { a: trA, t, k: [seg(t, tr0 + 0.2, tr0 + 1.0), seg(t, tr0 + 1.0, tr0 + 2.2), seg(t, tr0 + 2.6, tr0 + 3.6), seg(t, tr0 + 4.0, tr0 + 4.8)] },
-        fade: 0.7 * trA,
+        fade: 0.7 * trIn * (1 - smooth(seg(t, tr1 - 0.15, tr1 + 0.3))),
         shiftX: -330 * (1 - smooth(seg(t, tr0 - 0.4, tr0 + 0.5))),   // 接着上一段一直让在右边，翻译图出来时再慢慢回到中间
         labels: trA > 0.01 ? [] : t < ds0 ? ['merge'] : ['ds', 'vit', 'llm'],
       };
@@ -492,8 +494,8 @@ export function buildScore(Q, cap = null) {
           return blendCam(c0, live, smoother(seg(t, A0 - 1.2, A0 + 0.6)));
         },
         reply: { a: smooth(seg(t, sched[0].t0 - 0.4, sched[0].t0 + 0.2)), n: nRep, hl: t >= said ? gA : -1 },
-        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 - 0.3 } : null,
-        labels: t < sched[0].t0 + 1.0 ? ['llm'] : [],
+        panel: L >= 0 ? { kind: 'heat', a: smooth(seg(t, A0, A0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), g: gA, L, enr: F.enr, upto: L + (t < A1 ? pick(layers, t).p : 1), avg: t >= A1 - 0.3 } : null,
+        labels: [],
         lens3: { a: smooth(seg(t, lens0, lens0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), k: seg(t, lens0 + 0.3, lens0 + 2.6), fin: seg(t, lens0 + 3.0, lens0 + 3.4) },
       };
     });
@@ -614,7 +616,7 @@ export function buildScore(Q, cap = null) {
         return blendCam(c, far, smoother(seg(lt, 0, 8)));
       },
       fade: lerp(0.55, 0.92, smooth(seg(lt, 0, 1.2))),
-      reply: { a: 1 - smooth(seg(lt, 0, 0.6)), n: Q.G, hl: -1, big: true },
+      reply: { a: 1 - smooth(seg(lt, 0, 0.3)), n: Q.G, hl: -1, big: true },
       ov: {
         band: 1 - smooth(seg(lt, 0, 1)),
         site: segs.length ? {
