@@ -736,6 +736,8 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 
 浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=0>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
 
+**封面**：五支视频的封面（左边大标题、右边铺满片中真实画面，1920×1080）由 `node tools/video/covers/make_covers.mjs` 生成，输出到各视频目录下的 `cover.png`（推理英文版是 `cover-en.png`）。
+
 ## 训练视频
 
 `tools/video/train/` 用训练页第一章的 3D 机器（`public/train/js/glass3d/`）和真实训练记录（`public/train/data/glass*`）做了一支约 3 分钟的片子《AI 是怎么学会的——看一个小模型从零学会背《静夜思》》，风格、讲法和推理视频一样：顶部小章节进度条，一屏一行白话字幕加一个小号术语标签，全片只演示一次逐数计算。
