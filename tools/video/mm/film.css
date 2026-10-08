@@ -339,7 +339,7 @@ body { font-family: var(--serif); color: var(--ink); -webkit-font-smoothing: ant
 /* ================================================================ v2 */
 
 /* 每一小块 → 一串数 */
-.veccard { position: absolute; left: 64px; top: 150px; padding: 20px 26px 18px; border-radius: 20px; background: rgba(3, 7, 15, .92); border: 1px solid var(--line2); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); white-space: nowrap; }
+.veccard { position: absolute; left: 64px; top: 150px; padding: 20px 26px 18px; border-radius: 20px; background: rgba(3, 7, 15, .98); border: 1px solid var(--line2); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); white-space: nowrap; }
 .veccard .h { font-size: 30px; font-weight: 600; color: var(--ink); margin-bottom: 16px; }
 .veccard .row { display: flex; align-items: center; gap: 20px; }
 .veccard .pic canvas { display: block; width: 500px; height: 357px; border-radius: 10px; }

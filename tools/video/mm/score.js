@@ -290,7 +290,7 @@ export function buildScore(Q, cap = null) {
         cam: () => blendCam(photoCam(1.08), photoCam(1.0), smooth(seg(t, T0, T0 + 3))),
         lift,
         // 收尾分两步：算式板先退，3D 再亮回来（不交叉淡化）
-        fade: 0.62 * smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0] + 0.35, CALC.out[1]))),
+        fade: Math.max(0.62 * smooth(seg(t, CALC.board[0], CALC.board[1])), smooth(seg(t, CALC.out[0] - 0.3, CALC.out[0]))) * (1 - smooth(seg(t, CALC.out[0] + 0.35, CALC.out[1]))),   // 板子退场前 3D 先全黑，板子在黑底上淡出
         calc: { a: smooth(seg(t, CALC.board[0], CALC.board[1])) * (1 - smooth(seg(t, CALC.out[0] - 0.1, CALC.out[0] + 0.3))), t, C: CALC },
         hideLabels: true,
       };
