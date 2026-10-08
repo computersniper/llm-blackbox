@@ -736,7 +736,7 @@ python tools/video/review.py --frames $O/frames60 --fps 60 --every 2 --out $O/re
 
 浏览器里预览：<http://127.0.0.1:8776/tools/video/film.html?preview&t=0>（拖时间轴、空格暂停）。`render.mjs` 依赖 playwright-core，并把 `LD_LIBRARY_PATH` 指向 chromium 的依赖库（脚本里写好了这台 WSL 的路径）。
 
-**封面**：五支视频的封面（左边大标题、右边铺满片中真实画面，1920×1080）由 `node tools/video/covers/make_covers.mjs` 生成，输出到各视频目录下的 `cover.png`（推理英文版是 `cover-en.png`）。
+**封面**：横版封面就是各视频目录下的 `poster-*.png`（片中片名落版那一帧）；抖音竖版（1080×1920）由 `node tools/video/covers/vertical.mjs` 从横版截出标题和主体、四周羽化后放到深色底上，输出同名加 `-9x16`。另有一版左右排版的重新设计（`make_covers.mjs`，输出 `cover.png`），备用。
 
 ## 训练视频
 
