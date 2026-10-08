@@ -826,45 +826,47 @@ python tools/video/review.py --frames $O/frames30 --fps 30 --every 2 --out $O/re
 
 ## 多模态视频
 
-`tools/video/mm/` 用多模态页的 3D 舞台（`public/multimodal/js/scene.js`）和 Qwen3-VL-2B 的真实导出数据做了一支约 3 分钟的片子《AI 是怎么看图的》。图是「桌上的苹果」，问题「绿色的苹果是第几个？」（`apples-2`，贪心解码，回答「绿色的苹果是第3个。」）。
+`tools/video/mm/` 用多模态页的 3D 舞台（`public/multimodal/js/scene.js`）和 Qwen3-VL-2B 的真实导出数据做了一支 2 分 57 秒的片子《AI 是怎么看图的》。图是「桌上的苹果」，问题「绿色的苹果是第几个？」（`apples-2`，贪心解码，回答「绿色的苹果是第3个。」）。现在的版本是 v2（`multimodal-v2.mp4`）：视觉编码器、导入大模型、把词元插进对话这三段按用户意见重讲，总长不变。
 
 片子从一个干净的聊天页开始：点「图片」选中苹果那张，用拼音打出问题、发送；镜头推近消息，文字按真实分词裂成词元，图片和词元一起飞进黑箱的取景窗，片名落在黑箱正面。之后五章（顶部有章节进度条）：
 
 - **切成图块**：460×330 缩放到 448×320（边长取 32 的倍数），切成 20 × 28 = 560 个 16×16 的图块；再演示全片唯一一次逐数计算：绿苹果上的一个图块，16×16 像素 × 红绿蓝 3 × 2 帧 = 1536 个数，逐项乘第 606 号卷积核，加起来 +0.109，加偏置 −3.203，得到 −3.094（图块嵌入 1024 维里的一维）；
-- **视觉编码器**：图块飞进 24 层的塔，左边监视器是每层特征的前 3 个主成分（当红绿蓝），各层平均注意距离 7.1–12.5 块；输入时颜色跟着位置和像素走，第 5 层之后五个苹果（连绿的那个）变成一个颜色；
-- **四合一**：2×2 个图块合成一个视觉词元（560 → 140，4096 → 2048 维）；DeepStack 把第 5、11、17 层直接送进语言模型前三层；
-- **插进对话**：140 个视觉词元插在 `<|vision_start|>` 和 `<|vision_end|>` 之间；M-RoPE 给每个词元 (t, h, w)：绿苹果那一格 (25, 31, 32)，140 个词元只占 14 个位置号，问题从 40 接着数；
-- **看图回答**：28 层逐层看生成「3」时的注意力热力图，下面是每层的“对准倍数”（落在绿苹果框里的注意力比例 ÷ 框占的面积，框取 `tools/multimodal/grounding.py` 的标注）：前 16 层平均 1.2×，第 16–26 层平均 5.6×；逻辑透镜第 21 层先读出「三个」75%，最后输出「3」92%；图片位置的透镜读数第 22 层是「五个」「红色」，第 24 层是「苹果」；最后回答里的几个字各自在看哪（第 16–26 层平均）。
+- **视觉编码器**：每一小块先变成一串 1024 个数（一个“图像词”，示意图里亮的那一格就是刚才算的第 606 个）；24 层里所有小块互相看：从绿苹果那一格出发，第 5 层的注意力 56% 落在身边 3×3 格，第 17 层只剩 8%，看遍整张图；颜色是每块特征的前 3 个主成分，颜色越近 = 模型觉得越像：输入时颜色跟着位置和像素走，第 5 层之后五个苹果（连绿的那个）变成同一种颜色（圈出来的五个椭圆是从像素里找的苹果位置）；
+- **变成词元**：相邻 2×2 块合成一个（560 → 140）；示意图：4 块 × 1024 = 4096 个数，经合并器（小网络 MLP）翻译成 2048 个数，和问题里的「苹果」查词表得到的 2048 个数一样长，大模型就能当词来读；DeepStack 一句话：第 5、11、17 层的特征直接加到大模型前 3 层，补充细节；
+- **插进对话**：把整段对话的词元摆成一行（系统提示 21 个 → 用户 → 图片开始 → 140 个图片词元 → 图片结束 → 问题 7 个 → 结束 → 助手 → 回答从这里开始），图片按光栅顺序一个个落位（编号 25–164），只做淡入和上浮、不横向移动，标签不会互相压；M-RoPE：图片词元带着行、列位置（行 25–34、列 25–38，绿苹果那格 (25, 31, 32)），图片只占 14 个位置号，问题从 40 接着数；
+- **看图回答**：28 层逐层看生成「3」时的注意力热力图，下面是每层的“对准倍数”（落在绿苹果框里的注意力比例 ÷ 框占的面积，框取 `tools/multimodal/grounding.py` 的标注）：前 16 层平均 1.2×，第 16–26 层平均 5.6×；逻辑透镜第 19 层先读出「第三」98%，最后输出「3」92%；图片位置的透镜读数第 22 层是「五个」「红色」，第 24 层是「苹果」；最后回答里「苹果」「第」「3」各自在看哪：有的字看一大片，有的字盯住一点。
 
 片尾是多模态页的真实录屏（选图 → 点选词元 → 鼠标放在「3」上看热力图 → 揭开 → 点 ＋ 一层层钻进去 → 监视器上的热力图），落版网址 caijiechao.com/blackbox/multimodal/ 和二维码。讲解的写法和推理视频一样：一屏一行白话字幕 + 一个小号术语标签，正在讲的东西亮、其余压暗；配乐由 `mm/compose.py` 现场合成，讲解段更安静。
 
 | 文件（`tools/video/mm/`） | 作用 |
 | --- | --- |
 | `film.html` / `film.js` / `film.css` | 电影页：复用多模态页的 `Scene`（照片、ViT 塔、合并器、托盘、28 层），`__film.renderAt(t)` 确定地渲染第 t 秒；叠加层（字幕、术语、进度条、片名、回答行、片尾录屏窗口） |
-| `score.js` | 分镜表：段落（96 BPM，卡在小节线上）、舞台状态、机位、字幕、配乐事件；`facts()` 从数据里现算片子要讲的数（绿苹果的格子、每层对准倍数、透镜读数、M-RoPE 坐标） |
+| `score.js` | 分镜表：段落（96 BPM，卡在小节线上）、舞台状态、机位、字幕、配乐事件；`facts()` 从数据里现算片子要讲的数（绿苹果的格子和五个苹果的位置、每层对准倍数、透镜读数、M-RoPE 坐标） |
 | `opening.js` | 开场：聊天页（选图、拼音输入法、发送、推近、裂成词元）和交给 3D 以后照片 / 词元飞进取景窗 |
-| `panel.js` | 2D 讲解面板：监视器（主成分颜色、2×2 合并、M-RoPE 坐标、热力图 + 对准倍数柱、图片词元的透镜读数）、一次乘加的算式板、「3」的逻辑透镜卡 |
-| `render.mjs` | 逐帧截图，只用 CPU（SwiftShader，`--disable-gpu`），同时最多 3 个浏览器；渲染中按 `/proc/loadavg` 自动让路（一个 SwiftShader 浏览器约占 6–10 的负载，总负载尽量压在 14 以下，别人负载高时暂停）。整片 5325 帧在和别的渲染错峰的情况下约 90 分钟 |
-| `sitecap.mjs` | 片尾录屏：像用户一样操作 `public/multimodal/index.html`，CDP screencast 录下来；软件渲染太慢，页面时间放慢 4 倍再按页面时间重采样成 30 fps |
+| `panel.js` | 2D 讲解面板：监视器（ViT 注意力、主成分颜色、2×2 合并、热力图 + 对准倍数柱、图片词元的透镜读数、回答里每个字在看哪）、一次乘加的算式板、「3」的逻辑透镜卡；v2 加了“每块 → 1024 个数”、“4 块 → 小网络 → 2048 个数”和整段对话的词元序列图 |
+| `render.mjs` | 逐帧截图，只用 CPU（SwiftShader，`--disable-gpu`），同时最多 3 个浏览器；渲染中按 `/proc/loadavg` 自动让路（一个 SwiftShader 浏览器约占 6–10 的负载，总负载尽量压在 14 以下，别人负载高时暂停）。5325 帧大约 1–1.5 小时 |
+| `sitecap.mjs` | 片尾录屏：像用户一样操作 `public/multimodal/index.html`，按设备像素比 2 连续截图（2560×1440；无头 Chromium 的 screencast 只给 1280×720，推近会糊）；软件渲染太慢，页面时间放慢 8 倍再按页面时间重采样成 30 fps |
 | `compose.py` | 原创配乐（从 `../compose.py` 改来，段落换成这支片子的） |
-| `make_qr.py` / `qr-multimodal.svg` | 片尾二维码（segno 本地生成，指向 https://caijiechao.com/blackbox/multimodal/） |
-| `encode.sh` / `share.sh` | 成片（crf 18 + AAC 192k）/ 分享版（两遍编码 5 Mbps，≤120 MB） |
+| `make_qr.py` / `qr-multimodal.svg` | 片尾二维码（segno 本地生成，带 viewBox，指向 https://caijiechao.com/blackbox/multimodal/） |
+| `encode.sh` / `share.sh` | 成片（crf 18 + AAC 192k）/ 分享版（两遍编码 5 Mbps，≤120 MB）；`THREADS=8` 限制编码线程 |
 | `serve.py`、`explore.mjs`、`sheet.py` | 本地服务器（端口 8798，`/ext/fonts/` → D 盘字体，`/ext/mm/` → D 盘工作目录）、按舞台状态截图调试、拼联系表 |
 
-重新生成（帧、录屏、配乐、成片都放 D 盘）：
+重新生成（帧、录屏、配乐、成片都放 D 盘；v1 的帧、录屏和成片原样留着，v1 的代码在提交历史里）：
 
 ```bash
 # 需要 /mnt/d/cjc/videos/llm-inference/fonts/ 下的 NotoSerifSC-{Black,SemiBold}.otf 和 NotoSansSC-VF.ttf（SIL OFL）
 python tools/video/mm/serve.py --port 8798 &
 O=/mnt/d/cjc/videos/multimodal
 /mnt/d/cjc/venvs/blackbox/bin/python tools/video/mm/make_qr.py                 # 只在网址变了时需要
-node tools/video/mm/sitecap.mjs --out $O/sitecap                                 # 片尾录屏（只在网页改版时需要重录）
-node tools/video/mm/render.mjs frames --out $O/frames --fps 30 --workers 3       # 已有的帧会跳过；开渲前看一眼 uptime，别和别的渲染叠在一起
+node tools/video/mm/sitecap.mjs --out $O/sitecap-v2                              # 片尾录屏（只在网页改版时需要重录；电影页默认读 sitecap-v2，?cap= 可换）
+node tools/video/mm/render.mjs frames --out $O/frames-v2 --fps 30 --workers 3    # 已有的帧会跳过；开渲前看一眼 uptime，别和别的渲染叠在一起
 node tools/video/mm/render.mjs events --out tools/video/mm/events.json
-/mnt/d/cjc/venvs/blackbox/bin/python tools/video/mm/compose.py --events tools/video/mm/events.json --out $O/score.wav
-bash tools/video/mm/encode.sh $O/frames $O/score.wav $O/multimodal-v1.mp4 30
-bash tools/video/mm/share.sh $O/frames $O/score.wav $O/multimodal-v1-share.mp4
-node tools/video/mm/render.mjs poster --out $O/poster-v1.png                    # 默认：生成「3」时的热力图 + 片名
+/mnt/d/cjc/venvs/blackbox/bin/python tools/video/mm/compose.py --events tools/video/mm/events.json --out $O/score-v2.wav
+THREADS=8 bash tools/video/mm/encode.sh $O/frames-v2 $O/score-v2.wav $O/multimodal-v2.mp4 30
+THREADS=8 bash tools/video/mm/share.sh $O/frames-v2 $O/score-v2.wav $O/multimodal-v2-share.mp4
+node tools/video/mm/render.mjs poster --out $O/poster-v2.png                    # 默认：生成「3」时的热力图 + 片名（卡片和片名挨近，4:3 可以直接从中间裁）
+sh tools/video/covers/poster43.sh                                                # 4:3 封面（poster-v2-4x3.png）
+node tools/video/covers/vertical.mjs multimodal/poster-v2                        # 9:16 竖版封面（poster-v2-9x16.png）
 ```
 
 浏览器里预览：<http://127.0.0.1:8798/tools/video/mm/film.html?preview&t=0>（拖时间轴、空格暂停）。
