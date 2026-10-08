@@ -101,7 +101,8 @@ if (mode === 'events') {
   async function gate(w) {
     for (;;) {
       const l = load1(), others = l - PER * active;
-      const allow = Math.min(W, Math.max(0, Math.floor((14.5 - Math.max(0, others)) / PER)));
+      // 1 分钟负载有滞后：自己刚停下的进程还算在里面。别人的负载不到 12 时至少留 1 个在渲，免得走走停停
+      const allow = others >= 12 ? 0 : Math.min(W, Math.max(1, Math.floor((14.5 - Math.max(0, others)) / PER)));
       if (active < allow) { active++; return; }
       if (Date.now() - lastNote > 60000) { lastNote = Date.now(); console.log(`load ${l.toFixed(1)}（别人约 ${others.toFixed(1)}）：先让一让，${active} 个在渲`); }
       await wait(15000 + w * 1000);

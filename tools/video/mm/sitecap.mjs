@@ -1,6 +1,6 @@
 // 片尾用的多模态页录屏（从 ../sitecap.mjs 改来）：无头 Chromium 打开真实的 public/multimodal/index.html，像用户一样操作一遍
 // （选图 → 点选词元拼出问题 → 发送 → 鼠标放在回答的「3」上看热力图 → 揭开这条回复 → 点 ＋ 一层层钻进去 → 监视器上的热力图），
-// 用 CDP screencast 录下来，按 30 fps 等间隔重采样成 sitecap/f0000.jpg…，连同每次点击 / 悬停的时刻和位置写进 sitecap/meta.json。
+// 连续截图录下来（DPR 2，2560×1440），按 30 fps 等间隔重采样成 sitecap-v2/f0000.jpg…，连同每次点击 / 悬停的时刻和位置写进 sitecap/meta.json。
 //
 //   node tools/video/mm/sitecap.mjs [--out /mnt/d/cjc/videos/multimodal/sitecap] [--site http://127.0.0.1:8798/public/multimodal/] [--dry]
 //
@@ -15,11 +15,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || '/home/mtzn/cjc/huma
 
 const args = process.argv.slice(2);
 const arg = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-const OUT = arg('--out', '/mnt/d/cjc/videos/multimodal/sitecap');
+const OUT = arg('--out', '/mnt/d/cjc/videos/multimodal/sitecap-v2');
 const DRY = args.includes('--dry');
 const SITE = arg('--site', 'http://127.0.0.1:8798/public/multimodal/');
-const SLOW = Number(arg('--slow', '4'));
-const VW = 1280, VH = 720, DPR = 1.5, FPS = 30;
+const SLOW = Number(arg('--slow', '8'));   // 连续截图一张约 0.2 秒：页面时间放慢 8 倍，按页面时间算还有 30 fps 上下
+// v2：设备像素比 2（录屏 2560×1440），片尾推近 2 倍时不再发糊
+const VW = 1280, VH = 720, DPR = Number(arg('--dpr', '2')), FPS = 30;
 const env = { ...process.env, LD_LIBRARY_PATH: `${process.env.HOME}/.local/lib/chromium-deps/root/usr/lib/x86_64-linux-gnu` };
 const sleepReal = (ms) => new Promise((r) => setTimeout(r, ms));
 const sleep = (ms) => sleepReal(ms * SLOW);   // 按页面时间等
@@ -59,16 +60,22 @@ let writing = Promise.resolve();
 if (!DRY) {
   fs.mkdirSync(OUT, { recursive: true });
   for (const f of fs.readdirSync(OUT)) if (/^(raw|f)\d+\.jpg$/.test(f)) fs.unlinkSync(path.join(OUT, f));
-  cdp.on('Page.screencastFrame', (e) => {
+}
+// v2：不用 screencast（无头 Chromium 的 screencast 只给 CSS 像素大小的帧，1280×720，推近时发糊），
+// 改成连续截图：captureScreenshot 按设备像素比出图（DPR 2 → 2560×1440）。每张记下截图前后时间的中点，之后按时间重采样
+let capturing = !DRY;
+const capLoop = (async () => {
+  while (capturing) {
+    const a = Date.now() / 1000;
+    const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90, clip: { x: 0, y: 0, width: VW, height: VH, scale: DPR } });
+    const b = Date.now() / 1000;
     const k = frames.length;
     const file = path.join(OUT, `raw${String(k).padStart(5, '0')}.jpg`);
-    frames.push({ t: e.metadata.timestamp, file });
-    const buf = Buffer.from(e.data, 'base64');
+    frames.push({ t: (a + b) / 2, file });
+    const buf = Buffer.from(data, 'base64');
     writing = writing.then(() => fs.promises.writeFile(file, buf));
-    cdp.send('Page.screencastFrameAck', { sessionId: e.sessionId }).catch(() => {});
-  });
-  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 90, maxWidth: VW * DPR, maxHeight: VH * DPR, everyNthFrame: 1 });
-}
+  }
+})();
 const t0 = Date.now() / 1000;
 const actions = [];
 const now = () => (Date.now() / 1000 - t0) / SLOW;   // 页面时间
@@ -136,7 +143,8 @@ actions.push({ name: 'end', t: now() });
 console.log('final', await state());
 
 if (!DRY) {
-  await cdp.send('Page.stopScreencast');
+  capturing = false;
+  await capLoop;
   await writing;
   // 按页面时间 30 fps 等间隔重采样：每个输出帧取它之前最近的一帧
   const T1 = now();

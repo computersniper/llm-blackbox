@@ -10,7 +10,7 @@ import { clamp, lerp, seg, smooth, smoother, easeOut, easeInOut } from '../lib/c
 import { el, CueLayer } from '../lib/overlay.js';
 import { buildScore, G } from './score.js';
 import { Opening } from './opening.js';
-import { Monitor, CalcBoard, LensCard } from './panel.js';
+import { Monitor, CalcBoard, LensCard, VecCard, TransCard, SeqDiagram } from './panel.js';
 import { loadManifest, loadQuestion } from '/public/multimodal/js/data.js';
 import { tokPlain, shortSpecial, esc } from '/public/js/ui.js';
 
@@ -18,6 +18,8 @@ const params = new URLSearchParams(location.search);
 const FPS = Number(params.get('fps') || 30);
 const QID = params.get('q') || 'apples-2';
 const PREVIEW = params.has('preview');
+// 片尾录屏放在 D 盘工作目录的哪个子目录（v2 用 2560×1440 重录的 sitecap-v2）
+const CAP_DIR = params.get('cap') || 'sitecap-v2';
 const $ = (s) => document.querySelector(s);
 
 let E, S, Q, MAN, SC, OPENING, QR_SVG = '', CAP = null;
@@ -41,7 +43,7 @@ async function boot() {
   MAN = await loadManifest();
   const spec = MAN.images.flatMap((im) => im.questions).find((q) => q.id === QID);
   Q = await loadQuestion(spec, MAN);
-  CAP = await fetch('/ext/mm/sitecap/meta.json').then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  CAP = await fetch(`/ext/mm/${CAP_DIR}/meta.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   SC = buildScore(Q, CAP);
   if (CAP && SC.endSite) await preloadSite();
 
@@ -74,6 +76,12 @@ function tameScene() {
   }
   // 舞台里的 3D 标签按网站的小字排版：片子里一律收起，讲解交给字幕和面板（个别镜头单独打开）
   for (const sl of S.slabs) { sl.material.color.setHex(0x2b3f73); sl.material.roughness = 0.75; sl.material.metalness = 0.05; }
+  // 黑箱外壳 v1 几乎全黑：面板调成深蓝灰、粗糙一些，能接住一点灯光；边框更亮
+  for (const it of S.cAll) {
+    const mt = it.m;
+    if (mt.isMeshStandardMaterial && !mt.map) { mt.color.setHex(0x16243c); mt.metalness = 0.35; mt.roughness = 0.55; }
+    if (mt.isLineBasicMaterial && mt.color.getHex() === 0x5ef0d4) it.op = Math.min(1, it.op * 1.15);
+  }
   S.labels = { photo: S.photoLbl, vit: S.vitLbl, lvl: S.lvlLbl, merge: S.mergeLbl, llm: S.llmLbl, layer: S.layerLbl, out: S.outLbl, ds: S.dsLbl };
 }
 
@@ -94,9 +102,12 @@ function buildOverlays() {
   OV.mon = new Monitor(ov, Q, SC.F);
   OV.calc = new CalcBoard(ov, Q);
   OV.lens3 = new LensCard(ov, Q, SC.F);
+  OV.vec = new VecCard(ov, Q);
+  OV.trans = new TransCard(ov, Q, SC.F);
+  OV.seq = new SeqDiagram(ov, Q, SC.F);
   OV.dims = el('div', 'dims', '<div class="dw"><span></span></div><div class="dh"><span></span></div>', ov);
   // 片尾：多模态页录屏放在一个干净的窗口框里（不模仿任何浏览器），鼠标和点击是叠加上去的；最后落版网址 + 二维码
-  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">caijiechao.com/blackbox/multimodal/</span></div><canvas width="1920" height="1080"></canvas>`, ov);
+  OV.win = el('div', 'win', `<div class="bar"><i></i><i></i><i></i><span class="url">caijiechao.com/blackbox/multimodal/</span></div><canvas width="2560" height="1440"></canvas>`, ov);
   OV.winCtx = OV.win.querySelector('canvas').getContext('2d');
   OV.winIdx = -1;
   OV.cur = el('div', 'cur', `<span class="rip"></span><svg viewBox="0 0 24 24" width="30" height="30"><path d="M5 2.5v17.2l4.6-4.3 3 6.6 2.9-1.3-3-6.5h6.2z" fill="#fff" stroke="#05080f" stroke-width="1.4" stroke-linejoin="round"/></svg>`, ov);
@@ -188,7 +199,7 @@ function updateReply(R) {
 async function preloadSite() {
   const need = new Set();
   for (const sg of SC.endSite.segs) for (let f = sg.f0; f <= sg.f1 + 1e-6; f += 1 / 60) need.add(Math.min(CAP.n - 1, Math.max(0, Math.round(lerp(sg.c0, sg.c1, (f - sg.f0) / (sg.f1 - sg.f0)) * CAP.fps))));
-  await Promise.all([...need].map((k) => new Promise((res) => { const im = new Image(); im.onload = () => res(); im.onerror = () => res(); im.src = `/ext/mm/sitecap/f${String(k).padStart(4, '0')}.jpg`; SITE.set(k, im); })));
+  await Promise.all([...need].map((k) => new Promise((res) => { const im = new Image(); im.onload = () => res(); im.onerror = () => res(); im.src = `/ext/mm/${CAP_DIR}/f${String(k).padStart(4, '0')}.jpg`; SITE.set(k, im); })));
 }
 function cursorAt(ct) {
   const acts = CAP.actions.filter((a) => a.x != null);
@@ -205,7 +216,7 @@ function updateSite(Sx) {
   OV.fin.style.display = on && Sx.finA > 0.001 ? 'flex' : 'none';
   if (!on) return;
   const idx = Math.min(CAP.n - 1, Math.max(0, Math.round(Sx.ct * CAP.fps)));
-  if (idx !== OV.winIdx && SITE.get(idx)?.complete) { OV.winCtx.drawImage(SITE.get(idx), 0, 0, 1920, 1080); OV.winIdx = idx; }
+  if (idx !== OV.winIdx && SITE.get(idx)?.complete) { OV.winCtx.drawImage(SITE.get(idx), 0, 0, 2560, 1440); OV.winIdx = idx; }
   const k = Sx.fin ?? 0;
   let cx = lerp(960, 600, k), cy = lerp(474, 482, k), sc = lerp(1, 0.6, k);
   // 推近：把录屏里的某块区域（视口坐标）放大到 z 倍、移到画面中间
@@ -247,6 +258,9 @@ function updateOverlays(t, f) {
   OV.mon.update(f.panel);
   OV.calc.update(f.calc);
   OV.lens3.update(f.lens3);
+  OV.vec.update(f.vec);
+  OV.trans.update(f.trans);
+  OV.seq.update(f.seq);
   updateSite(o.site);
 }
 
@@ -339,14 +353,17 @@ function seek(t, pre = 4) {
 // 封面：片名落版那一刻（去掉字幕）
 // 封面：生成「3」时第 16–26 层平均的热力图（左边的监视器，正盯着绿苹果）+ 右边的片名；字幕、进度条、回答行都收起
 function poster(t) {
-  seek(t ?? SC.SEC.answer.t0 + 26.2, 6);
+  // v2：画面收紧——热力图卡片和片名挨近，放在中间 1440 像素里（4:3 封面直接从中间裁）
+  seek(t ?? SC.posterT, 6);
   for (const sel of ['.sub', '.term', '.prog', '.reply', '.lens3']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
-  $('#fade').style.opacity = '0.55';
+  $('#fade').style.opacity = '0.62';
+  OV.mon.el.style.left = '260px';
   const T = OV.title;
   T.style.display = 'block'; T.style.opacity = '1'; T.style.filter = '';
-  T.style.left = '1350px'; T.style.top = '520px'; T.style.transform = 'translate(-50%, -50%)';
+  T.style.left = '1330px'; T.style.top = '520px'; T.style.transform = 'translate(-50%, -50%)';
   const h1 = T.querySelector('h1');
   h1.style.letterSpacing = '0.08em'; h1.style.paddingLeft = '0.08em'; h1.style.fontSize = '76px';
+  T.querySelector('.eb').style.letterSpacing = '.32em';
   T.querySelector('.rule').style.width = '560px';
   for (const sel of ['.st', '.eb']) T.querySelector(sel).style.opacity = '1';
   T.querySelector('.spec').style.opacity = '0';
