@@ -559,7 +559,7 @@ def compose(ev, out_wav, stems_dir=None, ceiling=-2.0):
             continue
         notes, _ = CH[c]
         tones = sorted(set([m + 12 for m in notes] + [m + 24 for m in notes[:3]]))
-        sixteenth = nm in ('fly', 'vit', 'reply')
+        sixteenth = nm in ('fly', 'reply')   # v2：视觉编码器那段讲解变多，琶音放慢
         step = BEAT / 4 if sixteenth else BEAT / 2
         steps = int(round(BAR / step))
         pattern = list(range(len(tones))) + list(range(len(tones) - 2, 0, -1))
@@ -615,7 +615,7 @@ def compose(ev, out_wav, stems_dir=None, ceiling=-2.0):
     for b, c in enumerate(plan):
         t0 = b * BAR
         nm = sec(t0 + 0.1)
-        kind = {'chat': 'none', 'fly': 'heart', 'patch': 'none', 'calc': 'none', 'vit': 'groove', 'merge': 'heart', 'splice': 'none',
+        kind = {'chat': 'none', 'fly': 'heart', 'patch': 'none', 'calc': 'none', 'vit': 'half', 'merge': 'heart', 'splice': 'none',
                 'answer': 'heart', 'lens': 'half', 'reply': 'groove', 'end': 'none'}[nm]
         sname, k_in, nb_in = binfo[b]
         if nm == 'calc' and k_in % 4 == 2 and k_in < nb_in - 2:
@@ -729,7 +729,7 @@ def compose(ev, out_wav, stems_dir=None, ceiling=-2.0):
         bus.x *= duck
 
     # 段落音量：冷开场、拆层段落更安静，28 层和最后的自回归最满
-    LEVEL = {'chat': 0.7, 'fly': 0.95, 'patch': 0.78, 'calc': 0.72, 'vit': 1.0, 'merge': 0.86, 'splice': 0.78, 'answer': 0.86,
+    LEVEL = {'chat': 0.7, 'fly': 0.95, 'patch': 0.78, 'calc': 0.72, 'vit': 0.84, 'merge': 0.86, 'splice': 0.78, 'answer': 0.86,
              'lens': 0.9, 'reply': 1.0, 'end': 0.7}
     lvl = np.ones(pad.n)
     for s_ in sections:
