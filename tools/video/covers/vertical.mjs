@@ -17,7 +17,7 @@ const JOBS = [
   // 多模态：原图左右排（热力图卡片 | 标题），竖版里上下叠放，元素不变
   { src: 'multimodal/poster-v1.png', parts: [{ crop: [30, 100, 780, 860], top: 250, width: 940 }, { crop: [940, 360, 840, 330], top: 1330, width: 1020, feather: 16 }] },
   // 多模态 v2：卡片挪到 x 260–968、标题在 x 1010–1640，同样上下叠放
-  { src: 'multimodal/poster-v2.png', parts: [{ crop: [240, 130, 750, 810], top: 250, width: 940 }, { crop: [990, 370, 690, 270], top: 1330, width: 1000, feather: 16 }] },
+  { src: 'multimodal/poster-v2.png', parts: [{ crop: [240, 130, 750, 810], top: 250, width: 940 }, { crop: [940, 355, 790, 300], top: 1320, width: 1000 }] },
 ];
 
 const html = (src, parts) => `<!doctype html><html><head><meta charset="utf-8"><style>
