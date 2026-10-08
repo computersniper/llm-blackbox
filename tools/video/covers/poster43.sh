@@ -19,3 +19,6 @@ ffmpeg -loglevel error -y -i "$P" -f lavfi -i "color=c=0x060d18:s=720x500" -filt
    [base][mask]overlay=720:285[b2];[b2][title]overlay=722:345" \
   -frames:v 1 "$V/multimodal/poster-v1-4x3.png"
 echo "cover: $V/multimodal/poster-v1-4x3.png"
+
+# 多模态 v2：封面本身已经收紧（热力图卡片和标题都在中间 1440 像素里），直接裁
+cut43 "$V/multimodal/poster-v2.png"       230 "$V/multimodal/poster-v2-4x3.png"

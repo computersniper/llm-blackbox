@@ -1,6 +1,6 @@
 // 把视频原来的横版封面（poster-*.png，1920×1080）改成抖音竖版 9:16（1080×1920）。画面本身不重新设计：
 // 截出原图里标题和主体那一块，四周羽化后放在深色底上；底上只留一点同一张图的模糊氛围光。
-// 用法：node tools/video/covers/vertical.mjs   （输出到原文件旁边，文件名加 -9x16）
+// 用法：node tools/video/covers/vertical.mjs [子串…]   （输出到原文件旁边，文件名加 -9x16；给了子串就只做 src 含这些子串的那几张）
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -16,6 +16,8 @@ const JOBS = [
   { src: 'agent/poster-v1.png', parts: [{ crop: [400, 110, 1120, 880], top: 520, width: 1080 }] },
   // 多模态：原图左右排（热力图卡片 | 标题），竖版里上下叠放，元素不变
   { src: 'multimodal/poster-v1.png', parts: [{ crop: [30, 100, 780, 860], top: 250, width: 940 }, { crop: [940, 360, 840, 330], top: 1330, width: 1020, feather: 16 }] },
+  // 多模态 v2：卡片挪到 x 260–968、标题在 x 1010–1640，同样上下叠放
+  { src: 'multimodal/poster-v2.png', parts: [{ crop: [240, 130, 750, 810], top: 250, width: 940 }, { crop: [990, 370, 690, 270], top: 1330, width: 1000, feather: 16 }] },
 ];
 
 const html = (src, parts) => `<!doctype html><html><head><meta charset="utf-8"><style>
@@ -34,7 +36,8 @@ ${parts.map(({ crop: [x, y, w, h], top, width, feather }) => {
 
 const browser = await chromium.launch({ args: ['--disable-gpu', '--allow-file-access-from-files'] });
 const page = await browser.newPage({ viewport: { width: 1080, height: 1920 } });
-for (const j of JOBS) {
+const only = process.argv.slice(2);
+for (const j of JOBS.filter((x) => !only.length || only.some((k) => x.src.includes(k)))) {
   const src = `${V}/${j.src}`;
   // 本地图片要从 file:// 页面里引用才载得进来，所以先把页面写成文件（放 D 盘，不占 C 盘）
   mkdirSync(`${V}/covers`, { recursive: true });

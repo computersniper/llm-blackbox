@@ -428,7 +428,7 @@ export class TransCard {
     set('.ra .a2, .ra .mlp, .ra .a3, .ra .b2', smooth(k2));
     this.q('.ra .b4 i').style.width = `${(100 * smooth(k1)).toFixed(1)}%`;
     this.q('.ra .b2 i').style.width = `${(100 * smooth(seg(k2, 0.4, 1))).toFixed(1)}%`;
-    set('.rb', smooth(k3));
+    set('.rb > *', smooth(k3));   // .rb 是 display: contents，透明度要设在子元素上
     this.q('.rb .b2 i').style.width = `${(100 * smooth(seg(k3, 0.3, 1))).toFixed(1)}%`;
     set('.eq', smooth(k4));
     this.el.classList.toggle('same', k4 > 0.5);

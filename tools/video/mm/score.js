@@ -390,7 +390,7 @@ export function buildScore(Q, cap = null) {
   {
     const T0 = SEC.splice.t0, T1 = SEC.splice.t1;
     prog(T0, 3);
-    const SEQ = { in0: T0 + 0.3, in1: T0 + 2.6, split0: T0 + 4.4, split1: T0 + 8.4, rope0: T0 + 8.9, apple: T0 + 10.6, text0: T0 + 13.5, out0: T1 - 1.7, out1: T1 - 0.6 };
+    const SEQ = { in0: T0 + 0.3, in1: T0 + 2.6, split0: T0 + 4.4, split1: T0 + 8.4, rope0: T0 + 8.9, apple: T0 + 10.6, text0: T0 + 13.5, out0: T1 - 1.0, out1: T1 - 0.3 };
     ev(SEQ.in0, 'whoosh', { k: 0.45 });
     for (let j = 0; j < 7; j++) ev(lerp(SEQ.split0, SEQ.split1, j / 7), 'tick', { i: j, k: 0.35 });
     ev(SEQ.rope0, 'reveal', { k: 0.6 });
@@ -401,8 +401,8 @@ export function buildScore(Q, cap = null) {
     term(SEQ.split0 + 0.1, SEQ.rope0 - 0.1, `${m('&lt;|vision_start|&gt;')} ×${V.Nv} ${m('&lt;|vision_end|&gt;')} · 编号 ${m(V.vs)}–${m(V.vs + V.Nv - 1)}`);
     sub(SEQ.rope0, SEQ.text0 - 0.1, '图片词元带着自己的行、列位置');
     term(SEQ.rope0 + 0.1, SEQ.text0 - 0.1, `M-RoPE（时间, 行, 列）· 绿苹果 ${m(`(${F.pApple.join(', ')})`)}`);
-    sub(SEQ.text0, T1 - 0.15, '文字接在后面，继续往下数');
-    term(SEQ.text0 + 0.1, T1 - 0.15, `图片只占 ${m(F.nPos)} 个位置号 · 问题从 ${m(F.pQ[0])} 开始`);
+    sub(SEQ.text0, SEQ.out0 + 0.2, '文字接在后面，继续往下数');
+    term(SEQ.text0 + 0.1, SEQ.out0 + 0.2, `图片只占 ${m(F.nPos)} 个位置号 · 问题从 ${m(F.pQ[0])} 开始`);
     shot('splice', (lt, t) => {
       const out = smooth(seg(t, SEQ.out0, SEQ.out1));
       return {
