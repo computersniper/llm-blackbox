@@ -329,7 +329,7 @@ export function buildScore(Q, cap = null) {
       const st = flying ? mst(3, 0, { ph: 'vit', sub: 'embed' }, seg(t, fly0, fly1)) : mst(2, 0, { ph: 'vit' }, seg(t, up0, up1) * 0.999);
       const lv = flying ? 0 : Math.min(24, seg(t, up0, up1) * 25);
       let panel = null;
-      if (t >= at0 - 0.4 && t < col0 - 0.1) panel = { kind: 'vattn', a: smooth(seg(t, at0 - 0.4, at0 + 0.3)) * (1 - smooth(seg(t, col0 - 0.5, col0 - 0.1))), L: t < atL ? LA : LB };
+      if (t >= at0 - 0.05 && t < col0 - 0.1) panel = { kind: 'vattn', a: smooth(seg(t, at0 - 0.05, at0 + 0.45)) * (1 - smooth(seg(t, col0 - 0.5, col0 - 0.1))), L: t < atL ? LA : LB };
       else if (t >= col0 - 0.1) panel = { kind: 'pca', a: smooth(seg(t, col0 - 0.1, col0 + 0.5)) * (1 - smooth(seg(t, T1 - 0.5, T1))), lv: 0, cmp: 1, cmpL: CMP, cmpK: smooth(seg(t, cmp0, cmp0 + 0.9)), apples: smooth(seg(t, cmp0 + 0.9, cmp0 + 1.6)) };
       return {
         st,
@@ -341,7 +341,7 @@ export function buildScore(Q, cap = null) {
         },
         panel,
         vec: { a: smooth(seg(t, T0 + 0.5, T0 + 1.2)) * (1 - smooth(seg(t, up0 - 0.5, up0))), t, k: seg(t, T0 + 1.0, T0 + 3.6) },
-        shiftX: -330 * Math.max(smooth(seg(t, T0 + 0.5, T0 + 1.2)), panel ? smooth(panel.a) : 0),
+        shiftX: -330 * smooth(seg(t, T0 + 0.5, T0 + 1.2)),   // 左边一直有卡片（下一段开头也是）：3D 一直让到右边，卡片换来换去时不跳
         labels: flying ? [] : ['lvl', 'vit'],
       };
     });
@@ -370,7 +370,7 @@ export function buildScore(Q, cap = null) {
     const dsCam = cam([G.VX + 5.2, 4.4, 10.5], [G.VX + 3.6, 2.6, 0]);
     shot('merge', (lt, t) => {
       const st = t < ds0 ? mst(3, 0, { ph: 'merge', sub: t < g1 + 0.6 ? 'group' : 'mlp' }, t < g1 + 0.6 ? seg(t, g0, g1) : 1) : mst(3, 0, { ph: 'merge', sub: 'deep' }, seg(t, ds0, T1));
-      const trA = smooth(seg(t, tr0 - 0.2, tr0 + 0.5)) * (1 - smooth(seg(t, tr1 - 0.4, tr1 + 0.1)));
+      const trA = smooth(seg(t, tr0 - 0.05, tr0 + 0.6)) * (1 - smooth(seg(t, tr1 - 0.4, tr1 + 0.1)));
       return {
         st,
         cam: () => {
@@ -380,7 +380,7 @@ export function buildScore(Q, cap = null) {
         panel: { kind: 'merge', a: smooth(seg(t, g0 - 0.2, g0 + 0.5)) * (1 - smooth(seg(t, tr0 - 0.6, tr0 - 0.1))), k: seg(t, g0, g1) },
         trans: { a: trA, t, k: [seg(t, tr0 + 0.2, tr0 + 1.0), seg(t, tr0 + 1.0, tr0 + 2.2), seg(t, tr0 + 2.6, tr0 + 3.6), seg(t, tr0 + 4.0, tr0 + 4.8)] },
         fade: 0.7 * trA,
-        shiftX: t < tr0 ? undefined : 0,
+        shiftX: -330 * (1 - smooth(seg(t, tr0 - 0.4, tr0 + 0.5))),   // 接着上一段一直让在右边，翻译图出来时再慢慢回到中间
         labels: trA > 0.01 ? [] : t < ds0 ? ['merge'] : ['ds', 'vit', 'llm'],
       };
     });
@@ -390,7 +390,7 @@ export function buildScore(Q, cap = null) {
   {
     const T0 = SEC.splice.t0, T1 = SEC.splice.t1;
     prog(T0, 3);
-    const SEQ = { in0: T0 + 0.3, in1: T0 + 2.6, split0: T0 + 4.4, split1: T0 + 8.4, rope0: T0 + 8.9, apple: T0 + 10.6, text0: T0 + 13.5, out0: T1 - 1.0, out1: T1 - 0.3 };
+    const SEQ = { in0: T0 + 0.6, in1: T0 + 2.8, split0: T0 + 4.4, split1: T0 + 8.4, rope0: T0 + 8.9, apple: T0 + 10.6, text0: T0 + 13.5, out0: T1 - 1.0, out1: T1 - 0.3 };
     ev(SEQ.in0, 'whoosh', { k: 0.45 });
     for (let j = 0; j < 7; j++) ev(lerp(SEQ.split0, SEQ.split1, j / 7), 'tick', { i: j, k: 0.35 });
     ev(SEQ.rope0, 'reveal', { k: 0.6 });
@@ -404,7 +404,8 @@ export function buildScore(Q, cap = null) {
     sub(SEQ.text0, SEQ.out0 + 0.2, '文字接在后面，继续往下数');
     term(SEQ.text0 + 0.1, SEQ.out0 + 0.2, `图片只占 ${m(F.nPos)} 个位置号 · 问题从 ${m(F.pQ[0])} 开始`);
     shot('splice', (lt, t) => {
-      const out = smooth(seg(t, SEQ.out0, SEQ.out1));
+      // 收尾分两步：序列图先完全淡出，3D 托盘再亮起来（不交叉淡化，免得两层半透明叠在一起）
+      const outD = smooth(seg(t, SEQ.out0, SEQ.out0 + 0.35)), out3 = smooth(seg(t, SEQ.out0 + 0.35, SEQ.out1));
       return {
         st: mst(3, 0, { ph: 'splice', sub: 'template' }, seg(t, T0 + 1.0, SEQ.out0)),
         cam: (ctx) => {
@@ -412,8 +413,8 @@ export function buildScore(Q, cap = null) {
           const tray = cam([Sc.bcx + 1.6, 5.4, 12.5], [Sc.bcx + 1.2, 1.2, 0]);
           return blendCam(prevCam('merge', tray), tray, smoother(seg(lt, 0, 3.0)));
         },
-        seq: { a: smooth(seg(t, T0 + 0.1, T0 + 0.6)) * (1 - out), t, S: SEQ },
-        fade: (1 - out) * smooth(seg(t, T0, T0 + 0.6)),   // 序列图在前：3D 全部压黑，免得半透明叠在字后面
+        seq: { a: smooth(seg(t, T0 + 0.1, T0 + 0.6)) * (1 - outD), t, S: SEQ },
+        fade: (1 - out3) * smooth(seg(t, T0, T0 + 0.6)),   // 序列图在前：3D 全部压黑，免得半透明叠在字后面
         shiftX: 0,
       };
     });
