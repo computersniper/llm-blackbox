@@ -15,11 +15,12 @@ const { chromium } = require(process.env.PLAYWRIGHT_CORE || '/home/mtzn/cjc/huma
 
 const args = process.argv.slice(2);
 const arg = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
-const OUT = arg('--out', '/mnt/d/cjc/videos/multimodal/sitecap');
+const OUT = arg('--out', '/mnt/d/cjc/videos/multimodal/sitecap-v2');
 const DRY = args.includes('--dry');
 const SITE = arg('--site', 'http://127.0.0.1:8798/public/multimodal/');
-const SLOW = Number(arg('--slow', '4'));
-const VW = 1280, VH = 720, DPR = 1.5, FPS = 30;
+const SLOW = Number(arg('--slow', '5'));
+// v2：设备像素比 2（录屏 2560×1440），片尾推近 2 倍时不再发糊
+const VW = 1280, VH = 720, DPR = Number(arg('--dpr', '2')), FPS = 30;
 const env = { ...process.env, LD_LIBRARY_PATH: `${process.env.HOME}/.local/lib/chromium-deps/root/usr/lib/x86_64-linux-gnu` };
 const sleepReal = (ms) => new Promise((r) => setTimeout(r, ms));
 const sleep = (ms) => sleepReal(ms * SLOW);   // 按页面时间等
