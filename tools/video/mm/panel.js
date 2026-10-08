@@ -419,7 +419,7 @@ export class TransCard {
 
   update(P) {
     const on = P && P.a > 0.001;
-    this.el.style.display = on ? 'block' : 'none';
+    this.el.style.display = on ? '' : 'none';   // 空字符串：用 CSS 里的 grid
     if (!on) return;
     this.el.style.opacity = P.a.toFixed(3);
     const [k1, k2, k3, k4] = P.k;
@@ -467,7 +467,7 @@ export class SeqDiagram {
       if (it.cls === 'grid') return `<div class="it grid" data-j="${j}" style="width:${V.mw * CW}px;height:${V.mh * CW}px"><div class="img"></div><div class="cells">${Array.from({ length: V.Nv }, (_, m) => `<i style="left:${(m % V.mw) * CW}px;top:${Math.floor(m / V.mw) * CW}px;width:${CW}px;height:${CW}px"><b></b></i>`).join('')}</div>
         <div class="cnt"></div><div class="rl">${Array.from({ length: V.mh }, (_, r) => `<span style="top:${(r + 0.5) * CW}px">${F.p0[1] + r}</span>`).join('')}</div>
         <div class="cl">${Array.from({ length: V.mw }, (_, c) => `<span style="left:${(c + 0.5) * CW}px">${F.p0[2] + c}</span>`).join('')}</div>
-        <div class="axl">行↓ 列→</div><div class="tag"></div><div class="pos">图片：${F.p0[0]}–${F.pLast[2]}</div></div>`;
+        <div class="axl r">行↓</div><div class="axl c">列→</div><div class="tag"></div><div class="pos">图片：${F.p0[0]}–${F.pLast[2]}</div></div>`;
       if (it.cls === 'caret') return `<div class="it caret" data-j="${j}"><i></i><span>回答从这里开始</span></div>`;
       return `<div class="it ${it.cls}" data-j="${j}"><b>${esc(it.main)}</b>${it.mono ? `<small>${esc(it.mono)}</small>` : ''}<div class="pos">${it.pos}</div></div>`;
     }).join('')}</div>`;
@@ -494,7 +494,7 @@ export class SeqDiagram {
 
   update(P) {
     const on = P && P.a > 0.001;
-    this.el.style.display = on ? 'block' : 'none';
+    this.el.style.display = on ? '' : 'none';   // 空字符串：用 CSS 里的 flex（居中）
     if (!on) return;
     if (!this.fitted) this.fit();
     this.el.style.opacity = P.a.toFixed(3);
@@ -513,14 +513,15 @@ export class SeqDiagram {
     const st = `${done}|${t >= S.apple ? 1 : 0}`;
     if (st !== this.state) {
       this.state = st;
-      this.cells.forEach((c, m) => { c.className = m < done ? (m >= done - 6 ? 'on new' : 'on') : ''; if (t >= S.apple && m === F.apple) c.classList.add('hl'); });
+      this.cells.forEach((c, m) => { c.className = m < done ? (m >= done - 6 && done < V.Nv ? 'on new' : 'on') : ''; if (t >= S.apple && m === F.apple) c.classList.add('hl'); });
       this.cnt.innerHTML = kk > 0 ? `第 <b>${V.vs + Math.max(0, Math.min(V.Nv - 1, done - 1))}</b> 个词元` : '';
     }
-    this.grid.querySelector('.img').style.opacity = (1 - smooth(seg(kk, 0, 0.04))).toFixed(3);
+    // 切的过程中原图压暗留在底下，落了位的词元亮着盖在上面；全部落位后原图隐去
+    this.grid.querySelector('.img').style.opacity = (1 - 0.65 * smooth(seg(kk, 0, 0.06)) - 0.35 * smooth(seg(kk, 0.96, 1))).toFixed(3);
     this.cnt.style.opacity = (smooth(seg(t, S.split0, S.split0 + 0.3)) * (1 - smooth(seg(t, S.split1 + 0.2, S.split1 + 0.6)))).toFixed(3);
     // 3. M-RoPE：行号、列号；绿苹果那一格的 (t, h, w)
     const ra = smooth(seg(t, S.rope0, S.rope0 + 0.5));
-    for (const s of ['.rl', '.cl', '.axl']) this.grid.querySelector(s).style.opacity = ra.toFixed(3);
+    for (const s of ['.rl', '.cl', '.axl.r', '.axl.c']) this.grid.querySelector(s).style.opacity = ra.toFixed(3);
     const ta = smooth(seg(t, S.apple, S.apple + 0.4));
     if (ta > 0 && !this.tag.innerHTML) {
       const r = Math.floor(F.apple / V.mw), c = F.apple % V.mw;

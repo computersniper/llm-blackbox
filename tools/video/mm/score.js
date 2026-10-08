@@ -381,7 +381,7 @@ export function buildScore(Q, cap = null) {
         trans: { a: trA, t, k: [seg(t, tr0 + 0.2, tr0 + 1.0), seg(t, tr0 + 1.0, tr0 + 2.2), seg(t, tr0 + 2.6, tr0 + 3.6), seg(t, tr0 + 4.0, tr0 + 4.8)] },
         fade: 0.7 * trA,
         shiftX: t < tr0 ? undefined : 0,
-        labels: t < ds0 ? ['merge'] : ['ds', 'vit', 'llm'],
+        labels: trA > 0.01 ? [] : t < ds0 ? ['merge'] : ['ds', 'vit', 'llm'],
       };
     });
   }
@@ -413,7 +413,7 @@ export function buildScore(Q, cap = null) {
           return blendCam(prevCam('merge', tray), tray, smoother(seg(lt, 0, 3.0)));
         },
         seq: { a: smooth(seg(t, T0 + 0.1, T0 + 0.6)) * (1 - out), t, S: SEQ },
-        fade: 0.86 * (1 - out) * smooth(seg(t, T0, T0 + 0.6)),
+        fade: (1 - out) * smooth(seg(t, T0, T0 + 0.6)),   // 序列图在前：3D 全部压黑，免得半透明叠在字后面
         shiftX: 0,
       };
     });
@@ -421,6 +421,7 @@ export function buildScore(Q, cap = null) {
 
   /* ------------------------------------------------------------ ⑤ 看图回答：语言模型 28 层，「3」的热力图 */
   const gA = F.gAns;
+  let posterT = 0;
   const sched = (() => {
     const T0 = SEC.answer.t0;
     // 前几个字快速带过（每个 1 秒），「3」逐层慢慢看
@@ -437,6 +438,7 @@ export function buildScore(Q, cap = null) {
     const layers = lay(A0, raw.map((d, L) => ({ L, d })));
     const A1 = layers[layers.length - 1].t1;
     const lens0 = A1 + 2.1;
+    posterT = A1 + 1.0;   // 封面：第 16–26 层平均的热力图，透镜卡还没出来
     sched.forEach((s) => ev(s.t1 - 0.05, 'emit', { g: s.g, k: 0.45 }));
     sched.forEach((s) => { for (let L = 0; L < 28; L += 7) ev(s.t0 + (L / 28) * s.d, 'layer', { L, n: 28, k: 0.25 }); });
     layers.forEach((s) => { if (s.L % 2 === 0 || (s.L >= F.ga && s.L <= F.gb)) ev(s.t0, 'layer', { L: s.L, n: 28, k: s.L >= F.ga && s.L <= F.gb ? 0.7 : 0.4 }); });
@@ -645,5 +647,5 @@ export function buildScore(Q, cap = null) {
     const a = progs.length ? smooth(seg(t, progs[0].t, progs[0].t + 0.6)) * (1 - smooth(seg(t, SEC.end.t0, SEC.end.t0 + 1.0))) : 0;
     return { i, a: i < 0 ? 0 : a };
   };
-  return { end, frame, subs, terms, chapterNames: CHAPTERS, progAt, endSite, events, sections, open: OPEN, F, SEC, bpm: BPM, hotPatch, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
+  return { end, frame, subs, terms, chapterNames: CHAPTERS, progAt, endSite, events, sections, open: OPEN, F, SEC, bpm: BPM, hotPatch, posterT, shots: shots.map((s) => ({ name: s.name, t0: s.t0, t1: s.t1 })) };
 }

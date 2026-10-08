@@ -353,14 +353,17 @@ function seek(t, pre = 4) {
 // 封面：片名落版那一刻（去掉字幕）
 // 封面：生成「3」时第 16–26 层平均的热力图（左边的监视器，正盯着绿苹果）+ 右边的片名；字幕、进度条、回答行都收起
 function poster(t) {
-  seek(t ?? SC.SEC.answer.t0 + 26.2, 6);
+  // v2：画面收紧——热力图卡片和片名挨近，放在中间 1440 像素里（4:3 封面直接从中间裁）
+  seek(t ?? SC.posterT, 6);
   for (const sel of ['.sub', '.term', '.prog', '.reply', '.lens3']) document.querySelectorAll(sel).forEach((e) => { e.style.display = 'none'; });
-  $('#fade').style.opacity = '0.55';
+  $('#fade').style.opacity = '0.62';
+  OV.mon.el.style.left = '260px';
   const T = OV.title;
   T.style.display = 'block'; T.style.opacity = '1'; T.style.filter = '';
-  T.style.left = '1350px'; T.style.top = '520px'; T.style.transform = 'translate(-50%, -50%)';
+  T.style.left = '1330px'; T.style.top = '520px'; T.style.transform = 'translate(-50%, -50%)';
   const h1 = T.querySelector('h1');
   h1.style.letterSpacing = '0.08em'; h1.style.paddingLeft = '0.08em'; h1.style.fontSize = '76px';
+  T.querySelector('.eb').style.letterSpacing = '.32em';
   T.querySelector('.rule').style.width = '560px';
   for (const sel of ['.st', '.eb']) T.querySelector(sel).style.opacity = '1';
   T.querySelector('.spec').style.opacity = '0';
